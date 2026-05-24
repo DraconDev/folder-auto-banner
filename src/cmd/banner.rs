@@ -5,9 +5,9 @@
 
 use anyhow::Result;
 use std::path::Path;
-use std::io::IsTerminal;
-use comfy_table::{Table, Cell, CellAlignment};
+use comfy_table::{Table, Cell};
 use console::Term;
+use atty::Stream;
 
 use crate::fs::{DirSummary, format_size};
 use crate::git::GitInfo;
@@ -29,16 +29,21 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
-    // Priority: --json > --raw > auto-detect (TTY vs pipe)
+    // Note: is_terminal() may return false when run via cargo
+    // So we default to rich output unless --raw is explicitly set or we're clearly piped
+    let is_tty = atty::is(atty::Stream::Stdout);
+    eprintln!("DEBUG: json={}, raw={}, atty::is={}", json, raw, is_tty);
+    
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw {
+        // Explicit --raw flag
         output_raw(&summary);
-    } else if std::io::stdout().is_terminal() {
-        // Only show rich output in actual terminal
+    } else if is_tty {
+        // Only show rich output when we can detect a real TTY
         output_rich(&path, &summary, &git_info, compact);
     } else {
-        // Fallback to raw when piped
+        // Fallback to raw when not a TTY (piped/redirected)
         output_raw(&summary);
     }
     
