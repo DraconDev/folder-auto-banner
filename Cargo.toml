@@ -1,0 +1,69 @@
+[package]
+name = "cfm"
+version = "0.2.0"
+edition = "2021"
+description = "Contextual File Manager — An ephemeral, zero-hostage intelligence layer for the shell"
+license = "MIT"
+repository = "https://github.com/dracon/cfm"
+keywords = ["cli", "file-manager", "shell", "productivity"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "fm"
+path = "src/main.rs"
+
+[dependencies]
+# CLI parsing
+clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
+
+# Rich terminal output
+comfy-table = "6"
+console = "0.15"
+
+# Fast directory walking
+ignore = "0.4"
+
+# Git integration
+git2 = "0.19"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Directories
+directories = "5"
+
+# Progress bars
+indicatif = "0.17"
+
+# Human-readable sizes
+byte-unit = "5"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Path handling
+path.absolutize = "0.1"
+os_str_bytes = "6"
+
+# Glob patterns
+glob = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
