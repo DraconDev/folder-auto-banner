@@ -1,3 +1,14 @@
-fn main() {
-    println!("Hello, world!");
+mod cli;
+mod commands;
+mod banner;
+mod git;
+mod fs;
+mod state;
+
+use clap::Parser;
+use anyhow::Result;
+
+fn main() -> Result<()> {
+    let cli = cli::Cli::parse();
+    cli.run()
 }
