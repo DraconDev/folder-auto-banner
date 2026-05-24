@@ -29,12 +29,13 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
-    // We check both stdin and stdout for TTY status.
+    // Check both stdin and stdout for TTY status.
+    // Also check if TERM is set (indicates terminal environment)
     // If we can't detect either way, we default to rich output for better UX.
-    // This ensures the banner looks great when run directly from a terminal.
     let is_stdin_tty = atty::is(atty::Stream::Stdin);
     let is_stdout_tty = atty::is(atty::Stream::Stdout);
-    let is_not_tty = !is_stdin_tty && !is_stdout_tty;
+    let is_term_env = std::env::var("TERM").map(|t| !t.is_empty() && t != "dumb").unwrap_or(false);
+    let is_not_tty = !is_stdin_tty && !is_stdout_tty && !is_term_env;
     
     if json {
         output_json(&path, &summary, &git_info);
