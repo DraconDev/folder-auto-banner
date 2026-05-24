@@ -30,12 +30,11 @@ pub fn run_banner(
     
     // Output based on flags
     // Check both stdin and stdout for TTY status.
-    // Also check if TERM is set (indicates terminal environment)
-    // If we can't detect either way, we default to rich output for better UX.
+    // If both are not TTY (piped/redirected), use raw output.
+    // This ensures piping 'fm' to other commands works correctly.
     let is_stdin_tty = atty::is(atty::Stream::Stdin);
     let is_stdout_tty = atty::is(atty::Stream::Stdout);
-    let is_term_env = std::env::var("TERM").map(|t| !t.is_empty() && t != "dumb").unwrap_or(false);
-    let is_not_tty = !is_stdin_tty && !is_stdout_tty && !is_term_env;
+    let is_not_tty = !is_stdin_tty && !is_stdout_tty;
     
     if json {
         output_json(&path, &summary, &git_info);
