@@ -78,12 +78,14 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, compact: b
     
     let stats_line = if git_info.is_repo && git_info.last_commit_msg.is_some() {
         let commit_preview = git_info.last_commit_msg.as_ref().unwrap();
-        let commit_short = if commit_preview.len() > 40 {
-            format!("{}...", &commit_preview[..37])
+        // Use char-aware truncation for Unicode
+        let commit_short: String = commit_preview.chars().take(40).collect();
+        let commit_display = if commit_short.len() < commit_preview.len() {
+            format!("{}...", commit_short)
         } else {
-            commit_preview.clone()
+            commit_short
         };
-        format!("{} {} │ {} │ {}", project_icon, project_label, size_str, commit_short)
+        format!("{} {} │ {} │ {}", project_icon, project_label, size_str, commit_display)
     } else {
         format!("{} {} │ {} │ {} items", project_icon, project_label, size_str, item_count)
     };
@@ -143,9 +145,15 @@ fn print_ascii_header(path: &str, git_status: &str, _term_width: usize) {
 /// Print box drawing header
 fn print_box_drawing_header(path: &str, git_status: &str, term_width: usize) {
     let header_text = format!("📂 {} {}", path, git_status);
-    let dashes = "─".repeat(term_width.saturating_sub(2).max(header_text.len()));
-    println!("┌─{}┐", &dashes[..header_text.len().min(term_width.saturating_sub(4))]);
-    println!("│ {}", header_text);
+    // Use char-aware slicing for Unicode content
+    let char_count = header_text.chars().count();
+    let max_chars = term_width.saturating_sub(4).max(char_count);
+    let display_chars = char_count.min(max_chars);
+    let header_display: String = header_text.chars().take(display_chars).collect();
+    let dash_count = term_width.saturating_sub(2).max(header_text.len() + 2);
+    let dashes: String = "─".chars().take(dash_count).collect();
+    println!("┌─{}┐", &dashes[..dashes.len().min(header_display.len() + 2)]);
+    println!("│ {}", header_display);
 }
 
 /// Output raw (for piping)
