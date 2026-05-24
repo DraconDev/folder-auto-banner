@@ -29,20 +29,22 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
-    // Note: atty::is may return false when run via cargo
-    // So we use it as a hint but default to rich output when we can't detect pipe
-    let is_tty = atty::is(atty::Stream::Stdout);
+    // Check both stdout and stdin TTY - if either is a TTY, user is in a terminal
+    // Note: Some environments (cargo, IDE debuggers) may not report TTY correctly
+    // We default to rich output when we can't definitively confirm piping
+    let is_stdin_tty = atty::is(atty::Stream::Stdin);
+    let is_stdout_tty = atty::is(atty::Stream::Stdout);
     
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw {
-        // Explicit --raw flag
+        // Explicit --raw flag always means raw
         output_raw(&summary);
-    } else if is_tty {
-        // Only show rich output when we can detect a real TTY
+    } else if is_stdin_tty || is_stdout_tty {
+        // User is in a terminal (either stdin or stdout is a TTY)
         output_rich(&path, &summary, &git_info, compact);
     } else {
-        // Fallback to raw when not a TTY (piped/redirected)
+        // Not a TTY - probably piped or redirected, use raw
         output_raw(&summary);
     }
     
