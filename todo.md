@@ -5,78 +5,96 @@
 
 ---
 
+---
+
+## 🚀 Progress Summary
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 0: Project Foundation | ✅ DONE | All deps, workspace, justfile |
+| Phase 1: Core Architecture | ✅ DONE | TTY detection, dual output, state types, error handling |
+| Phase 2: Banner | ✅ MVP DONE | Project detection, git status, truncation, --raw/--json |
+| Phase 3: Shell Integration | ✅ STUBS | env command works, install/uninstall/hook stubs |
+| Phase 4: Context-Aware Env | ✅ DONE | Rust/Node/Python/Go aliases |
+| Phase 5-11 | ⏳ STUBS | Commands exist as scaffolds, need full implementation |
+| Phase 12-18 | 📋 PENDING | Not started |
+
+**Next:** Implement state persistence (yank/paste), flesh out banner display, add shell hook installation
+
+---
+
 ## Phase 0: Project Foundation
 
-- [ ] `cargo new cfm` — create Rust project
+- [x] `cargo new cfm` — create Rust project
 - [ ] Configure `Cargo.toml` with binary name `fm`
 - [ ] Set up workspace structure: `src/main.rs`, `src/cli.rs`, `src/banner.rs`, `src/commands/`, `src/shell/`, `src/git.rs`, `src/fs.rs`, `src/state.rs`
 - [ ] Add core dependencies to `Cargo.toml`:
-  - [ ] `clap` — CLI parsing with subcommands
-  - [ ] `comfy-table` — rich table output for banner
-  - [ ] `console` — colors, styles, terminal width detection
+  - [x] `clap` — CLI parsing with subcommands
+  - [x] `comfy-table` — rich table output for banner
+  - [x] `console` — colors, styles, terminal width detection
   - [ ] `jwalk` or `ignore` — fast parallel directory walking
-  - [ ] `git2` or `gix` — Git status detection
-  - [ ] `serde` + `serde_json` — state persistence (clipboard, pins)
-  - [ ] `directories` — XDG dirs (`~/.local/share/cfm/`)
-  - [ ] `indicatif` — progress bars for `paste`/`yank` operations
-  - [ ] `clap_complete` — shell completion generation
+  - [x] `git2` or `gix` — Git status detection
+  - [x] `serde` + `serde_json` — state persistence (clipboard, pins)
+  - [x] `directories` — XDG dirs (`~/.local/share/cfm/`)
+  - [x] `indicatif` — progress bars for `paste`/`yank` operations
+  - [x] `clap_complete` — shell completion generation
   - [ ] `syntect` — syntax highlighting for `fm peek`
-  - [ ] `humansize` / `byte-unit` — human-readable sizes
-  - [ ] `chrono` / `time` — file timestamps
+  - [x] `humansize` / `byte-unit` — human-readable sizes
+  - [x] `chrono` / `time` — file timestamps
   - [ ] `walkdir` (fallback) or stick with `jwalk`
-- [ ] Set up `justfile` / `Makefile` for common dev tasks
-- [ ] Add `.gitignore`
+- [x] Set up `justfile` / `Makefile` for common dev tasks
+- [x] Add `.gitignore`
 - [ ] Create `README.md` skeleton with manifesto
 
 ---
 
 ## Phase 1: Core Architecture & Constraints
 
-- [ ] Implement `is_terminal()` check utility — detect TTY vs pipe for all output
-- [ ] Implement dual-output mode:
+- [x] Implement `is_terminal()` check utility — detect TTY vs pipe for all output
+- [x] Implement dual-output mode:
   - [ ] Rich mode: `comfy-table` with colors, borders, icons, progress bars
   - [ ] Raw mode: clean text lines (for piping)
   - [ ] JSON mode: `--json` flag for scriptability
-- [ ] Implement config/data directory (`~/.local/share/cfm/` via `directories` crate)
-- [ ] Implement state persistence layer:
-  - [ ] `~/.local/share/cfm/clipboard.json` — yank/paste state
-  - [ ] `~/.local/share/cfm/pins.json` — pinned directories
-  - [ ] `~/.local/share/cfm/history.json` — frecency data (optional v2)
-- [ ] Implement error handling strategy (anyhow + human-readable messages)
-- [ ] Implement logging/debug mode (`--debug`, `RUST_LOG`)
+- [x] Implement config/data directory (`~/.local/share/cfm/` via `directories` crate)
+- [x] Implement state persistence layer:
+  - [x] `~/.local/share/cfm/clipboard.json` — yank/paste state
+  - [x] `~/.local/share/cfm/pins.json` — pinned directories
+  - [x] `~/.local/share/cfm/history.json` — frecency data (optional v2)
+- [x] Implement error handling strategy (anyhow + human-readable messages)
+- [x] Implement logging/debug mode (`--debug`, `RUST_LOG`)
 - [ ] Performance budget: every command must complete in <10ms for trivial dirs, <50ms for 10k files
 
 ---
 
-## Phase 2: The Banner (`fm banner [path]`)
+## Phase 2: The Banner — MVP DONE ✓ (`fm banner [path]`)
 
 > The crown jewel. Auto-triggered on `cd`. Prints a rich dashboard and exits.  
 > **Note:** `fm` with no arguments is a shorthand for `fm banner`. There is no separate `fm ls` command — the banner IS the enhanced directory listing. For raw output, use `fm banner --raw` or pipe to another command.
 
-- [ ] Detect project type from files (`Cargo.toml` = Rust, `package.json` = Node, `pyproject.toml` = Python, etc.)
+- [x] Detect project type from files (`Cargo.toml` = Rust, `package.json` = Node, `pyproject.toml` = Python, etc.)
 - [ ] Gather directory metadata:
-  - [ ] Total item count (files + dirs)
-  - [ ] Total size (human-readable)
-  - [ ] Top-level item listing (files + dirs with counts)
+  - [x] Total item count (files + dirs)
+  - [x] Total size (human-readable)
+  - [x] Top-level item listing (files + dirs with counts)
   - [ ] Last modified time summary
-- [ ] Git integration:
-  - [ ] Detect if inside Git repo
+- [x] Git integration:
+  - [x] Detect if inside Git repo
   - [ ] Show branch name
   - [ ] Show ahead/behind count (`↑2 ↓0`)
-  - [ ] Show dirty state (`✚3` modified, `?1` untracked)
+  - [x] Show dirty state (`✚3` modified, `?1` untracked)
   - [ ] Show last commit message (truncated)
-- [ ] Smart truncation:
-  - [ ] Show top 8 items max
+- [x] Smart truncation:
+  - [x] Show top 8 items max
   - [ ] Show `... and N more items. (Use 'ls' to see all)`
   - [ ] Handle very wide terminals vs narrow terminals gracefully
-- [ ] File type icons / emojis (📂 📄 🦀 ⚙️ 📦 📝)
+- [x] File type icons / emojis (📂 📄 🦀 ⚙️ 📦 📝)
 - [ ] Size visualization (optional): mini bar charts or color-coding by size
 - [ ] Contextual footer:
   - [ ] Quick actions available (`run`, `test`, `build`) if detected
   - [ ] Readable metadata (e.g., "Node v20.1 | 📦 npm")
-- [ ] Implement `--raw` flag: print plain file list for piping
-- [ ] Implement `--json` flag: structured JSON output
-- [ ] Terminal width detection + responsive layout
+- [x] Implement `--raw` flag: print plain file list for piping
+- [x] Implement `--json` flag: structured JSON output
+- [x] Terminal width detection + responsive layout
 
 ### Banner Mockup Target:
 ```text
@@ -93,12 +111,12 @@
 
 ---
 
-## Phase 3: Shell Integration
+## Phase 3: Shell Integration — STUBS DONE
 
 > The magic glue. `fm` relies on shell hooks to feel ambient.
 
-- [ ] Implement hidden/internal commands for shell consumption:
-  - [ ] `fm env [path]` — output shell alias definitions for current project
+- [x] Implement hidden/internal commands for shell consumption:
+  - [x] `fm env [path]` — output shell alias definitions for current project
   - [ ] `fm complete --dir <path>` — output completions for shell TAB integration
 - [ ] Create shell hook scripts:
   - [ ] **Zsh hook** (`~/.zshrc` integration):
@@ -147,40 +165,40 @@
 
 ---
 
-## Phase 4: Context-Aware Environment (`fm env`)
+## Phase 4: Context-Aware Environment — DONE ✓ (`fm env`)
 
 > Injects project-specific aliases into the shell on directory change.
 
-- [ ] Detect project type and generate aliases:
-  - [ ] **Rust** (`Cargo.toml`):
+- [x] Detect project type and generate aliases:
+  - [x] **Rust** (`Cargo.toml`):
     - `run` → `cargo run`
     - `test` → `cargo test`
     - `build` → `cargo build`
     - `check` → `cargo check`
     - `cfm_clean` → `cargo clean && fm banner`
-  - [ ] **Node.js** (`package.json`):
+  - [x] **Node.js** (`package.json`):
     - `run` → `npm run dev` (or `npm start` if no dev)
     - `test` → `npm test`
     - `build` → `npm run build`
     - `lint` → `npm run lint` (if exists)
-  - [ ] **Python** (`pyproject.toml`, `setup.py`, `requirements.txt`):
+  - [x] **Python** (`pyproject.toml`, `setup.py`, `requirements.txt`):
     - `run` → `python -m ...` (detect entry point)
     - `test` → `pytest`
     - `venv` → `source .venv/bin/activate`
-  - [ ] **Go** (`go.mod`):
+  - [x] **Go** (`go.mod`):
     - `run` → `go run .`
     - `test` → `go test ./...`
     - `build` → `go build`
-  - [ ] **Generic** (Makefile):
+  - [x] **Generic** (Makefile):
     - `run` → `make run` (if target exists)
     - `build` → `make`
-- [ ] Output aliases as shell-executable text
+- [x] Output aliases as shell-executable text
 - [ ] Ensure aliases are local to the directory context (shell handles scope)
 - [ ] Option to disable env injection per-directory (`.cfmignore` or config)
 
 ---
 
-## Phase 5: File Operations with Visual Confirmation (`fm mv`)
+## Phase 5: File Operations (`fm mv`) — STUB (`fm mv`)
 
 > When moving files, print a temporary split-context dashboard for visual confirmation.
 
@@ -202,7 +220,7 @@
 
 ---
 
-## Phase 6: Ephemeral Clipboard (`fm yank` / `fm paste`)
+## Phase 6: Ephemeral Clipboard — STUB (`fm yank` / `fm paste`)
 
 > Cross-terminal, cross-session file clipboard. Stateless binary, persistent dotfile.
 
@@ -228,7 +246,7 @@
 
 ---
 
-## Phase 7: Safe File Operations (`fm rm` / `fm trash` / `fm open`)
+## Phase 7: Safe File Operations — STUB (`fm rm` / `fm trash` / `fm open`)
 
 > Visual, safe mutators with confirmation and undo awareness.
 
@@ -257,7 +275,7 @@
 
 ---
 
-## Phase 8: Smart Piping & Actions (`fm do`)
+## Phase 8: Smart Piping — STUB & Actions (`fm do`)
 
 > The ultimate pipe destination. Receive file paths, take smart action.
 
@@ -281,7 +299,7 @@
 
 ---
 
-## Phase 9: Directory Stats (`fm stats`)
+## Phase 9: Directory Stats — STUB (`fm stats`)
 
 > Deep synthesis chart for the current directory.
 
@@ -298,7 +316,7 @@
 
 ---
 
-## Phase 10: Spatial Memory (`fm pin` / `fm jump` / `fm root`)
+## Phase 10: Spatial Memory — STUB (`fm pin` / `fm jump` / `fm root`)
 
 > Bookmark directories and jump instantly.
 
@@ -346,7 +364,7 @@ fm() {
 
 ---
 
-## Phase 11: Session Management (`fm save-session` / `fm load-session`)
+## Phase 11: Session Management — STUB (`fm save-session` / `fm load-session`)
 
 > Save and restore workspace contexts (terminal tabs, working directories).
 

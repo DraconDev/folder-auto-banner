@@ -9,7 +9,7 @@ use std::io::IsTerminal;
 use comfy_table::{Table, Cell, CellAlignment};
 use console::Term;
 
-use crate::fs::{DirSummary, ProjectType, format_size, format_relative_time};
+use crate::fs::{DirSummary, format_size};
 use crate::git::GitInfo;
 
 /// Run the banner command
@@ -29,12 +29,17 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
+    // Priority: --json > --raw > auto-detect (TTY vs pipe)
     if json {
         output_json(&path, &summary, &git_info);
-    } else if raw || !std::io::stdout().is_terminal() {
-        output_raw(&path, &summary);
-    } else {
+    } else if raw {
+        output_raw(&summary);
+    } else if std::io::stdout().is_terminal() {
+        // Only show rich output in actual terminal
         output_rich(&path, &summary, &git_info, compact);
+    } else {
+        // Fallback to raw when piped
+        output_raw(&summary);
     }
     
     Ok(())
@@ -137,7 +142,7 @@ fn print_box_drawing_header(path: &str, git_status: &str, term_width: usize) {
 }
 
 /// Output raw (for piping)
-fn output_raw(path: &Path, summary: &DirSummary) {
+fn output_raw(summary: &DirSummary) {
     for item in &summary.top_items {
         println!("{}", item.path.display());
     }
