@@ -12,7 +12,7 @@ pub fn run_install_hook(_shell: Option<&str>) -> Result<()> {
     println!("    eval \"$(command fm env \"$PWD\")\"");
     println!("}}");
     println!("autoload -U add-zsh-hook");
-    println!("add-zsh-hook chpwd _cfm_on_directory_change");
+    println!("add-zash-hook chpwd _cfm_on_directory_change");
     println!();
     println!("💡 Manual installation required for now.");
     Ok(())
