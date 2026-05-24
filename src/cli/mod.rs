@@ -4,7 +4,7 @@
 
 use clap::{Parser, Subcommand, ValueHint};
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// cfm — Contextual File Manager
 /// 

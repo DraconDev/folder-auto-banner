@@ -204,9 +204,10 @@ impl DirSummary {
 
 /// Human-readable size
 pub fn format_size(bytes: u64) -> String {
-    use byte_unit::Byte;
-    let byte = Byte::from_u128(bytes);
-    byte.get_appropriate_unit(true).to_string()
+    use byte_unit::{Byte, UnitType};
+    let byte = Byte::from_u64(bytes);
+    let adjusted = byte.get_appropriate_unit(UnitType::Binary);
+    format!("{}", adjusted)
 }
 
 /// Format relative time

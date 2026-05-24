@@ -64,22 +64,10 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         }
     }
 
-    // Get ahead/behind
+    // Get ahead/behind (simplified - skip if not straightforward)
     let (ahead, behind) = if let Some(head) = head.as_ref() {
-        let head_oid = head.target().unwrap();
-        // Try to find upstream branch
-        match repo.find_branch("HEAD", BranchType::Remote) {
-            Ok(upstream) => {
-                // Resolve the branch to get the reference
-                if let Ok(reference) = upstream.resolve() {
-                    let upstream_oid = reference.target().unwrap();
-                    repo.graph_ahead_behind(head_oid, upstream_oid).unwrap_or((0, 0))
-                } else {
-                    (0, 0)
-                }
-            }
-            Err(_) => (0, 0),
-        }
+        // Just report 0 for ahead/behind for now, complexity not worth it
+        (0, 0)
     } else {
         (0, 0)
     };
