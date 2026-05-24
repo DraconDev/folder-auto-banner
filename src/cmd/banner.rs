@@ -29,20 +29,21 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
-    // Check both stdin and stdout for TTY status.
-    // If both are not TTY (piped/redirected), use raw output.
-    // This ensures piping 'fm' to other commands works correctly.
-    let is_stdin_tty = atty::is(atty::Stream::Stdin);
+    // Check for terminal-like environment:
+    // 1. atty says stdout is a TTY
+    // 2. TERM is set (implies terminal, even if atty doesn't detect)
     let is_stdout_tty = atty::is(atty::Stream::Stdout);
-    let is_not_tty = !is_stdin_tty && !is_stdout_tty;
+    let term_env = std::env::var("TERM").unwrap_or_default();
+    let has_term_env = !term_env.is_empty() && term_env != "dumb";
+    let is_terminal_like = is_stdout_tty || has_term_env;
     
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw {
         // Explicit --raw flag always means raw
         output_raw(&summary);
-    } else if is_not_tty {
-        // Definitively piped/redirected - use raw output
+    } else if !is_terminal_like {
+        // Not a terminal - use raw output
         output_raw(&summary);
     } else {
         // User is in a terminal - show rich banner
