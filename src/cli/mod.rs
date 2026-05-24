@@ -352,11 +352,13 @@ impl Cli {
     match &self.command {
             // Banner (also default when no subcommand)
             Some(Banner { path, raw, json, compact }) => {
-                crate::cmd::banner::run_banner(path.as_ref(), *raw, *json, *compact)
+                let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
+                crate::cmd::banner::run_banner(p, *raw, *json, *compact)
             }
             None => {
                 // `fm` with no args = `fm banner`
-                crate::cmd::banner::run_banner(self.path.as_ref(), false, false, false)
+                let p: Option<&Path> = self.path.as_ref().map(|p| p.as_path());
+                crate::cmd::banner::run_banner(p, false, false, false)
             }
 
             // Phase 4: Env

@@ -4,8 +4,8 @@
 
 use anyhow::{Context, Result};
 use ignore::WalkBuilder;
-use std::path::Path;
-use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use chrono::{DateTime, Utc};
 
 /// Project type detection
 #[derive(Debug, Clone, PartialEq)]
@@ -87,11 +87,8 @@ pub struct DirEntry {
     pub is_file: bool,
     pub is_symlink: bool,
     pub size: u64,
-    pub modified: Option<chrono::DateTime<chrono::Utc>>,
+    pub modified: Option<DateTime<Utc>>,
 }
-
-use std::path::PathBuf;
-use chrono::{DateTime, Utc};
 
 impl DirEntry {
     pub fn icon(&self) -> &'static str {
@@ -126,7 +123,7 @@ impl DirSummary {
         let mut last_modified: Option<DateTime<Utc>> = None;
 
         let walker = WalkBuilder::new(path)
-            .max_depth(1)  // Only immediate directory
+            .max_depth(Some(1))  // Only immediate directory
             .hidden(false)
             .ignore(false)
             .build();
@@ -138,9 +135,9 @@ impl DirSummary {
             }
 
             let file_type = entry.file_type();
-            let is_dir = file_type.is_dir();
-            let is_file = file_type.is_file();
-            let is_symlink = file_type.is_symlink();
+            let is_dir = file_type.map(|ft| ft.is_dir()).unwrap_or(false);
+            let is_file = file_type.map(|ft| ft.is_file()).unwrap_or(false);
+            let is_symlink = file_type.map(|ft| ft.is_symlink()).unwrap_or(false);
 
             if is_dir {
                 dirs += 1;
@@ -157,8 +154,7 @@ impl DirSummary {
                 .and_then(|m| m.modified().ok())
                 .map(DateTime::<Utc>::from);
 
-            if modified.is_some() {
-                let mod_time = modified.unwrap();
+            if let Some(mod_time) = modified {
                 if last_modified.is_none() || mod_time > last_modified.unwrap() {
                     last_modified = Some(mod_time);
                 }
@@ -209,7 +205,7 @@ impl DirSummary {
 /// Human-readable size
 pub fn format_size(bytes: u64) -> String {
     use byte_unit::Byte;
-    let byte = Byte::from_bytes(bytes);
+    let byte = Byte::from_u128(bytes);
     byte.get_appropriate_unit(true).to_string()
 }
 

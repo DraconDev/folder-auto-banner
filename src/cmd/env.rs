@@ -9,7 +9,8 @@ use crate::fs::ProjectType;
 
 /// Run env command
 pub fn run_env(path: Option<&Path>, _format: Option<&str>) -> Result<()> {
-    let path = path.unwrap_or(std::env::current_dir()?.as_path());
+    let cwd = std::env::current_dir()?;
+    let path = path.unwrap_or(cwd.as_path());
     let project_type = ProjectType::detect(path);
 
     let aliases = generate_aliases(&project_type);
