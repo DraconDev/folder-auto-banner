@@ -6,7 +6,7 @@
 use anyhow::Result;
 use std::path::Path;
 use std::io::IsTerminal;
-use comfy_table::{Table, Cell, CellAlignment, BorderConstraint, TableImplementation};
+use comfy_table::{Table, Cell, CellAlignment};
 use console::Term;
 
 use crate::fs::{DirSummary, ProjectType, format_size, format_relative_time};
@@ -19,8 +19,8 @@ pub fn run_banner(
     json: bool,
     compact: bool,
 ) -> Result<()> {
-    let path = path.unwrap_or(std::env::current_dir()?.as_path());
-    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let cwd = std::env::current_dir()?;
+    let path = path.unwrap_or(cwd.as_path()).canonicalize().unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
     
     // Get directory summary
     let summary = DirSummary::scan(&path)?;

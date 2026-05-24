@@ -3,7 +3,8 @@ use anyhow::Result;
 use std::path::Path;
 
 pub fn run_stats(path: Option<&Path>, json: bool) -> Result<()> {
-    let path = path.unwrap_or(std::env::current_dir()?.as_path());
+    let cwd = std::env::current_dir()?;
+    let path = path.unwrap_or(cwd.as_path());
     
     if json {
         println!("{{\"path\":\"{}\",\"stats\":\"pending\"}}", path.display());

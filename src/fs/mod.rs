@@ -40,7 +40,6 @@ impl ProjectType {
                 "go.mod" => return ProjectType::Go,
                 "gemfile" => return ProjectType::Ruby,
                 "pom.xml" | "build.gradle" => return ProjectType::Java,
-                "CMakeLists.txt" => return ProjectType::Cpp,
                 "CMakeLists.txt" => return ProjectType::CMake,
                 _ => {}
             }
@@ -156,7 +155,7 @@ impl DirSummary {
             // Get modified time
             let modified = metadata.as_ref()
                 .and_then(|m| m.modified().ok())
-                .map(|t| DateTime::<Utc>::from(t));
+                .map(DateTime::<Utc>::from);
 
             if modified.is_some() {
                 let mod_time = modified.unwrap();
@@ -209,9 +208,9 @@ impl DirSummary {
 
 /// Human-readable size
 pub fn format_size(bytes: u64) -> String {
-    byte_unit::ByteUnit::byte(bytes)
-        .get_appropriate_unit(true)
-        .to_string()
+    use byte_unit::Byte;
+    let byte = Byte::from_bytes(bytes);
+    byte.get_appropriate_unit(true).to_string()
 }
 
 /// Format relative time

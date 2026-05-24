@@ -349,70 +349,70 @@ impl Cli {
                 .init();
         }
 
-        match &self.command {
+    match &self.command {
             // Banner (also default when no subcommand)
             Some(Banner { path, raw, json, compact }) => {
-                commands::banner::run_banner(path.as_ref(), *raw, *json, *compact)
+                crate::cmd::banner::run_banner(path.as_ref(), *raw, *json, *compact)
             }
             None => {
                 // `fm` with no args = `fm banner`
-                commands::banner::run_banner(self.path.as_ref(), false, false, false)
+                crate::cmd::banner::run_banner(self.path.as_ref(), false, false, false)
             }
 
             // Phase 4: Env
-            Some(Env { path, format }) => commands::env::run_env(path.as_ref(), format.as_deref()),
+            Some(Env { path, format }) => crate::cmd::env::run_env(path.as_ref(), format.as_deref()),
 
             // Phase 6: Clipboard
-            Some(Yank { paths }) => commands::yank::run_yank(paths),
-            Some(Paste { move_files, overwrite }) => commands::paste::run_paste(*move_files, *overwrite),
-            Some(Clipboard { clear }) => commands::clipboard::run_clipboard(*clear),
+            Some(Yank { paths }) => crate::cmd::yank::run_yank(paths),
+            Some(Paste { move_files, overwrite }) => crate::cmd::paste::run_paste(*move_files, *overwrite),
+            Some(Clipboard { clear }) => crate::cmd::clipboard::run_clipboard(*clear),
 
             // Phase 5: File ops
             Some(Mv { sources, dest, overwrite, rename, skip, dry_run }) => {
-                commands::mv::run_mv(sources, dest, *overwrite, *rename, *skip, *dry_run)
+                crate::cmd::mv::run_mv(sources, dest, *overwrite, *rename, *skip, *dry_run)
             }
             Some(Cp { sources, dest, overwrite, dry_run }) => {
-                commands::cp::run_cp(sources, dest, *overwrite, *dry_run)
+                crate::cmd::cp::run_cp(sources, dest, *overwrite, *dry_run)
             }
 
             // Phase 7: Safe ops
-            Some(Rm { paths, force, dry_run }) => commands::rm::run_rm(paths, *force, *dry_run),
-            Some(Trash { paths, force, dry_run }) => commands::trash::run_trash(paths, *force, *dry_run),
-            Some(Open { paths, dry_run }) => commands::open::run_open(paths, *dry_run),
+            Some(Rm { paths, force, dry_run }) => crate::cmd::rm::run_rm(paths, *force, *dry_run),
+            Some(Trash { paths, force, dry_run }) => crate::cmd::trash::run_trash(paths, *force, *dry_run),
+            Some(Open { paths, dry_run }) => crate::cmd::open::run_open(paths, *dry_run),
 
             // Phase 8: Smart piping
-            Some(Do { action, dry_run }) => commands::do_cmd::run_do(action.as_deref(), *dry_run),
-            Some(Peek { file, lines }) => commands::peek::run_peek(file, *lines),
+            Some(Do { action, dry_run }) => crate::cmd::do_cmd::run_do(action.as_deref(), *dry_run),
+            Some(Peek { file, lines }) => crate::cmd::peek::run_peek(file, *lines),
 
             // Phase 9: Stats
-            Some(Stats { path, json }) => commands::stats::run_stats(path.as_ref(), *json),
+            Some(Stats { path, json }) => crate::cmd::stats::run_stats(path.as_ref(), *json),
 
             // Phase 10: Pin/Jump/Root
-            Some(Pin { name }) => commands::pin::run_pin(name),
-            Some(Jump { name, print_cd }) => commands::jump::run_jump(name, *print_cd),
-            Some(Root { print_cd }) => commands::root::run_root(*print_cd),
-            Some(Pins) => commands::pins::run_pins(),
-            Some(Unpin { name }) => commands::unpin::run_unpin(name),
+            Some(Pin { name }) => crate::cmd::pin::run_pin(name),
+            Some(Jump { name, print_cd }) => crate::cmd::jump::run_jump(name, *print_cd),
+            Some(Root { print_cd }) => crate::cmd::root::run_root(*print_cd),
+            Some(Pins) => crate::cmd::pins::run_pins(),
+            Some(Unpin { name }) => crate::cmd::unpin::run_unpin(name),
 
             // Phase 11: Sessions
-            Some(SaveSession { name }) => commands::save_session::run_save_session(name),
-            Some(LoadSession { name, print_cd }) => commands::load_session::run_load_session(name, *print_cd),
-            Some(Sessions) => commands::sessions::run_sessions(),
-            Some(DeleteSession { name }) => commands::delete_session::run_delete_session(name),
+            Some(SaveSession { name }) => crate::cmd::save_session::run_save_session(name),
+            Some(LoadSession { name, print_cd }) => crate::cmd::load_session::run_load_session(name, *print_cd),
+            Some(Sessions) => crate::cmd::sessions::run_sessions(),
+            Some(DeleteSession { name }) => crate::cmd::delete_session::run_delete_session(name),
 
             // Phase 12: Diff
             Some(Diff { dir1, dir2, shallow, json }) => {
-                commands::diff::run_diff(dir1, dir2, *shallow, *json)
+                crate::cmd::diff::run_diff(dir1, dir2, *shallow, *json)
             }
 
             // Phase 3: Shell integration
-            Some(InstallHook { shell }) => commands::install_hook::run_install_hook(shell.as_deref()),
-            Some(UninstallHook) => commands::uninstall_hook::run_uninstall_hook(),
-            Some(Completion { shell }) => commands::completion::run_completion(shell),
+            Some(InstallHook { shell }) => crate::cmd::install_hook::run_install_hook(shell.as_deref()),
+            Some(UninstallHook) => crate::cmd::uninstall_hook::run_uninstall_hook(),
+            Some(Completion { shell }) => crate::cmd::completion::run_completion(shell),
 
             // Phase 14: Config
             Some(Config { edit, get, set }) => {
-                commands::config::run_config(*edit, get.as_deref(), set.as_deref())
+                crate::cmd::config::run_config(*edit, get.as_deref(), set.as_deref())
             }
         }
     }
