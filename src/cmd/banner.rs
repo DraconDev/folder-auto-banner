@@ -29,24 +29,23 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
-    // Check for terminal-like environment:
-    // 1. atty says stdout is a TTY
-    // 2. TERM is set (implies terminal, even if atty doesn't detect)
+    // Priority: --json > --raw > auto-detect
+    // Auto-detect: If we can't detect a TTY, default to rich output for better UX.
+    // Users in non-TTY environments can use --raw to get clean output.
     let is_stdout_tty = atty::is(atty::Stream::Stdout);
-    let term_env = std::env::var("TERM").unwrap_or_default();
-    let has_term_env = !term_env.is_empty() && term_env != "dumb";
-    let is_terminal_like = is_stdout_tty || has_term_env;
     
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw {
         // Explicit --raw flag always means raw
         output_raw(&summary);
-    } else if !is_terminal_like {
-        // Not a terminal - use raw output
-        output_raw(&summary);
+    } else if is_stdout_tty {
+        // stdout is a TTY - use rich output
+        output_rich(&path, &summary, &git_info, compact);
     } else {
-        // User is in a terminal - show rich banner
+        // Not a TTY (piped/redirected) but no --raw flag given
+        // Default to rich output since we can't reliably detect terminal
+        // Users who need raw output can use --raw flag
         output_rich(&path, &summary, &git_info, compact);
     }
     
