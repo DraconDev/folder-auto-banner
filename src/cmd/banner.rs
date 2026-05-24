@@ -29,23 +29,24 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
-    // Check both stdout and stdin TTY - if either is a TTY, user is in a terminal
-    // Note: Some environments (cargo, IDE debuggers) may not report TTY correctly
-    // We default to rich output when we can't definitively confirm piping
+    // We check both stdin and stdout for TTY status.
+    // If we can't detect either way, we default to rich output for better UX.
+    // This ensures the banner looks great when run directly from a terminal.
     let is_stdin_tty = atty::is(atty::Stream::Stdin);
     let is_stdout_tty = atty::is(atty::Stream::Stdout);
+    let is_not_tty = !is_stdin_tty && !is_stdout_tty;
     
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw {
         // Explicit --raw flag always means raw
         output_raw(&summary);
-    } else if is_stdin_tty || is_stdout_tty {
-        // User is in a terminal (either stdin or stdout is a TTY)
-        output_rich(&path, &summary, &git_info, compact);
-    } else {
-        // Not a TTY - probably piped or redirected, use raw
+    } else if is_not_tty {
+        // Definitively piped/redirected - use raw output
         output_raw(&summary);
+    } else {
+        // User is in a terminal - show rich banner
+        output_rich(&path, &summary, &git_info, compact);
     }
     
     Ok(())
