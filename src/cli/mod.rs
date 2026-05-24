@@ -387,7 +387,10 @@ impl Cli {
             Some(Peek { file, lines }) => crate::cmd::peek::run_peek(file, *lines),
 
             // Phase 9: Stats
-            Some(Stats { path, json }) => crate::cmd::stats::run_stats(path.as_ref().map(|p| p.as_path()), *json),
+            Some(Stats { path, json }) => {
+                let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
+                crate::cmd::stats::run_stats(p, *json)
+            }
 
             // Phase 10: Pin/Jump/Root
             Some(Pin { name }) => crate::cmd::pin::run_pin(name),
