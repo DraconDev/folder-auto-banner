@@ -114,7 +114,7 @@ pub enum Commands {
         skip: bool,
 
         /// Dry run (preview only)
-        #[arg(short, long)]
+        #[arg(long = "dry-run")]
         dry_run: bool,
     },
 
@@ -133,7 +133,7 @@ pub enum Commands {
         overwrite: bool,
 
         /// Dry run (preview only)
-        #[arg(short, long)]
+        #[arg(long = "dry-run")]
         dry_run: bool,
     },
 
@@ -145,11 +145,11 @@ pub enum Commands {
         paths: Vec<PathBuf>,
 
         /// Force (skip confirmation)
-        #[arg(short, long)]
+        #[arg(short = 'f', long)]
         force: bool,
 
         /// Dry run (preview only)
-        #[arg(short, long)]
+        #[arg(long = "dry-run")]
         dry_run: bool,
     },
 
@@ -160,11 +160,11 @@ pub enum Commands {
         paths: Vec<PathBuf>,
 
         /// Force (skip confirmation)
-        #[arg(short, long)]
+        #[arg(short = 'f', long)]
         force: bool,
 
         /// Dry run (preview only)
-        #[arg(short, long)]
+        #[arg(long = "dry-run")]
         dry_run: bool,
     },
 
@@ -175,7 +175,7 @@ pub enum Commands {
         paths: Vec<PathBuf>,
 
         /// Dry run (preview only)
-        #[arg(short, long)]
+        #[arg(long = "dry-run")]
         dry_run: bool,
     },
 
@@ -187,7 +187,7 @@ pub enum Commands {
         action: Option<String>,
 
         /// Dry run (preview only)
-        #[arg(short, long)]
+        #[arg(long = "dry-run")]
         dry_run: bool,
     },
 

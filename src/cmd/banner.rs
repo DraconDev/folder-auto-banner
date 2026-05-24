@@ -29,10 +29,9 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
-    // Note: is_terminal() may return false when run via cargo
-    // So we default to rich output unless --raw is explicitly set or we're clearly piped
+    // Note: atty::is may return false when run via cargo
+    // So we use it as a hint but default to rich output when we can't detect pipe
     let is_tty = atty::is(atty::Stream::Stdout);
-    eprintln!("DEBUG: json={}, raw={}, atty::is={}", json, raw, is_tty);
     
     if json {
         output_json(&path, &summary, &git_info);
