@@ -1,6 +1,5 @@
 mod cli;
 mod cmd;
-mod banner;
 mod git;
 mod fs;
 mod state;
