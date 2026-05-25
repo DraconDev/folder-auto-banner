@@ -96,7 +96,7 @@ fn analyze_dir(path: &Path, stats: &mut DirStats, depth: usize) -> Result<()> {
 
             // Track largest files (after binary check)
             stats.largest_files.push((entry_path.clone(), size));
-            stats.largest_files.sort_by(|a, b| b.1.cmp(&a.1));
+            stats.largest_files.sort_by_key(|b| std::cmp::Reverse(b.1));
             stats.largest_files.truncate(10);
         }
     }

@@ -75,16 +75,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, compact: b
     let project_icon = summary.project_type.icon();
     let project_label = summary.project_type.label();
     
-    let stats_line = if git_info.is_repo && git_info.last_commit_msg.is_some() {
-        let commit_preview = git_info.last_commit_msg.as_ref().unwrap();
-        // Use char-aware truncation for Unicode
-        let commit_short: String = commit_preview.chars().take(40).collect();
-        let commit_display = if commit_short.len() < commit_preview.len() {
-            format!("{}...", commit_short)
+    let stats_line = if git_info.is_repo {
+        if let Some(ref msg) = git_info.last_commit_msg {
+            // Use char-aware truncation for Unicode
+            let commit_short: String = msg.chars().take(40).collect();
+            let commit_display = if commit_short.len() < msg.len() {
+                format!("{}...", commit_short)
+            } else {
+                commit_short
+            };
+            format!("{} {} │ {} │ {}", project_icon, project_label, size_str, commit_display)
         } else {
-            commit_short
-        };
-        format!("{} {} │ {} │ {}", project_icon, project_label, size_str, commit_display)
+            format!("{} {} │ {} │ {} items", project_icon, project_label, size_str, item_count)
+        }
     } else {
         format!("{} {} │ {} │ {} items", project_icon, project_label, size_str, item_count)
     };
