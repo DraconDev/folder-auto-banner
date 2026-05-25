@@ -6,7 +6,7 @@
 //! - Size differences
 
 use anyhow::Result;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -24,16 +24,19 @@ pub fn run_diff(dir1: &Path, dir2: &Path, shallow: bool, json: bool) -> Result<(
     let files1 = scan_dir(dir1, shallow);
     let files2 = scan_dir(dir2, shallow);
     
-    let keys1: HashSet<_> = files1.keys().collect();
-    let keys2: HashSet<_> = files2.keys().collect();
+    let keys1: Vec<_> = files1.keys().cloned().collect();
+    let keys2: Vec<_> = files2.keys().cloned().collect();
+    
+    let keys1_set: std::collections::HashSet<_> = keys1.iter().collect();
+    let keys2_set: std::collections::HashSet<_> = keys2.iter().collect();
     
     // Find unique and common files
-    let unique_to_1: Vec<_> = keys1.difference(&keys2).copied().collect();
-    let unique_to_2: Vec<_> = keys2.difference(&keys1).copied().collect();
-    let common: Vec<_> = keys1.intersection(&keys2).copied().collect();
+    let unique_to_1: Vec<String> = keys1_set.difference(&keys2_set).cloned().collect();
+    let unique_to_2: Vec<String> = keys2_set.difference(&keys1_set).cloned().collect();
+    let common: Vec<String> = keys1_set.intersection(&keys2_set).cloned().collect();
 
     if json {
-        output_json(dir1, dir2, &unique_to_1, &unique_to_2, &common, &files1, &files2);
+        output_json(dir1, dir2, &unique_to_1, &unique_to_2, &common);
     } else {
         output_rich(dir1, dir2, &unique_to_1, &unique_to_2, &common, &files1, &files2);
     }
@@ -44,11 +47,10 @@ pub fn run_diff(dir1: &Path, dir2: &Path, shallow: bool, json: bool) -> Result<(
 #[derive(Default)]
 struct FileInfo {
     size: u64,
-    path: String,
 }
 
-fn scan_dir(dir: &Path, shallow: bool) -> std::collections::HashMap<String, FileInfo> {
-    let mut files = std::collections::HashMap::new();
+fn scan_dir(dir: &Path, shallow: bool) -> HashMap<String, FileInfo> {
+    let mut files = HashMap::new();
     scan_dir_recursive(dir, dir, &mut files, 0, shallow);
     files
 }
@@ -56,7 +58,7 @@ fn scan_dir(dir: &Path, shallow: bool) -> std::collections::HashMap<String, File
 fn scan_dir_recursive(
     base: &Path,
     current: &Path,
-    files: &mut std::collections::HashMap<String, FileInfo>,
+    files: &mut HashMap<String, FileInfo>,
     depth: usize,
     shallow: bool,
 ) {
@@ -71,9 +73,10 @@ fn scan_dir_recursive(
 
     for entry in entries.filter_map(|e| e.ok()) {
         let path = entry.path();
-        let relative = path.strip_prefix(base)
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
+        let relative = match path.strip_prefix(base) {
+            Ok(p) => p.to_string_lossy().to_string(),
+            Err(_) => continue,
+        };
         
         if relative.is_empty() || relative.starts_with('.') {
             continue;
@@ -83,7 +86,7 @@ fn scan_dir_recursive(
             scan_dir_recursive(base, &path, files, depth + 1, shallow);
         } else if path.is_file() {
             let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-            files.insert(relative, FileInfo { size, path: path.to_string_lossy().to_string() });
+            files.insert(relative, FileInfo { size });
         }
     }
 }
@@ -91,11 +94,11 @@ fn scan_dir_recursive(
 fn output_rich(
     dir1: &Path,
     dir2: &Path,
-    unique_to_1: &[&str],
-    unique_to_2: &[&str],
-    common: &[&str],
-    files1: &std::collections::HashMap<String, FileInfo>,
-    files2: &std::collections::HashMap<String, FileInfo>,
+    unique_to_1: &[String],
+    unique_to_2: &[String],
+    common: &[String],
+    files1: &HashMap<String, FileInfo>,
+    files2: &HashMap<String, FileInfo>,
 ) {
     println!("🔍 Comparing directories");
     println!("  {}  →  {}", dir1.display(), dir2.display());
@@ -113,7 +116,7 @@ fn output_rich(
         println!();
         println!("📁 Only in {}:", dir1.file_name().unwrap_or_default().to_string_lossy());
         for file in unique_to_1.iter().take(20) {
-            let size = files1.get(*file).map(|f| format_size(f.size)).unwrap_or_default();
+            let size = files1.get(file).map(|f| format_size(f.size)).unwrap_or_default();
             println!("  + {} ({})", file, size);
         }
         if unique_to_1.len() > 20 {
@@ -126,7 +129,7 @@ fn output_rich(
         println!();
         println!("📁 Only in {}:", dir2.file_name().unwrap_or_default().to_string_lossy());
         for file in unique_to_2.iter().take(20) {
-            let size = files2.get(*file).map(|f| format_size(f.size)).unwrap_or_default();
+            let size = files2.get(file).map(|f| format_size(f.size)).unwrap_or_default();
             println!("  + {} ({})", file, size);
         }
         if unique_to_2.len() > 20 {
@@ -135,7 +138,7 @@ fn output_rich(
     }
 
     // Check common files for size differences
-    let size_diff: Vec<_> = common.iter()
+    let size_diff: Vec<&String> = common.iter()
         .filter(|f| {
             let s1 = files1.get(*f).map(|i| i.size).unwrap_or(0);
             let s2 = files2.get(*f).map(|i| i.size).unwrap_or(0);
@@ -183,11 +186,9 @@ fn format_size(bytes: u64) -> String {
 fn output_json(
     dir1: &Path,
     dir2: &Path,
-    unique_to_1: &[&str],
-    unique_to_2: &[&str],
-    common: &[&str],
-    _files1: &std::collections::HashMap<String, FileInfo>,
-    _files2: &std::collections::HashMap<String, FileInfo>,
+    unique_to_1: &[String],
+    unique_to_2: &[String],
+    common: &[String],
 ) {
     println!("{{");
     println!("  \"dir1\": \"{}\",", dir1.display());
