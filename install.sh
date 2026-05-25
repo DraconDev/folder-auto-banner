@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/run/current-system/sw/bin/bash
 #
 # cfm — Contextual File Manager
 # Auto-install script with shell hook integration
