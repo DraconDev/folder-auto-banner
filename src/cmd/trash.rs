@@ -81,8 +81,10 @@ pub fn run_trash(paths: &[PathBuf], verbose: bool) -> Result<()> {
 }
 
 fn get_trash_base() -> Result<PathBuf> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Cannot find home directory"))?;
-    Ok(home.join(TRASH_DIR))
+    let proj_dirs = directories::ProjectDirs::from("com", "cfm", "cfm")
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine config directory"))?;
+    let data_dir = proj_dirs.data_dir();
+    Ok(data_dir.join("trash"))
 }
 
 fn load_manifest(trash_base: &Path) -> Result<TrashManifest> {

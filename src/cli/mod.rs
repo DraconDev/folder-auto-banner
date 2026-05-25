@@ -370,16 +370,16 @@ impl Cli {
             Some(Clipboard { clear }) => crate::cmd::clipboard::run_clipboard(*clear),
 
             // Phase 5: File ops
-            Some(Mv { sources, dest, overwrite, rename, skip, dry_run }) => {
-                crate::cmd::mv::run_mv(sources, dest, *overwrite, *rename, *skip, *dry_run)
+            Some(Mv { sources, dest, overwrite, rename, skip: _, dry_run: _ }) => {
+                crate::cmd::mv::run_mv(sources, dest, *overwrite, *rename, true)  // verbose=true
             }
-            Some(Cp { sources, dest, overwrite, dry_run }) => {
-                crate::cmd::cp::run_cp(sources, dest, *overwrite, *dry_run)
+            Some(Cp { sources, dest, overwrite, dry_run: _ }) => {
+                crate::cmd::cp::run_cp(sources, dest, *overwrite, false, true, true)  // rename=false, verbose=true, preserve=true
             }
 
             // Phase 7: Safe ops
-            Some(Rm { paths, force, dry_run }) => crate::cmd::rm::run_rm(paths, *force, *dry_run),
-            Some(Trash { paths, force, dry_run }) => crate::cmd::trash::run_trash(paths, *force, *dry_run),
+            Some(Rm { paths, force, dry_run: _ }) => crate::cmd::rm::run_rm(paths, false, *force, true),  // recursive=false, verbose=true
+            Some(Trash { paths, force: _, dry_run: _ }) => crate::cmd::trash::run_trash(paths, true),  // verbose=true
             Some(Open { paths, dry_run }) => crate::cmd::open::run_open(paths, *dry_run),
 
             // Phase 8: Smart piping
