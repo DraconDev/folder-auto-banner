@@ -11,35 +11,38 @@ Build the `cfm` (Contextual File Manager) Rust CLI tool, following the todo.md p
 ### ✅ Phase 4: Context-Aware Environment — DONE
 
 ### ✅ Phase 6: Ephemeral Clipboard (`fm yank` / `fm paste` / `fm clipboard`) — DONE!
-- `fm yank <paths>`: Resolves paths, saves to clipboard.json
-- `fm paste`: Copies files from clipboard to current dir
-- `fm paste --move-files`: Moves files instead of copying
-- `fm clipboard`: Shows clipboard contents
-- `fm clipboard --clear`: Clears clipboard
-- State persistence via ClipboardState in ~/.local/share/cfm/clipboard.json
-
 **Working commands:**
 ```bash
 fm yank Cargo.toml todo.md   # → Copies to clipboard
 fm clipboard                 # → Shows clipboard contents
-fm paste                    # → Copies from clipboard (skip existing)
-fm paste --move-files       # → Moves from clipboard (clears entry)
+fm paste                    # → Copies from clipboard
+fm paste --move-files       # → Moves files (clears entry)
 fm clipboard --clear        # → Clears clipboard
 ```
 
-### ⏳ Phase 5: File Operations (`fm mv`) — NEXT
-- Split context dashboard for move operations
+### ✅ Phase 10: Spatial Memory (`fm pin` / `fm jump` / `fm root`) — DONE!
+**Working commands:**
+```bash
+fm pin dev                  # → Pin current dir as "dev"
+fm pin src                  # → Pin another dir
+fm pins                     # → List all pins
+fm jump dev                 # → Print cd command
+fm unpin dev               # → Remove pin
+fm root                    # → Print cd to git root
+```
+
+### ⏳ Phase 5: File Operations (`fm mv` / `fm cp` / `fm rm` / `fm trash`) — NEXT
 - Collision detection (--overwrite, --rename, --skip)
 
-### ⏳ Phase 7: Safe File Operations (`fm rm` / `fm trash` / `fm open`)
-- Confirmation, dry-run, piped input support
-
-### ⏳ Phase 10: Spatial Memory (`fm pin` / `fm jump` / `fm root`)
-- Bookmark system with shell wrapper
+### ⏳ Phase 7: Safe File Operations (`fm open`)
+- Open files with default app
 
 ## Status
 
-Core banner and clipboard are working. Next: pin/jump/root, then file operations.
+Core functionality is working:
+- Banner with TTY detection (rich/JSON/raw modes)
+- Clipboard (yank/paste/clipboard)
+- Pins (pin/jump/pins/unpin/root)
 
 ## Done Criteria
 1. Code compiles and passes `cargo test`
