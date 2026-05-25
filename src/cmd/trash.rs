@@ -119,20 +119,27 @@ fn trash_file(path: &Path, trash_base: &Path, manifest: &mut TrashManifest, verb
     let trash_path = trash_base.join(&id);
     
     // Move file to trash
-    if path.is_dir() {
-        fs::rename(path, &trash_path).or_else(|_| {
-            // If rename fails (cross-device), copy and delete
-            copy_dir_recursive(path, &trash_path)?;
-            delete_recursive(path)?;
-            Ok(())
-        })?;
+    let result: Result<(), anyhow::Error> = if path.is_dir() {
+        match fs::rename(path, &trash_path) {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                // If rename fails (cross-device), copy and delete
+                copy_dir_recursive(path, &trash_path)?;
+                delete_recursive(path)?;
+                Ok(())
+            }
+        }
     } else {
-        fs::rename(path, &trash_path).or_else(|_| {
-            fs::copy(path, &trash_path)?;
-            fs::remove_file(path)?;
-            Ok(())
-        })?;
-    }
+        match fs::rename(path, &trash_path) {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                fs::copy(path, &trash_path)?;
+                fs::remove_file(path)?;
+                Ok(())
+            }
+        }
+    };
+    result?;
 
     // Add to manifest
     manifest.items.push(TrashItem {

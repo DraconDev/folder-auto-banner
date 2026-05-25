@@ -156,7 +156,7 @@ fn generate_unique_name(path: &Path) -> PathBuf {
     let mut counter = 1;
     loop {
         let new_name = match ext.as_ref() {
-            Some(ext) => format!("{} ({}){}.{}", stem, counter, ext),
+            Some(ext) => format!("{stem} ({counter}).{ext}", stem = stem, counter = counter, ext = ext),
             None => format!("{} ({})", stem, counter),
         };
         let new_path = parent.join(&new_name);
