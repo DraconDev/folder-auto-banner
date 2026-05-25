@@ -2,11 +2,11 @@
 
 Build the `cfm` (Contextual File Manager) Rust CLI tool.
 
-## Progress (Iteration 5)
+## Progress (Iteration 6)
 
-### ✅ Phase 0-11: ALL CORE PHASES COMPLETE
+### ✅ Phase 0-12: ALL CORE + DIFF COMPLETE
 
-### Working Commands (full list):
+### All Working Commands:
 ```bash
 # Banner
 fm                    # Rich in terminal, raw when piped
@@ -36,8 +36,9 @@ fm root
 
 # Utils
 fm open <files>             # Open with default app
-fm do [action]              # Act on stdin paths (list/count/delete/open/cat/custom)
+fm do [action]              # Act on stdin paths
 fm stats [--json]           # Deep directory stats
+fm diff <dir1> <dir2>       # Compare directories
 
 # Sessions
 fm save-session <name> [--desc]
@@ -51,29 +52,13 @@ fm completion <shell>
 fm config [--get] [--set]
 ```
 
-### Stats Output Features:
-- Total size, files, directories, max depth
-- File types breakdown with visual bars
-- Largest files (top 10)
-- Hidden files count, binary detection
-- Code file percentage
-
-### Do Command Actions:
-- `fm do` (default: list) — List piped paths
-- `fm do count` — Count lines in files
-- `fm do delete` — Trash files
-- `fm do open` — Open files
-- `fm do cat` — Print file contents
-- `fm do <cmd>` — Run custom command with `{}` for path
-
-### ⏳ Phase 12-18: Polish phases
-- Diff command (visual comparison)
-- Completions (clap_complete)
-- Config (toml)
-- Polish (clippy fixes)
-- Tests
-- Documentation
-- Packaging (crates.io)
+### ⏳ Remaining Phases
+- Phase 13: Completions (clap_complete)
+- Phase 14: Config (toml file support)
+- Phase 15: Polish (clippy fixes, NO_COLOR, Unicode fallback)
+- Phase 16: Tests
+- Phase 17: Documentation (README update)
+- Phase 18: Packaging (crates.io)
 
 ## Done Criteria
 1. Code compiles and passes `cargo test`
