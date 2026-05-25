@@ -98,7 +98,7 @@ fn is_protected_path(path: &Path) -> bool {
     ];
     
     for d in &dangerous {
-        if path_str == d || path_str.starts_with(&format!("{}/", d)) {
+        if path_str == *d || path_str.starts_with(&format!("{}/", d)) {
             return true;
         }
     }
