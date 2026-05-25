@@ -241,6 +241,6 @@ impl DirSummary {
             };
             *counts.entry(ext).or_insert(0) += 1;
         }
-        counts.into_iter().map(|(k, v)| (k, v)).collect()
+        counts.into_iter().collect()
     }
 }
