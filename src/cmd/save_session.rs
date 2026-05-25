@@ -1,13 +1,11 @@
 //! Save session command — save current workspace state
 //! 
-//! Saves: cwd, clipboard, pins to session file
+//! Saves: cwd, git branch, timestamp to session file
 
 use anyhow::Result;
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 use std::fs;
-
-const SESSIONS_DIR: &str = ".local/share/cfm/sessions";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Session {
@@ -22,7 +20,8 @@ pub fn run_save_session(name: &str, description: Option<&str>) -> Result<()> {
     let cwd = std::env::current_dir()?;
     
     // Get git branch if in a repo
-    let git_branch = crate::git::get_current_branch(&cwd).ok();
+    let git_info = crate::git::get_git_info(&cwd).ok();
+    let git_branch = git_info.as_ref().and_then(|i| i.branch.clone());
     
     let session = Session {
         name: name.to_string(),
