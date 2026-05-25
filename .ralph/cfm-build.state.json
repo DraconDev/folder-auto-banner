@@ -1,7 +1,7 @@
 {
   "name": "cfm-build",
   "taskFile": ".ralph/cfm-build.md",
-  "iteration": 6,
+  "iteration": 7,
   "maxIterations": 50,
   "itemsPerIteration": 3,
   "reflectEvery": 5,
