@@ -118,11 +118,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path, preserve: bool) -> Result<()> {
         if ty.is_dir() {
             copy_dir_recursive(&src_path, &dst_path, preserve)?;
         } else {
-            if preserve {
-                fs::copy(&src_path, &dst_path)?;
-            } else {
-                fs::copy(&src_path, &dst_path)?;
-            }
+            fs::copy(&src_path, &dst_path)?;
         }
     }
     Ok(())

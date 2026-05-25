@@ -141,7 +141,7 @@ fn output_rich(stats: &DirStats, path: &Path) {
     println!();
     println!("📋 FILE TYPES (by count)");
     let mut types: Vec<_> = stats.by_extension.iter().collect();
-    types.sort_by(|a, b| b.1.count.cmp(&a.1.count));
+    types.sort_by_key(|b| std::cmp::Reverse(b.1.count));
     
     for (ext, fc) in types.iter().take(10) {
         let bar = make_bar(fc.count, stats.total_files, 20);
@@ -196,7 +196,7 @@ fn output_json(stats: &DirStats, path: &Path) {
     
     println!("  \"by_extension\": {{");
     let mut types: Vec<_> = stats.by_extension.iter().collect();
-    types.sort_by(|a, b| b.1.count.cmp(&a.1.count));
+    types.sort_by_key(|b| std::cmp::Reverse(b.1.count));
     
     for (i, (ext, fc)) in types.iter().enumerate() {
         let comma = if i < types.len() - 1 { "," } else { "" };
