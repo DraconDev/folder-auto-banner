@@ -1,11 +1,21 @@
-//! Jump command — jump to a pinned directory
+//! Jump command — cd to a pinned directory
+//! 
+//! Prints cd command for shell to execute
+
 use anyhow::Result;
 
-pub fn run_jump(name: &str, print_cd: bool) -> Result<()> {
-    if print_cd {
-        println!("cd /some/pinned/path");
-    } else {
-        println!("⬆️  Jump to: {} (not yet implemented)", name);
-    }
+use crate::state::PinsState;
+
+pub fn run_jump(name: &str) -> Result<()> {
+    // Load pins
+    let state = PinsState::load().unwrap_or_default();
+
+    // Find pin
+    let pin = state.pins.iter().find(|p| p.name == name)
+        .ok_or_else(|| anyhow::anyhow!("Pin '{}' not found. Use 'fm pins' to see available pins.", name))?;
+
+    // Print cd command (shell integration)
+    println!("cd '{}'", pin.path.display());
+    
     Ok(())
 }
