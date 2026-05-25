@@ -6,7 +6,7 @@ use anyhow::Result;
 
 use crate::state::PinsState;
 
-pub fn run_jump(name: &str) -> Result<()> {
+pub fn run_jump(name: &str, _print_cd: bool) -> Result<()> {
     // Load pins
     let state = PinsState::load().unwrap_or_default();
 
