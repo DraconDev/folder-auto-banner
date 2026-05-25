@@ -182,8 +182,8 @@ pub enum Commands {
     // === Phase 8: Smart Piping ===
     /// Act on piped file paths (pipe destination)
     Do {
-        /// Override action (e.g., cat, edit, open)
-        #[arg(long)]
+        /// Action to perform (list, count, delete, open, cat, or custom command with {})
+        #[arg(default_value = "list")]
         action: Option<String>,
 
         /// Dry run (preview only)

@@ -4,7 +4,7 @@ Build the `cfm` (Contextual File Manager) Rust CLI tool.
 
 ## Progress (Iteration 5)
 
-### ✅ Phase 0-10: CORE PHASES COMPLETE
+### ✅ Phase 0-11: ALL CORE PHASES COMPLETE
 
 ### Working Commands (full list):
 ```bash
@@ -14,52 +14,66 @@ fm banner --json      # JSON output
 fm banner --raw       # Explicit raw output
 
 # Env
-fm env                # Project aliases (cargo run, npm run dev, etc.)
+fm env                # Project aliases
 
 # File ops
-fm mv <src> <dest> [--overwrite] [--rename]   # Move
-fm cp <src> <dest> [--overwrite]             # Copy
-fm rm <files> [-r]                            # Remove (safe)
-fm trash <files>                              # Move to trash
+fm mv <src> <dest> [--overwrite] [--rename]
+fm cp <src> <dest> [--overwrite]
+fm rm <files> [-r]
+fm trash <files>
 
 # Clipboard
-fm yank <files>              # Copy to clipboard
-fm paste [--move-files]      # Paste from clipboard
-fm clipboard [--clear]       # Show/clear clipboard
+fm yank <files>
+fm paste [--move-files]
+fm clipboard [--clear]
 
 # Pins
-fm pin <name>               # Bookmark directory
-fm pins                     # List pins
-fm jump <name>              # Print cd command
-fm unpin <name>             # Remove pin
-fm root                     # Jump to git root
+fm pin <name>
+fm pins
+fm jump <name>
+fm unpin <name>
+fm root
 
 # Utils
 fm open <files>             # Open with default app
-fm do [action]              # Act on stdin paths
+fm do [action]              # Act on stdin paths (list/count/delete/open/cat/custom)
 fm stats [--json]           # Deep directory stats
-fm diff <dir1> <dir2>        # Compare directories
 
 # Sessions
-fm save-session <name> [--desc]     # Save workspace
-fm load-session <name>              # Show restore commands
-fm sessions                         # List sessions
-fm delete-session <name>            # Delete session
+fm save-session <name> [--desc]
+fm load-session <name>
+fm sessions
+fm delete-session <name>
 
 # Shell integration
-fm install-hook            # Show hook script
-fm completion <shell>      # Generate completions
-fm config [--get] [--set]   # Config management
+fm install-hook
+fm completion <shell>
+fm config [--get] [--set]
 ```
 
-### ⏳ Phase 11: Session Management — DONE!
-- `fm save-session` — Save cwd, branch, description
-- `fm load-session` — Print restore commands
-- `fm sessions` — List all saved sessions
-- `fm delete-session` — Delete a session
+### Stats Output Features:
+- Total size, files, directories, max depth
+- File types breakdown with visual bars
+- Largest files (top 10)
+- Hidden files count, binary detection
+- Code file percentage
 
-### ⏳ Phase 12-18: Future phases
-- Diff, completions, config, polish, tests, docs, packaging
+### Do Command Actions:
+- `fm do` (default: list) — List piped paths
+- `fm do count` — Count lines in files
+- `fm do delete` — Trash files
+- `fm do open` — Open files
+- `fm do cat` — Print file contents
+- `fm do <cmd>` — Run custom command with `{}` for path
+
+### ⏳ Phase 12-18: Polish phases
+- Diff command (visual comparison)
+- Completions (clap_complete)
+- Config (toml)
+- Polish (clippy fixes)
+- Tests
+- Documentation
+- Packaging (crates.io)
 
 ## Done Criteria
 1. Code compiles and passes `cargo test`
