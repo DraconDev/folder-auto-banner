@@ -256,6 +256,10 @@ pub enum Commands {
         /// Name for the session
         #[arg(required = true)]
         name: String,
+        
+        /// Optional description
+        #[arg(long = "desc")]
+        description: Option<String>,
     },
 
     /// Load a saved session
@@ -400,8 +404,8 @@ impl Cli {
             Some(Unpin { name }) => crate::cmd::unpin::run_unpin(name),
 
             // Phase 11: Sessions
-            Some(SaveSession { name }) => crate::cmd::save_session::run_save_session(name),
-            Some(LoadSession { name, print_cd }) => crate::cmd::load_session::run_load_session(name, *print_cd),
+            Some(SaveSession { name, description }) => crate::cmd::save_session::run_save_session(name, description.as_deref()),
+            Some(LoadSession { name, print_cd: _ }) => crate::cmd::load_session::run_load_session(name),
             Some(Sessions) => crate::cmd::sessions::run_sessions(),
             Some(DeleteSession { name }) => crate::cmd::delete_session::run_delete_session(name),
 
