@@ -54,7 +54,7 @@ pub fn run_banner(
 /// Output rich formatted banner
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, compact: bool) {
     let term_width = Term::stdout().size().1 as usize;
-    let max_items = if compact { 4 } else { 8 };
+    let max_items = if compact { 4 } else { 20 };
 
     // Header line with path and git status
     let git_status = crate::git::format_git_status(git_info);
