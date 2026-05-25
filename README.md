@@ -92,3 +92,45 @@ cargo clippy  # 0 warnings
 ## License
 
 MIT
+## Installation
+
+### Quick Install Script (Recommended)
+
+```bash
+cd /home/dracon/Dev/cli-file-manager
+./install.sh  # Auto-detects shell and installs
+```
+
+This script will:
+1. Build the binary (`target/release/fm`)
+2. Copy it to `~/bin/fm`
+3. Add shell hook to your config (~/.bashrc or ~/.zshrc)
+
+### Manual Installation
+
+```bash
+cargo build --release
+cp target/release/fm ~/bin/fm
+```
+
+Then add to your shell config:
+
+**Bash:**
+```bash
+_cfm_hook() {
+    command fm banner "$PWD"
+}
+```
+
+**Zsh:**
+```bash
+autoload -U add-zsh-hook
+add-zsh-hook chpwd _cfm_hook
+```
+
+Then reload your shell:
+```bash
+source ~/.bashrc  # or source ~/.zshrc
+```
+
+Now type `cd` anywhere to see the auto banner! 🎉
