@@ -31,9 +31,9 @@ pub fn run_diff(dir1: &Path, dir2: &Path, shallow: bool, json: bool) -> Result<(
     let keys2_set: std::collections::HashSet<_> = keys2.iter().collect();
     
     // Find unique and common files
-    let unique_to_1: Vec<String> = keys1_set.difference(&keys2_set).cloned().collect();
-    let unique_to_2: Vec<String> = keys2_set.difference(&keys1_set).cloned().collect();
-    let common: Vec<String> = keys1_set.intersection(&keys2_set).cloned().collect();
+    let unique_to_1: Vec<String> = keys1_set.difference(&keys2_set).map(|s| s.clone()).collect();
+    let unique_to_2: Vec<String> = keys2_set.difference(&keys1_set).map(|s| s.clone()).collect();
+    let common: Vec<String> = keys1_set.intersection(&keys2_set).map(|s| s.clone()).collect();
 
     if json {
         output_json(dir1, dir2, &unique_to_1, &unique_to_2, &common);
