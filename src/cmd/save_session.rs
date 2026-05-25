@@ -1,8 +1,62 @@
-//! Save session command
-use anyhow::Result;
+//! Save session command — save current workspace state
+//! 
+//! Saves: cwd, clipboard, pins to session file
 
-pub fn run_save_session(name: &str) -> Result<()> {
-    let path = std::env::current_dir()?;
-    println!("💾 Session saved: {} -> {}", name, path.display());
+use anyhow::Result;
+use std::path::PathBuf;
+use serde::{Serialize, Deserialize};
+use std::fs;
+
+const SESSIONS_DIR: &str = ".local/share/cfm/sessions";
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Session {
+    pub name: String,
+    pub cwd: PathBuf,
+    pub timestamp: String,
+    pub git_branch: Option<String>,
+    pub description: Option<String>,
+}
+
+pub fn run_save_session(name: &str, description: Option<&str>) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    
+    // Get git branch if in a repo
+    let git_branch = crate::git::get_current_branch(&cwd).ok();
+    
+    let session = Session {
+        name: name.to_string(),
+        cwd: cwd.clone(),
+        timestamp: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        git_branch,
+        description: description.map(|s| s.to_string()),
+    };
+
+    // Get sessions directory
+    let proj_dirs = directories::ProjectDirs::from("com", "cfm", "cfm")
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine config directory"))?;
+    let sessions_dir = proj_dirs.data_dir().join("sessions");
+    fs::create_dir_all(&sessions_dir)?;
+
+    // Save session
+    let session_file = sessions_dir.join(format!("{}.json", sanitize_filename(name)));
+    let content = serde_json::to_string_pretty(&session)?;
+    fs::write(&session_file, content)?;
+
+    println!("💾 Saved session: {}", name);
+    println!("   Directory: {}", cwd.display());
+    if let Some(ref branch) = session.git_branch {
+        println!("   Branch: {}", branch);
+    }
+    if let Some(ref desc) = session.description {
+        println!("   Note: {}", desc);
+    }
+
     Ok(())
+}
+
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect()
 }

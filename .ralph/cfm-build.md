@@ -2,54 +2,59 @@
 
 Build the `cfm` (Contextual File Manager) Rust CLI tool.
 
-## Progress (Iteration 4)
+## Progress (Iteration 5)
 
 ### ✅ Phase 0-4: FOUNDATION COMPLETE
-- Banner, env, state types, TTY detection all working
-
 ### ✅ Phase 5: File Operations — DONE!
-```bash
-fm mv <src> <dest> [--overwrite] [--rename]   # Move with collision detection
-fm cp <src> <dest> [--overwrite]               # Copy with collision detection
-fm rm <files> [-r]                              # Safe remove (no protected paths)
-fm trash <files>                                # Move to ~/.local/share/cfm/trash/
-```
-
-**Working features:**
-- Collision detection (skip/overwrite/rename)
-- Cross-device move support
-- Protected path safety
-- Trash with manifest for recovery
-
 ### ✅ Phase 6: Ephemeral Clipboard — DONE!
-```bash
-fm yank <files>    # Copy to clipboard
-fm paste           # Paste from clipboard  
-fm paste --move-files  # Move from clipboard
-fm clipboard       # Show clipboard
-fm clipboard --clear  # Clear clipboard
-```
-
+### ✅ Phase 7: Safe File Operations — DONE!
+### ✅ Phase 8: Smart Piping — DONE!
+### ✅ Phase 9: Directory Stats — DONE!
 ### ✅ Phase 10: Spatial Memory — DONE!
+
+### Working Commands (full list):
 ```bash
-fm pin <name>       # Bookmark directory
-fm pins            # List pins
-fm jump <name>     # Print cd command
-fm unpin <name>    # Remove pin
-fm root            # Jump to git root
+# Banner
+fm               # Rich in terminal, raw when piped
+fm banner --json # JSON output
+
+# Env
+fm env           # Project aliases
+
+# File ops
+fm mv <src> <dest> [--overwrite] [--rename]
+fm cp <src> <dest> [--overwrite]
+fm rm <files> [-r]
+fm trash <files>    # → ~/.local/share/cfm/trash/
+
+# Clipboard
+fm yank <files>
+fm paste [--move-files]
+fm clipboard [--clear]
+
+# Pins
+fm pin <name>
+fm pins
+fm jump <name>
+fm unpin <name>
+fm root
+
+# Utils
+fm open <files>     # Open with default app
+fm do [action]      # Act on stdin paths (list, count, delete, open, cat, custom)
+fm stats [--json]   # Deep directory analysis
+fm trash <files>    # Move to trash
 ```
 
-### ⏳ Phase 7: Safe File Operations — NEXT
-- [ ] `fm open` — open with default app
-- [ ] `fm do` — stdin pipe destination
+### Stats Output Features:
+- Total size, files, directories, max depth
+- File types breakdown with visual bars
+- Largest files (top 10)
+- Hidden files count
+- Binary files detection
+- Code file percentage
 
-### ⏳ Phase 8: Smart Piping
-- [ ] `fm do` — stdin pipe destination
-
-### ⏳ Phase 9: Stats
-- [ ] `fm stats` — deep synthesis
-
-### ⏳ Phase 11: Session Management
+### ⏳ Phase 11: Session Management — NEXT
 - [ ] `fm save-session`
 - [ ] `fm load-session`
 - [ ] `fm sessions`
