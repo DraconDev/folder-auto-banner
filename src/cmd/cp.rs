@@ -106,7 +106,7 @@ fn perform_copy(source: &Path, dest: &Path, preserve: bool, verbose: bool) -> Re
     Ok(())
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path, preserve: bool) -> Result<()> {
+fn copy_dir_recursive(src: &Path, dst: &Path, _preserve: bool) -> Result<()> {
     fs::create_dir_all(dst)?;
     
     for entry in fs::read_dir(src)? {
@@ -116,7 +116,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path, preserve: bool) -> Result<()> {
         let dst_path = dst.join(entry.file_name());
         
         if ty.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path, preserve)?;
+            copy_dir_recursive(&src_path, &dst_path, _preserve)?;
         } else {
             fs::copy(&src_path, &dst_path)?;
         }
