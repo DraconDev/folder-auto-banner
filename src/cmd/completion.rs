@@ -1,7 +1,7 @@
 //! Completion command — generate shell completions
 use anyhow::Result;
 use clap::Command;
-use clap_complete::{Generator, shells, generate};
+use clap_complete::{shells, generate};
 
 pub fn run_completion(shell: &str) -> Result<()> {
     let mut cmd = Command::new("fm")

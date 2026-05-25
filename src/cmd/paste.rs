@@ -3,10 +3,9 @@
 //! Copies files from clipboard to current directory
 
 use anyhow::Result;
-use std::path::PathBuf;
 use std::fs;
 
-use crate::state::{ClipboardState, ClipboardEntry};
+use crate::state::ClipboardState;
 
 pub fn run_paste(move_files: bool, overwrite: bool) -> Result<()> {
     // Load clipboard

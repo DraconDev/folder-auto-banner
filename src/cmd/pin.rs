@@ -3,7 +3,6 @@
 //! Saves directory paths to ~/.local/share/cfm/pins.json
 
 use anyhow::Result;
-use std::path::Path;
 
 use crate::state::{PinsState, Pin};
 

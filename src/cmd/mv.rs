@@ -7,7 +7,6 @@ use anyhow::Result;
 use std::path::{PathBuf, Path};
 use std::fs;
 
-use crate::fs::format_size;
 
 #[derive(Debug, Clone)]
 pub enum CollisionAction {

@@ -361,7 +361,7 @@ impl Cli {
             }
             None => {
                 // `fm` with no args = `fm banner`
-                let p: Option<&Path> = self.path.as_ref().map(|p| p.as_path());
+                let p: Option<&Path> = self.path.as_deref();
                 crate::cmd::banner::run_banner(p, false, false, false)
             }
 

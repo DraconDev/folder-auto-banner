@@ -6,7 +6,6 @@
 use anyhow::Result;
 use std::path::{PathBuf, Path};
 use std::fs;
-use std::io;
 
 #[derive(Debug, Clone)]
 pub enum CollisionAction {
@@ -90,7 +89,7 @@ fn perform_copy(source: &Path, dest: &Path, preserve: bool, verbose: bool) -> Re
     } else {
         if preserve {
             // Preserve metadata
-            let meta = fs::metadata(source)?;
+            let _meta = fs::metadata(source)?;
             fs::copy(source, dest)?;
             // Note: Can't easily preserve all metadata in std
         } else {

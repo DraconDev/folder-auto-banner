@@ -15,9 +15,7 @@ use anyhow::Result;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::Command;
-use std::process::Stdio;
 
-use crate::fs::ProjectType;
 
 pub fn run_do(action: Option<&str>, verbose: bool) -> Result<()> {
     // Read paths from stdin

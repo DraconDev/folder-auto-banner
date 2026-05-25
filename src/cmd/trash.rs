@@ -7,7 +7,6 @@
 use anyhow::Result;
 use std::path::{PathBuf, Path};
 use std::fs;
-use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 const TRASH_DIR: &str = ".local/share/cfm/trash";

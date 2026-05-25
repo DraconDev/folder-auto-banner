@@ -2,8 +2,8 @@
 //! 
 //! Uses git2 crate for fast, native Git operations.
 
-use anyhow::{Context, Result};
-use git2::{Repository, BranchType};
+use anyhow::Result;
+use git2::Repository;
 use std::path::Path;
 
 /// Git status for a directory
@@ -27,10 +27,7 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         Err(_) => return Ok(GitInfo::default()),
     };
 
-    let head = match repo.head() {
-        Ok(h) => Some(h),
-        Err(_) => None,
-    };
+    let head = repo.head().ok();
 
     let branch = head.as_ref().and_then(|h| {
         h.shorthand().map(|s| s.to_string())
@@ -65,7 +62,7 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
     }
 
     // Get ahead/behind (simplified - skip if not straightforward)
-    let (ahead, behind) = if let Some(head) = head.as_ref() {
+    let (ahead, behind) = if let Some(_head) = head.as_ref() {
         // Just report 0 for ahead/behind for now, complexity not worth it
         (0, 0)
     } else {

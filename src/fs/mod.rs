@@ -2,7 +2,7 @@
 //! 
 //! Fast, parallel directory walking using ignore crate.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};

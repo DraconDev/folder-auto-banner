@@ -7,7 +7,6 @@ use anyhow::Result;
 use std::path::Path;
 use comfy_table::{Table, Cell};
 use console::Term;
-use atty::Stream;
 
 use crate::fs::{DirSummary, format_size};
 use crate::git::GitInfo;
@@ -102,7 +101,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, compact: b
         let mut table = Table::new();
         table.set_header(vec!["", "Name", "Type", "Size"]);
         
-        for (i, item) in top_items.iter().enumerate() {
+        for item in top_items.iter() {
             let icon = if item.is_dir { "📂" } else { "📄" };
             let type_label = if item.is_dir {
                 format!("{} item(s)", count_items_in_dir(item))
