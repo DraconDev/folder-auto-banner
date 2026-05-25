@@ -98,9 +98,7 @@ fn analyze_dir(path: &Path, stats: &mut DirStats, depth: usize) -> Result<()> {
             stats.largest_files.push((entry_path.clone(), size));
             stats.largest_files.sort_by(|a, b| b.1.cmp(&a.1));
             stats.largest_files.truncate(10);
-
-            // Track binary separately (already counted above)
-            // (removed duplicate tracking)
+        }
     }
 
     Ok(())
