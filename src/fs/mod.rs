@@ -229,3 +229,18 @@ pub fn format_relative_time(dt: &DateTime<Utc>) -> String {
         "just now".to_string()
     }
 }
+impl DirSummary {
+    /// Get file type breakdown
+    pub fn by_type(&self) -> Vec<(String, usize)> {
+        let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for entry in &self.top_items {
+            let ext = if let Some(dot) = entry.name.rfind('.') {
+                entry.name[dot+1..].to_lowercase()
+            } else {
+                "other".to_string()
+            };
+            *counts.entry(ext).or_insert(0) += 1;
+        }
+        counts.into_iter().map(|(k, v)| (k, v)).collect()
+    }
+}
