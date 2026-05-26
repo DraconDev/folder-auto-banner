@@ -74,20 +74,51 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     };
     
     let git_branch = git_info.branch.as_deref().unwrap_or("");
+    
+    // Build enhanced header with git status
     let header = if git_info.is_repo {
+        // Git repo - show branch and status
+        let status_parts = [
+            if git_info.modified > 0 { format!("{} modified", git_info.modified) } else { String::new() },
+            if git_info.untracked > 0 { format!("{} untracked", git_info.untracked) } else { String::new() },
+            if git_info.staged > 0 { format!("{} staged", git_info.staged) } else { String::new() },
+            if git_info.ahead.unwrap_or(0) > 0 { format!("↑{}", git_info.ahead.unwrap()) } else { String::new() },
+            if git_info.behind.unwrap_or(0) > 0 { format!("↓{}", git_info.behind.unwrap()) } else { String::new() },
+        ].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" │ ");
+        
         if git_branch.is_empty() {
-            format!("{} {} │ {} │ {} │ {} files │ {} dirs", 
-                project_icon, path_display, project_label, size_str,
-                summary.files, summary.dirs)
+            if status_parts.is_empty() {
+                format!("{} {} │ {} │ {} │ {} files │ {} dirs", 
+                    project_icon, path_display, project_label, size_str,
+                    summary.files, summary.dirs)
+            } else {
+                format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {}", 
+                    project_icon, path_display, project_label, size_str,
+                    summary.files, summary.dirs, status_parts)
+            }
         } else {
-            format!("{} {} [{}] │ {} │ {} │ {} files │ {} dirs", 
-                project_icon, path_display, git_branch, project_label, size_str,
-                summary.files, summary.dirs)
+            if status_parts.is_empty() {
+                format!("{} {} [{}] │ {} │ {} │ {} files │ {} dirs", 
+                    project_icon, path_display, git_branch, project_label, size_str,
+                    summary.files, summary.dirs)
+            } else {
+                format!("{} {} [{}] │ {} │ {} │ {} files │ {} dirs │ {}", 
+                    project_icon, path_display, git_branch, project_label, size_str,
+                    summary.files, summary.dirs, status_parts)
+            }
         }
     } else {
-        format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} items", 
-            project_icon, path_display, project_label, size_str,
-            summary.files, summary.dirs, summary.total_items)
+        // Not a git repo
+        let hidden_count = hidden_items.len();
+        if hidden_count > 0 {
+            format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} hidden │ {} total", 
+                project_icon, path_display, project_label, size_str,
+                summary.files, summary.dirs, hidden_count, summary.total_items)
+        } else {
+            format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} items", 
+                project_icon, path_display, project_label, size_str,
+                summary.files, summary.dirs, summary.total_items)
+        }
     };
     
     let header_display: String = header.chars().take(term_width.saturating_sub(2)).collect();
