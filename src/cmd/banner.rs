@@ -113,7 +113,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     // Smart hidden: show if we have room (less than 70% of screen used by visible items)
     let total_visible = visible_items.len();
-    let rows_for_visible = (total_visible + num_cols - 1) / num_cols;
+    let rows_for_visible = total_visible.div_ceil(num_cols);
     let max_rows = 20; // max rows to show
     
     let show_hidden = rows_for_visible <= max_rows && total_visible < 30;
@@ -122,7 +122,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let display_items = if show_hidden {
         visible_items.iter().chain(hidden_items.iter()).copied().collect()
     } else {
-        visible_items.iter().map(|i| *i).collect::<Vec<_>>()
+        visible_items.iter().copied().collect::<Vec<_>>()
     };
     
     // Display in columns
