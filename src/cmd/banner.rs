@@ -6,7 +6,7 @@
 use anyhow::Result;
 use std::path::Path;
 
-use crate::fs::{DirSummary, format_size_compact};
+use crate::fs::{DirSummary, format_size_compact, format_relative_time};
 use crate::git::GitInfo;
 
 /// Run the banner command
@@ -22,7 +22,6 @@ pub fn run_banner(
     let summary = DirSummary::scan(&path)?;
     let git_info = crate::git::get_git_info(&path)?;
     
-    // Default to rich output for better UX
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw {
@@ -36,15 +35,13 @@ pub fn run_banner(
 
 /// Output rich formatted banner - list view like a file manager
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
-    let term_width = 120; // Fixed width for consistent formatting
+    let term_width = 120usize;
     
-    // Path info
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
     let project_label = summary.project_type.label();
     
-    // Relative path from home
     let home = std::env::var("HOME").unwrap_or_default();
     let path_display = if path_str.starts_with(&home) {
         let relative = &path_str[home.len()..];
@@ -60,7 +57,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let git_branch = git_info.branch.as_deref().unwrap_or("");
     let hidden_count = summary.top_items.iter().filter(|item| item.name.starts_with('.')).count();
     
-    // Build header
     let header = if git_info.is_repo {
         let status_parts = [
             if git_info.modified > 0 { format!("{} modified", git_info.modified) } else { String::new() },
@@ -107,7 +103,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     println!("{}", header_display);
     println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
     
-    // Separate items
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
     let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
     
@@ -119,39 +114,35 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         }
     }
     
-    // Smart hidden - show if < 30 visible items
     let total_visible = visible_items.len();
     let show_hidden = total_visible < 30;
     
-    // Sort: directories first, then files, alphabetically within each group
     let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden {
         visible_items.iter().chain(hidden_items.iter()).copied().collect()
     } else {
         visible_items.to_vec()
     };
     
-    // Sort: dirs first, then alphabetically
     display_items.sort_by(|a, b| {
-        // Directories come first
         if a.is_dir != b.is_dir {
             return b.is_dir.cmp(&a.is_dir);
         }
-        // Then alphabetical (case-insensitive)
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
     
-    // List view - one item per line, like file manager
     for item in display_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
             let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
             let name = item.name.chars().take(40).collect::<String>();
-            println!("  📂 drwxr-xr-x  {:>10}  {:<8}  {:<40}", count_str, "--", name);
+            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+            println!("  📂 drwxr-xr-x  {:>10}  {:<8}  {:<40}  {}", count_str, "--", name, modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(item);
             let name = item.name.chars().take(40).collect::<String>();
-            println!("  📄 -rw-r--r--  {:>10}  {:<8}  {:<40}", size, ext, name);
+            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+            println!("  📄 -rw-r--r--  {:>10}  {:<8}  {:<40}  {}", size, ext, name, modified);
         }
     }
     
@@ -160,14 +151,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     }
 }
 
-/// Output raw (for piping)
 fn output_raw(summary: &DirSummary) {
     for item in &summary.top_items {
         println!("{}", item.path.display());
     }
 }
 
-/// Output JSON (for scripting)
 fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
     use serde_json::json;
     
@@ -199,14 +188,12 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
     println!("{}", serde_json::to_string_pretty(&output).unwrap());
 }
 
-/// Count items in a directory
 fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
     std::fs::read_dir(&entry.path)
         .map(|d| d.count())
         .unwrap_or(0)
 }
 
-/// Get extension-based label
 fn get_extension_label(item: &crate::fs::DirEntry) -> String {
     let name = &item.name;
     if let Some(dot) = name.rfind('.') {
