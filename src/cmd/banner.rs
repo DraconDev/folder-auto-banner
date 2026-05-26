@@ -6,7 +6,6 @@
 use anyhow::Result;
 use std::path::Path;
 use console::Term;
-use dirs::home_dir;
 
 use crate::fs::{DirSummary, format_size_compact};
 use crate::git::GitInfo;
@@ -61,18 +60,14 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let project_icon = summary.project_type.icon();
     let project_label = summary.project_type.label();
     
-    // Show relative path when possible, otherwise truncate
-    let home = dirs::home_dir().map(|h| h.to_string_lossy().to_string());
-    let path_display = if let Some(ref h) = home {
-        if path_str.starts_with(h) {
-            let relative = path_str[h.len()..].to_string();
-            if relative.is_empty() || relative == "/" {
-                "~".to_string()
-            } else {
-                format!("~{}", relative)
-            }
+    // Show relative path from home directory
+    let home = std::env::var("HOME").unwrap_or_default();
+    let path_display = if path_str.starts_with(&home) {
+        let relative = &path_str[home.len()..];
+        if relative.is_empty() || relative == "/" {
+            "~".to_string()
         } else {
-            path_str.to_string()
+            format!("~{}", relative)
         }
     } else {
         path_str.to_string()
