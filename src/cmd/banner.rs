@@ -140,18 +140,17 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     }
     
     // Calculate columns based on terminal width
-    // Each column: name (20) + count/size (8) + modified (15) = ~43 chars
-    // But we need to wrap rows properly, so cap max columns
-    let col_width = 45;
-    let max_cols = 5; // max columns per row to keep rows reasonable
+    // Each column: name (22) + size/count (8) + type (6) + modified (15) = ~51 chars total
+    let col_width = 53;
+    let max_cols = 5; // max columns per row
     let num_cols = (term_width / col_width).max(1).min(max_cols);
     
-    // Smart hidden: show if we have room (less than 70% of screen used by visible items)
+    // Smart hidden: show if we have room
     let total_visible = visible_items.len();
     let rows_for_visible = total_visible.div_ceil(num_cols);
-    let max_rows = 20; // max rows to show
+    let max_rows = 15; 
     
-    let show_hidden = rows_for_visible <= max_rows && total_visible < 30;
+    let show_hidden = rows_for_visible <= max_rows && total_visible < 35;
     
     // Prepare items to display
     let display_items = if show_hidden {
@@ -160,31 +159,35 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         visible_items.to_vec()
     };
     
-    // Display in columns - row-based, each row has multiple items
-    // Items are printed row by row, each row contains num_cols items
+    // Print table header
+    let separator = "─".repeat(term_width.saturating_sub(2).max(60));
+    println!("{}", separator);
+    
+    // Display in columns - row by row with proper spacing
     let mut row_idx = 0;
     while row_idx < display_items.len() {
         let end_idx = (row_idx + num_cols).min(display_items.len());
         let row_items = &display_items[row_idx..end_idx];
         
-        // Print items in this row
-        let row_str = row_items.iter().map(|item| {
-            if item.is_dir {
+        // Build row string with proper column alignment
+        let mut row_parts: Vec<String> = Vec::new();
+        for item in row_items {
+            let (name_part, count_part, type_part) = if item.is_dir {
                 let count = count_items_in_dir(item);
-                let count_str = if count == 1 { "1" } else { &format!("{}", count) };
-                let name = item.name.chars().take(20).collect::<String>();
-                let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                format!("📂 {:<20} {}  {}", name, count_str, modified)
+                let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
+                let name = item.name.chars().take(22).collect::<String>();
+                (format!("📂 {}", name), count_str.to_string(), "".to_string())
             } else {
                 let size = format_size_compact(item.size);
                 let ext = get_extension_label(item);
-                let name = item.name.chars().take(20).collect::<String>();
-                let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                format!("📄 {:<20} {:>6}  {:<4}  {}", name, size, ext, modified)
-            }
-        }).collect::<Vec<_>>().join("  ");
-        
-        println!("{}", row_str);
+                let name = item.name.chars().take(22).collect::<String>();
+                (format!("📄 {}", name), format!("{:>8}", size), ext)
+            };
+            
+            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+            row_parts.push(format!("{} │ {} │ {} │ {}", name_part, count_part, type_part, modified));
+        }
+        println!("{}", row_parts.join("  "));
         row_idx = end_idx;
     }
     
