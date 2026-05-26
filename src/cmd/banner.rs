@@ -99,7 +99,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     println!("{}", header);
     println!("{}", "─".repeat(100));
-    println!("{:<14} {:>10}  {:<8}  {:<30}  {:<15}", "TYPE", "SIZE", "EXT", "NAME", "MODIFIED");
+    println!("{:<4}  {:<30}  {:>10}  {:<10}  {:<15}", "", "NAME", "SIZE", "TYPE", "MODIFIED");
     println!("{}", "─".repeat(100));
     
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
@@ -132,16 +132,14 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     for item in display_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
-            let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
-            let name = item.name.chars().take(30).collect::<String>();
+            let count_str = if count == 1 { "1" } else { &format!("{}", count) };
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("📂 {:<14} {:>10}  {:<8}  {:<30}  {:<15}", "drwxr-xr-x", count_str, "[DIR]", name, modified);
+            println!("d  {:<30} {:>5} items  {}", item.name, count_str, modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(item);
-            let name = item.name.chars().take(30).collect::<String>();
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("📄 {:<14} {:>10}  {:<8}  {:<30}  {:<15}", "-rw-r--r--", size, ext, name, modified);
+            println!("-  {:<30} {:>8}  {:.<8}  {}", item.name, size, ext, modified);
         }
     }
     
