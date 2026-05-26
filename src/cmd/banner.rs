@@ -152,41 +152,54 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         visible_items.to_vec()
     };
     
-    // Separator then table column headers
+    // Table layout: 4 columns of NAME | SIZE | TYPE | MODIFIED
+    let cells_per_row = 4;
+    
+    // Smart hidden
+    let total_visible = visible_items.len();
+    let show_hidden = total_visible.div_ceil(cells_per_row) <= 12 && total_visible < 30;
+    
+    let display_items = if show_hidden {
+        visible_items.iter().chain(hidden_items.iter()).copied().collect()
+    } else {
+        visible_items.to_vec()
+    };
+    
     let sep = "─".repeat(term_width.saturating_sub(2).max(60));
+    
+    // Table header
+    let h1 = format!("{:<18} │ {:>10} │ {:<8} │ {:<15}", "NAME", "SIZE", "TYPE", "MODIFIED");
     println!("{}", sep);
-    // Multi-column header
-    let h1 = format!("{:<18} │ {:>10} │ {:<8} │ {:<15}", "NAME", "SIZE/COUNT", "TYPE", "MODIFIED");
-    let h2 = format!("{:<18} │ {:>10} │ {:<8} │ {:<15}", "NAME", "SIZE/COUNT", "TYPE", "MODIFIED");
-    println!("{}   {}", h1, h2);
-    println!("{}", sep);
+    println!("{}   {}", h1, h1);
     println!("{}", sep);
     
-    // Print items in table rows
+    // Table data rows
+    let data_width = 18 + 1 + 10 + 1 + 8 + 1 + 15; // 54 chars per cell
+    let cell_sep = "   "; // 3 spaces between cells
+    
     for chunk in display_items.chunks(cells_per_row) {
-        let mut row_parts: Vec<String> = Vec::new();
+        let mut parts: Vec<String> = Vec::new();
         for item in chunk {
             if item.is_dir {
                 let count = count_items_in_dir(item);
                 let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
                 let name = item.name.chars().take(18).collect::<String>();
                 let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                row_parts.push(format!("📂 {:<18} │ {:>10} │ {:<8} │ {:<15}",
-                    name, count_str, "", modified));
+                parts.push(format!("📂 {:<18}│{:>10}│{:<8}│{:.<15}", name, count_str, "", modified));
             } else {
                 let size = format_size_compact(item.size);
                 let ext = get_extension_label(item);
                 let name = item.name.chars().take(18).collect::<String>();
                 let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                row_parts.push(format!("📄 {:<18} │ {:>10} │ {:<8} │ {:<15}",
-                    name, size, ext, modified));
+                parts.push(format!("📄 {:<18}│{:>10}│{:<8}│{:.<15}", name, size, ext, modified));
             }
         }
-        // Pad empty cells if last row has fewer items
-        while row_parts.len() < cells_per_row {
-            row_parts.push(format!("{:<18} │ {:>10} │ {:<8} │ {:<15}", "", "", "", ""));
+        // Pad empty cells for last row
+        while parts.len() < cells_per_row {
+            parts.push(format!("{:<18}│{:>10}│{:<8}│{:.<15}", "", "", "", ""));
         }
-        println!("{}", row_parts.join("   "));
+        // Join with space between columns
+        println!("{}", parts.join(cell_sep));
     }
     
     // Show hidden count if not displayed
