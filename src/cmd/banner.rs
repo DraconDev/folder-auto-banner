@@ -140,9 +140,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     }
     
     // Calculate columns based on terminal width
-    // Each column: name (20) + size (8) + type (6) = ~34 chars
-    let col_width = 36;
-    let num_cols = (term_width / col_width).max(1);
+    // Each column: name (20) + count/size (8) + modified (15) = ~43 chars
+    // But we need to wrap rows properly, so cap max columns
+    let col_width = 45;
+    let max_cols = 5; // max columns per row to keep rows reasonable
+    let num_cols = (term_width / col_width).max(1).min(max_cols);
     
     // Smart hidden: show if we have room (less than 70% of screen used by visible items)
     let total_visible = visible_items.len();
@@ -158,30 +160,32 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         visible_items.to_vec()
     };
     
-    // Display in columns
-    let mut rows: Vec<Vec<String>> = Vec::new();
-    for chunk in display_items.chunks(num_cols) {
-        let mut row = Vec::new();
-        for item in chunk {
+    // Display in columns - row-based, each row has multiple items
+    // Items are printed row by row, each row contains num_cols items
+    let mut row_idx = 0;
+    while row_idx < display_items.len() {
+        let end_idx = (row_idx + num_cols).min(display_items.len());
+        let row_items = &display_items[row_idx..end_idx];
+        
+        // Print items in this row
+        let row_str = row_items.iter().map(|item| {
             if item.is_dir {
                 let count = count_items_in_dir(item);
                 let count_str = if count == 1 { "1" } else { &format!("{}", count) };
                 let name = item.name.chars().take(20).collect::<String>();
                 let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                row.push(format!("📂 {:<20} {}  {}", name, count_str, modified));
+                format!("📂 {:<20} {}  {}", name, count_str, modified)
             } else {
                 let size = format_size_compact(item.size);
                 let ext = get_extension_label(item);
                 let name = item.name.chars().take(20).collect::<String>();
                 let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                row.push(format!("📄 {:<20} {:>6}  {:<4}  {}", name, size, ext, modified));
+                format!("📄 {:<20} {:>6}  {:<4}  {}", name, size, ext, modified)
             }
-        }
-        rows.push(row);
-    }
-    
-    for row in rows {
-        println!("{}", row.join("  "));
+        }).collect::<Vec<_>>().join("  ");
+        
+        println!("{}", row_str);
+        row_idx = end_idx;
     }
     
     // Show hidden count if not displayed
