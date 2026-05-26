@@ -55,7 +55,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let term_width = Term::stdout().size().1 as usize;
     
     // Single-line header: compact, fits terminal
-    let git_status = crate::git::format_git_status(git_info);
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
@@ -75,7 +74,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             let commit_display = if commit_short.len() < msg.len() {
                 format!("{}...", commit_short)
             } else {
-                commit_short
+                commit_short.clone()
             };
             format!("{} {} │ {} {} │ {} │ {}", 
                 project_icon, path_display, project_label, size_str,
@@ -96,6 +95,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
     
     // Show ALL items, one per line, compact
+    let _remaining = summary.total_items; // total item count for reference
     for item in &summary.top_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
