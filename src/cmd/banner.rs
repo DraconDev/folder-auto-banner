@@ -7,7 +7,7 @@ use anyhow::Result;
 use std::path::Path;
 use console::Term;
 
-use crate::fs::{DirSummary, format_size_compact};
+use crate::fs::{DirSummary, format_size_compact, format_relative_time};
 use crate::git::GitInfo;
 
 /// Run the banner command
@@ -95,18 +95,20 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
     
     // Show ALL items, one per line, compact
-    // Fixed width: name (14), size (8), type (8)
+    // Use most of terminal width: name (40), size (8), type (6), modified (12)
     for item in &summary.top_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
             let count_str = if count == 1 { "item" } else { "items" };
-            let name = item.name.chars().take(14).collect::<String>();
-            println!("  📂 {:<14} {} {}", name, count, count_str);
+            let name = item.name.chars().take(40).collect::<String>();
+            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+            println!("  📂 {:<40} {} {}  {}", name, count, count_str, modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(&item.name);
-            let name = item.name.chars().take(14).collect::<String>();
-            println!("  📄 {:<14} {}  {}", name, size, ext);
+            let name = item.name.chars().take(40).collect::<String>();
+            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+            println!("  📄 {:<40} {:>8}  {:<6}  {}", name, size, ext, modified);
         }
     }
 }
