@@ -70,15 +70,15 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     let header = if git_info.is_repo {
         if let Some(ref msg) = git_info.last_commit_msg {
-            let commit_short: String = msg.chars().take(20).collect();
+            let commit_short: String = msg.chars().take(15).collect();
             let commit_display = if commit_short.len() < msg.len() {
                 format!("{}...", commit_short)
             } else {
                 commit_short
             };
-            format!("{} {} │ {} │ {} │ {} files │ {} dirs", 
+            format!("{} {} │ {} │ {} │ {}", 
                 project_icon, path_display, project_label, size_str,
-                summary.files, summary.dirs)
+                commit_display)
         } else {
             format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} items", 
                 project_icon, path_display, project_label, size_str,
@@ -100,7 +100,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         if item.is_dir {
             let count = count_items_in_dir(item);
             let name = item.name.chars().take(40).collect::<String>();
-            println!("  📂 {:<40} {} items", name, count);
+            let count_str = if count == 1 { "item" } else { "items" };
+            println!("  📂 {:<40} {} {}", name, count, count_str);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(&item.name);
@@ -175,7 +176,9 @@ fn get_extension_label(name: &str) -> String {
             "py" => "Py".to_string(),
             "js" | "ts" => "JS".to_string(),
             "lock" => "Lock".to_string(),
-            "gitignore" | "gitattributes" => ext.to_uppercase().to_string(),
+            "gitignore" => "GIT-IGN".to_string(),
+            "gitignore-local" => "GIT-IGN".to_string(),
+            "gitattributes" => "GIT-ATT".to_string(),
             _ => ext.to_uppercase().chars().take(4).collect(),
         }
     } else {
