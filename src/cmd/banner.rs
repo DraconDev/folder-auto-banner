@@ -209,6 +209,7 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
 
 /// Get extension-based label — compact
 fn get_extension_label(item: &crate::fs::DirEntry) -> String {
+    let name = &item.name;
     if let Some(dot) = name.rfind('.') {
         let ext = &name[dot+1..].to_lowercase();
         match ext.as_str() {
