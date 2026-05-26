@@ -75,6 +75,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     let git_branch = git_info.branch.as_deref().unwrap_or("");
     
+    // Count hidden items (needed for both git and non-git headers)
+    let hidden_count = summary.top_items.iter().filter(|item| item.name.starts_with('.')).count();
+    
     // Build enhanced header with git status
     let header = if git_info.is_repo {
         // Git repo - show branch and status
@@ -82,8 +85,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             if git_info.modified > 0 { format!("{} modified", git_info.modified) } else { String::new() },
             if git_info.untracked > 0 { format!("{} untracked", git_info.untracked) } else { String::new() },
             if git_info.staged > 0 { format!("{} staged", git_info.staged) } else { String::new() },
-            if git_info.ahead.unwrap_or(0) > 0 { format!("↑{}", git_info.ahead.unwrap()) } else { String::new() },
-            if git_info.behind.unwrap_or(0) > 0 { format!("↓{}", git_info.behind.unwrap()) } else { String::new() },
+            if git_info.ahead > 0 { format!("↑{}", git_info.ahead) } else { String::new() },
+            if git_info.behind > 0 { format!("↓{}", git_info.behind) } else { String::new() },
         ].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" │ ");
         
         if git_branch.is_empty() {
@@ -109,7 +112,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         }
     } else {
         // Not a git repo
-        let hidden_count = hidden_items.len();
         if hidden_count > 0 {
             format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} hidden │ {} total", 
                 project_icon, path_display, project_label, size_str,
