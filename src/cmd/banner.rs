@@ -6,7 +6,6 @@
 use anyhow::Result;
 use std::path::Path;
 use console::Term;
-
 use crate::fs::{DirSummary, format_size_compact, format_relative_time};
 use crate::git::GitInfo;
 
@@ -117,13 +116,35 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let sep = "─".repeat(term_width.saturating_sub(2).max(60));
     println!("{}", sep);
     
-    // Table header - 4 cells per row, each with NAME | SIZE | TYPE | MODIFIED | PERMS
-    let cell_hdr = format!("{:<18}│{:>9}│{:>7}│{:.<13}│{:>10}", "NAME", "SIZE", "TYPE", "MODIFIED", "PERMS");
+    // Table header - 4 cells per row
+    let cell_hdr = format!("{:<16}│{:>9}│{:>7}│{:.<14}", "NAME", "SIZE", "TYPE", "MODIFIED");
     println!("{}   {}   {}   {}", cell_hdr, cell_hdr, cell_hdr, cell_hdr);
     println!("{}", sep);
     
+    // Separate items
+    let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
+    let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
+    
+    for item in &summary.top_items {
+        if item.name.starts_with('.') {
+            hidden_items.push(item);
+        } else {
+            visible_items.push(item);
+        }
+    }
+    
+    // Smart hidden
+    let total_visible = visible_items.len();
+    let show_hidden = total_visible.div_ceil(4) <= 12 && total_visible < 30;
+    
+    let display_items = if show_hidden {
+        visible_items.iter().chain(hidden_items.iter()).copied().collect()
+    } else {
+        visible_items.to_vec()
+    };
+    
     // Table data
-    for chunk in display_items.chunks(cells_per_row) {
+    for chunk in display_items.chunks(4) {
         let parts: Vec<String> = chunk.iter().map(|item| {
             if item.is_dir {
                 let count = count_items_in_dir(item);
