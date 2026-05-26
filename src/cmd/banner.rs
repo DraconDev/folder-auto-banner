@@ -68,10 +68,17 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         path_str.to_string()
     };
     
+    let git_branch = git_info.branch.as_deref().unwrap_or("");
     let header = if git_info.is_repo {
-        format!("{} {} │ {} │ {} │ {} │ {}", 
-            project_icon, path_display, project_label, size_str,
-            summary.files, summary.dirs)
+        if git_branch.is_empty() {
+            format!("{} {} │ {} │ {} │ {} files │ {} dirs", 
+                project_icon, path_display, project_label, size_str,
+                summary.files, summary.dirs)
+        } else {
+            format!("{} {} [{}] │ {} │ {} │ {} files │ {} dirs", 
+                project_icon, path_display, git_branch, project_label, size_str,
+                summary.files, summary.dirs)
+        }
     } else {
         format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} items", 
             project_icon, path_display, project_label, size_str,
