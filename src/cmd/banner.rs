@@ -35,8 +35,6 @@ pub fn run_banner(
 
 /// Output rich formatted banner - list view like a file manager
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
-    let term_width = 120usize;
-    
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
@@ -99,9 +97,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         }
     };
     
-    let header_display: String = header.chars().take(term_width.saturating_sub(2)).collect();
-    println!("{}", header_display);
-    println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
+    println!("{}", "─".repeat(100));
+    println!("{:<14} {:>10}  {:<6}  {:<30}  {}", "TYPE", "SIZE", "", "NAME", "MODIFIED");
+    println!("{}", "─".repeat(100));
     
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
     let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
@@ -134,15 +132,15 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         if item.is_dir {
             let count = count_items_in_dir(item);
             let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
-            let name = item.name.chars().take(40).collect::<String>();
+            let name = item.name.chars().take(30).collect::<String>();
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("  📂 drwxr-xr-x  {:>10}  {:<8}  {:<40}  {}", count_str, "--", name, modified);
+            println!("📂 {:<12} {:>10}  {:<6}  {:<30}  {}", "drwxr-xr-x", count_str, "--", name, modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(item);
-            let name = item.name.chars().take(40).collect::<String>();
+            let name = item.name.chars().take(30).collect::<String>();
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("  📄 -rw-r--r--  {:>10}  {:<8}  {:<40}  {}", size, ext, name, modified);
+            println!("📄 {:<12} {:>10}  {:<6}  {:<30}  {}", "-rw-r--r--", size, ext, name, modified);
         }
     }
     
