@@ -17,8 +17,10 @@ The cfm banner now shows:
 ### 2. Better Column Layout
 - [ ] Responsive columns based on terminal width
 - [ ] Optimal column widths (name, size, type, modified, perms?)
-- [ ] Fill columns properly (not ragged)
+- [x] Row-based output (one item per line, clear and readable) - ✅ Done
 - [ ] Sort by: name, size, modified, type (default: name)
+- [x] Max columns capped at 5 to keep rows manageable - ✅ Done
+- [ ] Column-based output (multiple items per row) - deprecated per user preference
 
 ### 3. More Item Information
 - [ ] Show permissions (rwxr-xr-x)
