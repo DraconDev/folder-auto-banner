@@ -6,6 +6,7 @@
 use anyhow::Result;
 use std::path::Path;
 use console::Term;
+
 use crate::fs::{DirSummary, format_size_compact, format_relative_time};
 use crate::git::GitInfo;
 
@@ -19,15 +20,11 @@ pub fn run_banner(
     let cwd = std::env::current_dir()?;
     let path = path.unwrap_or(cwd.as_path()).canonicalize().unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
     
-    // Get directory summary
     let summary = DirSummary::scan(&path)?;
-    
-    // Get git info
     let git_info = crate::git::get_git_info(&path)?;
     
     let is_stdout_tty = atty::is(atty::Stream::Stdout);
     
-    // Auto-detect based on TTY
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw || !is_stdout_tty {
@@ -39,11 +36,11 @@ pub fn run_banner(
     Ok(())
 }
 
-/// Output rich formatted banner with table layout
+/// Output rich formatted banner - list view like a file manager
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
     let term_width = Term::stdout().size().1 as usize;
     
-    // Path and size
+    // Path info
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
@@ -110,14 +107,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     let header_display: String = header.chars().take(term_width.saturating_sub(2)).collect();
     println!("{}", header_display);
-    
-    let sep = "─".repeat(term_width.saturating_sub(2).max(60));
-    println!("{}", sep);
-    
-    // Table header - 4 cells per row
-    let cell_hdr = format!("{:<16}│{:>9}│{:>7}│{:.<14}", "NAME", "SIZE", "TYPE", "MODIFIED");
-    println!("{}   {}   {}   {}", cell_hdr, cell_hdr, cell_hdr, cell_hdr);
-    println!("{}", sep);
+    println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
     
     // Separate items
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
@@ -131,9 +121,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         }
     }
     
-    // Smart hidden
+    // Smart hidden - show if < 30 visible items
     let total_visible = visible_items.len();
-    let show_hidden = total_visible.div_ceil(4) <= 12 && total_visible < 30;
+    let show_hidden = total_visible < 30;
     
     let display_items = if show_hidden {
         visible_items.iter().chain(hidden_items.iter()).copied().collect()
@@ -141,24 +131,20 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         visible_items.to_vec()
     };
     
-    // Table data
-    for chunk in display_items.chunks(4) {
-        let parts: Vec<String> = chunk.iter().map(|item| {
-            if item.is_dir {
-                let count = count_items_in_dir(item);
-                let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
-                let name = item.name.chars().take(16).collect::<String>();
-                let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                format!("📂 {:<16}│{:>9}│{:>7}│{:.<14}", name, count_str, "--", modified)
-            } else {
-                let size = format_size_compact(item.size);
-                let ext = get_extension_label(item);
-                let name = item.name.chars().take(16).collect::<String>();
-                let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                format!("📄 {:<16}│{:>9}│{:>7}│{:.<14}", name, size, ext, modified)
-            }
-        }).collect();
-        println!("{}", parts.join("   "));
+    // List view - one item per line, like file manager
+    for item in display_items {
+        if item.is_dir {
+            let count = count_items_in_dir(item);
+            let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
+            let name = item.name.chars().take(40).collect::<String>();
+            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+            println!("  📂 drwxr-xr-x  {:>10}  {:<8}  {:<40}  {}", "[DIR]", count_str, "--", name);
+        } else {
+            let size = format_size_compact(item.size);
+            let ext = get_extension_label(item);
+            let name = item.name.chars().take(40).collect::<String>();
+            println!("  📄 -rw-r--r--  {:>10}  {:<8}  {:<40}", size, ext, name);
+        }
     }
     
     if !show_hidden && !hidden_items.is_empty() {
