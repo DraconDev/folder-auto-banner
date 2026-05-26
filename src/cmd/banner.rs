@@ -99,7 +99,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     println!("{}", header);
     println!("{}", "─".repeat(100));
-    println!("{:<12} {:>10}  {:<6}  {:<30}  {}", "TYPE", "SIZE", " ", "NAME", "MODIFIED");
+    println!("{:<12} {:>10}  {:<8}  {:<30}  {}", "TYPE", "SIZE", "EXT", "NAME", "MODIFIED");
     println!("{}", "─".repeat(100));
     
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
@@ -135,13 +135,13 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
             let name = item.name.chars().take(30).collect::<String>();
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("📂 {:<12} {:>10}  {:<6}  {:<30}  {}", "drwxr-xr-x", count_str, "--", name, modified);
+            println!("📂 {:<12} {:>10}  {:<8}  {:<30}  {}", "drwxr-xr-x", count_str, "", name, modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(item);
             let name = item.name.chars().take(30).collect::<String>();
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("📄 {:<12} {:>10}  {:<6}  {:<30}  {}", "-rw-r--r--", size, ext, name, modified);
+            println!("📄 {:<12} {:>10}  {:<8}  {:<30}  {}", "-rw-r--r--", size, ext, name, modified);
         }
     }
     
