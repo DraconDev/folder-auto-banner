@@ -152,9 +152,20 @@ fn print_box_drawing_header(path: &str, git_status: &str, term_width: usize) {
     let max_chars = term_width.saturating_sub(4).max(char_count);
     let display_chars = char_count.min(max_chars);
     let header_display: String = header_text.chars().take(display_chars).collect();
-    let dash_count = term_width.saturating_sub(2).max(header_text.len() + 2);
+    
+    // Calculate how many dashes we need (accounting for Unicode characters)
+    let dash_needed = header_display.chars().count() + 2;
+    let dash_count = if dash_needed > term_width.saturating_sub(2) {
+        term_width.saturating_sub(2)
+    } else {
+        dash_needed
+    };
+    
+    // Create dashes string (each ─ is 3 bytes, so we take exactly dash_count characters)
     let dashes: String = "─".chars().take(dash_count).collect();
-    println!("┌─{}┐", &dashes[..dashes.len().min(header_display.len() + 2)]);
+    
+    // Print with proper Unicode handling
+    println!("┌─{}┐", dashes);
     println!("│ {}", header_display);
 }
 
