@@ -219,6 +219,43 @@ pub fn format_size(bytes: u64) -> String {
     s
 }
 
+/// Human-readable size — very compact (no decimals for large values)
+pub fn format_size_compact(bytes: u64) -> String {
+    if bytes == 0 {
+        return "0 B".to_string();
+    }
+    
+    if bytes < 1024 {
+        return format!("{} B", bytes);
+    } else if bytes < 1024 * 1024 {
+        // KiB - 1 decimal if needed
+        let kb = bytes as f64 / 1024.0;
+        if kb.fract() == 0.0 {
+            format!("{} KiB", kb as u64)
+        } else {
+            format!("{:.1} KiB", kb)
+        }
+    } else if bytes < 1024 * 1024 * 1024 {
+        // MiB - no decimals for values >= 10
+        let mb = bytes as f64 / (1024.0 * 1024.0);
+        if mb >= 10.0 && mb.fract() == 0.0 {
+            format!("{} MiB", mb as u64)
+        } else if mb >= 10.0 {
+            format!("{:.1} MiB", mb)
+        } else {
+            format!("{:.2} MiB", mb)
+        }
+    } else {
+        // GiB
+        let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+        if gb >= 10.0 {
+            format!("{:.1} GiB", gb)
+        } else {
+            format!("{:.2} GiB", gb)
+        }
+    }
+}
+
 /// Format relative time
 pub fn format_relative_time(dt: &DateTime<Utc>) -> String {
     let now = Utc::now();
