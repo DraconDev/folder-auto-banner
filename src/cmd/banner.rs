@@ -27,40 +27,32 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
     
     // Output based on flags
-    // Priority: --json > --raw > auto-detect
-    // Auto-detect: If we can't detect a TTY, default to rich output for better UX.
-    // Users in non-TTY environments can use --raw to get clean output.
     let is_stdout_tty = atty::is(atty::Stream::Stdout);
     
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw {
-        // Explicit --raw flag always means raw
         output_raw(&summary);
     } else if is_stdout_tty {
-        // stdout is a TTY - use rich output
         output_rich(&path, &summary, &git_info, compact);
     } else {
-        // Not a TTY (piped/redirected) but no --raw flag given
-        // Default to rich output since we can't reliably detect terminal
-        // Users who need raw output can use --raw flag
         output_rich(&path, &summary, &git_info, compact);
     }
     
     Ok(())
 }
 
-/// Output rich formatted banner — compact, horizontal, columns, smart hidden show
+/// Output rich formatted banner with table layout
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
     let term_width = Term::stdout().size().1 as usize;
     
-    // Single-line header: compact, fits terminal
+    // Path and size
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
     let project_label = summary.project_type.label();
     
-    // Show relative path from home directory
+    // Relative path from home
     let home = std::env::var("HOME").unwrap_or_default();
     let path_display = if path_str.starts_with(&home) {
         let relative = &path_str[home.len()..];
@@ -74,13 +66,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     };
     
     let git_branch = git_info.branch.as_deref().unwrap_or("");
-    
-    // Count hidden items (needed for both git and non-git headers)
     let hidden_count = summary.top_items.iter().filter(|item| item.name.starts_with('.')).count();
     
-    // Build enhanced header with git status
+    // Build header
     let header = if git_info.is_repo {
-        // Git repo - show branch and status
         let status_parts = [
             if git_info.modified > 0 { format!("{} modified", git_info.modified) } else { String::new() },
             if git_info.untracked > 0 { format!("{} untracked", git_info.untracked) } else { String::new() },
@@ -111,7 +100,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             }
         }
     } else {
-        // Not a git repo
         if hidden_count > 0 {
             format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} hidden │ {} total", 
                 project_icon, path_display, project_label, size_str,
@@ -125,58 +113,16 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     let header_display: String = header.chars().take(term_width.saturating_sub(2)).collect();
     println!("{}", header_display);
-    println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
-    
-    // Separate hidden and non-hidden items
-    let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
-    let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
-    
-    for item in &summary.top_items {
-        if item.name.starts_with('.') {
-            hidden_items.push(item);
-        } else {
-            visible_items.push(item);
-        }
-    }
-    
-    // Table layout: name | size | type | modified across multiple columns
-    let cells_per_row = 4; // Fixed 4 columns for consistent table look
-    
-    // Smart hidden
-    let total_visible = visible_items.len();
-    let show_hidden = total_visible.div_ceil(cells_per_row) <= 12 && total_visible < 30;
-    
-    let display_items = if show_hidden {
-        visible_items.iter().chain(hidden_items.iter()).copied().collect()
-    } else {
-        visible_items.to_vec()
-    };
-    
-    // Table layout: 4 columns of NAME | SIZE | TYPE | MODIFIED
-    let cells_per_row = 4;
-    
-    // Smart hidden
-    let total_visible = visible_items.len();
-    let show_hidden = total_visible.div_ceil(cells_per_row) <= 12 && total_visible < 30;
-    
-    let display_items = if show_hidden {
-        visible_items.iter().chain(hidden_items.iter()).copied().collect()
-    } else {
-        visible_items.to_vec()
-    };
     
     let sep = "─".repeat(term_width.saturating_sub(2).max(60));
     println!("{}", sep);
     
-    // Header row showing the 4 columns
-    println!("{:<16}│{:>9}│{:>7}│{:.<14} │ {:<16}│{:>9}│{:>7}│{:.<14} │ {:<16}│{:>9}│{:>7}│{:.<14} │ {:<16}│{:>9}│{:>7}│{:.<14}",
-        "NAME", "SIZE", "TYPE", "MODIFIED",
-        "NAME", "SIZE", "TYPE", "MODIFIED",
-        "NAME", "SIZE", "TYPE", "MODIFIED",
-        "NAME", "SIZE", "TYPE", "MODIFIED");
+    // Table header - 4 cells per row, each with NAME | SIZE | TYPE | MODIFIED | PERMS
+    let cell_hdr = format!("{:<18}│{:>9}│{:>7}│{:.<13}│{:>10}", "NAME", "SIZE", "TYPE", "MODIFIED", "PERMS");
+    println!("{}   {}   {}   {}", cell_hdr, cell_hdr, cell_hdr, cell_hdr);
     println!("{}", sep);
     
-    // Print data rows
+    // Table data
     for chunk in display_items.chunks(cells_per_row) {
         let parts: Vec<String> = chunk.iter().map(|item| {
             if item.is_dir {
@@ -196,13 +142,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         println!("{}", parts.join("   "));
     }
     
-    // Show hidden count if not displayed
     if !show_hidden && !hidden_items.is_empty() {
         println!("\n  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
     }
 }
-
-
 
 /// Output raw (for piping)
 fn output_raw(summary: &DirSummary) {
@@ -243,8 +186,6 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
     println!("{}", serde_json::to_string_pretty(&output).unwrap());
 }
 
-
-
 /// Count items in a directory
 fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
     std::fs::read_dir(&entry.path)
@@ -252,7 +193,7 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .unwrap_or(0)
 }
 
-/// Get extension-based label — compact
+/// Get extension-based label
 fn get_extension_label(item: &crate::fs::DirEntry) -> String {
     let name = &item.name;
     if let Some(dot) = name.rfind('.') {
