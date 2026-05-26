@@ -123,11 +123,22 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let total_visible = visible_items.len();
     let show_hidden = total_visible < 30;
     
-    let display_items = if show_hidden {
+    // Sort: directories first, then files, alphabetically within each group
+    let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden {
         visible_items.iter().chain(hidden_items.iter()).copied().collect()
     } else {
         visible_items.to_vec()
     };
+    
+    // Sort: dirs first, then alphabetically
+    display_items.sort_by(|a, b| {
+        // Directories come first
+        if a.is_dir != b.is_dir {
+            return b.is_dir.cmp(&a.is_dir);
+        }
+        // Then alphabetical (case-insensitive)
+        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+    });
     
     // List view - one item per line, like file manager
     for item in display_items {
