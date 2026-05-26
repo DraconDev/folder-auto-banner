@@ -25,6 +25,8 @@ pub fn run_banner(
     // Get git info
     let git_info = crate::git::get_git_info(&path)?;
     
+    let is_stdout_tty = atty::is(atty::Stream::Stdout);
+    
     // Auto-detect based on TTY
     if json {
         output_json(&path, &summary, &git_info);
