@@ -23,11 +23,10 @@ pub fn run_banner(
     let summary = DirSummary::scan(&path)?;
     let git_info = crate::git::get_git_info(&path)?;
     
-    let is_stdout_tty = atty::is(atty::Stream::Stdout);
-    
+    // Default to rich output for better UX
     if json {
         output_json(&path, &summary, &git_info);
-    } else if raw || !is_stdout_tty {
+    } else if raw {
         output_raw(&summary);
     } else {
         output_rich(&path, &summary, &git_info, compact);
