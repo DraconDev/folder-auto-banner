@@ -69,20 +69,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     };
     
     let header = if git_info.is_repo {
-        if let Some(ref msg) = git_info.last_commit_msg {
-            let commit_short: String = msg.chars().take(12).collect();
-            let commit_display = if commit_short.len() < msg.len() {
-                format!("{}...", commit_short)
-            } else {
-                commit_short
-            };
-            format!("{} {} │ {} │ {}", 
-                project_icon, path_display, project_label, size_str)
-        } else {
-            format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} items", 
-                project_icon, path_display, project_label, size_str,
-                summary.files, summary.dirs, summary.total_items)
-        }
+        format!("{} {} │ {} │ {} │ {} │ {}", 
+            project_icon, path_display, project_label, size_str,
+            summary.files, summary.dirs)
     } else {
         format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} items", 
             project_icon, path_display, project_label, size_str,
