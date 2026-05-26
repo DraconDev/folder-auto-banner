@@ -50,7 +50,7 @@ pub fn run_banner(
     Ok(())
 }
 
-/// Output rich formatted banner — compact, horizontal, show everything
+/// Output rich formatted banner — compact, horizontal, columns, smart hidden show
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
     let term_width = Term::stdout().size().1 as usize;
     
@@ -94,22 +94,66 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     println!("{}", header_display);
     println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
     
-    // Show ALL items, one per line, use full terminal width
-    // name (50), size (8), type (6), modified (15)
+    // Separate hidden and non-hidden items
+    let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
+    let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
+    
     for item in &summary.top_items {
-        if item.is_dir {
-            let count = count_items_in_dir(item);
-            let count_str = if count == 1 { "item" } else { "items" };
-            let name = item.name.chars().take(50).collect::<String>();
-            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("  📂 {:<50} {} {}  {}", name, count, count_str, modified);
+        if item.name.starts_with('.') {
+            hidden_items.push(item);
         } else {
-            let size = format_size_compact(item.size);
-            let ext = get_extension_label(&item.name);
-            let name = item.name.chars().take(50).collect::<String>();
-            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("  📄 {:<50} {:>8}  {:<6}  {}", name, size, ext, modified);
+            visible_items.push(item);
         }
+    }
+    
+    // Calculate columns based on terminal width
+    // Each column: name (20) + size (8) + type (6) = ~34 chars
+    let col_width = 36;
+    let num_cols = (term_width / col_width).max(1);
+    
+    // Smart hidden: show if we have room (less than 70% of screen used by visible items)
+    let total_visible = visible_items.len();
+    let rows_for_visible = (total_visible + num_cols - 1) / num_cols;
+    let max_rows = 20; // max rows to show
+    
+    let show_hidden = rows_for_visible <= max_rows && total_visible < 30;
+    
+    // Prepare items to display
+    let display_items = if show_hidden {
+        visible_items.iter().chain(hidden_items.iter()).copied().collect()
+    } else {
+        visible_items.iter().map(|i| *i).collect::<Vec<_>>()
+    };
+    
+    // Display in columns
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    for chunk in display_items.chunks(num_cols) {
+        let mut row = Vec::new();
+        for item in chunk {
+            if item.is_dir {
+                let count = count_items_in_dir(item);
+                let count_str = if count == 1 { "1" } else { &format!("{}", count) };
+                let name = item.name.chars().take(20).collect::<String>();
+                let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+                row.push(format!("📂 {:<20} {}  {}", name, count_str, modified));
+            } else {
+                let size = format_size_compact(item.size);
+                let ext = get_extension_label(item);
+                let name = item.name.chars().take(20).collect::<String>();
+                let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+                row.push(format!("📄 {:<20} {:>6}  {:<4}  {}", name, size, ext, modified));
+            }
+        }
+        rows.push(row);
+    }
+    
+    for row in rows {
+        println!("{}", row.join("  "));
+    }
+    
+    // Show hidden count if not displayed
+    if !show_hidden && !hidden_items.is_empty() {
+        println!("\n  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
     }
 }
 
@@ -164,7 +208,7 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
 }
 
 /// Get extension-based label — compact
-fn get_extension_label(name: &str) -> String {
+fn get_extension_label(item: &crate::fs::DirEntry) -> String {
     if let Some(dot) = name.rfind('.') {
         let ext = &name[dot+1..].to_lowercase();
         match ext.as_str() {
