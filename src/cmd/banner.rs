@@ -98,14 +98,14 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     for item in &summary.top_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
-            let name = item.name.chars().take(35).collect::<String>();
             let count_str = if count == 1 { "item" } else { "items" };
-            println!("  📂 {:<35} {} {}", name, count, count_str);
+            let name = item.name.chars().take(25).collect::<String>();
+            println!("  📂 {:<25} {} {}", name, count, count_str);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(&item.name);
-            let name = item.name.chars().take(35).collect::<String>();
-            println!("  📄 {:<35} {}  {}", name, size, ext);
+            let name = item.name.chars().take(25).collect::<String>();
+            println!("  📄 {:<25} {}  {}", name, size, ext);
         }
     }
 }
