@@ -139,16 +139,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         }
     }
     
-    // Calculate cols based on terminal width
-    // Each col: name (16) + size (7) + type (6) + modified (14) = ~43 chars
-    let col_width = 45;
-    let max_cols = 5;
-    let num_cols = (term_width / col_width).max(1).min(max_cols);
+    // Table layout: name | size | type | modified across multiple columns
+    let cells_per_row = 4; // Fixed 4 columns for consistent table look
     
     // Smart hidden
     let total_visible = visible_items.len();
-    let rows_for_visible = total_visible.div_ceil(num_cols);
-    let show_hidden = rows_for_visible <= 12 && total_visible < 30;
+    let show_hidden = total_visible.div_ceil(cells_per_row) <= 12 && total_visible < 30;
     
     let display_items = if show_hidden {
         visible_items.iter().chain(hidden_items.iter()).copied().collect()
@@ -156,35 +152,41 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         visible_items.to_vec()
     };
     
-    // Separator
+    // Separator then table column headers
     let sep = "─".repeat(term_width.saturating_sub(2).max(60));
     println!("{}", sep);
+    // Multi-column header
+    let h1 = format!("{:<18} │ {:>10} │ {:<8} │ {:<15}", "NAME", "SIZE/COUNT", "TYPE", "MODIFIED");
+    let h2 = format!("{:<18} │ {:>10} │ {:<8} │ {:<15}", "NAME", "SIZE/COUNT", "TYPE", "MODIFIED");
+    println!("{}   {}", h1, h2);
+    println!("{}", sep);
+    println!("{}", sep);
     
-    // Table header-like format
-    let row_count = display_items.len().div_ceil(num_cols);
-    
-    for row_num in 0..row_count {
-        let start_idx = row_num * num_cols;
-        let end_idx = (start_idx + num_cols).min(display_items.len());
-        let row_items = &display_items[start_idx..end_idx];
-        
-        let parts: Vec<String> = row_items.iter().map(|item| {
+    // Print items in table rows
+    for chunk in display_items.chunks(cells_per_row) {
+        let mut row_parts: Vec<String> = Vec::new();
+        for item in chunk {
             if item.is_dir {
                 let count = count_items_in_dir(item);
                 let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
-                let name = item.name.chars().take(16).collect::<String>();
+                let name = item.name.chars().take(18).collect::<String>();
                 let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                format!("📂 {:<16} {:>7}   {}", name, count_str, modified)
+                row_parts.push(format!("📂 {:<18} │ {:>10} │ {:<8} │ {:<15}",
+                    name, count_str, "", modified));
             } else {
                 let size = format_size_compact(item.size);
                 let ext = get_extension_label(item);
-                let name = item.name.chars().take(16).collect::<String>();
+                let name = item.name.chars().take(18).collect::<String>();
                 let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                format!("📄 {:<16} {:>7} {:<6} {}", name, size, ext, modified)
+                row_parts.push(format!("📄 {:<18} │ {:>10} │ {:<8} │ {:<15}",
+                    name, size, ext, modified));
             }
-        }).collect();
-        
-        println!("{}", parts.join(" │ "));
+        }
+        // Pad empty cells if last row has fewer items
+        while row_parts.len() < cells_per_row {
+            row_parts.push(format!("{:<18} │ {:>10} │ {:<8} │ {:<15}", "", "", "", ""));
+        }
+        println!("{}", row_parts.join("   "));
     }
     
     // Show hidden count if not displayed
