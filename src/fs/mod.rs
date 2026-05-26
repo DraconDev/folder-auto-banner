@@ -221,13 +221,11 @@ pub fn format_size(bytes: u64) -> String {
 
 /// Human-readable size — very compact (no decimals for large values)
 pub fn format_size_compact(bytes: u64) -> String {
-    if bytes == 0 {
-        return "0 B".to_string();
-    }
-    
     if bytes < 1024 {
-        return format!("{} B", bytes);
-    } else if bytes < 1024 * 1024 {
+        format!("{} B", bytes)
+    } else if bytes == 0 {
+        "0 B".to_string()
+    } else if bytes < 1024 * 1024 { else if bytes < 1024 * 1024 {
         // KiB - 1 decimal if needed
         let kb = bytes as f64 / 1024.0;
         if kb.fract() == 0.0 {
