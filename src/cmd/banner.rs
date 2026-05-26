@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use std::path::Path;
-use comfy_table::{Table, Cell};
 use console::Term;
 
 use crate::fs::{DirSummary, format_size};
@@ -51,123 +50,60 @@ pub fn run_banner(
     Ok(())
 }
 
-/// Output rich formatted banner
-fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, compact: bool) {
+/// Output rich formatted banner — compact, horizontal, show everything
+fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
     let term_width = Term::stdout().size().1 as usize;
-    let max_items = if compact { 4 } else { 20 };
-
-    // Header line with path and git status
+    
+    // Single-line header with all key info
     let git_status = crate::git::format_git_status(git_info);
     let path_str = path.to_string_lossy();
-    
-    println!();
-    
-    // Try to use box drawing, fall back to ASCII if needed
-    if supports_box_drawing() {
-        print_box_drawing_header(&path_str, &git_status, term_width);
-    } else {
-        print_ascii_header(&path_str, &git_status, term_width);
-    }
-    
-    // Project type and stats line
     let size_str = format_size(summary.total_size);
-    let item_count = format!("{} items", summary.total_items);
     let project_icon = summary.project_type.icon();
     let project_label = summary.project_type.label();
     
-    let stats_line = if git_info.is_repo {
+    let header = if git_info.is_repo {
         if let Some(ref msg) = git_info.last_commit_msg {
-            // Use char-aware truncation for Unicode
-            let commit_short: String = msg.chars().take(40).collect();
+            let commit_short: String = msg.chars().take(50).collect();
             let commit_display = if commit_short.len() < msg.len() {
                 format!("{}...", commit_short)
             } else {
                 commit_short
             };
-            format!("{} {} │ {} │ {}", project_icon, project_label, size_str, commit_display)
+            format!("📂 {} {} │ {} {} │ {} │ {} files │ {} dirs │ {}", 
+                path_str, git_status, project_icon, project_label, size_str,
+                summary.files, summary.dirs, commit_display)
         } else {
-            format!("{} {} │ {} │ {} items", project_icon, project_label, size_str, item_count)
+            format!("📂 {} {} │ {} {} │ {} │ {} files │ {} dirs │ {} items total", 
+                path_str, git_status, project_icon, project_label, size_str,
+                summary.files, summary.dirs, summary.total_items)
         }
     } else {
-        format!("{} {} │ {} │ {} items", project_icon, project_label, size_str, item_count)
+        format!("📂 {} │ {} {} │ {} │ {} files │ {} dirs │ {} items total", 
+            path_str, project_icon, project_label, size_str,
+            summary.files, summary.dirs, summary.total_items)
     };
     
-    println!("│ {}", stats_line);
-    println!("│ {}", "-".repeat(term_width.saturating_sub(4).max(60)));
+    // Truncate header to fit terminal width
+    let header_display: String = header.chars().take(term_width.saturating_sub(2)).collect();
+    println!("{}", header_display);
+    println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
     
-    // Items grid
-    let top_items = summary.top_items(max_items);
-    let remaining = summary.remaining(max_items);
-    
-    if !top_items.is_empty() {
-        // Build table
-        let mut table = Table::new();
-        table.set_header(vec!["", "Name", "Type", "Size"]);
-        
-        for item in top_items.iter() {
-            let icon = if item.is_dir { "📂" } else { "📄" };
-            let type_label = if item.is_dir {
-                format!("{} item(s)", count_items_in_dir(item))
-            } else {
-                get_extension_label(&item.name)
-            };
-            let size_str = if item.is_dir { "-".to_string() } else { format_size(item.size) };
-            
-            table.add_row(vec![
-                Cell::new(icon),
-                Cell::new(&item.name),
-                Cell::new(&type_label),
-                Cell::new(&size_str),
-            ]);
+    // Show ALL items, one per line, compact horizontal layout
+    for item in &summary.top_items {
+        if item.is_dir {
+            let count = count_items_in_dir(item);
+            let name = item.name.chars().take(term_width.saturating_sub(30)).collect::<String>();
+            println!("  📂 {:<45} {} item(s)", name, count);
+        } else {
+            let size = format_size(item.size);
+            let ext = get_extension_label(&item.name);
+            let name = item.name.chars().take(term_width.saturating_sub(35)).collect::<String>();
+            println!("  📄 {:<45} {:>10}  {}", name, size, ext);
         }
-        
-        println!("{}", table);
     }
-    
-    // Footer
-    if remaining > 0 {
-        println!("│ ... and {} more items. (Use 'ls' to see all)", remaining);
-    }
-    
-    // Close box
-    if supports_box_drawing() {
-        println!("└─{}", "─".repeat(term_width.saturating_sub(2).max(70)));
-    } else {
-        println!("└{}", "~".repeat(term_width.saturating_sub(2).max(70)));
-    }
-    println!();
 }
 
-/// Print ASCII fallback header
-fn print_ascii_header(path: &str, git_status: &str, _term_width: usize) {
-    let header = format!("{} {}", path, git_status);
-    println!("{}", header);
-}
 
-/// Print box drawing header
-fn print_box_drawing_header(path: &str, git_status: &str, term_width: usize) {
-    let header_text = format!("📂 {} {}", path, git_status);
-    // Use char-aware slicing for Unicode content
-    let char_count = header_text.chars().count();
-    let max_chars = term_width.saturating_sub(4).max(char_count);
-    let display_chars = char_count.min(max_chars);
-    let header_display: String = header_text.chars().take(display_chars).collect();
-    
-    // Calculate how many dashes we need (accounting for Unicode characters)
-    let dash_needed = header_display.chars().count() + 2;
-    let dash_count = if dash_needed > term_width.saturating_sub(2) {
-        term_width.saturating_sub(2)
-    } else {
-        dash_needed
-    };
-    
-    // Create dashes string (each ─ is 3 bytes, so we take exactly dash_count characters)
-    let dashes: String = "─".chars().take(dash_count).collect();
-    
-    // Print with proper Unicode handling
-    println!("┌─{}┐", dashes);
-    println!("│ {}", header_display);
-}
 
 /// Output raw (for piping)
 fn output_raw(summary: &DirSummary) {
@@ -208,21 +144,7 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
     println!("{}", serde_json::to_string_pretty(&output).unwrap());
 }
 
-/// Check if terminal supports box drawing characters
-fn supports_box_drawing() -> bool {
-    // Check for NO_COLOR
-    if std::env::var("NO_COLOR").is_ok() {
-        return false;
-    }
-    
-    // Check TERM
-    let term = std::env::var("TERM").unwrap_or_default();
-    if term == "dumb" || term.contains("screen") && term.contains("1") {
-        return false;
-    }
-    
-    true
-}
+
 
 /// Count items in a directory
 fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
