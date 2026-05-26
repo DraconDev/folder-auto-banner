@@ -166,40 +166,33 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     };
     
     let sep = "─".repeat(term_width.saturating_sub(2).max(60));
-    
-    // Table header
-    let h_cell = format!("{:<16}│{:>9}│{:>7}│{:<14}", "NAME", "SIZE", "TYPE", "MODIFIED");
-    println!("{}", sep);
-    println!("{}   {}   {}   {}", h_cell, h_cell, h_cell, h_cell);
-    println!("{}", sep);
     println!("{}", sep);
     
-    // Table data rows
-    println!("{}", sep);
+    // Header row showing the 4 columns
+    println!("{:<16}│{:>9}│{:>7}│{:.<14} │ {:<16}│{:>9}│{:>7}│{:.<14} │ {:<16}│{:>9}│{:>7}│{:.<14} │ {:<16}│{:>9}│{:>7}│{:.<14}",
+        "NAME", "SIZE", "TYPE", "MODIFIED",
+        "NAME", "SIZE", "TYPE", "MODIFIED",
+        "NAME", "SIZE", "TYPE", "MODIFIED",
+        "NAME", "SIZE", "TYPE", "MODIFIED");
     println!("{}", sep);
     
-    // Table data rows - simple pipe-separated columns
+    // Print data rows
     for chunk in display_items.chunks(cells_per_row) {
-        let mut parts: Vec<String> = Vec::new();
-        for item in chunk {
+        let parts: Vec<String> = chunk.iter().map(|item| {
             if item.is_dir {
                 let count = count_items_in_dir(item);
                 let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
                 let name = item.name.chars().take(16).collect::<String>();
                 let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                parts.push(format!("📂 {:<16}│{:>9}│{:>7}│{:.<14}", name, count_str, "--", modified));
+                format!("📂 {:<16}│{:>9}│{:>7}│{:.<14}", name, count_str, "--", modified)
             } else {
                 let size = format_size_compact(item.size);
                 let ext = get_extension_label(item);
                 let name = item.name.chars().take(16).collect::<String>();
                 let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-                parts.push(format!("📄 {:<16}│{:>9}│{:>7}│{:.<14}", name, size, ext, modified));
+                format!("📄 {:<16}│{:>9}│{:>7}│{:.<14}", name, size, ext, modified)
             }
-        }
-        // Pad empty cells
-        while parts.len() < cells_per_row {
-            parts.push(format!("{:<16}│{:>9}│{:>7}│{:<14}", "", "", "", ""));
-        }
+        }).collect();
         println!("{}", parts.join("   "));
     }
     
