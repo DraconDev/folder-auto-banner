@@ -7,7 +7,7 @@ use anyhow::Result;
 use std::path::Path;
 use console::Term;
 
-use crate::fs::{DirSummary, format_size, format_size_compact};
+use crate::fs::{DirSummary, format_size_compact};
 use crate::git::GitInfo;
 
 /// Run the banner command
@@ -71,7 +71,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let header = if git_info.is_repo {
         if let Some(ref msg) = git_info.last_commit_msg {
             let commit_short: String = msg.chars().take(35).collect();
-            let commit_display = if commit_short.len() < msg.len() {
+            let commit_display: String = if commit_short.len() < msg.len() {
                 format!("{}...", commit_short)
             } else {
                 commit_short.clone()
