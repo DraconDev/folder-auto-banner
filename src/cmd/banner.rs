@@ -99,7 +99,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     println!("{}", header);
     println!("{}", "─".repeat(100));
-    println!("{:<12} {:>10}  {:<8}  {:<30}  {}", "TYPE", "SIZE", "EXT", "NAME", "MODIFIED");
+    println!("{:<12} {:>10}  {:<8}  {:<30}  {:<15}", "TYPE", "SIZE", "EXT", "NAME", "MODIFIED");
     println!("{}", "─".repeat(100));
     
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
