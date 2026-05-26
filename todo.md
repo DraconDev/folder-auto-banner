@@ -19,8 +19,7 @@ The cfm banner now shows:
 - [ ] Optimal column widths (name, size, type, modified, perms?)
 - [x] Row-based output (one item per line, clear and readable) - ✅ Done
 - [ ] Sort by: name, size, modified, type (default: name)
-- [x] Max columns capped at 5 to keep rows manageable - ✅ Done
-- [ ] Column-based output (multiple items per row) - deprecated per user preference
+- [x] List view like file manager - ✅ Done, one item per line
 
 ### 3. More Item Information
 - [ ] Show permissions (rwxr-xr-x)
