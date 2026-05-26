@@ -7,7 +7,7 @@ use anyhow::Result;
 use std::path::Path;
 use console::Term;
 
-use crate::fs::{DirSummary, format_size};
+use crate::fs::{DirSummary, format_size, format_size_compact};
 use crate::git::GitInfo;
 
 /// Run the banner command
@@ -54,51 +54,58 @@ pub fn run_banner(
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
     let term_width = Term::stdout().size().1 as usize;
     
-    // Single-line header with all key info
+    // Single-line header: compact, fits terminal
     let git_status = crate::git::format_git_status(git_info);
     let path_str = path.to_string_lossy();
-    let size_str = format_size(summary.total_size);
+    let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
     let project_label = summary.project_type.label();
     
+    // Truncate path if needed
+    let path_display: String = if path_str.chars().count() > 40 {
+        let last = path_str.rsplit('/').next().unwrap_or("");
+        format!(".../{}", last).chars().take(20).collect()
+    } else {
+        path_str.to_string()
+    };
+    
     let header = if git_info.is_repo {
         if let Some(ref msg) = git_info.last_commit_msg {
-            let commit_short: String = msg.chars().take(50).collect();
+            let commit_short: String = msg.chars().take(35).collect();
             let commit_display = if commit_short.len() < msg.len() {
                 format!("{}...", commit_short)
             } else {
                 commit_short
             };
-            format!("📂 {} {} │ {} {} │ {} │ {} files │ {} dirs │ {}", 
-                path_str, git_status, project_icon, project_label, size_str,
-                summary.files, summary.dirs, commit_display)
+            format!("{} {} │ {} {} │ {} │ {}", 
+                project_icon, path_display, project_label, size_str,
+                summary.files, summary.dirs)
         } else {
-            format!("📂 {} {} │ {} {} │ {} │ {} files │ {} dirs │ {} items total", 
-                path_str, git_status, project_icon, project_label, size_str,
+            format!("{} {} │ {} {} │ {} files │ {} dirs │ {} items", 
+                project_icon, path_display, project_label, size_str,
                 summary.files, summary.dirs, summary.total_items)
         }
     } else {
-        format!("📂 {} │ {} {} │ {} │ {} files │ {} dirs │ {} items total", 
-            path_str, project_icon, project_label, size_str,
+        format!("{} {} │ {} {} │ {} files │ {} dirs │ {} items", 
+            project_icon, path_display, project_label, size_str,
             summary.files, summary.dirs, summary.total_items)
     };
     
-    // Truncate header to fit terminal width
     let header_display: String = header.chars().take(term_width.saturating_sub(2)).collect();
     println!("{}", header_display);
     println!("{}", "─".repeat(term_width.saturating_sub(2).max(60)));
     
-    // Show ALL items, one per line, compact horizontal layout
+    // Show ALL items, one per line, compact
     for item in &summary.top_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
-            let name = item.name.chars().take(term_width.saturating_sub(30)).collect::<String>();
-            println!("  📂 {:<45} {} item(s)", name, count);
+            let name = item.name.chars().take(40).collect::<String>();
+            println!("  📂 {:<40} {} items", name, count);
         } else {
-            let size = format_size(item.size);
+            let size = format_size_compact(item.size);
             let ext = get_extension_label(&item.name);
-            let name = item.name.chars().take(term_width.saturating_sub(35)).collect::<String>();
-            println!("  📄 {:<45} {:>10}  {}", name, size, ext);
+            let name = item.name.chars().take(40).collect::<String>();
+            println!("  📄 {:<40} {:>8}  {}", name, size, ext);
         }
     }
 }
