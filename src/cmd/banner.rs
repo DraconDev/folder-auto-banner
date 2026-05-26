@@ -155,7 +155,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let display_items = if show_hidden {
         visible_items.iter().chain(hidden_items.iter()).copied().collect()
     } else {
-        visible_items.iter().copied().collect::<Vec<_>>()
+        visible_items.to_vec()
     };
     
     // Display in columns

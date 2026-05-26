@@ -9,9 +9,8 @@ The cfm banner now shows:
 ## Desired Improvements
 
 ### 1. More Information in Header
-- [ ] Git status indicators (dirty, staged, ahead/behind)
+- [x] Git status indicators (dirty, staged, ahead/behind) - ✅ Shows "1 modified", "3 untracked", etc.
 - [ ] Last modified date of directory itself
-- [ ] Number of hidden items (if filtered)
 - [ ] Free/used space for filesystem
 - [ ] Parent directory size
 
@@ -52,7 +51,7 @@ The cfm banner now shows:
 - [ ] Theme colors
 
 ### 8. Git Integration
-- [ ] Show git status icons per item (modified, staged, untracked)
+- [x] Show git status icons per item (modified, staged, untracked) - ✅ In header
 - [ ] Show which items are in .gitignore
 - [ ] Show conflicts in merge
 - [ ] Branch comparison (main vs feature)
