@@ -202,12 +202,21 @@ impl DirSummary {
     }
 }
 
-/// Human-readable size
+/// Human-readable size — compact
 pub fn format_size(bytes: u64) -> String {
     use byte_unit::{Byte, UnitType};
     let byte = Byte::from_u64(bytes);
     let adjusted = byte.get_appropriate_unit(UnitType::Binary);
-    format!("{}", adjusted)
+    // Truncate to 1 decimal place for compactness
+    let s = format!("{}", adjusted);
+    if let Some(dot) = s.find('.') {
+        let after_dot = &s[dot+1..];
+        if after_dot.len() > 1 {
+            let truncated: String = s.chars().take(dot + 2).collect();
+            return truncated;
+        }
+    }
+    s
 }
 
 /// Format relative time
