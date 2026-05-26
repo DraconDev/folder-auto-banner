@@ -139,32 +139,28 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         }
     }
     
-    // Calculate columns based on terminal width
-    // Each column: name (24) + size (10) + type (8) + modified (18) = ~60 chars total
-    let col_width = 62;
-    let max_cols = 4; // max columns per row
+    // Calculate cols based on terminal width
+    // Each col: name (16) + size (7) + type (6) + modified (14) = ~43 chars
+    let col_width = 45;
+    let max_cols = 5;
     let num_cols = (term_width / col_width).max(1).min(max_cols);
     
-    // Smart hidden: show if we have room
+    // Smart hidden
     let total_visible = visible_items.len();
     let rows_for_visible = total_visible.div_ceil(num_cols);
-    let max_rows = 12; 
+    let show_hidden = rows_for_visible <= 12 && total_visible < 30;
     
-    let show_hidden = rows_for_visible <= max_rows && total_visible < 30;
-    
-    // Prepare items to display
     let display_items = if show_hidden {
         visible_items.iter().chain(hidden_items.iter()).copied().collect()
     } else {
         visible_items.to_vec()
     };
     
-    // Print separator line
-    let separator = "─".repeat(term_width.saturating_sub(2).max(60));
-    println!("{}", separator);
+    // Separator
+    let sep = "─".repeat(term_width.saturating_sub(2).max(60));
+    println!("{}", sep);
     
-    // Build and print table headers for each column group
-    // Calculate how many column groups we have
+    // Table header-like format
     let row_count = display_items.len().div_ceil(num_cols);
     
     for row_num in 0..row_count {
@@ -172,24 +168,23 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let end_idx = (start_idx + num_cols).min(display_items.len());
         let row_items = &display_items[start_idx..end_idx];
         
-        // Build column data for this row
-        let mut parts: Vec<String> = Vec::new();
-        for item in row_items {
-            let (name_part, size_part, type_part) = if item.is_dir {
+        let parts: Vec<String> = row_items.iter().map(|item| {
+            if item.is_dir {
                 let count = count_items_in_dir(item);
                 let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
-                let name = item.name.chars().take(24).collect::<String>();
-                (format!("📂 {:<24}", name), format!("{:>10}", count_str), "".to_string())
+                let name = item.name.chars().take(16).collect::<String>();
+                let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+                format!("📂 {:<16} {:>7}   {}", name, count_str, modified)
             } else {
                 let size = format_size_compact(item.size);
                 let ext = get_extension_label(item);
-                let name = item.name.chars().take(24).collect::<String>();
-                (format!("📄 {:<24}", name), format!("{:>10}", size), format!("{:<8}", ext))
-            };
-            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            parts.push(format!("{} │ {} │ {} │ {}", name_part, size_part, type_part, modified));
-        }
-        println!("{}", parts.join("  "));
+                let name = item.name.chars().take(16).collect::<String>();
+                let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
+                format!("📄 {:<16} {:>7} {:<6} {}", name, size, ext, modified)
+            }
+        }).collect();
+        
+        println!("{}", parts.join(" │ "));
     }
     
     // Show hidden count if not displayed
