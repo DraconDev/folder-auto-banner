@@ -153,22 +153,23 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .unwrap_or(0)
 }
 
-/// Get extension-based label
+/// Get extension-based label — compact
 fn get_extension_label(name: &str) -> String {
     if let Some(dot) = name.rfind('.') {
         let ext = &name[dot+1..].to_lowercase();
         match ext.as_str() {
             "rs" => "Rust".to_string(),
-            "toml" => "Config".to_string(),
-            "md" => "Markdown".to_string(),
+            "toml" => "TOML".to_string(),
+            "md" => "MD".to_string(),
             "json" => "JSON".to_string(),
             "yaml" | "yml" => "YAML".to_string(),
-            "txt" => "Text".to_string(),
-            "sh" => "Shell".to_string(),
-            "py" => "Python".to_string(),
-            "js" | "ts" => "JavaScript".to_string(),
-            "lock" => "Lockfile".to_string(),
-            _ => ext.to_uppercase(),
+            "txt" => "TXT".to_string(),
+            "sh" => "SH".to_string(),
+            "py" => "Py".to_string(),
+            "js" | "ts" => "JS".to_string(),
+            "lock" => "Lock".to_string(),
+            "gitignore" | "gitattributes" => ext.to_uppercase().to_string(),
+            _ => ext.to_uppercase().chars().take(4).collect(),
         }
     } else {
         "File".to_string()
