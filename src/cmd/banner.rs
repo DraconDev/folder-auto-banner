@@ -6,6 +6,11 @@
 use anyhow::Result;
 use std::path::Path;
 
+use comfy_table::{
+    Cell, ColumnConstraint, ContentArrangement, Table, Width, presets,
+};
+use console::Term;
+
 use crate::fs::{DirSummary, format_size_compact, format_relative_time};
 use crate::git::GitInfo;
 
@@ -127,28 +132,51 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
     
-    // Compact table: ICON(5) + NAME(28) + SIZE(8) + MODIFIED(11) = ~56 chars
-    println!("┌─────┬─────────────────────────────┬────────┬───────────┐");
-    println!("│     │ NAME                        │ SIZE   │ MODIFIED │");
-    println!("├─────┼─────────────────────────────┼────────┼───────────┤");
-    
+    // Build the file listing table with responsive column widths
+    let term = Term::stdout();
+    let (term_w, _) = term.size();
+    let table_width = if term_w > 0 { (term_w as u16).min(140).max(60) } else { 80_u16 };
+
+    let mut table = Table::new();
+    table
+        .load_preset(presets::UTF8_FULL)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_width(table_width)
+        .set_header(vec![
+            Cell::new(""),
+            Cell::new("NAME"),
+            Cell::new("SIZE"),
+            Cell::new("MODIFIED"),
+        ]);
+
     for item in display_items {
-        if item.is_dir {
-            let count = count_items_in_dir(item);
-            let count_str = if count == 1 { "1" } else { &format!("{}", count) };
-            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name = truncate(&item.name, 27);
-            println!("│ 📂  │ {:<27} │ {:>5}  │ {:<9} │", name, count_str, modified);
+        let icon = if item.is_dir { "📂" } else { "📄" };
+        let size_or_count = if item.is_dir {
+            count_items_in_dir(item).to_string()
         } else {
-            let size = format_size_compact(item.size);
-            let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name = truncate(&item.name, 27);
-            println!("│ 📄  │ {:<27} │ {:>6} │ {:<9} │", name, size, modified);
-        }
+            format_size_compact(item.size)
+        };
+        let modified = item.modified.as_ref()
+            .map(|dt| format_relative_time(dt))
+            .unwrap_or_default();
+
+        table.add_row(vec![
+            Cell::new(icon),
+            Cell::new(item.name.clone()),
+            Cell::new(size_or_count),
+            Cell::new(modified),
+        ]);
     }
-    
-    println!("└─────┴─────────────────────────────┴────────┴───────────┘");
-    
+
+    table.set_constraints(vec![
+        ColumnConstraint::UpperBoundary(Width::Fixed(5)),
+        ColumnConstraint::LowerBoundary(Width::Fixed(15)),
+        ColumnConstraint::UpperBoundary(Width::Fixed(12)),
+        ColumnConstraint::UpperBoundary(Width::Fixed(14)),
+    ]);
+
+    println!("{table}");
+
     if !show_hidden && !hidden_items.is_empty() {
         println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
     }
@@ -197,11 +225,3 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .unwrap_or(0)
 }
 
-fn truncate(s: &str, width: usize) -> String {
-    let chars: Vec<char> = s.chars().collect();
-    if chars.len() > width {
-        format!("{}…", chars[..width-1].iter().collect::<String>())
-    } else {
-        s.to_string()
-    }
-}
