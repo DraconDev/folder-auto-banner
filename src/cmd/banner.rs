@@ -158,42 +158,26 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         .load_preset("││──├─┼┤│    ┬┴┌┐└┘")
         .set_content_arrangement(ContentArrangement::Disabled)
         .set_header(vec![
-            Cell::new(format!("{}NAME{}", BOLD, RESET)),
-            Cell::new(format!("{}SIZE{}", BOLD, RESET)),
-            Cell::new(format!("{}MODIFIED{}", BOLD, RESET)),
+            Cell::new("NAME"),
+            Cell::new("SIZE"),
+            Cell::new("MODIFIED"),
         ]);
 
     for item in display_items {
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
-        // Color: dirs=blue, executables=green, symlinks=magenta, hidden=dim
-        let name_color = if item.is_dir {
-            BLUE
-        } else if item.is_symlink {
-            MAGENTA
-        } else if item.is_exec {
-            GREEN
-        } else if item.name.starts_with('.') {
-            DIM
-        } else {
-            ""
-        };
-
-        // Build name: "icon colored_name"
-        let colored_name = if item.is_symlink {
+        // Build name with optional symlink target
+        let display_name = if item.is_symlink {
             if let Some(target) = &item.symlink_target {
-                format!("{}{}{} {}→{} {}",
-                    name_color, item.name, RESET,
-                    DIM, RESET,
-                    target)
+                format!("{} → {}", item.name, target)
             } else {
-                format!("{}{}{}", name_color, item.name, RESET)
+                item.name.clone()
             }
         } else {
-            format!("{}{}{}", name_color, item.name, RESET)
+            item.name.clone()
         };
 
-        let name_cell = format!("{} {}{}", icon_str, colored_name, RESET);
+        let name_cell = format!("{} {}", icon_str, display_name);
         let name_display = truncate_ansi(&name_cell, name_width);
 
         let size_or_count = if item.is_dir {
@@ -203,14 +187,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         };
 
         let modified = item.modified.as_ref()
-            .map(|dt| {
-                let t = format_relative_time(dt);
-                if t == "just now" {
-                    format!("{}just now{}", GREEN, RESET)
-                } else {
-                    t
-                }
-            })
+            .map(|dt| format_relative_time(dt))
             .unwrap_or_default();
 
         table.add_row(vec![
