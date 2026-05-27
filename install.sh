@@ -37,11 +37,22 @@ for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     fi
 done
 
-# Clean up old hooks (both _cfm_hook and _cfm_on_directory_change)
+# Clean up old hooks (all known variants: _cfm_hook, _cfm_on_directory_change, _cfm_on_startup)
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     if [ -f "$rc" ]; then
-        sed -i '/_cfm_hook\|_cfm_on_directory_change/d' "$rc" 2>/dev/null || true
-        sed -i '/^# cfm auto-banner hook/d' "$rc" 2>/dev/null || true
+        # Remove any line containing old cfm function names or old hook registrations
+        sed -i '/_cfm_hook\|_cfm_on_directory_change\|_cfm_on_startup/d' "$rc" 2>/dev/null || true
+        # Remove old chpwd + precmd hook registrations
+        sed -i '/add-zsh-hook \(chpwd\|precmd\) _cfm/d' "$rc" 2>/dev/null || true
+        # Remove old cfm comment headers
+        sed -i '/^# cfm shell integration\|^# cfm auto-banner hook/d' "$rc" 2>/dev/null || true
+        # Remove orphaned function fragments (stray closing braces from partial teardowns)
+        sed -i '/^    command fm banner/d' "$rc" 2>/dev/null || true
+        sed -i '/command \/home\/.*\/bin\/fm banner/d' "$rc" 2>/dev/null || true
+        sed -i '/^}export PATH=/d' "$rc" 2>/dev/null || true
+        sed -i '/^}autoload/d' "$rc" 2>/dev/null || true
+        # Remove old ~/bin PATH exports (we use ~/.local/bin now)
+        sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' "$rc" 2>/dev/null || true
     fi
 done
 
