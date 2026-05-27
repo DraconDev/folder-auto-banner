@@ -137,13 +137,14 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let (term_w, _) = term.size();
     let term_width = if term_w > 0 { (term_w as usize).min(120).max(60) } else { 80_usize };
 
-    // Fixed columns: icon(4) + size(10) + modified(14) + border overhead(7) = 35
-    // Name gets the rest, minimum 20
-    let name_width = term_width.saturating_sub(35).max(20);
+    // Fixed columns: icon(4) + size(10) + modified(16) ≈ 30
+    // Comfy-table adds ~12 chars of border/padding overhead
+    let fixed_overhead = 42;
+    let name_width = term_width.saturating_sub(fixed_overhead).max(20);
 
     let mut table = Table::new();
     table
-        .load_preset(presets::UTF8_FULL)
+        .load_preset(presets::UTF8_FULL_CONDENSED)
         .set_content_arrangement(ContentArrangement::Disabled)
         .set_width(term_width as u16)
         .set_header(vec![
@@ -177,7 +178,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         ColumnConstraint::Absolute(Width::Fixed(4)),
         ColumnConstraint::Absolute(Width::Fixed(name_width as u16)),
         ColumnConstraint::Absolute(Width::Fixed(10)),
-        ColumnConstraint::Absolute(Width::Fixed(14)),
+        ColumnConstraint::Absolute(Width::Fixed(16)),
     ]);
 
     // Prevent row wrapping
