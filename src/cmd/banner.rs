@@ -9,6 +9,7 @@ use std::path::Path;
 use comfy_table::{
     Cell, ColumnConstraint, ContentArrangement, Table, Width,
 };
+use console::Term;
 
 use crate::fs::{DirSummary, format_size_compact, format_relative_time};
 use crate::git::GitInfo;
@@ -131,20 +132,29 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
     
-    // Build the file listing table with responsive column widths
+    // Build the file listing table — icon merged into name, responsive width
+    let term = Term::stdout();
+    let (tw, _) = term.size();
+    let term_width = if tw > 0 { (tw as usize).min(100).max(60) } else { 80_usize };
+
+    // Columns: NAME (rest) + SIZE (10) + MODIFIED (16) + borders/padding (~10)
+    let overhead = 36;
+    let name_width = term_width.saturating_sub(overhead).max(25);
+
     let mut table = Table::new();
     table
         .load_preset("││──├─┼┤│    ┬┴┌┐└┘")
-        .set_content_arrangement(ContentArrangement::DynamicFullWidth)
+        .set_content_arrangement(ContentArrangement::Disabled)
         .set_header(vec![
-            Cell::new(""),
             Cell::new("NAME"),
             Cell::new("SIZE"),
             Cell::new("MODIFIED"),
         ]);
 
     for item in display_items {
-        let icon = if item.is_dir { "📂" } else { "📄" };
+        let icon = if item.is_dir { "📂 " } else { "📄 " };
+        let name = format!("{}{}", icon, item.name);
+        let name_display = truncate(&name, name_width);
         let size_or_count = if item.is_dir {
             count_items_in_dir(item).to_string()
         } else {
@@ -153,21 +163,18 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let modified = item.modified.as_ref()
             .map(|dt| format_relative_time(dt))
             .unwrap_or_default();
-        let name = truncate(&item.name, 80);
 
         table.add_row(vec![
-            Cell::new(icon),
-            Cell::new(name),
+            Cell::new(name_display),
             Cell::new(size_or_count),
             Cell::new(modified),
         ]);
     }
 
     table.set_constraints(vec![
-        ColumnConstraint::UpperBoundary(Width::Fixed(5)),
-        ColumnConstraint::LowerBoundary(Width::Fixed(15)),
-        ColumnConstraint::UpperBoundary(Width::Fixed(12)),
-        ColumnConstraint::UpperBoundary(Width::Fixed(16)),
+        ColumnConstraint::Absolute(Width::Fixed(name_width as u16)),
+        ColumnConstraint::Absolute(Width::Fixed(10)),
+        ColumnConstraint::Absolute(Width::Fixed(16)),
     ]);
 
     // Prevent row wrapping
