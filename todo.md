@@ -14,9 +14,16 @@
 - [x] 100+ mappings: `Cargo.toml` → 🦀, `install.sh` → 🐚, `README.md` → 📖, `.lock` → 🔒, etc.
 - [x] Separate `src/icon.rs` module with unit tests
 
+### lsd-style Columns
+- [x] PERM column: `drwxr-xr-x` / `-rw-r--r--` / `-rwxr-xr-x`
+- [x] OWNER column: resolved from `/etc/passwd`
+- [x] Exact date format: `May 27 22:05` (not relative like "30 minutes ago")
+- [x] Responsive widths with 5-column layout
+
 ### Permissions & Symlinks
-- [x] `DirEntry` fields: `is_exec`, `perms`, `symlink_target`
-- [x] Unix permissions via `std::os::unix::fs::PermissionsExt::mode()` → `rwxrwxrwx`
+- [x] `DirEntry` fields: `is_exec`, `perms`, `symlink_target`, `owner`, `group`
+- [x] Unix permissions via `std::os::unix::fs::PermissionsExt::mode()` → `drwxr-xr-x`
+- [x] Owner/group resolution from `/etc/passwd` and `/etc/group`
 - [x] Symlink target resolution via `std::fs::read_link`
 - [x] `truncate_ansi()` handles ANSI escape sequences without breaking width calculation
 

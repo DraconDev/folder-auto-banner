@@ -157,7 +157,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let mut table = Table::new();
     table
         .load_preset("││──├─┼┤│    ┬┴┌┐└┘")
-        .set_content_arrangement(ContentArrangement::Disabled)
+        .set_content_arrangement(ContentArrangement::DynamicFullWidth)
         .set_width(term_width as u16)
         .set_header(vec![
             Cell::new("PERM"),
