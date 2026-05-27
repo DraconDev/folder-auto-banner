@@ -203,7 +203,6 @@ fn truncate(s: &str, width: usize) -> String {
         s.to_string()
     }
 }
-}
 
 fn output_raw(summary: &DirSummary) {
     for item in &summary.top_items {
