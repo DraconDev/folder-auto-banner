@@ -42,6 +42,7 @@ _cfm_hook() {
     eval "$(command fm env "$PWD")"
     command fm banner "$PWD"
 }
+_cfm_hook  # fire on new shell/tab startup
 ```
 
 ### Bash (`~/.bashrc`)

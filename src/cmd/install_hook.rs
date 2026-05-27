@@ -15,6 +15,7 @@ pub fn run_install_hook(_shell: Option<&str>) -> Result<()> {
     println!("    command fm banner \"$PWD\"");
     println!("    eval \"$(command fm env \"$PWD\")\"");
     println!("}}");
+    println!("_cfm_hook  # fire on new shell/tab startup");
     println!();
     println!("── Bash (~/.bashrc) ──");
     println!();
