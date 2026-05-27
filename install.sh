@@ -66,6 +66,7 @@ if [ -f "$HOME/.zshrc" ]; then
         fi
         echo 'add-zsh-hook chpwd _cfm_hook'
         echo "_cfm_hook() { command $BIN_PATH banner \"\$PWD\"; }"
+        echo '_cfm_hook  # fire on new shell/tab startup'
     } >> "$HOME/.zshrc"
     echo "✅ Added chpwd hook to ~/.zshrc"
 fi
