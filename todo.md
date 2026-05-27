@@ -1,123 +1,127 @@
-# Banner Improvement TODO
+# cfm TODO
 
-## Current State
-The cfm banner now shows:
-- Single-line header with path, project type, size, file/dir counts
-- Items in columns with name, count/size, type, modified time
-- Smart hidden file handling
+## ✅ Done (since last audit)
 
-## Desired Improvements
+### Table / Display
+- [x] Replace manual `println!` box-drawing with `comfy-table` v6
+- [x] Custom preset matching original `│`, `─`, `├`, `┼`, `┤` style
+- [x] Responsive column widths (caps at 100, min 60, name column gets remainder)
+- [x] Merge icon into name column (`📂 .dracon` instead of wasted icon column)
+- [x] `max_height(1)` prevents row wrapping; `truncate()` handles overflow with `…`
 
-### 1. More Information in Header
-- [x] Git status indicators (dirty, staged, ahead/behind) - ✅ Shows "1 modified", "3 untracked", etc.
+### Install / Shell
+- [x] Consolidated 4 redundant install scripts into 1
+- [x] `install.sh` tears down old binary before copying new one
+- [x] Cleanup handles all hook-name variants: `_cfm_hook`, `_cfm_on_directory_change`, `_cfm_on_startup`
+- [x] Cleanup removes old `~/bin` PATH, orphaned function fragments, fused braces
+- [x] Hook fires on new tabs/shell startup (not just `cd`)
+- [x] Bash `PROMPT_COMMAND` support
+- [x] Typo `add-zash-hook` → `add-zsh-hook` fixed in `install_hook.rs`
+- [x] Hook names unified to `_cfm_hook` everywhere
+
+### Docs / CI
+- [x] `INSTALL.md` — removed hardcoded `/home/dracon` paths, added bash section
+- [x] `README.md` — mentions both zsh and bash
+- [x] `.ralph/cfm-build.md` — fixed claims (no builds, no completions installed)
+- [x] `release.yml` — fixed step ordering, switched to `softprops/action-gh-release@v2`
+
+### Code Cleanup
+- [x] Removed orphaned `banner_new.rs`
+- [x] Removed empty unused `src/shell/`, `src/banner/` dirs
+- [x] All 10 tests pass
+
+---
+
+## 🔜 Next Up — Lifted from lsd Analysis
+
+`lsd` source study (`src/display.rs`, `src/icon.rs`) revealed patterns we can adopt:
+
+### 1. File-Type Icons (replaces 📂/📄 everywhere)
+Current: only `📂` (dir) and `📄` (file).
+Target: 3-tier icon lookup like lsd's `Icon::get()`:
+
+| Tier | Match | Examples |
+|------|-------|----------|
+| Filename | exact match | `Cargo.toml` → 🦀, `package.json` → 📦, `Makefile` → ⚙ |
+| Extension | `.ext` → icon | `.rs` → 🦀, `.py` → 🐍, `.js` → , `.ts` → , `.go` → , `.md` →  |
+| Fallback | type-based | dir → 📁, executable → ⚙, symlink → 🔗, regular → 📄 |
+
+- [ ] Define `IconMap` struct with `names: HashMap` + `extensions: HashMap`
+- [ ] Ship a default mapping embedded in binary (no YAML theme files yet)
+- [ ] Nerd Font icons for languages (` js`, ` ts`, ` c`, ` cpp`, ` lua`, etc.)
+- [ ] Unicode fallback icons when Nerd Font unavailable
+
+### 2. Permission Column (like `lsd -l`)
+- [ ] Add optional `PERM` column: `drwxr-xr-x`
+- [ ] Configurable via `--blocks` or config flag
+- [ ] Show owner/group optionally
+
+### 3. Fix Unicode Width Handling
+Current `truncate()` counts `char`s, not display width. CJK chars (width 2) and emoji are miscounted.
+- [ ] Add `unicode-width` crate dependency
+- [ ] Replace `truncate()` with display-width-aware version
+- [ ] Test with: 日本語, 中文, 🦀📂 emoji
+
+### 4. Color by File Type
+- [ ] Directories → blue/cyan
+- [ ] Executables → green
+- [ ] Symlinks → magenta
+- [ ] Hidden files → dim/gray
+- [ ] Use `crossterm` (already a transitive dep via comfy-table) or `anstyle`
+
+### 5. Symlink Target Display
+- [ ] Show `→ target` after symlink name (like `lsd -l`)
+- [ ] Already have `is_symlink` metadata in `DirEntry`
+
+---
+
+## 🗺️ Bucket List
+
+### Header Enhancements
 - [ ] Last modified date of directory itself
-- [ ] Free/used space for filesystem
+- [ ] Free/used filesystem space
 - [ ] Parent directory size
 
-### 2. Better Column Layout
-- [ ] Responsive columns based on terminal width
-- [ ] Optimal column widths (name, size, type, modified, perms?)
-- [x] Row-based output (one item per line, clear and readable) - ✅ Done
-- [ ] Sort by: name, size, modified, type (default: name)
-- [x] List view like file manager - ✅ Done, one item per line
-
-### 3. More Item Information
-- [ ] Show permissions (rwxr-xr-x)
-- [ ] Show owner/group for dirs
-- [ ] Show symlink target
-- [ ] Show file type icon beyond dir/file
-- [ ] Color coding by type/category
-- [ ] Size bar visualization (like disk usage bars)
-
-### 4. Context Menu / Quick Actions
-- [ ] Show common actions (mv, cp, open)
-- [ ] Keyboard shortcuts
-- [ ] Preview on hover (hard in CLI, maybe skip)
-
-### 5. Filtering & Search
-- [ ] `--hidden` flag to always show hidden
-- [ ] `--sort` flag (name, size, modified)
+### Column Options
+- [ ] `--sort name|size|modified|type` flag
 - [ ] `--filter` flag (type, size range, name pattern)
-- [ ] `--max` flag (max items per column)
+- [ ] `--max N` flag (limit items shown)
+- [ ] `--hidden` flag to always show dotfiles
 
-### 6. Performance
-- [ ] Cache directory scan results
-- [ ] Parallel scanning
-- [ ] `--depth` flag for recursive view
+### Table Views
+- [ ] `--tree` recursive view (like `lsd --tree`)
+- [ ] `--grid` compact multi-column layout (like `ls` default)
 
-### 7. User Preferences
-- [ ] `fm config` to save preferences
-- [ ] Remember last sort preference
-- [ ] Configurable columns
-- [ ] Theme colors
+### Git Per-File Status
+- [ ] Show `M` / `?` / `+` per-file git status icons
+- [ ] Color modified/staged/untracked items differently
+- [ ] Show .gitignore'd files dimmed
 
-### 8. Git Integration
-- [x] Show git status icons per item (modified, staged, untracked) - ✅ In header
-- [ ] Show which items are in .gitignore
-- [ ] Show conflicts in merge
-- [ ] Branch comparison (main vs feature)
+### Config System
+- [ ] `fm config` TUI or file-based preferences
+- [ ] Remember sort order, icon theme, column layout
+- [ ] Configurable visible columns (permissions on/off, etc.)
 
-### 9. Smart Categorization
-- [ ] Group by type (Documents, Images, Code, etc.)
-- [ ] Show category counts
-- [ ] Collapsible groups
+### Size Visualization
+- [ ] Size bar next to file size (like `du` or `dust`)
+- [ ] Highlight largest files
 
-### 10. Rich Output Options
-- [ ] `--tree` view for subdirectories
-- [ ] `--preview` for file contents
-- [ ] `--duplicates` find duplicate files
-- [ ] `--large` highlight large files
+### Performance
+- [ ] Cache directory scan results (TTL-based)
+- [ ] `--depth N` for shallow recursive view
+- [ ] Bench: <50ms for 10k files
 
-## Priority
+### Safety / Polish
+- [ ] Deduplicate `autoload -U add-zsh-hook` in install.sh (guard with grep)
+- [ ] Test install.sh idempotency (run twice = no duplicates)
+- [ ] `cargo clippy` pass
+- [ ] `cargo fmt` pass
 
-### High
-1. More informative header (git status, hidden count)
-2. Better column sizing
-3. Filtering options
+---
 
-### Medium
-4. Permissions display
-5. Sort options
-6. Size visualization
-
-### Low
-7. Config system
-8. Caching
-9. Rich preview modes
-
-## Implementation Notes
-
-### Column Width Strategy
-- Read terminal width from `console` crate
-- Calculate optimal column count: `term_width / (name_width + size_width + type_width)`
-- Minimum column width: 40 chars
-- Allow user config for preferred widths
-
-### Git Status Icons
-```rust
-" "  // clean
-"*"  // modified
-"+"  // staged
-"?"  // untracked
-"!"  // conflicts
-"~"  // behind
-"^"  // ahead
-```
-
-### Size Bar Visualization
-```rust
-// Visual representation of size
-fn size_bar(bytes: u64, max: u64) -> String {
-    let ratio = (bytes as f64 / max as f64).min(1.0);
-    let bars = (ratio * 10.0).round() as usize;
-    format!("{:━<10}", "█".repeat(bars))
-}
-```
-
-## Testing
+## Testing Backlog
 - [ ] Test with 1000+ items in directory
 - [ ] Test with very long filenames
-- [ ] Test with unicode filenames
-- [ ] Test with symlinks
-- [ ] Test with Windows paths
-- [ ] Performance benchmark (< 50ms for 10k files)
+- [ ] Test with CJK/emoji filenames (after unicode-width fix)
+- [ ] Test with symlinks + broken symlinks
+- [ ] Performance benchmark
