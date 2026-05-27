@@ -20,6 +20,7 @@ clap_complete = "4"
 # Rich terminal output
 comfy-table = "6"
 console = "0.15"
+unicode-width = "0.2"
 
 # Fast directory walking
 ignore = "0.4"

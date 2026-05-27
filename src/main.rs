@@ -4,6 +4,7 @@ mod cli;
 mod cmd;
 mod git;
 mod fs;
+mod icon;
 mod state;
 
 use clap::Parser;

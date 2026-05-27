@@ -86,18 +86,11 @@ pub struct DirEntry {
     pub is_dir: bool,
     pub is_file: bool,
     pub is_symlink: bool,
+    pub is_exec: bool,
     pub size: u64,
     pub modified: Option<DateTime<Utc>>,
-}
-
-impl DirEntry {
-    pub fn icon(&self) -> &'static str {
-        if self.is_dir {
-            "📂"
-        } else {
-            "📄"
-        }
-    }
+    pub perms: String,
+    pub symlink_target: Option<String>,
 }
 
 /// Directory summary
