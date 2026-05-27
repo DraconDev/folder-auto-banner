@@ -135,13 +135,17 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     // Build the file listing table with responsive column widths
     let term = Term::stdout();
     let (term_w, _) = term.size();
-    let table_width = if term_w > 0 { (term_w as u16).min(140).max(60) } else { 80_u16 };
+    let term_width = if term_w > 0 { (term_w as usize).min(120).max(60) } else { 80_usize };
+
+    // Fixed columns: icon(4) + size(10) + modified(14) + border overhead(7) = 35
+    // Name gets the rest, minimum 20
+    let name_width = term_width.saturating_sub(35).max(20);
 
     let mut table = Table::new();
     table
         .load_preset(presets::UTF8_FULL)
-        .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_width(table_width)
+        .set_content_arrangement(ContentArrangement::Disabled)
+        .set_width(term_width as u16)
         .set_header(vec![
             Cell::new(""),
             Cell::new("NAME"),
@@ -159,27 +163,46 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let modified = item.modified.as_ref()
             .map(|dt| format_relative_time(dt))
             .unwrap_or_default();
+        let name = truncate(&item.name, name_width);
 
         table.add_row(vec![
             Cell::new(icon),
-            Cell::new(item.name.clone()),
+            Cell::new(name),
             Cell::new(size_or_count),
             Cell::new(modified),
         ]);
     }
 
     table.set_constraints(vec![
-        ColumnConstraint::UpperBoundary(Width::Fixed(5)),
-        ColumnConstraint::LowerBoundary(Width::Fixed(15)),
-        ColumnConstraint::UpperBoundary(Width::Fixed(12)),
-        ColumnConstraint::UpperBoundary(Width::Fixed(14)),
+        ColumnConstraint::Absolute(Width::Fixed(4)),
+        ColumnConstraint::Absolute(Width::Fixed(name_width as u16)),
+        ColumnConstraint::Absolute(Width::Fixed(10)),
+        ColumnConstraint::Absolute(Width::Fixed(14)),
     ]);
+
+    // Prevent row wrapping
+    for row in table.row_iter_mut() {
+        row.max_height(1);
+    }
 
     println!("{table}");
 
     if !show_hidden && !hidden_items.is_empty() {
         println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
     }
+}
+
+fn truncate(s: &str, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() > width {
+        format!("{}…", chars[..width.saturating_sub(1)].iter().collect::<String>())
+    } else {
+        s.to_string()
+    }
+}
 }
 
 fn output_raw(summary: &DirSummary) {
