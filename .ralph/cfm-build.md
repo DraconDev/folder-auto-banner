@@ -7,8 +7,8 @@
 After running the installation script and sourcing your shell config, the auto banner now works:
 
 ```bash
-source ~/.bashrc
-cd /home/dracon/Dev/cli-file-manager
+exec zsh            # or: source ~/.bashrc
+cd cfm
 # See rich banner with:
 # - Project type (🦀 Rust)
 # - Git status
@@ -19,15 +19,14 @@ cd /home/dracon/Dev/cli-file-manager
 ### Quick Test
 
 ```bash
-cd /home/dracon/Dev/cli-file-manager
-./target/release/fm
+cargo run
 ```
 
 Or after installation:
 
 ```bash
-source ~/.bashrc
-cd /home/dracon/Dev/cli-file-manager
+source ~/.bashrc   # or: exec zsh
+cd cfm
 # Auto banner appears!
 ```
 
@@ -83,12 +82,12 @@ cd /home/dracon/Dev/cli-file-manager
 
 ### Direct
 ```bash
-./target/release/fm
+cargo run
 ```
 
 ### Auto (after installation)
 ```bash
-cd /home/dracon/Dev/cli-file-manager
+cd cfm
 # Banner appears automatically!
 ```
 
