@@ -7,7 +7,7 @@ use anyhow::Result;
 use std::path::Path;
 
 use comfy_table::{
-    Cell, ColumnConstraint, ContentArrangement, Table, Width, presets,
+    Cell, ColumnConstraint, ContentArrangement, Table, Width,
 };
 use console::Term;
 
@@ -144,7 +144,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
 
     let mut table = Table::new();
     table
-        .load_preset(presets::UTF8_FULL_CONDENSED)
+        .load_preset("││──├─┼┤│    ┬┴┌┐└┘")
         .set_content_arrangement(ContentArrangement::Disabled)
         .set_width(term_width as u16)
         .set_header(vec![
