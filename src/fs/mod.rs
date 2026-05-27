@@ -138,7 +138,15 @@ impl DirSummary {
                 files += 1;
             }
 
-            let metadata = entry.metadata().ok();
+            // Try to get metadata — for symlinks, follow the link
+            let metadata = entry.metadata().ok().or_else(|| {
+                if is_symlink {
+                    std::fs::metadata(entry.path()).ok()
+                } else {
+                    None
+                }
+            });
+
             let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
             total_size += size;
 
@@ -153,14 +161,46 @@ impl DirSummary {
                 }
             }
 
+            // Unix permissions
+            let (perms, is_exec) = if let Some(meta) = &metadata {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let mode = meta.permissions().mode();
+                    let perms_str = format_mode(mode);
+                    let exec = mode & 0o111 != 0;
+                    (perms_str, exec)
+                }
+                #[cfg(not(unix))]
+                {
+                    let read_only = meta.permissions().readonly();
+                    let perms_str = if read_only { "r--r--r--".to_string() } else { "rw-rw-rw-".to_string() };
+                    (perms_str, false)
+                }
+            } else {
+                ("----------".to_string(), false)
+            };
+
+            // Symlink target
+            let symlink_target = if is_symlink {
+                std::fs::read_link(entry.path())
+                    .ok()
+                    .map(|p| p.to_string_lossy().to_string())
+            } else {
+                None
+            };
+
             top_items.push(DirEntry {
                 name: entry.file_name().to_string_lossy().to_string(),
                 path: entry.path().to_path_buf(),
                 is_dir,
                 is_file,
                 is_symlink,
+                is_exec,
                 size,
                 modified,
+                perms,
+                symlink_target,
             });
         }
 
