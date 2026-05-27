@@ -11,7 +11,7 @@ use comfy_table::{
 };
 use console::Term;
 
-use crate::fs::{DirSummary, format_size_compact, format_relative_time};
+use crate::fs::{DirSummary, format_size_compact, format_exact_time};
 use crate::git::GitInfo;
 use crate::icon;
 
@@ -144,20 +144,23 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
 
-    // Build the file listing table — icon merged into name, responsive width
+    // Build the file listing table — like lsd -l but with icons
     let term = Term::stdout();
     let (tw, _) = term.size();
-    let term_width = if tw > 0 { (tw as usize).min(100).max(60) } else { 80_usize };
+    let term_width = if tw > 0 { (tw as usize).min(120).max(60) } else { 80_usize };
 
-    // Columns: NAME (rest) + SIZE (12) + MODIFIED (18) + borders/padding (10)
-    let overhead = 40;
-    let name_width = term_width.saturating_sub(overhead).max(25);
+    // Columns: PERM(10) + OWNER(8) + SIZE(12) + MODIFIED(12) + borders/padding(10)
+    // = 52 overhead, name gets the rest (min 20)
+    let overhead = 52;
+    let name_width = term_width.saturating_sub(overhead).max(20);
 
     let mut table = Table::new();
     table
         .load_preset("││──├─┼┤│    ┬┴┌┐└┘")
         .set_content_arrangement(ContentArrangement::Disabled)
         .set_header(vec![
+            Cell::new("PERM"),
+            Cell::new("OWNER"),
             Cell::new("NAME"),
             Cell::new("SIZE"),
             Cell::new("MODIFIED"),
@@ -187,10 +190,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         };
 
         let modified = item.modified.as_ref()
-            .map(|dt| format_relative_time(dt))
+            .map(|dt| format_exact_time(dt))
             .unwrap_or_default();
 
         table.add_row(vec![
+            Cell::new(&item.perms),
+            Cell::new(&item.owner),
             Cell::new(name_display),
             Cell::new(size_or_count),
             Cell::new(modified),
@@ -198,9 +203,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     }
 
     table.set_constraints(vec![
+        ColumnConstraint::Absolute(Width::Fixed(10)),
+        ColumnConstraint::Absolute(Width::Fixed(8)),
         ColumnConstraint::Absolute(Width::Fixed(name_width as u16)),
         ColumnConstraint::Absolute(Width::Fixed(12)),
-        ColumnConstraint::Absolute(Width::Fixed(18)),
+        ColumnConstraint::Absolute(Width::Fixed(12)),
     ]);
 
     // Prevent row wrapping

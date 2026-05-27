@@ -90,6 +90,8 @@ pub struct DirEntry {
     pub size: u64,
     pub modified: Option<DateTime<Utc>>,
     pub perms: String,
+    pub owner: String,
+    pub group: String,
     pub symlink_target: Option<String>,
 }
 
@@ -161,24 +163,32 @@ impl DirSummary {
                 }
             }
 
-            // Unix permissions
-            let (perms, is_exec) = if let Some(meta) = &metadata {
+            // Unix permissions + owner/group
+            let (perms, is_exec, owner, group) = if let Some(meta) = &metadata {
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
                     let mode = meta.permissions().mode();
                     let perms_str = format_mode(mode);
                     let exec = mode & 0o111 != 0;
-                    (perms_str, exec)
+
+                    // Resolve uid/gid to names via /etc/passwd and /etc/group
+                    use std::os::unix::fs::MetadataExt;
+                    let uid = meta.uid();
+                    let gid = meta.gid();
+                    let owner = resolve_uid(uid).unwrap_or_else(|| uid.to_string());
+                    let group = resolve_gid(gid).unwrap_or_else(|| gid.to_string());
+
+                    (perms_str, exec, owner, group)
                 }
                 #[cfg(not(unix))]
                 {
                     let read_only = meta.permissions().readonly();
                     let perms_str = if read_only { "r--r--r--".to_string() } else { "rw-rw-rw-".to_string() };
-                    (perms_str, false)
+                    (perms_str, false, "?".to_string(), "?".to_string())
                 }
             } else {
-                ("----------".to_string(), false)
+                ("----------".to_string(), false, "?".to_string(), "?".to_string())
             };
 
             // Symlink target
@@ -200,6 +210,8 @@ impl DirSummary {
                 size,
                 modified,
                 perms,
+                owner,
+                group,
                 symlink_target,
             });
         }
@@ -306,6 +318,11 @@ pub fn format_relative_time(dt: &DateTime<Utc>) -> String {
         "just now".to_string()
     }
 }
+
+/// Format exact date/time like lsd: "May 27 23:06"
+pub fn format_exact_time(dt: &DateTime<Utc>) -> String {
+    dt.format("%b %d %H:%M").to_string()
+}
 impl DirSummary {
     /// Get file type breakdown
     pub fn by_type(&self) -> Vec<(String, usize)> {
@@ -338,4 +355,38 @@ fn format_mode(mode: u32) -> String {
         "{}{}{}{}{}{}{}{}{}",
         user, user_w, user_x, group, group_w, group_x, other, other_w, other_x
     )
+}
+
+/// Resolve uid to username from /etc/passwd
+#[cfg(unix)]
+fn resolve_uid(uid: u32) -> Option<String> {
+    let content = std::fs::read_to_string("/etc/passwd").ok()?;
+    for line in content.lines() {
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() >= 3 {
+            if let Ok(file_uid) = parts[2].parse::<u32>() {
+                if file_uid == uid {
+                    return Some(parts[0].to_string());
+                }
+            }
+        }
+    }
+    Some(uid.to_string())
+}
+
+/// Resolve gid to group name from /etc/group
+#[cfg(unix)]
+fn resolve_gid(gid: u32) -> Option<String> {
+    let content = std::fs::read_to_string("/etc/group").ok()?;
+    for line in content.lines() {
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() >= 3 {
+            if let Ok(file_gid) = parts[2].parse::<u32>() {
+                if file_gid == gid {
+                    return Some(parts[0].to_string());
+                }
+            }
+        }
+    }
+    Some(gid.to_string())
 }
