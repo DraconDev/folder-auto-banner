@@ -127,28 +127,28 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
     
-    // Simple space-padded columns (no box drawing chars)
-    println!("{:─^80}", "");
-    println!("{:>4}  {:<30}  {:>10}  {:<10}  {:<15}", "TYPE", "NAME", "SIZE", "TYPE", "MODIFIED");
-    println!("{:─^80}", "");
+    // Print table with proper column separators
+    println!("┌────────┬──────────────────────────────────────┬──────────────┬──────────────────┐");
+    println!("│ ICON  │ NAME                                │ SIZE         │ MODIFIED         │");
+    println!("├────────┼──────────────────────────────────────┼──────────────┼──────────────────┤");
     
     for item in display_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
             let count_str = if count == 1 { "1" } else { &format!("{}", count) };
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name_len = 30.min(item.name.chars().count());
-            let name = item.name.chars().take(30).collect::<String>();
-            println!("{:>4}  {:<30}  {:>10}  {:<10}  {:<15}", "[DIR]", name, count_str, "[DIR]", modified);
+            let name_trunc = truncate(&item.name, 36);
+            println!("│   📂   │ {:<38} │ {:>11} │ {:<16} │", name_trunc, count_str, modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(item);
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name = item.name.chars().take(30).collect::<String>();
-            println!("{:>4}  {:<30}  {:>10}  {:<10}  {:<15}", "[FILE]", name, size, ext, modified);
+            let name_trunc = truncate(&item.name, 36);
+            println!("│   📄   │ {:<38} │ {:>11} │ {:<16} │", name_trunc, size, modified);
         }
     }
-    println!("{:─^80}", "");
+    
+    println!("└────────┴──────────────────────────────────────┴──────────────┴──────────────────┘");
     
     if !show_hidden && !hidden_items.is_empty() {
         println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
@@ -196,6 +196,15 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
     std::fs::read_dir(&entry.path)
         .map(|d| d.count())
         .unwrap_or(0)
+}
+
+fn truncate(s: &str, width: usize) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() > width {
+        chars[..width].iter().collect()
+    } else {
+        s.to_string()
+    }
 }
 
 fn get_extension_label(item: &crate::fs::DirEntry) -> String {
