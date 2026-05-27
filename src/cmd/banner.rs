@@ -33,7 +33,7 @@ pub fn run_banner(
     Ok(())
 }
 
-/// Output rich formatted banner - list view like a file manager
+/// Output rich formatted banner - table view like a file manager
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
@@ -99,9 +99,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     
     println!("{}", header);
     println!();
-    println!("┌───────────────────────────────────┬─────────┬─────────┬────────────────┐");
-    println!("│ NAME                           │ SIZE    │ TYPE   │ MODIFIED       │");
-    println!("├───────────────────────────────────┼─────────┼─────────┼────────────────┤");
+    
+    // Print table header with borders
+    println!("┌────────┬────────────────────────────┬──────────┬─────────┬────────────────┐");
+    println!("│  ICON  │ NAME                       │ SIZE     │ TYPE   │ MODIFIED      │");
+    println!("├────────┼────────────────────────────┼──────────┼─────────┼────────────────┤");
     
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
     let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
@@ -130,21 +132,33 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
     
+    fn pad_right(s: &str, width: usize) -> String {
+        let len = s.chars().count();
+        if len >= width {
+            s.chars().take(width).collect()
+        } else {
+            format!("{}{}", s, " ".repeat(width - len))
+        }
+    }
+    
     for item in display_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
             let count_str = if count == 1 { "1" } else { &format!("{}", count) };
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("│ 📂 {:<33} │ {:>7} │[DIR]  │ {:<14} │", item.name, count_str, modified);
+            let name = pad_right(&item.name, 26);
+            println!("│   📂   │ {} │ {:>8} │ [DIR]  │ {} │", name, count_str, modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(item);
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("│ 📄 {:<33} │ {:>7} │ {:^5} │ {:<14} │", item.name, size, ext, modified);
+            let name = pad_right(&item.name, 26);
+            let ext_padded = pad_right(&ext, 7);
+            println!("│   📄   │ {} │ {:>8} │ {} │ {} │", name, size, ext_padded, modified);
         }
     }
     
-    println!("└───────────────────────────────────┴─────────┴─────────┴────────────────┘");
+    println!("└────────┴────────────────────────────┴──────────┴─────────┴────────────────┘");
     
     if !show_hidden && !hidden_items.is_empty() {
         println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
