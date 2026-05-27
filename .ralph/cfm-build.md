@@ -36,10 +36,9 @@ cd /home/dracon/Dev/cli-file-manager
 ## 📦 What's Included
 
 1. **Auto Install Script** (`install.sh`)
-   - Builds binary
-   - Copies to `~/bin/fm`
-   - Adds shell hook
-   - Installs completions
+   - Copies binary to `~/.local/bin/fm`
+   - Adds shell hook (zsh + bash)
+   - Cleans up old versions
 
 2. **Auto Banner Hook**
    - Automatically shows banner on every `cd`

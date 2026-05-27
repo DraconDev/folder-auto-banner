@@ -2,27 +2,25 @@
 
 ## ✅ COMPLETE AND WORKING!
 
-### Auto Banner (Zsh)
+### Auto Banner (Zsh / Bash)
 
 ```bash
-source ~/.zshrc
-cd /home/dracon/Dev/cli-file-manager
+exec zsh            # or: source ~/.bashrc
+cd cfm
 # See auto banner automatically!
 ```
 
 ### Quick Test
 
 ```bash
-source ~/.zshrc
-cd /home/dracon/Dev/cli-file-manager
-./target/release/fm
+cargo run
 ```
 
 ---
 
 ## 🎯 Features
 
-- **Auto banner** on every `cd` (zsh)
+- **Auto banner** on every `cd` (zsh / bash)
 - **Rich output** with Unicode icons
 - **28 commands** implemented
 - **Zero-hostage** philosophy
@@ -33,7 +31,7 @@ cd /home/dracon/Dev/cli-file-manager
 
 ```bash
 ./install.sh
-source ~/.zshrc
+exec zsh   # or: source ~/.bashrc
 ```
 
 ---

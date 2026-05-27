@@ -5,74 +5,78 @@
 ### Method 1: Auto Install Script (Recommended)
 
 ```bash
-cd /home/dracon/Dev/cli-file-manager
+cd cfm
 ./install.sh
-source ~/.zshrc  # or source ~/.bashrc
+exec zsh   # or: source ~/.bashrc
 ```
 
-### Method 2: Manual Installation
+### Method 2: Build + Install
 
 ```bash
-cd /home/dracon/Dev/cli-file-manager
+cd cfm
 cargo build --release
-cp target/release/fm ~/bin/fm
+./install.sh
+exec zsh   # or: source ~/.bashrc
 ```
 
-Then add to your shell config:
+### Method 3: Cargo Install
 
-**Bash:**
 ```bash
-export PATH="$HOME/bin:$PATH"
-_cfm_hook() {
-    command /home/dracon/bin/fm banner "$PWD"
-}
+cargo install --path .
 ```
 
-**Zsh:**
+Then add the hook to your shell config manually — see the section below.
+
+---
+
+## Shell Hook Setup
+
+Add the appropriate section to your shell config:
+
+### Zsh (`~/.zshrc`)
 ```bash
-export PATH="$HOME/bin:$PATH"
+# cfm auto-banner hook
 autoload -U add-zsh-hook
 add-zsh-hook chpwd _cfm_hook
 _cfm_hook() {
-    command /home/dracon/bin/fm banner "$PWD"
+    eval "$(command fm env "$PWD")"
+    command fm banner "$PWD"
 }
 ```
 
-Reload your shell:
+### Bash (`~/.bashrc`)
 ```bash
-source ~/.bashrc  # or source ~/.zshrc
+# cfm auto-banner hook
+_cfm_hook() {
+    eval "$(command fm env "$PWD")"
+    command fm banner "$PWD"
+}
+PROMPT_COMMAND="_cfm_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 ```
+
+Then reload: `exec zsh` or `source ~/.bashrc`
+
+---
 
 ## Usage
 
-### Direct Use
 ```bash
-cd /home/dracon/Dev/cli-file-manager
-./target/release/fm
-```
-
-### After Installation (Auto Banner)
-```bash
-cd /home/dracon/Dev/cli-file-manager
-# Auto banner appears!
-```
-
-### Common Commands
-```bash
-fm banner --json     # JSON output
-fm yank file.txt     # Copy to clipboard
-fm paste             # Paste from clipboard
-fm mv src/main.rs target/  # Move file
-fm diff src cmd      # Compare directories
+fm                          # Show banner for current directory
+fm banner /some/path        # Show banner for specific directory
+fm banner --json            # JSON output
+fm stats                    # Directory statistics
+fm yank file.txt            # Copy to clipboard
+fm paste                    # Paste from clipboard
+fm mv src/file target/      # Move file
+fm diff src cmd             # Compare directories
+fm pin myproject            # Pin current directory
+fm jump myproject           # Jump to pinned directory
+fm install-hook             # Print shell hook for manual setup
 ```
 
 ## Testing
 
 ```bash
-# Test the banner
-./target/release/fm
-
-# Test auto banner
-source ~/.bashrc
-cd /home/dracon/Dev/cli-file-manager
+cargo run                   # Test the banner
+cargo test                  # Run test suite
 ```
