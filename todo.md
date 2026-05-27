@@ -1,13 +1,24 @@
 # cfm TODO
 
-## ✅ Done (since last audit)
+## ✅ Done
 
 ### Table / Display
 - [x] Replace manual `println!` box-drawing with `comfy-table` v6
 - [x] Custom preset matching original `│`, `─`, `├`, `┼`, `┤` style
 - [x] Responsive column widths (caps at 100, min 60, name column gets remainder)
-- [x] Merge icon into name column (`📂 .dracon` instead of wasted icon column)
-- [x] `max_height(1)` prevents row wrapping; `truncate()` handles overflow with `…`
+- [x] Merge icon into name column (`📁 .dracon` instead of wasted icon column)
+- [x] `max_height(1)` prevents row wrapping; `truncate_ansi()` handles overflow with `…`
+
+### File-Type Icons (lifted from lsd)
+- [x] 3-tier icon lookup: exact filename → extension → type fallback
+- [x] 100+ mappings: `Cargo.toml` → 🦀, `install.sh` → 🐚, `README.md` → 📖, `.lock` → 🔒, etc.
+- [x] Separate `src/icon.rs` module with unit tests
+
+### Permissions & Symlinks
+- [x] `DirEntry` fields: `is_exec`, `perms`, `symlink_target`
+- [x] Unix permissions via `std::os::unix::fs::PermissionsExt::mode()` → `rwxrwxrwx`
+- [x] Symlink target resolution via `std::fs::read_link`
+- [x] `truncate_ansi()` handles ANSI escape sequences without breaking width calculation
 
 ### Install / Shell
 - [x] Consolidated 4 redundant install scripts into 1
@@ -28,91 +39,58 @@
 ### Code Cleanup
 - [x] Removed orphaned `banner_new.rs`
 - [x] Removed empty unused `src/shell/`, `src/banner/` dirs
-- [x] All 10 tests pass
+- [x] Added `unicode-width` for proper CJK/emoji truncation
+- [x] All 13 tests pass (5 unit + 8 integration)
 
 ---
 
-## 🔜 Next Up — Lifted from lsd Analysis
+## 🔜 Next Up
 
-`lsd` source study (`src/display.rs`, `src/icon.rs`) revealed patterns we can adopt:
+### 1. Color in Table (requires comfy-table Cell styling)
+- [ ] Directories → blue, executables → green, symlinks → magenta, hidden → dim
+- [ ] Use `Cell::set_style()` instead of raw ANSI escape codes
 
-### 1. File-Type Icons (replaces 📂/📄 everywhere)
-Current: only `📂` (dir) and `📄` (file).
-Target: 3-tier icon lookup like lsd's `Icon::get()`:
-
-| Tier | Match | Examples |
-|------|-------|----------|
-| Filename | exact match | `Cargo.toml` → 🦀, `package.json` → 📦, `Makefile` → ⚙ |
-| Extension | `.ext` → icon | `.rs` → 🦀, `.py` → 🐍, `.js` → , `.ts` → , `.go` → , `.md` →  |
-| Fallback | type-based | dir → 📁, executable → ⚙, symlink → 🔗, regular → 📄 |
-
-- [ ] Define `IconMap` struct with `names: HashMap` + `extensions: HashMap`
-- [ ] Ship a default mapping embedded in binary (no YAML theme files yet)
-- [ ] Nerd Font icons for languages (` js`, ` ts`, ` c`, ` cpp`, ` lua`, etc.)
-- [ ] Unicode fallback icons when Nerd Font unavailable
-
-### 2. Permission Column (like `lsd -l`)
-- [ ] Add optional `PERM` column: `drwxr-xr-x`
-- [ ] Configurable via `--blocks` or config flag
+### 2. Permission Column
+- [ ] Add optional `PERM` column to table (like `lsd -l`)
+- [ ] Configurable via `--compact` or config flag
 - [ ] Show owner/group optionally
 
-### 3. Fix Unicode Width Handling
-Current `truncate()` counts `char`s, not display width. CJK chars (width 2) and emoji are miscounted.
-- [ ] Add `unicode-width` crate dependency
-- [ ] Replace `truncate()` with display-width-aware version
-- [ ] Test with: 日本語, 中文, 🦀📂 emoji
-
-### 4. Color by File Type
-- [ ] Directories → blue/cyan
-- [ ] Executables → green
-- [ ] Symlinks → magenta
-- [ ] Hidden files → dim/gray
-- [ ] Use `crossterm` (already a transitive dep via comfy-table) or `anstyle`
-
-### 5. Symlink Target Display
-- [ ] Show `→ target` after symlink name (like `lsd -l`)
-- [ ] Already have `is_symlink` metadata in `DirEntry`
-
----
-
-## 🗺️ Bucket List
-
-### Header Enhancements
+### 3. Header Improvements
 - [ ] Last modified date of directory itself
 - [ ] Free/used filesystem space
 - [ ] Parent directory size
 
-### Column Options
-- [ ] `--sort name|size|modified|type` flag
+### 4. Sorting & Filtering
+- [ ] `--sort name|size|modified` flag
 - [ ] `--filter` flag (type, size range, name pattern)
 - [ ] `--max N` flag (limit items shown)
 - [ ] `--hidden` flag to always show dotfiles
 
-### Table Views
+### 5. Table Views
 - [ ] `--tree` recursive view (like `lsd --tree`)
 - [ ] `--grid` compact multi-column layout (like `ls` default)
 
-### Git Per-File Status
+### 6. Git Per-File Status
 - [ ] Show `M` / `?` / `+` per-file git status icons
 - [ ] Color modified/staged/untracked items differently
 - [ ] Show .gitignore'd files dimmed
 
-### Config System
+### 7. Config System
 - [ ] `fm config` TUI or file-based preferences
 - [ ] Remember sort order, icon theme, column layout
-- [ ] Configurable visible columns (permissions on/off, etc.)
+- [ ] Configurable visible columns
 
-### Size Visualization
+### 8. Size Visualization
 - [ ] Size bar next to file size (like `du` or `dust`)
 - [ ] Highlight largest files
 
-### Performance
+### 9. Performance
 - [ ] Cache directory scan results (TTL-based)
 - [ ] `--depth N` for shallow recursive view
 - [ ] Bench: <50ms for 10k files
 
-### Safety / Polish
-- [ ] Deduplicate `autoload -U add-zsh-hook` in install.sh (guard with grep)
+### 10. Safety / Polish
+- [ ] Deduplicate `autoload -U add-zsh-hook` in install.sh
 - [ ] Test install.sh idempotency (run twice = no duplicates)
 - [ ] `cargo clippy` pass
 - [ ] `cargo fmt` pass
@@ -122,6 +100,6 @@ Current `truncate()` counts `char`s, not display width. CJK chars (width 2) and 
 ## Testing Backlog
 - [ ] Test with 1000+ items in directory
 - [ ] Test with very long filenames
-- [ ] Test with CJK/emoji filenames (after unicode-width fix)
+- [ ] Test with CJK/emoji filenames
 - [ ] Test with symlinks + broken symlinks
 - [ ] Performance benchmark
