@@ -158,6 +158,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     table
         .load_preset("││──├─┼┤│    ┬┴┌┐└┘")
         .set_content_arrangement(ContentArrangement::Disabled)
+        .set_width(term_width as u16)
         .set_header(vec![
             Cell::new("PERM"),
             Cell::new("OWNER"),
