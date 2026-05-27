@@ -9,7 +9,6 @@ use std::path::Path;
 use comfy_table::{
     Cell, ColumnConstraint, ContentArrangement, Table, Width,
 };
-use console::Term;
 
 use crate::fs::{DirSummary, format_size_compact, format_relative_time};
 use crate::git::GitInfo;
@@ -133,20 +132,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     });
     
     // Build the file listing table with responsive column widths
-    let term = Term::stdout();
-    let (term_w, _) = term.size();
-    let term_width = if term_w > 0 { (term_w as usize).min(120).max(60) } else { 80_usize };
-
-    // Fixed columns: icon(4) + size(10) + modified(16) ≈ 30
-    // Comfy-table adds ~12 chars of border/padding overhead
-    let fixed_overhead = 42;
-    let name_width = term_width.saturating_sub(fixed_overhead).max(20);
-
     let mut table = Table::new();
     table
         .load_preset("││──├─┼┤│    ┬┴┌┐└┘")
-        .set_content_arrangement(ContentArrangement::Disabled)
-        .set_width(term_width as u16)
+        .set_content_arrangement(ContentArrangement::DynamicFullWidth)
         .set_header(vec![
             Cell::new(""),
             Cell::new("NAME"),
@@ -164,7 +153,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let modified = item.modified.as_ref()
             .map(|dt| format_relative_time(dt))
             .unwrap_or_default();
-        let name = truncate(&item.name, name_width);
+        let name = truncate(&item.name, 80);
 
         table.add_row(vec![
             Cell::new(icon),
@@ -175,10 +164,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     }
 
     table.set_constraints(vec![
-        ColumnConstraint::Absolute(Width::Fixed(4)),
-        ColumnConstraint::Absolute(Width::Fixed(name_width as u16)),
-        ColumnConstraint::Absolute(Width::Fixed(10)),
-        ColumnConstraint::Absolute(Width::Fixed(16)),
+        ColumnConstraint::UpperBoundary(Width::Fixed(5)),
+        ColumnConstraint::LowerBoundary(Width::Fixed(15)),
+        ColumnConstraint::UpperBoundary(Width::Fixed(12)),
+        ColumnConstraint::UpperBoundary(Width::Fixed(16)),
     ]);
 
     // Prevent row wrapping
