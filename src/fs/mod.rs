@@ -321,3 +321,21 @@ impl DirSummary {
         counts.into_iter().collect()
     }
 }
+
+/// Format Unix file mode to rwxrwxrwx string
+#[cfg(unix)]
+fn format_mode(mode: u32) -> String {
+    let user = if mode & 0o400 != 0 { 'r' } else { '-' };
+    let user_w = if mode & 0o200 != 0 { 'w' } else { '-' };
+    let user_x = if mode & 0o100 != 0 { 'x' } else { '-' };
+    let group = if mode & 0o040 != 0 { 'r' } else { '-' };
+    let group_w = if mode & 0o020 != 0 { 'w' } else { '-' };
+    let group_x = if mode & 0o010 != 0 { 'x' } else { '-' };
+    let other = if mode & 0o004 != 0 { 'r' } else { '-' };
+    let other_w = if mode & 0o002 != 0 { 'w' } else { '-' };
+    let other_x = if mode & 0o001 != 0 { 'x' } else { '-' };
+    format!(
+        "{}{}{}{}{}{}{}{}{}",
+        user, user_w, user_x, group, group_w, group_x, other, other_w, other_x
+    )
+}
