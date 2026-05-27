@@ -101,7 +101,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     println!();
     
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
-    let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
+ let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
     
     for item in &summary.top_items {
         if item.name.starts_with('.') {
@@ -127,28 +127,28 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
     
-    // Print table with proper column separators
-    println!("┌────────┬──────────────────────────────────────┬──────────────┬──────────────────┐");
-    println!("│ ICON  │ NAME                                │ SIZE         │ MODIFIED         │");
-    println!("├────────┼──────────────────────────────────────┼──────────────┼──────────────────┤");
+    // Fixed-width table with proper column alignment
+    // Columns: ICON(6) + NAME(40) + SIZE(12) + MODIFIED(15) = 73 chars + separators
+    println!("┌────────┬────────────────────────────────────────┬────────────┬───────────────┐");
+    println!("│{:^8} │ {:<40} │ {:>10} │ {:<13} │", "ICON", "NAME", "SIZE/ITEMS", "MODIFIED");
+    println!("├────────┼────────────────────────────────────────┼────────────┼───────────────┤");
     
     for item in display_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
-            let count_str = if count == 1 { "1" } else { &format!("{}", count) };
+            let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name_trunc = truncate(&item.name, 36);
-            println!("│   📂   │ {:<38} │ {:>11} │ {:<16} │", name_trunc, count_str, modified);
+            let name = pad_right(&item.name, 40);
+            println!("│{:^8} │ {} │ {:>10} │ {:<13} │", "📂", name, count_str, modified);
         } else {
             let size = format_size_compact(item.size);
-            let ext = get_extension_label(item);
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name_trunc = truncate(&item.name, 36);
-            println!("│   📄   │ {:<38} │ {:>11} │ {:<16} │", name_trunc, size, modified);
+            let name = pad_right(&item.name, 40);
+            println!("│{:^8} │ {} │ {:>10} │ {:<13} │", "📄", name, size, modified);
         }
     }
     
-    println!("└────────┴──────────────────────────────────────┴──────────────┴──────────────────┘");
+    println!("└────────┴────────────────────────────────────────┴────────────┴───────────────┘");
     
     if !show_hidden && !hidden_items.is_empty() {
         println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
@@ -198,12 +198,12 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .unwrap_or(0)
 }
 
-fn truncate(s: &str, width: usize) -> String {
-    let chars: Vec<char> = s.chars().collect();
-    if chars.len() > width {
-        chars[..width].iter().collect()
+fn pad_right(s: &str, width: usize) -> String {
+    let len = s.chars().count();
+    if len >= width {
+        s.chars().take(width).collect()
     } else {
-        s.to_string()
+        format!("{}{}", s, " ".repeat(width - len))
     }
 }
 
