@@ -30,38 +30,15 @@ jobs:
       - name: Run tests
         run: cargo test --release
 
-      - name: Package
-        shell: bash
-        run: |
-          mkdir -p release
-          cp target/release/fm release/
-          cp README.md release/
-          cp LICENSE release/ || echo "MIT" > release/LICENSE
-
-      - name: Create checksums
-        shell: bash
-        run: |
-          cd release
-          sha256sum fm > fm.sha256
-          echo "Release artifacts: ${{ github.ref_name }}"
-
-      - name: Upload artifacts
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/fm
-          asset_name: fm
-          asset_content_type: application/octet-stream
-
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: |
+            target/release/fm
+          body: |
+            Release ${{ github.ref_name }}
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
