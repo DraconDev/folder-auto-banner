@@ -339,21 +339,31 @@ impl DirSummary {
     }
 }
 
-/// Format Unix file mode to rwxrwxrwx string
+/// Format Unix file mode to drwxr-xrwx string (10 chars like `ls -l`)
 #[cfg(unix)]
 fn format_mode(mode: u32) -> String {
-    let user = if mode & 0o400 != 0 { 'r' } else { '-' };
+    // File type
+    let ft = match mode & 0o170000 {
+        0o040000 => 'd',
+        0o120000 => 'l',
+        0o010000 => 'p',
+        0o020000 => 'c',
+        0o060000 => 'b',
+        0o140000 => 's',
+        _ => '-',
+    };
+    let user_r = if mode & 0o400 != 0 { 'r' } else { '-' };
     let user_w = if mode & 0o200 != 0 { 'w' } else { '-' };
     let user_x = if mode & 0o100 != 0 { 'x' } else { '-' };
-    let group = if mode & 0o040 != 0 { 'r' } else { '-' };
+    let group_r = if mode & 0o040 != 0 { 'r' } else { '-' };
     let group_w = if mode & 0o020 != 0 { 'w' } else { '-' };
     let group_x = if mode & 0o010 != 0 { 'x' } else { '-' };
-    let other = if mode & 0o004 != 0 { 'r' } else { '-' };
+    let other_r = if mode & 0o004 != 0 { 'r' } else { '-' };
     let other_w = if mode & 0o002 != 0 { 'w' } else { '-' };
     let other_x = if mode & 0o001 != 0 { 'x' } else { '-' };
     format!(
-        "{}{}{}{}{}{}{}{}{}",
-        user, user_w, user_x, group, group_w, group_x, other, other_w, other_x
+        "{}{}{}{}{}{}{}{}{}{}",
+        ft, user_r, user_w, user_x, group_r, group_w, group_x, other_r, other_w, other_x
     )
 }
 

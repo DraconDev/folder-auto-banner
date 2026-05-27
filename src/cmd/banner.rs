@@ -149,10 +149,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let (tw, _) = term.size();
     let term_width = if tw > 0 { (tw as usize).min(120).max(60) } else { 80_usize };
 
-    // Columns: PERM(10) + OWNER(8) + SIZE(12) + MODIFIED(12) + borders/padding(10)
-    // = 52 overhead, name gets the rest (min 20)
-    let overhead = 52;
-    let name_width = term_width.saturating_sub(overhead).max(20);
+    // Columns: PERM(12) + OWNER(10) + SIZE(12) + MODIFIED(14) + borders/padding(12)
+    // = 60 overhead, name gets the rest (min 15)
+    let overhead = 60;
+    let name_width = term_width.saturating_sub(overhead).max(15);
 
     let mut table = Table::new();
     table
@@ -203,11 +203,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     }
 
     table.set_constraints(vec![
+        ColumnConstraint::Absolute(Width::Fixed(12)),
         ColumnConstraint::Absolute(Width::Fixed(10)),
-        ColumnConstraint::Absolute(Width::Fixed(8)),
         ColumnConstraint::Absolute(Width::Fixed(name_width as u16)),
         ColumnConstraint::Absolute(Width::Fixed(12)),
-        ColumnConstraint::Absolute(Width::Fixed(12)),
+        ColumnConstraint::Absolute(Width::Fixed(14)),
     ]);
 
     // Prevent row wrapping
