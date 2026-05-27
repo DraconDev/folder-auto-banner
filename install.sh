@@ -61,7 +61,9 @@ if [ -f "$HOME/.zshrc" ]; then
     {
         echo ''
         echo '# cfm auto-banner hook'
-        echo 'autoload -U add-zsh-hook'
+        if ! grep -qF 'autoload -U add-zsh-hook' "$HOME/.zshrc"; then
+            echo 'autoload -U add-zsh-hook'
+        fi
         echo 'add-zsh-hook chpwd _cfm_hook'
         echo "_cfm_hook() { command $BIN_PATH banner \"\$PWD\"; }"
     } >> "$HOME/.zshrc"
