@@ -134,12 +134,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             let count = count_items_in_dir(item);
             let count_str = if count == 1 { "1" } else { &format!("{}", count) };
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("📂 │ {:<30} │ {:>5} items │ {:<8} │ {}", item.name, count_str, "[DIR]", modified);
+            println!("[📂] │ {:<30} │ {:>5} items │ {:<8} │ {}", item.name, count_str, "[DIR]", modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(item);
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            println!("📄 │ {:<30} │ {:>8} │ {:<8} │ {}", item.name, size, ext, modified);
+            println!("[📄] │ {:<30} │ {:>8} │ {:<8} │ {}", item.name, size, ext, modified);
         }
     }
     
