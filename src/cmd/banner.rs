@@ -100,11 +100,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     println!("{}", header);
     println!();
     
-    // Print table header with borders
-    println!("┌────────┬────────────────────────────┬──────────┬─────────┬────────────────┐");
-    println!("│  ICON  │ NAME                       │ SIZE     │ TYPE   │ MODIFIED      │");
-    println!("├────────┼────────────────────────────┼──────────┼─────────┼────────────────┤");
-    
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
     let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
     
@@ -132,33 +127,28 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
     
-    fn pad_right(s: &str, width: usize) -> String {
-        let len = s.chars().count();
-        if len >= width {
-            s.chars().take(width).collect()
-        } else {
-            format!("{}{}", s, " ".repeat(width - len))
-        }
-    }
+    // Simple space-padded columns (no box drawing chars)
+    println!("{:─^80}", "");
+    println!("{:>4}  {:<30}  {:>10}  {:<10}  {:<15}", "TYPE", "NAME", "SIZE", "TYPE", "MODIFIED");
+    println!("{:─^80}", "");
     
     for item in display_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
             let count_str = if count == 1 { "1" } else { &format!("{}", count) };
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name = pad_right(&item.name, 26);
-            println!("│   📂   │ {} │ {:>8} │ [DIR]  │ {} │", name, count_str, modified);
+            let name_len = 30.min(item.name.chars().count());
+            let name = item.name.chars().take(30).collect::<String>();
+            println!("{:>4}  {:<30}  {:>10}  {:<10}  {:<15}", "[DIR]", name, count_str, "[DIR]", modified);
         } else {
             let size = format_size_compact(item.size);
             let ext = get_extension_label(item);
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name = pad_right(&item.name, 26);
-            let ext_padded = pad_right(&ext, 7);
-            println!("│   📄   │ {} │ {:>8} │ {} │ {} │", name, size, ext_padded, modified);
+            let name = item.name.chars().take(30).collect::<String>();
+            println!("{:>4}  {:<30}  {:>10}  {:<10}  {:<15}", "[FILE]", name, size, ext, modified);
         }
     }
-    
-    println!("└────────┴────────────────────────────┴──────────┴─────────┴────────────────┘");
+    println!("{:─^80}", "");
     
     if !show_hidden && !hidden_items.is_empty() {
         println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
