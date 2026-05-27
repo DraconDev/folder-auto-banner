@@ -30,19 +30,18 @@ fi
 # Add PATH to shell configs (only if not already there)
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     if [ -f "$rc" ]; then
-        if ! grep -q "export PATH=.*$BIN_DIR" "$rc" 2>/dev/null; then
+        if ! grep -qF "$BIN_DIR" "$rc" 2>/dev/null; then
             echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$rc"
             echo "✅ Added $BIN_DIR to PATH in $(basename "$rc")"
         fi
     fi
 done
 
-# Remove old hook if it exists (clean teardown)
+# Clean up old hooks (both _cfm_hook and _cfm_on_directory_change)
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     if [ -f "$rc" ]; then
-        sed -i '/^_cfm_hook()/,/^}/d' "$rc" 2>/dev/null || true
-        sed -i '/add-zsh-hook chpwd _cfm_hook/d' "$rc" 2>/dev/null || true
-        sed -i '/autoload -U add-zsh-hook/{ /^$/d; }' "$rc" 2>/dev/null || true
+        sed -i '/_cfm_hook\|_cfm_on_directory_change/d' "$rc" 2>/dev/null || true
+        sed -i '/^# cfm auto-banner hook/d' "$rc" 2>/dev/null || true
     fi
 done
 
@@ -73,7 +72,7 @@ echo ''
 echo "✅ Installation complete!"
 echo ''
 echo "Reload your shell:"
-echo "  source ~/.zshrc   # or: exec zsh"
+echo "  exec zsh   # or: source ~/.bashrc"
 echo ''
 echo "Test it:"
 echo "  cd $(pwd)"
