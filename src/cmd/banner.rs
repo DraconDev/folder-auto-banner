@@ -101,7 +101,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     println!();
     
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
- let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
+    let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
     
     for item in &summary.top_items {
         if item.name.starts_with('.') {
@@ -127,28 +127,27 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
     
-    // Fixed-width table with proper column alignment
-    // Columns: ICON(6) + NAME(40) + SIZE(12) + MODIFIED(15) = 73 chars + separators
-    println!("┌────────┬────────────────────────────────────────┬────────────┬───────────────┐");
-    println!("│{:^8} │ {:<40} │ {:>10} │ {:<13} │", "ICON", "NAME", "SIZE/ITEMS", "MODIFIED");
-    println!("├────────┼────────────────────────────────────────┼────────────┼───────────────┤");
+    // Compact table: ICON(5) + NAME(28) + SIZE(8) + MODIFIED(11) = ~56 chars
+    println!("┌─────┬─────────────────────────────┬────────┬───────────┐");
+    println!("│     │ NAME                        │ SIZE   │ MODIFIED │");
+    println!("├─────┼─────────────────────────────┼────────┼───────────┤");
     
     for item in display_items {
         if item.is_dir {
             let count = count_items_in_dir(item);
-            let count_str = if count == 1 { "1 item" } else { &format!("{} items", count) };
+            let count_str = if count == 1 { "1" } else { &format!("{}", count) };
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name = pad_right(&item.name, 40);
-            println!("│{:^8} │ {} │ {:>10} │ {:<13} │", "📂", name, count_str, modified);
+            let name = truncate(&item.name, 27);
+            println!("│ 📂  │ {:<27} │ {:>5}  │ {:<9} │", name, count_str, modified);
         } else {
             let size = format_size_compact(item.size);
             let modified = item.modified.map(|dt| format_relative_time(&dt)).unwrap_or_default();
-            let name = pad_right(&item.name, 40);
-            println!("│{:^8} │ {} │ {:>10} │ {:<13} │", "📄", name, size, modified);
+            let name = truncate(&item.name, 27);
+            println!("│ 📄  │ {:<27} │ {:>6} │ {:<9} │", name, size, modified);
         }
     }
     
-    println!("└────────┴────────────────────────────────────────┴────────────┴───────────────┘");
+    println!("└─────┴─────────────────────────────┴────────┴───────────┘");
     
     if !show_hidden && !hidden_items.is_empty() {
         println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
@@ -198,36 +197,11 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .unwrap_or(0)
 }
 
-fn pad_right(s: &str, width: usize) -> String {
-    let len = s.chars().count();
-    if len >= width {
-        s.chars().take(width).collect()
+fn truncate(s: &str, width: usize) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() > width {
+        format!("{}…", chars[..width-1].iter().collect::<String>())
     } else {
-        format!("{}{}", s, " ".repeat(width - len))
-    }
-}
-
-fn get_extension_label(item: &crate::fs::DirEntry) -> String {
-    let name = &item.name;
-    if let Some(dot) = name.rfind('.') {
-        let ext = &name[dot+1..].to_lowercase();
-        match ext.as_str() {
-            "rs" => "Rust".to_string(),
-            "toml" => "TOML".to_string(),
-            "md" => "MD".to_string(),
-            "json" => "JSON".to_string(),
-            "yaml" | "yml" => "YAML".to_string(),
-            "txt" => "TXT".to_string(),
-            "sh" => "SH".to_string(),
-            "py" => "Py".to_string(),
-            "js" | "ts" => "JS".to_string(),
-            "lock" => "Lock".to_string(),
-            "gitignore" => "GIT-IGN".to_string(),
-            "gitignore-local" => "GIT-IGN".to_string(),
-            "gitattributes" => "GIT-ATT".to_string(),
-            _ => ext.to_uppercase().chars().take(4).collect(),
-        }
-    } else {
-        "File".to_string()
+        s.to_string()
     }
 }
