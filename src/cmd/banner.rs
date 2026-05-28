@@ -163,11 +163,13 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     // Compute max column widths for alignment
     let mut max_perm = 10; // "drwxr-xr-x"
     let mut max_owner = 5; // "OWNER"
+    let mut max_group = 5; // "GROUP"
     let mut max_size = 4;  // "SIZE"
 
     for item in &display_items {
         max_perm = max_perm.max(item.perms.len());
         max_owner = max_owner.max(item.owner.len());
+        max_group = max_group.max(item.group.len());
         let size_str = if item.is_dir {
             count_items_in_dir(item).to_string()
         } else {
@@ -222,11 +224,13 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         // Pad columns for alignment
         let perm_padded = format!("{:<width$}", item.perms, width = max_perm);
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
+        let group_padded = format!("{:<width$}", item.group, width = max_group);
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
-        // lsd/exa order: PERM OWNER SIZE DATE NAME
-        println!("{} {} {} {}  {} {}{}",
-            perm_padded, owner_padded, size_padded, modified, git_icon, icon_str, name_display);
+        // lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
+        println!("{} {} {} {} {}  {} {}{}",
+            perm_padded, owner_padded, group_padded, size_padded, modified,
+            git_icon, icon_str, name_display);
     }
 
     if !show_hidden && !hidden_items.is_empty() {
