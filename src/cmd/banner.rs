@@ -172,6 +172,57 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         if !git_status_str.is_empty() {
             parts.push(format!("│ {}", git_status_str));
         }
+        // Build status
+        if let Some(ref build) = summary.build_status {
+            if build.ok {
+                parts.push(format!("│ {}✓ builds{}", color(GREEN), color(RESET)));
+            } else {
+                let err_str = if build.errors > 0 {
+                    format!(" ({} err)", build.errors)
+                } else {
+                    String::new()
+                };
+                parts.push(format!("│ {}✗ build errors{}{}", color(RED), err_str, color(RESET)));
+            }
+        }
+        // TODO count
+        if let Some(ref todos) = summary.todo_info {
+            if todos.count > 0 {
+                parts.push(format!("│ {}📝 {} TODOs{}", color(YELLOW), todos.count, color(RESET)));
+            }
+        }
+        // Port usage
+        if let Some(ref ports) = summary.port_info {
+            if !ports.ports.is_empty() {
+                let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
+                parts.push(format!("│ {}🔌 {}{}", color(CYAN), port_str.join(", "), color(RESET)));
+            }
+        }
+        // Docker info
+        if let Some(ref docker) = summary.docker_info {
+            let running = docker.containers.iter().filter(|c| c.status.contains("Up")).count();
+            let total = docker.containers.len();
+            if total > 0 {
+                parts.push(format!("│ {}🐳 {} containers ({} running){}", color(BLUE), total, running, color(RESET)));
+            } else if docker.has_compose || docker.has_dockerfile {
+                parts.push(format!("│ {}🐳 docker{}", color(DIM), color(RESET)));
+            }
+        }
+        // Code metrics
+        if let Some(ref metrics) = summary.code_metrics {
+            if metrics.total_loc > 0 {
+                let loc_str = format_loc(metrics.total_loc);
+                if metrics.by_extension.len() > 1 {
+                    let ext_str: Vec<String> = metrics.by_extension.iter()
+                        .take(3)
+                        .map(|(ext, loc)| format!("{}: {}", ext, format_loc(*loc)))
+                        .collect();
+                    parts.push(format!("│ {}📊 {} LOC ({}){}", color(GREEN), loc_str, ext_str.join(", "), color(RESET)));
+                } else {
+                    parts.push(format!("│ {}📊 {} LOC{}", color(GREEN), loc_str, color(RESET)));
+                }
+            }
+        }
         // Last commit info
         if let (Some(ref hash), Some(ref msg)) = (&git_info.last_commit_hash, &git_info.last_commit_msg) {
             let short_msg = if msg.len() > 30 {
@@ -198,6 +249,44 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         parts.push(format!("{} dirs", summary.dirs));
         if hidden_count > 0 {
             parts.push(format!("│ {} hidden", hidden_count));
+        }
+        // Build status (non-git)
+        if let Some(ref build) = summary.build_status {
+            if build.ok {
+                parts.push(format!("│ {}✓ builds{}", color(GREEN), color(RESET)));
+            } else {
+                parts.push(format!("│ {}✗ build errors{}", color(RED), color(RESET)));
+            }
+        }
+        // TODO count (non-git)
+        if let Some(ref todos) = summary.todo_info {
+            if todos.count > 0 {
+                parts.push(format!("│ {}📝 {} TODOs{}", color(YELLOW), todos.count, color(RESET)));
+            }
+        }
+        // Port usage (non-git)
+        if let Some(ref ports) = summary.port_info {
+            if !ports.ports.is_empty() {
+                let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
+                parts.push(format!("│ {}🔌 {}{}", color(CYAN), port_str.join(", "), color(RESET)));
+            }
+        }
+        // Docker info (non-git)
+        if let Some(ref docker) = summary.docker_info {
+            let running = docker.containers.iter().filter(|c| c.status.contains("Up")).count();
+            let total = docker.containers.len();
+            if total > 0 {
+                parts.push(format!("│ {}🐳 {} containers ({} running){}", color(BLUE), total, running, color(RESET)));
+            } else if docker.has_compose || docker.has_dockerfile {
+                parts.push(format!("│ {}🐳 docker{}", color(DIM), color(RESET)));
+            }
+        }
+        // Code metrics (non-git)
+        if let Some(ref metrics) = summary.code_metrics {
+            if metrics.total_loc > 0 {
+                let loc_str = format_loc(metrics.total_loc);
+                parts.push(format!("│ {}📊 {} LOC{}", color(GREEN), loc_str, color(RESET)));
+            }
         }
         parts.push(format!("│ {} total", summary.total_items));
         parts.join(" ")
@@ -226,11 +315,43 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         visible_items.to_vec()
     };
 
+    // Sort based on --sort flag
+    let sort_mode = sort.unwrap_or("name");
     display_items.sort_by(|a, b| {
-        if a.is_dir != b.is_dir {
-            return b.is_dir.cmp(&a.is_dir);
+        // Always keep directories first unless sorting by type
+        if sort_mode != "type" && a.is_dir != b.is_dir {
+            return if reverse {
+                a.is_dir.cmp(&b.is_dir)
+            } else {
+                b.is_dir.cmp(&a.is_dir)
+            };
         }
-        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+
+        let ordering = match sort_mode {
+            "size" => a.size.cmp(&b.size),
+            "date" => {
+                let a_time = a.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                let b_time = b.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                a_time.cmp(&b_time)
+            }
+            "type" => {
+                let a_ext = a.name.rfind('.').map(|i| &a.name[i..]).unwrap_or("");
+                let b_ext = b.name.rfind('.').map(|i| &b.name[i..]).unwrap_or("");
+                let ext_cmp = a_ext.cmp(b_ext);
+                if ext_cmp != std::cmp::Ordering::Equal {
+                    ext_cmp
+                } else {
+                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                }
+            }
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()), // "name" or default
+        };
+
+        if reverse {
+            ordering.reverse()
+        } else {
+            ordering
+        }
     });
 
     // Compute max column widths for alignment
@@ -807,4 +928,15 @@ fn colorize_perms(perms: &str) -> String {
         }
     }
     result
+}
+
+/// Format LOC count compactly (e.g., 4.2k, 1.1k, 983)
+fn format_loc(loc: usize) -> String {
+    if loc < 1000 {
+        format!("{}", loc)
+    } else if loc < 10000 {
+        format!("{:.1}k", loc as f64 / 1000.0)
+    } else {
+        format!("{}k", loc / 1000)
+    }
 }

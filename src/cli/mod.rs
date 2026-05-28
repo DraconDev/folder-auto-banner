@@ -50,6 +50,34 @@ pub enum Commands {
         /// Compact output (fewer lines)
         #[arg(short, long)]
         compact: bool,
+
+        /// Disable build status check
+        #[arg(long)]
+        no_build_check: bool,
+
+        /// Disable TODO/FIXME scanning
+        #[arg(long)]
+        no_todos: bool,
+
+        /// Disable port detection
+        #[arg(long)]
+        no_ports: bool,
+
+        /// Disable Docker detection
+        #[arg(long)]
+        no_docker: bool,
+
+        /// Disable code metrics
+        #[arg(long)]
+        no_metrics: bool,
+
+        /// Sort order: name, size, date, type
+        #[arg(long, value_parser = ["name", "size", "date", "type"])]
+        sort: Option<String>,
+
+        /// Reverse sort order
+        #[arg(short, long)]
+        reverse: bool,
     },
 
     // === Phase 4: Context-Aware Environment ===
