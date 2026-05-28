@@ -235,7 +235,13 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             format!("{:>width$}", get_file_contents(item), width = max_contents)
         };
 
-        let perm_colored = colorize_perms(&item.perms);
+        // Owner/group in dim to de-emphasize (like exa/lsd)
+        let owner_colored = if max_owner > item.owner.len() {
+            format!("{}{}{}", color(DIM), owner_padded, color(RESET))
+        } else {
+            format!("{}{}{}", color(DIM), owner_padded, color(RESET))
+        };
+        let group_colored = format!("{}{}{}", color(DIM), group_padded, color(RESET));
 
         // Color size: dim <1KB, normal 1KB-1MB, bold 1-100MB, bright+color >100MB
         let size_colored = if item.size > 100 * 1024 * 1024 {
@@ -250,7 +256,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
 
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
         println!("{} {} {} {} {} {} {}{}{}",
-            perm_colored, owner_padded, group_padded, modified, size_colored, contents_padded,
+            perm_colored, owner_colored, group_colored, modified, size_colored, contents_padded,
             git_icon, icon_str, name_display);
     }
 
