@@ -294,9 +294,9 @@ pub fn format_size_compact(bytes: u64) -> String {
     }
 }
 
-/// Format exact date/time — compact exa-style: "27 May 23:42"
+/// Format exact date/time — ISO-style: "2024-05-27"
 pub fn format_exact_time(dt: &DateTime<Utc>) -> String {
-    dt.format("%d %b %H:%M").to_string()
+    dt.format("%Y-%m-%d").to_string()
 }
 
 /// Format relative time
