@@ -183,7 +183,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         max_contents = max_contents.max(contents_str.len());
     }
 
-    // Print each row — lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
+    // Print each row — PERM OWNER GROUP CONTENTS SIZE DATE NAME
     for item in display_items {
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
@@ -244,9 +244,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             size_padded
         };
 
-        // lsd/exa order: PERM OWNER GROUP SIZE CONTENTS DATE NAME
+        // lsd/exa order: PERM OWNER GROUP CONTENTS SIZE DATE NAME
         println!("{} {} {} {} {} {} {}{}{}",
-            perm_colored, owner_padded, group_padded, size_colored, contents_padded, modified,
+            perm_colored, owner_padded, group_padded, contents_padded, size_colored, modified,
             git_icon, icon_str, name_display);
     }
 
