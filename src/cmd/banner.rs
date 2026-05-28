@@ -168,18 +168,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let mut max_owner = 5; // "OWNER"
     let mut max_group = 5; // "GROUP"
     let mut max_size = 4;  // "SIZE"
-    let mut max_contents = 4; // "CONTENTS"
+    let mut max_contents = 9; // "1920x1080" for images
 
     for item in &display_items {
         max_owner = max_owner.max(item.owner.len());
         max_group = max_group.max(item.group.len());
         let size_str = format_size_compact(item.size);
         max_size = max_size.max(size_str.len());
-        if item.is_dir {
-            let cnt = count_items_in_dir(item);
-            let cnt_str = cnt.to_string();
-            max_contents = max_contents.max(cnt_str.len());
-        }
+        let contents_str = if item.is_dir {
+            count_items_in_dir(item).to_string()
+        } else {
+            get_file_contents(item)
+        };
+        max_contents = max_contents.max(contents_str.len());
     }
 
     // Print each row — lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
@@ -231,7 +232,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let contents_padded = if item.is_dir {
             format!("{:>width$}", count_items_in_dir(item).to_string(), width = max_contents)
         } else {
-            format!("{:>width$}", "", width = max_contents)
+            format!("{:>width$}", get_file_contents(item), width = max_contents)
         };
 
         let perm_colored = colorize_perms(&item.perms);
@@ -338,6 +339,58 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
     std::fs::read_dir(&entry.path)
         .map(|d| d.count())
         .unwrap_or(0)
+}
+
+/// Get contents description for a file — line count for text, resolution for image, empty for others
+fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
+    let name = &entry.name;
+    let lower = name.to_lowercase();
+
+    // Image files: try to get resolution from header
+    if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
+        if let Ok(bytes) = std::fs::read(&entry.path) {
+            if let Some(res) = extract_image_resolution(&bytes, &lower) {
+                return res;
+            }
+        }
+    }
+
+    // Text files under 1MB: count lines
+    if entry.size < 1024 * 1024 {
+        if let Ok(content) = std::fs::read_to_string(&entry.path) {
+            let lines = content.lines().count();
+            return lines.to_string();
+        }
+    }
+
+    String::new()
+}
+
+/// Extract image resolution from PNG or JPEG header bytes
+fn extract_image_resolution(bytes: &[u8], ext: &str) -> Option<String> {
+    if ext == ".png" && bytes.len() >= 24 {
+        // PNG: width at offset 16-19 (big endian), height at 20-23
+        let w = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]) as usize;
+        let h = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]) as usize;
+        if w > 0 && h > 0 {
+            return Some(format!("{}x{}", w, h));
+        }
+    } else if (ext == ".jpg" || ext == ".jpeg") && bytes.len() >= 2 {
+        // JPEG: find SOF marker and read dimensions
+        // Simple approach: scan for FF C0 through FF CF markers (SOF0-SOF15)
+        let mut i = 2;
+        while i < bytes.len().saturating_sub(9) {
+            if bytes[i] == 0xFF && bytes[i+1] >= 0xC0 && bytes[i+1] <= 0xCF && bytes[i+1] != 0xC4 && bytes[i+1] != 0xC8 && bytes[i+1] != 0xCC {
+                let h = ((bytes[i+5] as usize) << 8) | (bytes[i+6] as usize);
+                let w = ((bytes[i+7] as usize) << 8) | (bytes[i+8] as usize);
+                if w > 0 && h > 0 {
+                    return Some(format!("{}x{}", w, h));
+                }
+            }
+            i += 1;
+        }
+    }
+    None
 }
 
 /// Colorize permission string like exa — each char colored by meaning
