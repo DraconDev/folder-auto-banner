@@ -468,15 +468,24 @@ fn count_sqlite_tables(path: &std::path::Path) -> Option<usize> {
 }
 
 /// Extract video duration from MP4/MOV container headers
-/// Reads first 256KB to find moov atom, then tries end of file for fast-start videos
+/// Scans first chunk and last chunk to find moov > mvhd atom
 fn extract_video_duration(path: &std::path::Path) -> Option<String> {
     use std::io::{Read, Seek, SeekFrom};
     
     let mut file = std::fs::File::open(path).ok()?;
     let file_len = file.metadata().ok()?.len();
     
-    // Try first 256KB
-    let mut buf = vec![0u8; 262144];
+    // For large files, read more from start (moov can be huge for long videos)
+    let start_read = if file_len > 100 * 1024 * 1024 {
+        10 * 1024 * 1024 // 10MB for files > 100MB
+    } else if file_len > 10 * 1024 * 1024 {
+        4 * 1024 * 1024  // 4MB for files > 10MB
+    } else {
+        file_len as usize // Small files: read whole thing
+    };
+    
+    let start_read = (start_read as u64).min(file_len) as usize;
+    let mut buf = vec![0u8; start_read];
     let bytes_read = file.read(&mut buf).ok()?;
     buf.truncate(bytes_read);
     
@@ -484,14 +493,13 @@ fn extract_video_duration(path: &std::path::Path) -> Option<String> {
         return Some(dur);
     }
     
-    // If not found, try end of file with larger buffer
-    // moov for fast-start videos is at end, can be several MB
+    // If not found at start, try end of file
     let end_read = if file_len > 100 * 1024 * 1024 {
-        10 * 1024 * 1024 // 10MB for files > 100MB
+        10 * 1024 * 1024
     } else if file_len > 10 * 1024 * 1024 {
-        4 * 1024 * 1024  // 4MB for files > 10MB
+        4 * 1024 * 1024
     } else {
-        file_len as usize // Small files: just read the whole thing
+        file_len as usize
     };
     
     let end_read = (end_read as u64).min(file_len) as usize;
