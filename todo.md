@@ -3,104 +3,129 @@
 ## ✅ Done
 
 ### Table / Display
-- [x] Replace manual `println!` box-drawing with `comfy-table` v6
-- [x] Custom preset matching original `│`, `─`, `├`, `┼`, `┤` style
-- [x] Responsive column widths (caps at 100, min 60, name column gets remainder)
-- [x] Merge icon into name column (`📁 .dracon` instead of wasted icon column)
-- [x] `max_height(1)` prevents row wrapping; `truncate_ansi()` handles overflow with `…`
+- [x] Replaced manual box-drawing with comfy-table v6
+- [x] Custom preset matching `│`, `─`, `├`, `┼`, `┤` style
+- [x] Responsive column widths (caps at 120, min 60)
+- [x] Merge icon into name column
+- [x] `max_height(1)` prevents row wrapping; `truncate_ansi()` handles overflow
+- [x] Switched to compact lsd/exa-style layout (no borders, aligned text)
+- [x] Column order: `PERM OWNER GROUP SIZE DATE NAME` (matches lsd/exa)
 
 ### File-Type Icons (lifted from lsd)
 - [x] 3-tier icon lookup: exact filename → extension → type fallback
-- [x] 100+ mappings: `Cargo.toml` → 🦀, `install.sh` → 🐚, `README.md` → 📖, `.lock` → 🔒, etc.
+- [x] 100+ mappings: `Cargo.toml` → 🦀, `install.sh` → 🐚, `.lock` → 🔒, etc.
 - [x] Separate `src/icon.rs` module with unit tests
 
-### lsd-style Columns
-- [x] PERM column: `drwxr-xr-x` / `-rw-r--r--` / `-rwxr-xr-x`
-- [x] OWNER column: resolved from `/etc/passwd`
-- [x] Exact date format: `May 27 22:05` (not relative like "30 minutes ago")
-- [x] Responsive widths with 5-column layout
-
-### Permissions & Symlinks
-- [x] `DirEntry` fields: `is_exec`, `perms`, `symlink_target`, `owner`, `group`
+### Permissions & Owner/Group
+- [x] `DirEntry` fields: `is_exec`, `perms`, `owner`, `group`, `symlink_target`
 - [x] Unix permissions via `std::os::unix::fs::PermissionsExt::mode()` → `drwxr-xr-x`
-- [x] Owner/group resolution from `/etc/passwd` and `/etc/group`
+- [x] Owner/group resolved from `/etc/passwd` and `/etc/group`
 - [x] Symlink target resolution via `std::fs::read_link`
-- [x] `truncate_ansi()` handles ANSI escape sequences without breaking width calculation
+
+### Compact Size/Date Formats
+- [x] Size: exa-style `4.3k`, `1.1k`, `983` (no "B" suffix)
+- [x] Date: exa-style `27 May 23:42` (day month hour:minute)
+
+### Git Integration
+- [x] Header shows branch name + dirty state (yellow when dirty, blue when clean)
+- [x] Header shows `*N` modified, `+N` staged, `?N` untracked, `↑N` ahead, `↓N` behind
+- [x] `FileStatus` enum with per-file icons and colors
+- [x] `file_statuses: HashMap<String, FileStatus>` populated during scan
 
 ### Install / Shell
 - [x] Consolidated 4 redundant install scripts into 1
 - [x] `install.sh` tears down old binary before copying new one
-- [x] Cleanup handles all hook-name variants: `_cfm_hook`, `_cfm_on_directory_change`, `_cfm_on_startup`
-- [x] Cleanup removes old `~/bin` PATH, orphaned function fragments, fused braces
+- [x] Cleanup handles all hook-name variants
 - [x] Hook fires on new tabs/shell startup (not just `cd`)
 - [x] Bash `PROMPT_COMMAND` support
-- [x] Typo `add-zash-hook` → `add-zsh-hook` fixed in `install_hook.rs`
 - [x] Hook names unified to `_cfm_hook` everywhere
 
 ### Docs / CI
-- [x] `INSTALL.md` — removed hardcoded `/home/dracon` paths, added bash section
+- [x] `INSTALL.md` — removed hardcoded paths, added bash section
 - [x] `README.md` — mentions both zsh and bash
-- [x] `.ralph/cfm-build.md` — fixed claims (no builds, no completions installed)
 - [x] `release.yml` — fixed step ordering, switched to `softprops/action-gh-release@v2`
-
-### Code Cleanup
-- [x] Removed orphaned `banner_new.rs`
-- [x] Removed empty unused `src/shell/`, `src/banner/` dirs
-- [x] Added `unicode-width` for proper CJK/emoji truncation
-- [x] All 13 tests pass (5 unit + 8 integration)
 
 ---
 
-## 🔜 Next Up
+## 🔜 In Progress
 
-### 1. Color in Table (requires comfy-table Cell styling)
-- [ ] Directories → blue, executables → green, symlinks → magenta, hidden → dim
-- [ ] Use `Cell::set_style()` instead of raw ANSI escape codes
+### 1. Git Per-File Status Icons
+**Problem:** `file_statuses` map uses paths relative to repo root (`src/main.rs`) but lookup uses `item.name` (`main.rs`). Need to strip repo root prefix before lookup.
 
-### 2. Permission Column
-- [ ] Add optional `PERM` column to table (like `lsd -l`)
-- [ ] Configurable via `--compact` or config flag
-- [ ] Show owner/group optionally
+**Fix:** Compute `item.path.strip_prefix(repo_root)` and use that for lookup. Also need to pass `repo_root` through or restructure lookup.
 
-### 3. Header Improvements
-- [ ] Last modified date of directory itself
-- [ ] Free/used filesystem space
-- [ ] Parent directory size
+**Expected output:**
+```
+-rw-r--r-- dracon users 1.3k 27 May 22:04 M 🦀 Cargo.toml    (M = modified)
+-rw-r--r-- dracon users 64k  27 May 22:06   🔒 Cargo.lock     (clean)
+```
 
-### 4. Sorting & Filtering
-- [ ] `--sort name|size|modified` flag
+### 2. ANSI Colors Rendering
+**Problem:** Colors show as raw codes in non-tty contexts. Need to:
+- Detect tty and only emit colors when terminal supports it
+- Use `console::Term::stdout().is_term()` or `atty` crate
+- Or use comfy-table's `should_style()` / `enforce_styling()`
+
+**Expected colors (lsd/exa style):**
+| Type | Color |
+|------|-------|
+| Directories | Blue bold |
+| Executables | Green bold |
+| Symlinks | Magenta |
+| Hidden files | Dim gray |
+| Git modified | Yellow |
+| Git staged | Green |
+| Git untracked | Dim |
+| Regular files | White (default) |
+
+---
+
+## 📋 Next Up
+
+### 3. More Git Info
+- [ ] Show last commit date per file (like `tig` or `git log --format`)
+- [ ] Show which branch a file was last changed on
+- [ ] Show conflict markers during merge (`!` icon)
+- [ ] Show stash count in header (`⚑2`)
+- [ ] Show worktree state (rebase, cherry-pick, etc.)
+
+### 4. File Metadata
+- [ ] Show number of hard links (like `ls -l`)
+- [ ] Show file size as a mini bar (like `dust` or `duf`)
+- [ ] Show file age relative to git repo creation
+- [ ] Show MIME type or category (Code, Config, Document, Media, etc.)
+
+### 5. Sorting & Filtering
+- [ ] `--sort name|size|modified|type` flag
 - [ ] `--filter` flag (type, size range, name pattern)
 - [ ] `--max N` flag (limit items shown)
 - [ ] `--hidden` flag to always show dotfiles
+- [ ] `--group` flag to group by type (dirs, files, symlinks)
 
-### 5. Table Views
+### 6. Table Views
 - [ ] `--tree` recursive view (like `lsd --tree`)
 - [ ] `--grid` compact multi-column layout (like `ls` default)
+- [ ] `--long` full mode (like `ls -l` with all columns)
+- [ ] `--short` minimal mode (just name + icon)
 
-### 6. Git Per-File Status
-- [ ] Show `M` / `?` / `+` per-file git status icons
-- [ ] Color modified/staged/untracked items differently
-- [ ] Show .gitignore'd files dimmed
+### 7. Color Themes
+- [ ] Support `LS_COLORS` environment variable
+- [ ] Support `NO_COLOR` environment variable
+- [ ] Configurable color scheme via config file
+- [ ] Dark/light theme support
 
-### 7. Config System
-- [ ] `fm config` TUI or file-based preferences
-- [ ] Remember sort order, icon theme, column layout
-- [ ] Configurable visible columns
-
-### 8. Size Visualization
-- [ ] Size bar next to file size (like `du` or `dust`)
-- [ ] Highlight largest files
-
-### 9. Performance
+### 8. Performance
 - [ ] Cache directory scan results (TTL-based)
 - [ ] `--depth N` for shallow recursive view
+- [ ] Parallel stat calls for large directories
 - [ ] Bench: <50ms for 10k files
 
-### 10. Safety / Polish
+### 9. Safety / Polish
 - [ ] Deduplicate `autoload -U add-zsh-hook` in install.sh
 - [ ] Test install.sh idempotency (run twice = no duplicates)
 - [ ] `cargo clippy` pass
 - [ ] `cargo fmt` pass
+- [ ] Handle broken symlinks gracefully
 
 ---
 
@@ -109,4 +134,6 @@
 - [ ] Test with very long filenames
 - [ ] Test with CJK/emoji filenames
 - [ ] Test with symlinks + broken symlinks
+- [ ] Test git status in repos with many changes
+- [ ] Test in non-tty contexts (piped output)
 - [ ] Performance benchmark
