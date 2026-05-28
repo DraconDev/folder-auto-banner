@@ -77,9 +77,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     // Build git branch with color: blue if clean, yellow if dirty
     let branch_display = if !git_branch.is_empty() {
         if git_info.is_dirty {
-            format!("{}[{}{}{}]", YELLOW, git_branch, YELLOW, RESET)
+            format!("{}[{}{}{}]", color(YELLOW), git_branch, color(YELLOW), color(RESET))
         } else {
-            format!("{}[{}{}{}]", BLUE_BOLD, git_branch, BLUE_BOLD, RESET)
+            format!("{}[{}{}{}]", color(BLUE_BOLD), git_branch, color(BLUE_BOLD), color(RESET))
         }
     } else {
         String::new()
@@ -88,25 +88,25 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     // Build git status indicators (p10k-style)
     let mut git_status = Vec::new();
     if git_info.modified > 0 {
-        git_status.push(format!("{}*{}{}", YELLOW, git_info.modified, RESET));
+        git_status.push(format!("{}*{}{}", color(YELLOW), git_info.modified, color(RESET)));
     }
     if git_info.staged > 0 {
-        git_status.push(format!("{}+{}{}", GREEN, git_info.staged, RESET));
+        git_status.push(format!("{}+{}{}", color(GREEN), git_info.staged, color(RESET)));
     }
     if git_info.untracked > 0 {
-        git_status.push(format!("{}?{}{}", DIM, git_info.untracked, RESET));
+        git_status.push(format!("{}?{}{}", color(DIM), git_info.untracked, color(RESET)));
     }
     if git_info.ahead > 0 {
-        git_status.push(format!("{}↑{}{}", CYAN, git_info.ahead, RESET));
+        git_status.push(format!("{}↑{}{}", color(CYAN), git_info.ahead, color(RESET)));
     }
     if git_info.behind > 0 {
-        git_status.push(format!("{}↓{}{}", RED, git_info.behind, RESET));
+        git_status.push(format!("{}↓{}{}", color(RED), git_info.behind, color(RESET)));
     }
     let git_status_str = git_status.join(" ");
 
     let header = if git_info.is_repo {
         let mut parts = vec![
-            format!("{} {} {}", project_icon, path_display, BOLD),
+            format!("{} {} {}", project_icon, path_display, color(BOLD)),
         ];
         if !branch_display.is_empty() {
             parts.push(format!("{} │", branch_display));
@@ -121,7 +121,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         parts.join(" ")
     } else {
         let mut parts = vec![
-            format!("{} {} {}", project_icon, path_display, BOLD),
+            format!("{} {} {}", project_icon, path_display, color(BOLD)),
         ];
         parts.push(format!("{} │", project_label));
         parts.push(format!("{} │", size_str));
@@ -192,19 +192,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             let rel_str = rel.to_string_lossy();
             git_info.file_statuses.get(rel_str.as_ref())
                 .or_else(|| git_info.file_statuses.get(item.name.as_str()))
-                .map(|fs| format!("{}{}{}", fs.color(), fs.icon(), RESET))
+                .map(|fs| format!("{}{}{}", color(fs.color()), fs.icon(), color(RESET)))
                 .unwrap_or_default()
         };
 
         // Color the name based on type (like lsd/exa)
         let (name_prefix, name_suffix) = if item.is_dir {
-            (BLUE_BOLD, RESET)
+            (color(BLUE_BOLD), color(RESET))
         } else if item.is_symlink {
-            (MAGENTA, RESET)
+            (color(MAGENTA), color(RESET))
         } else if item.is_exec {
-            (GREEN_BOLD, RESET)
+            (color(GREEN_BOLD), color(RESET))
         } else if item.name.starts_with('.') {
-            (DIM, RESET)
+            (color(DIM), color(RESET))
         } else {
             ("", "")
         };
@@ -212,7 +212,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         // Build name with optional symlink target
         let name_display = if item.is_symlink {
             if let Some(target) = &item.symlink_target {
-                format!("{}{}{} {}→{} {}", name_prefix, item.name, name_suffix, DIM, RESET, target)
+                format!("{}{}{} {}→{} {}", name_prefix, item.name, name_suffix, color(DIM), color(RESET), target)
             } else {
                 format!("{}{}{}", name_prefix, item.name, name_suffix)
             }
