@@ -236,9 +236,21 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let group_padded = format!("{:<width$}", item.group, width = max_group);
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
+        // Color permissions like exa: user/group/other rwx colored
+        let perm_colored = colorize_perms(&item.perms);
+
+        // Color size: dim if small, bold if large
+        let size_colored = if item.is_dir {
+            format!("{}{}{}", color(DIM), size_padded, color(RESET))
+        } else if item.size > 1024 * 1024 {
+            format!("{}{}{}", color(BOLD), size_padded, color(RESET))
+        } else {
+            size_padded.to_string()
+        };
+
         // lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
         println!("{} {} {} {} {} {}{}{}",
-            perm_padded, owner_padded, group_padded, size_padded, modified,
+            perm_colored, owner_padded, group_padded, size_colored, modified,
             git_icon, icon_str, name_display);
     }
 
