@@ -4,16 +4,8 @@
 //! Each entry has a timestamp; expired entries are ignored.
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-/// Cached entry with timestamp
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheEntry<T: Serialize + for<'de> Deserialize<'de>> {
-    pub value: T,
-    pub timestamp_ms: u64,
-}
 
 /// File-based TTL cache
 pub struct Cache {
@@ -40,34 +32,38 @@ impl Cache {
     }
 
     /// Get a cached value if it exists and is not expired
-    pub fn get<T: Serialize + for<'de> Deserialize<'de>>(&self, key: &str, ttl: Duration) -> Option<T> {
+    pub fn get<T: serde::Serialize + for<'de> serde::Deserialize<'de>>(&self, key: &str, ttl: Duration) -> Option<T> {
         let path = self.path_for(key);
         let content = std::fs::read_to_string(&path).ok()?;
-        let entry: CacheEntry<T> = serde_json::from_str(&content).ok()?;
+
+        // Parse as generic JSON to extract timestamp
+        let parsed: serde_json::Value = serde_json::from_str(&content).ok()?;
+        let timestamp_ms = parsed.get("timestamp_ms")?.as_u64()?;
 
         let now_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as u64;
 
-        if now_ms.saturating_sub(entry.timestamp_ms) < ttl.as_millis() as u64 {
-            Some(entry.value)
+        if now_ms.saturating_sub(timestamp_ms) < ttl.as_millis() as u64 {
+            let value = serde_json::from_value(parsed.get("value")?.clone()).ok()?;
+            Some(value)
         } else {
             None
         }
     }
 
     /// Store a value in the cache
-    pub fn set<T: Serialize + for<'de> Deserialize<'de>>(&self, key: &str, value: T) -> Result<()> {
+    pub fn set<T: serde::Serialize>(&self, key: &str, value: T) -> Result<()> {
         let now_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as u64;
 
-        let entry = CacheEntry {
-            value,
-            timestamp_ms: now_ms,
-        };
+        let entry = serde_json::json!({
+            "value": value,
+            "timestamp_ms": now_ms,
+        });
 
         let path = self.path_for(key);
         let content = serde_json::to_string(&entry)?;

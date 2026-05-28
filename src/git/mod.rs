@@ -134,10 +134,14 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
 
     // Get ahead/behind using git2
     let (ahead, behind) = if let Some(head) = head.as_ref() {
-        if let Some(upstream_name) = head.upstream_name() {
-            if let Ok(upstream_ref) = repo.find_reference(upstream_name.as_str()) {
-                if let (Some(head_oid), Some(upstream_oid)) = (head.target(), upstream_ref.target()) {
-                    repo.ahead_behind(head_oid, upstream_oid).unwrap_or((0, 0))
+        if let Some(head_oid) = head.target() {
+            // Try to find upstream branch
+            let branch_name = head.shorthand().unwrap_or("");
+            let upstream_ref_name = format!("refs/remotes/origin/{}", branch_name);
+            
+            if let Ok(upstream_ref) = repo.find_reference(&upstream_ref_name) {
+                if let Some(upstream_oid) = upstream_ref.target() {
+                    repo.graph_ahead_behind(head_oid, upstream_oid).unwrap_or((0, 0))
                 } else {
                     (0, 0)
                 }

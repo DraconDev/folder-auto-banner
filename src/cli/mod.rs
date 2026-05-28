@@ -76,7 +76,7 @@ pub enum Commands {
         sort: Option<String>,
 
         /// Reverse sort order
-        #[arg(short, long)]
+        #[arg(long)]
         reverse: bool,
     },
 
