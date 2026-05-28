@@ -242,6 +242,105 @@ impl DirSummary {
             }
         });
 
+        // Run optional checks with caching
+        let cache = crate::cache::Cache::new().ok();
+        let cache_key = |feature: &str| crate::cache::cache_key(path, feature);
+
+        let build_status = if check_build {
+            if let Some(ref cache) = cache {
+                let key = cache_key("build");
+                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(30)) {
+                    Some(cached)
+                } else {
+                    let result = crate::build_status::check_build(path, &project_type);
+                    if let Some(ref r) = result {
+                        let _ = cache.set(&key, r.clone());
+                    }
+                    result
+                }
+            } else {
+                crate::build_status::check_build(path, &project_type)
+            }
+        } else {
+            None
+        };
+
+        let todo_info = if scan_todos {
+            if let Some(ref cache) = cache {
+                let key = cache_key("todos");
+                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(60)) {
+                    Some(cached)
+                } else {
+                    let result = crate::todo_scanner::scan_todos(path).ok();
+                    if let Some(ref r) = result {
+                        let _ = cache.set(&key, r.clone());
+                    }
+                    result
+                }
+            } else {
+                crate::todo_scanner::scan_todos(path).ok()
+            }
+        } else {
+            None
+        };
+
+        let code_metrics = if check_metrics {
+            if let Some(ref cache) = cache {
+                let key = cache_key("metrics");
+                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(60)) {
+                    Some(cached)
+                } else {
+                    let result = crate::code_metrics::scan_metrics(path).ok();
+                    if let Some(ref r) = result {
+                        let _ = cache.set(&key, r.clone());
+                    }
+                    result
+                }
+            } else {
+                crate::code_metrics::scan_metrics(path).ok()
+            }
+        } else {
+            None
+        };
+
+        let port_info = if check_ports {
+            if let Some(ref cache) = cache {
+                let key = cache_key("ports");
+                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(10)) {
+                    Some(cached)
+                } else {
+                    let result = crate::port_usage::detect_ports(path).ok();
+                    if let Some(ref r) = result {
+                        let _ = cache.set(&key, r.clone());
+                    }
+                    result
+                }
+            } else {
+                crate::port_usage::detect_ports(path).ok()
+            }
+        } else {
+            None
+        };
+
+        let docker_info = if check_docker {
+            if let Some(ref cache) = cache {
+                let key = cache_key("docker");
+                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(10)) {
+                    Some(cached)
+                } else {
+                    let result = crate::docker::detect_docker(path).ok();
+                    if let Some(ref r) = result {
+                        let _ = cache.set(&key, r.clone());
+                    }
+                    result
+                }
+            } else {
+                crate::docker::detect_docker(path).ok()
+            }
+        } else {
+            None
+        };
+
         Ok(DirSummary {
             total_items: files + dirs,
             total_size,
@@ -250,6 +349,11 @@ impl DirSummary {
             top_items,
             project_type,
             last_modified,
+            build_status,
+            todo_info,
+            code_metrics,
+            port_info,
+            docker_info,
         })
     }
 

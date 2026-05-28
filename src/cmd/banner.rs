@@ -58,11 +58,32 @@ pub fn run_banner(
     raw: bool,
     json: bool,
     compact: bool,
+    no_build_check: bool,
+    no_todos: bool,
+    no_ports: bool,
+    no_docker: bool,
+    no_metrics: bool,
+    sort: Option<&str>,
+    reverse: bool,
 ) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let path = path.unwrap_or(cwd.as_path()).canonicalize().unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
 
-    let summary = DirSummary::scan(&path)?;
+    // Check env vars for disabling features
+    let no_build_check = no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";
+    let no_todos = no_todos || std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
+    let no_ports = no_ports || std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
+    let no_docker = no_docker || std::env::var("CFM_NO_DOCKER").unwrap_or_default() == "1";
+    let no_metrics = no_metrics || std::env::var("CFM_NO_METRICS").unwrap_or_default() == "1";
+
+    let summary = DirSummary::scan_with_options(
+        &path,
+        !no_build_check,
+        !no_todos,
+        !no_ports,
+        !no_docker,
+        !no_metrics,
+    )?;
     let git_info = crate::git::get_git_info(&path)?;
 
     if json {
@@ -70,14 +91,14 @@ pub fn run_banner(
     } else if raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, compact);
+        output_rich(&path, &summary, &git_info, compact, sort, reverse);
     }
 
     Ok(())
 }
 
 /// Output rich formatted banner — compact lsd-style layout
-fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
+fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool, sort: Option<&str>, reverse: bool) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();

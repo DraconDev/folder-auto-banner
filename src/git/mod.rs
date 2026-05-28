@@ -132,10 +132,21 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         }
     }
 
-    // Get ahead/behind (simplified - skip if not straightforward)
-    let (ahead, behind) = if let Some(_head) = head.as_ref() {
-        // Just report 0 for ahead/behind for now, complexity not worth it
-        (0, 0)
+    // Get ahead/behind using git2
+    let (ahead, behind) = if let Some(head) = head.as_ref() {
+        if let Some(upstream_name) = head.upstream_name() {
+            if let Ok(upstream_ref) = repo.find_reference(upstream_name.as_str()) {
+                if let (Some(head_oid), Some(upstream_oid)) = (head.target(), upstream_ref.target()) {
+                    repo.ahead_behind(head_oid, upstream_oid).unwrap_or((0, 0))
+                } else {
+                    (0, 0)
+                }
+            } else {
+                (0, 0)
+            }
+        } else {
+            (0, 0)
+        }
     } else {
         (0, 0)
     };
