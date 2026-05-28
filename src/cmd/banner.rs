@@ -237,11 +237,15 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
 
         let perm_colored = colorize_perms(&item.perms);
 
-        // Color size: bold if large
-        let size_colored = if item.size > 1024 * 1024 {
+        // Color size: dim <1KB, normal 1KB-1MB, bold 1-100MB, bright+color >100MB
+        let size_colored = if item.size > 100 * 1024 * 1024 {
+            format!("{}{}{}", color(YELLOW), size_padded, color(RESET))
+        } else if item.size > 1024 * 1024 {
             format!("{}{}{}", color(BOLD), size_padded, color(RESET))
+        } else if item.size < 1024 {
+            format!("{}{}{}", color(DIM), size_padded, color(RESET))
         } else {
-            size_padded
+            size_padded.to_string()
         };
 
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
@@ -346,8 +350,11 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     let name = &entry.name;
     let lower = name.to_lowercase();
 
-    // Symlinks: show dash
+    // Symlinks: show target length
     if entry.is_symlink {
+        if let Some(target) = &entry.symlink_target {
+            return format!("{}→", target.len());
+        }
         return String::new();
     }
 
