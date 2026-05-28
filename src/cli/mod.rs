@@ -383,14 +383,14 @@ impl Cli {
 
     match &self.command {
             // Banner (also default when no subcommand)
-            Some(Banner { path, raw, json, compact }) => {
+            Some(Banner { path, raw, json, compact, no_build_check, no_todos, no_ports, no_docker, no_metrics, sort, reverse }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
-                crate::cmd::banner::run_banner(p, *raw, *json, *compact)
+                crate::cmd::banner::run_banner(p, *raw, *json, *compact, *no_build_check, *no_todos, *no_ports, *no_docker, *no_metrics, sort.as_deref(), *reverse)
             }
             None => {
                 // `fm` with no args = `fm banner`
                 let p: Option<&Path> = self.path.as_deref();
-                crate::cmd::banner::run_banner(p, false, false, false)
+                crate::cmd::banner::run_banner(p, false, false, false, false, false, false, false, false, None, false)
             }
 
             // Phase 4: Env
