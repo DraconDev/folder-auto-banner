@@ -182,10 +182,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     for item in display_items {
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
-        // Per-file git status icon (with trailing space)
+        // Per-file git status icon (no trailing space — format string adds it)
         let git_icon = git_info.file_statuses.get(item.name.as_str()).map(|fs| {
-            format!("{}{}{} ", fs.color(), fs.icon(), RESET)
-        }).unwrap_or_else(|| " ".to_string());
+            format!("{}{}{}", fs.color(), fs.icon(), RESET)
+        }).unwrap_or_default();
 
         // Color the name based on type (like lsd/exa)
         let (name_prefix, name_suffix) = if item.is_dir {
@@ -228,7 +228,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
         // lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
-        println!("{} {} {} {} {}  {} {}{}",
+        println!("{} {} {} {} {} {}{}",
             perm_padded, owner_padded, group_padded, size_padded, modified,
             git_icon, icon_str, name_display);
     }
