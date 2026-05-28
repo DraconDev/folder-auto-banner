@@ -18,6 +18,41 @@ pub struct GitInfo {
     pub untracked: usize,
     pub last_commit_msg: Option<String>,
     pub is_dirty: bool,
+    pub file_statuses: std::collections::HashMap<String, FileStatus>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FileStatus {
+    Modified,
+    Added,
+    Deleted,
+    Renamed,
+    Untracked,
+    Conflict,
+}
+
+impl FileStatus {
+    pub fn icon(&self) -> &'static str {
+        match self {
+            FileStatus::Modified => "M",
+            FileStatus::Added => "+",
+            FileStatus::Deleted => "D",
+            FileStatus::Renamed => "R",
+            FileStatus::Untracked => "?",
+            FileStatus::Conflict => "!",
+        }
+    }
+
+    pub fn color(&self) -> &'static str {
+        match self {
+            FileStatus::Modified => "\x1b[33m",   // yellow
+            FileStatus::Added => "\x1b[32m",      // green
+            FileStatus::Deleted => "\x1b[31m",    // red
+            FileStatus::Renamed => "\x1b[36m",    // cyan
+            FileStatus::Untracked => "\x1b[2m",   // dim
+            FileStatus::Conflict => "\x1b[31m",   // red
+        }
+    }
 }
 
 /// Get Git info for a directory
