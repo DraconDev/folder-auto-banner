@@ -288,7 +288,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let contents_raw = if item.is_dir {
             count_items_in_dir(item).to_string()
         } else {
-            get_file_contents(item)
+            get_file_contents_raw(item)
         };
         let contents_padded = format!("{:>width$}", contents_raw, width = max_contents);
 
@@ -310,9 +310,18 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             size_padded
         };
 
+        // Contents: color by type
+        let contents_colored = if item.is_dir {
+            contents_padded
+        } else {
+            let colored = get_file_contents(item);
+            // Re-pad with colored version (ANSI codes don't affect width)
+            format!("{:>width$}", colored, width = max_contents + (colored.len() - contents_raw.len()))
+        };
+
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
         println!("{} {} {} {} {} {} {}{}{}",
-            perm_colored, owner_colored, group_colored, modified, size_colored, contents_padded,
+            perm_colored, owner_colored, group_colored, modified, size_colored, contents_colored,
             git_icon, icon_str, name_display);
     }
 
