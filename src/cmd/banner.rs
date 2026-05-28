@@ -396,6 +396,13 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
             return dur;
         }
     }
+    
+    // WebM/MKV: extract duration from EBML headers
+    if lower.ends_with(".webm") || lower.ends_with(".mkv") {
+        if let Some(dur) = extract_webm_duration(&entry.path) {
+            return dur;
+        }
+    }
 
     // Text files under 1MB: count lines
     if entry.size < 1024 * 1024 {
@@ -553,6 +560,69 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
         
         i += size;
     }
+    None
+}
+
+/// Extract video duration from WebM/MKV (EBML) container headers
+fn extract_webm_duration(path: &std::path::Path) -> Option<String> {
+    let buf = std::fs::read(path).ok()?;
+    
+    // WebM/MKV uses EBML format
+    // Look for Duration element (0x4489) and TimecodeScale (0x2AD7B1)
+    let mut timecode_scale: u64 = 1000000; // default 1ms
+    let mut duration: f64 = 0.0;
+    let mut found_duration = false;
+    
+    let mut i = 0;
+    while i < buf.len().saturating_sub(12) {
+        // Check for TimecodeScale element (0x2AD7B1)
+        if buf[i] == 0x2A && buf[i+1] == 0xD7 && buf[i+2] == 0xB1 {
+            let size = buf[i+3] as usize;
+            if size <= 8 && i + 4 + size <= buf.len() {
+                let mut val: u64 = 0;
+                for j in 0..size {
+                    val = (val << 8) | (buf[i+4+j] as u64);
+                }
+                if val > 0 {
+                    timecode_scale = val;
+                }
+            }
+        }
+        
+        // Check for Duration element (0x4489)
+        if buf[i] == 0x44 && buf[i+1] == 0x89 {
+            let size = buf[i+2] as usize;
+            if size == 4 && i + 3 + 4 <= buf.len() {
+                let bits = u32::from_be_bytes([buf[i+3], buf[i+4], buf[i+5], buf[i+6]]);
+                duration = f32::from_bits(bits) as f64;
+                found_duration = true;
+            } else if size == 8 && i + 3 + 8 <= buf.len() {
+                let bits = u64::from_be_bytes([buf[i+3], buf[i+4], buf[i+5], buf[i+6], 
+                                               buf[i+7], buf[i+8], buf[i+9], buf[i+10]]);
+                duration = f64::from_bits(bits);
+                found_duration = true;
+            }
+        }
+        
+        i += 1;
+    }
+    
+    if found_duration && duration > 0.0 {
+        let seconds = (duration * timecode_scale as f64 / 1_000_000_000.0) as u64;
+        if seconds > 0 {
+            let mins = seconds / 60;
+            let secs = seconds % 60;
+            if mins >= 60 {
+                let hours = mins / 60;
+                let mins = mins % 60;
+                return Some(format!("{}:{:02}:{:02}", hours, mins, secs));
+            } else if mins > 0 {
+                return Some(format!("{}:{:02}", mins, secs));
+            }
+            return Some(format!("{}s", seconds));
+        }
+    }
+    
     None
 }
 
