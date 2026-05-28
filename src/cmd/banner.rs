@@ -199,12 +199,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         max_group = max_group.max(item.group.len());
         let size_str = format_size_compact(item.size);
         max_size = max_size.max(size_str.len());
-        let contents_str = if item.is_dir {
-            count_items_in_dir(item).to_string()
+        let contents_len = if item.is_dir {
+            count_items_in_dir(item).to_string().len()
         } else {
-            get_file_contents(item)
+            get_file_contents_raw(item).len()
         };
-        max_contents = max_contents.max(contents_str.len().max(4));
+        max_contents = max_contents.max(contents_len.max(4));
     }
 
     // Print each row — PERM OWNER GROUP CONTENTS SIZE DATE NAME
@@ -285,22 +285,21 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let group_padded = format!("{:<width$}", item.group, width = max_group);
         let size_padded = format!("{:>width$}", format_size_compact(item.size), width = max_size);
-        let contents_padded = if item.is_dir {
-            format!("{:>width$}", count_items_in_dir(item).to_string(), width = max_contents)
+        let contents_raw = if item.is_dir {
+            count_items_in_dir(item).to_string()
         } else {
-            format!("{:>width$}", get_file_contents(item), width = max_contents)
+            get_file_contents(item)
         };
+        let contents_padded = format!("{:>width$}", contents_raw, width = max_contents);
 
-        // Owner/group in dim to de-emphasize (like exa/lsd)
-        let owner_colored = if max_owner > item.owner.len() {
-            format!("{}{}{}", color(DIM), owner_padded, color(RESET))
-        } else {
-            format!("{}{}{}", color(DIM), owner_padded, color(RESET))
-        };
-        let group_colored = format!("{}{}{}", color(DIM), group_padded, color(RESET));
+        // Colorize permissions
         let perm_colored = colorize_perms(&item.perms);
 
-        // Color size: dim <1KB, normal 1KB-1MB, bold 1-100MB, bright+color >100MB
+        // Owner/group: dimmed (like exa/lsd)
+        let owner_colored = format!("{}{}{}", color(DIM), owner_padded, color(RESET));
+        let group_colored = format!("{}{}{}", color(DIM), group_padded, color(RESET));
+
+        // Size: dim <1KB, bold 1-100MB, yellow >100MB, normal otherwise
         let size_colored = if item.size > 100 * 1024 * 1024 {
             format!("{}{}{}", color(YELLOW), size_padded, color(RESET))
         } else if item.size > 1024 * 1024 {
@@ -308,7 +307,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         } else if item.size < 1024 {
             format!("{}{}{}", color(DIM), size_padded, color(RESET))
         } else {
-            size_padded.to_string()
+            size_padded
         };
 
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
