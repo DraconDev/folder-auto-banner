@@ -414,6 +414,38 @@ fn extract_image_resolution(bytes: &[u8], ext: &str) -> Option<String> {
     None
 }
 
+/// Count ZIP file entries by scanning local file headers
+fn count_zip_entries(bytes: &[u8]) -> Option<usize> {
+    let mut count = 0;
+    let mut i = 0;
+    while i < bytes.len().saturating_sub(4) {
+        if bytes[i] == 0x50 && bytes[i+1] == 0x4B && bytes[i+2] == 0x03 && bytes[i+3] == 0x04 {
+            count += 1;
+            i += 4;
+        } else {
+            i += 1;
+        }
+    }
+    if count > 0 { Some(count) } else { None }
+}
+
+/// Count SQLite tables by reading schema
+fn count_sqlite_tables(path: &std::path::Path) -> Option<usize> {
+    let bytes = std::fs::read(path).ok()?;
+    if bytes.len() < 16 { return None; }
+    let header = std::str::from_utf8(&bytes[..16]).ok()?;
+    if !header.starts_with("SQLite format 3") { return None; }
+
+    use std::process::Command;
+    let output = Command::new("sqlite3")
+        .arg(path)
+        .arg("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
+        .output().ok()?;
+
+    let count = String::from_utf8_lossy(&output.stdout).trim().parse().ok()?;
+    Some(count)
+}
+
 /// Colorize permission string like exa — each char colored by meaning
 /// d=blue, l=magenta, r=green, w=yellow, x=red, -=dim
 fn colorize_perms(perms: &str) -> String {
