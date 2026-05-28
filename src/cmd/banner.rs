@@ -6,10 +6,8 @@
 use anyhow::Result;
 use std::path::Path;
 
-use comfy_table::{
-    Cell, ColumnConstraint, ContentArrangement, Table, Width,
-};
 use console::Term;
+use unicode_width::UnicodeWidthStr;
 
 use crate::fs::{DirSummary, format_size_compact, format_exact_time};
 use crate::git::GitInfo;
@@ -19,12 +17,9 @@ use crate::icon;
 const RESET: &str = "\x1b[0m";
 const DIM: &str = "\x1b[2m";
 const BOLD: &str = "\x1b[1m";
-const CYAN: &str = "\x1b[36m";
 const BLUE: &str = "\x1b[34m";
 const GREEN: &str = "\x1b[32m";
-const YELLOW: &str = "\x1b[33m";
 const MAGENTA: &str = "\x1b[35m";
-const RED: &str = "\x1b[31m";
 
 /// Run the banner command
 pub fn run_banner(
@@ -50,7 +45,7 @@ pub fn run_banner(
     Ok(())
 }
 
-/// Output rich formatted banner - table view like a file manager
+/// Output rich formatted banner — compact lsd-style layout
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
@@ -144,45 +139,49 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
 
-    // Build the file listing table — like lsd -l but with icons
-    let term = Term::stdout();
-    let (tw, _) = term.size();
-    let term_width = if tw > 0 { (tw as usize).min(120).max(60) } else { 80_usize };
+    // Compute max column widths for alignment
+    let mut max_perm = 10; // "drwxr-xr-x"
+    let mut max_owner = 5; // "OWNER"
+    let mut max_size = 4;  // "SIZE"
 
-    // Columns: PERM(12) + OWNER(10) + SIZE(12) + MODIFIED(14) + borders/padding(12)
-    // = 60 overhead, name gets the rest (min 15)
-    let overhead = 60;
-    let name_width = term_width.saturating_sub(overhead).max(15);
+    for item in &display_items {
+        max_perm = max_perm.max(item.perms.len());
+        max_owner = max_owner.max(item.owner.len());
+        let size_str = if item.is_dir {
+            count_items_in_dir(item).to_string()
+        } else {
+            format_size_compact(item.size)
+        };
+        max_size = max_size.max(size_str.len());
+    }
 
-    let mut table = Table::new();
-    table
-        .load_preset("││──├─┼┤│    ┬┴┌┐└┘")
-        .set_content_arrangement(ContentArrangement::DynamicFullWidth)
-        .set_width(term_width as u16)
-        .set_header(vec![
-            Cell::new("PERM"),
-            Cell::new("OWNER"),
-            Cell::new("NAME"),
-            Cell::new("SIZE"),
-            Cell::new("MODIFIED"),
-        ]);
-
+    // Print each row — compact lsd-style: PERM OWNER [icon] NAME  SIZE  MODIFIED
     for item in display_items {
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
-        // Build name with optional symlink target
-        let display_name = if item.is_symlink {
-            if let Some(target) = &item.symlink_target {
-                format!("{} → {}", item.name, target)
-            } else {
-                item.name.clone()
-            }
+        // Color the name based on type
+        let name_color = if item.is_dir {
+            BLUE
+        } else if item.is_symlink {
+            MAGENTA
+        } else if item.is_exec {
+            GREEN
+        } else if item.name.starts_with('.') {
+            DIM
         } else {
-            item.name.clone()
+            ""
         };
 
-        let name_cell = format!("{} {}", icon_str, display_name);
-        let name_display = truncate_ansi(&name_cell, name_width);
+        // Build name with optional symlink target
+        let name_display = if item.is_symlink {
+            if let Some(target) = &item.symlink_target {
+                format!("{}{}{} {}→{} {}", name_color, item.name, RESET, DIM, RESET, target)
+            } else {
+                format!("{}{}{}", name_color, item.name, RESET)
+            }
+        } else {
+            format!("{}{}{}", name_color, item.name, RESET)
+        };
 
         let size_or_count = if item.is_dir {
             count_items_in_dir(item).to_string()
@@ -194,29 +193,14 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             .map(|dt| format_exact_time(dt))
             .unwrap_or_default();
 
-        table.add_row(vec![
-            Cell::new(&item.perms),
-            Cell::new(&item.owner),
-            Cell::new(name_display),
-            Cell::new(size_or_count),
-            Cell::new(modified),
-        ]);
+        // Pad columns for alignment
+        let perm_padded = format!("{:<width$}", item.perms, width = max_perm);
+        let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
+        let size_padded = format!("{:>width$}", size_or_count, width = max_size);
+
+        println!("{} {} {} {} {}  {}",
+            perm_padded, owner_padded, icon_str, name_display, size_padded, modified);
     }
-
-    table.set_constraints(vec![
-        ColumnConstraint::Absolute(Width::Fixed(12)),
-        ColumnConstraint::Absolute(Width::Fixed(10)),
-        ColumnConstraint::Absolute(Width::Fixed(name_width as u16)),
-        ColumnConstraint::Absolute(Width::Fixed(12)),
-        ColumnConstraint::Absolute(Width::Fixed(14)),
-    ]);
-
-    // Prevent row wrapping
-    for row in table.row_iter_mut() {
-        row.max_height(1);
-    }
-
-    println!("{table}");
 
     if !show_hidden && !hidden_items.is_empty() {
         println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
@@ -235,7 +219,6 @@ fn truncate_ansi(s: &str, width: usize) -> String {
 
     while let Some(&c) = chars.peek() {
         if c == '\x1b' {
-            // ANSI escape sequence — pass through entirely
             result.push(c);
             chars.next();
             while let Some(next) = chars.next() {
@@ -247,11 +230,8 @@ fn truncate_ansi(s: &str, width: usize) -> String {
             continue;
         }
 
-        // Use unicode_width to compute display width of this char
         let char_width = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-
         if visible_width + char_width > width.saturating_sub(1) {
-            // Truncate — add ellipsis
             result.push('…');
             return result;
         }
@@ -259,28 +239,6 @@ fn truncate_ansi(s: &str, width: usize) -> String {
         visible_width += char_width;
         result.push(c);
         chars.next();
-    }
-
-    result
-}
-
-/// Plain-text truncate (no ANSI) — used for non-colored strings
-fn truncate(s: &str, width: usize) -> String {
-    if width == 0 {
-        return String::new();
-    }
-
-    let mut visible_width = 0;
-    let mut result = String::new();
-
-    for c in s.chars() {
-        let char_width = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-        if visible_width + char_width > width.saturating_sub(1) {
-            result.push('…');
-            return result;
-        }
-        visible_width += char_width;
-        result.push(c);
     }
 
     result
@@ -304,6 +262,8 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
             "is_exec": item.is_exec,
             "size": item.size,
             "perms": item.perms,
+            "owner": item.owner,
+            "group": item.group,
             "symlink_target": item.symlink_target,
         })
     }).collect();
