@@ -31,6 +31,11 @@
 - [x] Header shows `*N` modified, `+N` staged, `?N` untracked, `↑N` ahead, `↓N` behind
 - [x] `FileStatus` enum with per-file icons and colors
 - [x] `file_statuses: HashMap<String, FileStatus>` populated during scan
+- [x] Per-file git status lookup by relative path
+
+### TTY Detection
+- [x] Colors only emit when stdout is a real terminal
+- [x] Non-tty output is plain text (no broken escape codes)
 
 ### Install / Shell
 - [x] Consolidated 4 redundant install scripts into 1
@@ -49,78 +54,68 @@
 
 ## 🔜 In Progress
 
-### 1. Git Per-File Status Icons
-**Problem:** `file_statuses` map uses paths relative to repo root (`src/main.rs`) but lookup uses `item.name` (`main.rs`). Need to strip repo root prefix before lookup.
+### 1. More Vibrant Colors (exa/lsd style)
+**Current:** Only filenames are colored (blue dirs, green exec, dim hidden).
+**Target:** Color the whole row like exa/lsd:
 
-**Fix:** Compute `item.path.strip_prefix(repo_root)` and use that for lookup. Also need to pass `repo_root` through or restructure lookup.
+| Element | Color Scheme |
+|---------|-------------|
+| Permissions `r` | Green (readable) |
+| Permissions `w` | Yellow (writable) |
+| Permissions `x` | Red (executable) |
+| Permissions `d` | Blue (directory) |
+| Permissions `l` | Magenta (symlink) |
+| Permissions `-` | Dim (no permission) |
+| Owner/Group | Dim (less prominent) |
+| Size | Bold if >1MB, dim if small |
+| Date | Bright if recent, dim if old |
+| Filenames | Already colored ✓ |
 
-**Expected output:**
-```
--rw-r--r-- dracon users 1.3k 27 May 22:04 M 🦀 Cargo.toml    (M = modified)
--rw-r--r-- dracon users 64k  27 May 22:06   🔒 Cargo.lock     (clean)
-```
-
-### 2. ANSI Colors Rendering
-**Problem:** Colors show as raw codes in non-tty contexts. Need to:
-- Detect tty and only emit colors when terminal supports it
-- Use `console::Term::stdout().is_term()` or `atty` crate
-- Or use comfy-table's `should_style()` / `enforce_styling()`
-
-**Expected colors (lsd/exa style):**
-| Type | Color |
-|------|-------|
-| Directories | Blue bold |
-| Executables | Green bold |
-| Symlinks | Magenta |
-| Hidden files | Dim gray |
-| Git modified | Yellow |
-| Git staged | Green |
-| Git untracked | Dim |
-| Regular files | White (default) |
+**Implementation:** Add `colorize_perms()` function that wraps each permission character in ANSI codes.
 
 ---
 
 ## 📋 Next Up
 
-### 3. More Git Info
+### 2. More Git Info
 - [ ] Show last commit date per file (like `tig` or `git log --format`)
 - [ ] Show which branch a file was last changed on
 - [ ] Show conflict markers during merge (`!` icon)
 - [ ] Show stash count in header (`⚑2`)
 - [ ] Show worktree state (rebase, cherry-pick, etc.)
 
-### 4. File Metadata
+### 3. File Metadata
 - [ ] Show number of hard links (like `ls -l`)
 - [ ] Show file size as a mini bar (like `dust` or `duf`)
 - [ ] Show file age relative to git repo creation
 - [ ] Show MIME type or category (Code, Config, Document, Media, etc.)
 
-### 5. Sorting & Filtering
+### 4. Sorting & Filtering
 - [ ] `--sort name|size|modified|type` flag
 - [ ] `--filter` flag (type, size range, name pattern)
 - [ ] `--max N` flag (limit items shown)
 - [ ] `--hidden` flag to always show dotfiles
 - [ ] `--group` flag to group by type (dirs, files, symlinks)
 
-### 6. Table Views
+### 5. Table Views
 - [ ] `--tree` recursive view (like `lsd --tree`)
 - [ ] `--grid` compact multi-column layout (like `ls` default)
 - [ ] `--long` full mode (like `ls -l` with all columns)
 - [ ] `--short` minimal mode (just name + icon)
 
-### 7. Color Themes
+### 6. Color Themes
 - [ ] Support `LS_COLORS` environment variable
 - [ ] Support `NO_COLOR` environment variable
 - [ ] Configurable color scheme via config file
 - [ ] Dark/light theme support
 
-### 8. Performance
+### 7. Performance
 - [ ] Cache directory scan results (TTL-based)
 - [ ] `--depth N` for shallow recursive view
 - [ ] Parallel stat calls for large directories
 - [ ] Bench: <50ms for 10k files
 
-### 9. Safety / Polish
+### 8. Safety / Polish
 - [ ] Deduplicate `autoload -U add-zsh-hook` in install.sh
 - [ ] Test install.sh idempotency (run twice = no duplicates)
 - [ ] `cargo clippy` pass
