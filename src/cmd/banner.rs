@@ -6,9 +6,6 @@
 use anyhow::Result;
 use std::path::Path;
 
-use console::Term;
-use unicode_width::UnicodeWidthStr;
-
 use crate::fs::{DirSummary, format_size_compact, format_exact_time};
 use crate::git::GitInfo;
 use crate::icon;
@@ -193,12 +190,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             .map(|dt| format_exact_time(dt))
             .unwrap_or_default();
 
-        // Pad columns for alignment
+        // Pad PERM, OWNER, SIZE for alignment (name doesn't need padding)
         let perm_padded = format!("{:<width$}", item.perms, width = max_perm);
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
-        println!("{} {} {} {} {}  {}",
+        println!("{} {} {} {} {} {}",
             perm_padded, owner_padded, icon_str, name_display, size_padded, modified);
     }
 
