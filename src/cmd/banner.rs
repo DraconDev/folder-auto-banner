@@ -476,12 +476,14 @@ fn extract_video_duration(path: &std::path::Path) -> Option<String> {
     let file_len = file.metadata().ok()?.len();
     
     // For large files, read more from start (moov can be huge for long videos)
-    let start_read = if file_len > 100 * 1024 * 1024 {
-        10 * 1024 * 1024 // 10MB for files > 100MB
+    let start_read = if file_len > 500 * 1024 * 1024 {
+        50 * 1024 * 1024 // 50MB for very large files
+    } else if file_len > 100 * 1024 * 1024 {
+        20 * 1024 * 1024 // 20MB for files > 100MB
     } else if file_len > 10 * 1024 * 1024 {
-        4 * 1024 * 1024  // 4MB for files > 10MB
+        10 * 1024 * 1024 // 10MB for files > 10MB
     } else {
-        file_len as usize // Small files: read whole thing
+        file_len as usize
     };
     
     let start_read = (start_read as u64).min(file_len) as usize;
@@ -494,10 +496,12 @@ fn extract_video_duration(path: &std::path::Path) -> Option<String> {
     }
     
     // If not found at start, try end of file
-    let end_read = if file_len > 100 * 1024 * 1024 {
-        10 * 1024 * 1024
+    let end_read = if file_len > 500 * 1024 * 1024 {
+        50 * 1024 * 1024
+    } else if file_len > 100 * 1024 * 1024 {
+        20 * 1024 * 1024
     } else if file_len > 10 * 1024 * 1024 {
-        4 * 1024 * 1024
+        10 * 1024 * 1024
     } else {
         file_len as usize
     };
