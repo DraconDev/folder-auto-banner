@@ -233,7 +233,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let group_padded = format!("{:<width$}", item.group, width = max_group);
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
-        // Color permissions like exa: user/group/other rwx colored
         let perm_colored = colorize_perms(&item.perms);
 
         // Color size: dim if small, bold if large
