@@ -490,10 +490,8 @@ fn extract_video_duration(path: &std::path::Path) -> Option<String> {
         10 * 1024 * 1024 // 10MB for files > 100MB
     } else if file_len > 10 * 1024 * 1024 {
         4 * 1024 * 1024  // 4MB for files > 10MB
-    } else if file_len > 1024 * 1024 {
-        1024 * 1024      // 1MB for files > 1MB
     } else {
-        return None; // Small files should have moov at start
+        file_len as usize // Small files: just read the whole thing
     };
     
     let end_read = (end_read as u64).min(file_len) as usize;
