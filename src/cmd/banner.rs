@@ -384,43 +384,43 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     let name = &entry.name;
     let lower = name.to_lowercase();
 
-    // Symlinks: show target length
+    // Symlinks: show target length in dim
     if entry.is_symlink {
         if let Some(target) = &entry.symlink_target {
-            return format!("{}→", target.len());
+            return format!("{}{}→{}", color(DIM), target.len(), color(RESET));
         }
         return String::new();
     }
 
-    // Image files: try to get resolution from header
+    // Image files: try to get resolution from header (yellow)
     if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
         if let Ok(bytes) = std::fs::read(&entry.path) {
             if let Some(res) = extract_image_resolution(&bytes, &lower) {
-                return res;
+                return format!("{}{}{}", color(YELLOW), res, color(RESET));
             }
         }
     }
 
-    // ZIP files: count entries
+    // ZIP files: count entries (yellow)
     if lower.ends_with(".zip") {
         if let Ok(bytes) = std::fs::read(&entry.path) {
             if let Some(count) = count_zip_entries(&bytes) {
-                return count.to_string();
+                return format!("{}{}{}", color(YELLOW), count, color(RESET));
             }
         }
     }
 
-    // SQLite DB: show table count
+    // SQLite DB: show table count (cyan)
     if lower.ends_with(".db") || lower.ends_with(".sqlite") || lower.ends_with(".sqlite3") {
         if let Some(count) = count_sqlite_tables(&entry.path) {
-            return format!("{}t", count);
+            return format!("{}{}t{}", color(CYAN), count, color(RESET));
         }
     }
 
-    // Video files: extract duration from container headers
+    // Video files: extract duration from container headers (magenta)
     if lower.ends_with(".mp4") || lower.ends_with(".mov") || lower.ends_with(".m4v") {
         if let Some(dur) = extract_video_duration(&entry.path) {
-            return dur;
+            return format!("{}{}{}", color(MAGENTA), dur, color(RESET));
         }
     }
     
