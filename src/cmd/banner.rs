@@ -468,89 +468,95 @@ fn count_sqlite_tables(path: &std::path::Path) -> Option<usize> {
 }
 
 /// Extract video duration from MP4/MOV container headers
-/// Reads first 256KB to find moov atom, parses mvhd for timescale/duration
+/// Reads first 256KB to find moov atom, then tries end of file for fast-start videos
 fn extract_video_duration(path: &std::path::Path) -> Option<String> {
     use std::io::{Read, Seek, SeekFrom};
     
     let mut file = std::fs::File::open(path).ok()?;
-    let mut buf = [0u8; 262144]; // 256KB
-    let bytes_read = file.read(&mut buf).ok()?;
+    let file_len = file.metadata().ok()?.len();
     
-    // Look for moov atom in the first 256KB
-    let mut moov_offset = None;
+    // Try first 256KB
+    let mut buf = vec![0u8; 262144];
+    let bytes_read = file.read(&mut buf).ok()?;
+    buf.truncate(bytes_read);
+    
+    if let Some(dur) = parse_mp4_duration(&buf) {
+        return Some(dur);
+    }
+    
+    // If not found, try end of file with larger buffer
+    // moov for fast-start videos is at end, can be several MB
+    let end_read = if file_len > 100 * 1024 * 1024 {
+        10 * 1024 * 1024 // 10MB for files > 100MB
+    } else if file_len > 10 * 1024 * 1024 {
+        4 * 1024 * 1024  // 4MB for files > 10MB
+    } else if file_len > 1024 * 1024 {
+        1024 * 1024      // 1MB for files > 1MB
+    } else {
+        return None; // Small files should have moov at start
+    };
+    
+    let end_read = (end_read as u64).min(file_len) as usize;
+    file.seek(SeekFrom::Start(file_len - end_read as u64)).ok()?;
+    let mut buf = vec![0u8; end_read];
+    let bytes_read = file.read(&mut buf).ok()?;
+    buf.truncate(bytes_read);
+    
+    parse_mp4_duration(&buf)
+}
+
+/// Parse MP4 buffer for moov > mvhd and extract duration
+fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
     let mut i = 0;
-    while i < bytes_read.saturating_sub(8) {
+    while i < buf.len().saturating_sub(8) {
         let size = u32::from_be_bytes([buf[i], buf[i+1], buf[i+2], buf[i+3]]) as usize;
-        if size < 8 || size > bytes_read { break; }
+        if size < 8 { break; }
         
+        // Check for "moov" atom
         if buf[i+4] == 0x6D && buf[i+5] == 0x6F && buf[i+6] == 0x6F && buf[i+7] == 0x76 {
-            moov_offset = Some(i);
-            break;
+            // Found moov, scan inside for mvhd
+            let mut j = i + 8;
+            let moov_end = i + size;
+            
+            while j < moov_end.saturating_sub(8) && j < buf.len().saturating_sub(8) {
+                let atom_size = u32::from_be_bytes([buf[j], buf[j+1], buf[j+2], buf[j+3]]) as usize;
+                if atom_size < 8 || atom_size > size { break; }
+                
+                // Check for "mvhd" atom
+                if buf[j+4] == 0x6D && buf[j+5] == 0x76 && buf[j+6] == 0x68 && buf[j+7] == 0x64 {
+                    let version = buf[j+8];
+                    
+                    let (timescale, duration) = if version == 0 {
+                        let ts = u32::from_be_bytes([buf[j+20], buf[j+21], buf[j+22], buf[j+23]]);
+                        let dur = u32::from_be_bytes([buf[j+24], buf[j+25], buf[j+26], buf[j+27]]);
+                        (ts as u64, dur as u64)
+                    } else {
+                        let ts = u32::from_be_bytes([buf[j+28], buf[j+29], buf[j+30], buf[j+31]]);
+                        let dur = u64::from_be_bytes([buf[j+32], buf[j+33], buf[j+34], buf[j+35], 
+                                                      buf[j+36], buf[j+37], buf[j+38], buf[j+39]]);
+                        (ts as u64, dur)
+                    };
+                    
+                    if timescale > 0 && duration > 0 {
+                        let seconds = duration / timescale;
+                        let mins = seconds / 60;
+                        let secs = seconds % 60;
+                        if mins >= 60 {
+                            let hours = mins / 60;
+                            let mins = mins % 60;
+                            return Some(format!("{}:{:02}:{:02}", hours, mins, secs));
+                        } else if mins > 0 {
+                            return Some(format!("{}:{:02}", mins, secs));
+                        }
+                        return Some(format!("{}s", seconds));
+                    }
+                }
+                j += atom_size;
+            }
         }
+        
         i += size;
     }
-    
-    // If moov not found at start, check last 256KB (moov can be at end for fast-start)
-    if moov_offset.is_none() {
-        let file_len = file.metadata().ok()?.len();
-        if file_len > 262144 {
-            file.seek(SeekFrom::Start(file_len - 262144)).ok()?;
-            let bytes_read = file.read(&mut buf).ok()?;
-            let mut i = 0;
-            while i < bytes_read.saturating_sub(8) {
-                let size = u32::from_be_bytes([buf[i], buf[i+1], buf[i+2], buf[i+3]]) as usize;
-                if size < 8 || size > bytes_read { break; }
-                
-                if buf[i+4] == 0x6D && buf[i+5] == 0x6F && buf[i+6] == 0x6F && buf[i+7] == 0x76 {
-                    moov_offset = Some(i);
-                    break;
-                }
-                i += size;
-            }
-        }
-    }
-    
-    // Now find mvhd inside moov
-    let moov = moov_offset?;
-    let moov_size = u32::from_be_bytes([buf[moov], buf[moov+1], buf[moov+2], buf[moov+3]]) as usize;
-    
-    // Scan inside moov for mvhd
-    let mut i = moov + 8;
-    let moov_end = moov + moov_size;
-    
-    while i < moov_end.saturating_sub(8) && i < bytes_read.saturating_sub(8) {
-        let atom_size = u32::from_be_bytes([buf[i], buf[i+1], buf[i+2], buf[i+3]]) as usize;
-        if atom_size < 8 || atom_size > moov_size { break; }
-        
-        // Check for "mvhd" atom
-        if buf[i+4] == 0x6D && buf[i+5] == 0x76 && buf[i+6] == 0x68 && buf[i+7] == 0x64 {
-            let version = buf[i+8];
-            
-            let (timescale, duration) = if version == 0 {
-                let ts = u32::from_be_bytes([buf[i+20], buf[i+21], buf[i+22], buf[i+23]]);
-                let dur = u32::from_be_bytes([buf[i+24], buf[i+25], buf[i+26], buf[i+27]]);
-                (ts as u64, dur as u64)
-            } else {
-                let ts = u32::from_be_bytes([buf[i+28], buf[i+29], buf[i+30], buf[i+31]]);
-                let dur = u64::from_be_bytes([buf[i+32], buf[i+33], buf[i+34], buf[i+35], 
-                                              buf[i+36], buf[i+37], buf[i+38], buf[i+39]]);
-                (ts as u64, dur)
-            };
-            
-            if timescale > 0 && duration > 0 {
-                let seconds = duration / timescale;
-                let mins = seconds / 60;
-                let secs = seconds % 60;
-                if mins > 0 {
-                    return Some(format!("{}:{:02}", mins, secs));
-                }
-                return Some(format!("{}s", seconds));
-            }
-        }
-        
-        i += atom_size;
-    }
-    
     None
 }
 
