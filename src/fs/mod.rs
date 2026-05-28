@@ -264,20 +264,40 @@ pub fn format_size(bytes: u64) -> String {
     s
 }
 
-/// Human-readable size — very compact (no decimals for large values)
+/// Human-readable size — very compact (like exa: 4.3k, 1.1k, 983)
 pub fn format_size_compact(bytes: u64) -> String {
     if bytes == 0 {
-        "0 B".to_string()
+        "0".to_string()
     } else if bytes < 1024 {
-        format!("{} B", bytes)
+        format!("{}", bytes)
     } else if bytes < 1024 * 1024 {
-        // KiB - 1 decimal if needed
         let kb = bytes as f64 / 1024.0;
-        if kb.fract() == 0.0 {
-            format!("{} KiB", kb as u64)
+        if kb >= 10.0 {
+            format!("{:.0}k", kb)
         } else {
-            format!("{:.1} KiB", kb)
+            format!("{:.1}k", kb)
         }
+    } else if bytes < 1024 * 1024 * 1024 {
+        let mb = bytes as f64 / (1024.0 * 1024.0);
+        if mb >= 10.0 {
+            format!("{:.0}M", mb)
+        } else {
+            format!("{:.1}M", mb)
+        }
+    } else {
+        let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+        if gb >= 10.0 {
+            format!("{:.0}G", gb)
+        } else {
+            format!("{:.1}G", gb)
+        }
+    }
+}
+
+/// Format exact date/time — compact exa-style: "27 May 23:42"
+pub fn format_exact_time(dt: &DateTime<Utc>) -> String {
+    dt.format("%d %b %H:%M").to_string()
+}
     } else if bytes < 1024 * 1024 * 1024 {
         // MiB - no decimals for values >= 10
         let mb = bytes as f64 / (1024.0 * 1024.0);
