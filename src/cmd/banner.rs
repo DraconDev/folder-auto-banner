@@ -231,7 +231,36 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         } else if item.name.starts_with('.') {
             (color(DIM), color(RESET))
         } else {
-            ("", "")
+            // Color by file extension
+            let ext = item.name.rfind('.').map(|i| &item.name[i..]).unwrap_or("");
+            match ext {
+                // Config files - yellow
+                ".json" | ".yaml" | ".yml" | ".toml" | ".ini" | ".conf" | ".cfg" | ".env" => {
+                    (color(YELLOW), color(RESET))
+                }
+                // Documentation - blue
+                ".md" | ".txt" | ".rst" | ".doc" | ".docx" | ".pdf" => {
+                    (color(BLUE), color(RESET))
+                }
+                // Source code - green
+                ".rs" | ".py" | ".js" | ".ts" | ".jsx" | ".tsx" | ".go" | ".rb" | ".java" | ".c" | ".cpp" | ".h" => {
+                    (color(GREEN), color(RESET))
+                }
+                // Images - magenta
+                ".png" | ".jpg" | ".jpeg" | ".gif" | ".svg" | ".webp" | ".ico" => {
+                    (color(MAGENTA), color(RESET))
+                }
+                // Videos - cyan
+                ".mp4" | ".mkv" | ".avi" | ".mov" | ".webm" => {
+                    (color(CYAN), color(RESET))
+                }
+                // Archives - red
+                ".zip" | ".tar" | ".gz" | ".bz2" | ".xz" | ".7z" | ".rar" | ".tgz" => {
+                    (color(RED), color(RESET))
+                }
+                // Default - no color
+                _ => ("", "")
+            }
         };
 
         // Build name with optional symlink target
@@ -431,11 +460,11 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
         }
     }
 
-    // Text files under 1MB: count lines
+    // Text files under 1MB: count lines (cyan)
     if entry.size < 1024 * 1024 {
         if let Ok(content) = std::fs::read_to_string(&entry.path) {
             let lines = content.lines().count();
-            return lines.to_string();
+            return format!("{}{}{}", color(CYAN), lines, color(RESET));
         }
     }
 
