@@ -7,7 +7,7 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::fs::{DirSummary, format_size_compact, format_exact_time};
-use crate::git::{GitInfo, FileStatus};
+use crate::git::GitInfo;
 use crate::icon;
 
 // ANSI color codes
@@ -224,7 +224,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
-        println!("{} {} {} {}{} {} {}",
+        println!("{} {} {}{} {} {} {}",
             perm_padded, owner_padded, git_icon, icon_str, name_display, size_padded, modified);
     }
 
