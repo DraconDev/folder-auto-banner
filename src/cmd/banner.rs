@@ -168,7 +168,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let mut max_owner = 5; // "OWNER"
     let mut max_group = 5; // "GROUP"
     let mut max_size = 4;  // "SIZE"
-    let mut max_contents = 9; // "1920x1080" for images
+    let mut max_contents = 4; // dynamic
 
     for item in &display_items {
         max_owner = max_owner.max(item.owner.len());
@@ -180,7 +180,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         } else {
             get_file_contents(item)
         };
-        max_contents = max_contents.max(contents_str.len());
+        max_contents = max_contents.max(contents_str.len().max(4));
     }
 
     // Print each row — PERM OWNER GROUP CONTENTS SIZE DATE NAME
@@ -244,9 +244,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             size_padded
         };
 
-        // PERM OWNER GROUP DATE CONTENTS SIZE NAME
+        // PERM OWNER GROUP DATE SIZE CONTENTS NAME
         println!("{} {} {} {} {} {} {}{}{}",
-            perm_colored, owner_padded, group_padded, modified, contents_padded, size_colored,
+            perm_colored, owner_padded, group_padded, modified, size_colored, contents_padded,
             git_icon, icon_str, name_display);
     }
 
