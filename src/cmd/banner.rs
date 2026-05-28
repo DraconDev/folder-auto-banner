@@ -168,16 +168,18 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let mut max_owner = 5; // "OWNER"
     let mut max_group = 5; // "GROUP"
     let mut max_size = 4;  // "SIZE"
+    let mut max_contents = 4; // "CONTENTS"
 
     for item in &display_items {
         max_owner = max_owner.max(item.owner.len());
         max_group = max_group.max(item.group.len());
-        let size_str = if item.is_dir {
-            count_items_in_dir(item).to_string()
-        } else {
-            format_size_compact(item.size)
-        };
+        let size_str = format_size_compact(item.size);
         max_size = max_size.max(size_str.len());
+        if item.is_dir {
+            let cnt = count_items_in_dir(item);
+            let cnt_str = cnt.to_string();
+            max_contents = max_contents.max(cnt_str.len());
+        }
     }
 
     // Print each row — lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
@@ -218,12 +220,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             format!("{}{}{}", name_prefix, item.name, name_suffix)
         };
 
-        let size_or_count = if item.is_dir {
-            count_items_in_dir(item).to_string()
-        } else {
-            format_size_compact(item.size)
-        };
-
         let modified = item.modified.as_ref()
             .map(|dt| format_exact_time(dt))
             .unwrap_or_default();
@@ -231,22 +227,25 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         // Pad columns for alignment
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let group_padded = format!("{:<width$}", item.group, width = max_group);
-        let size_padded = format!("{:>width$}", size_or_count, width = max_size);
+        let size_padded = format!("{:>width$}", format_size_compact(item.size), width = max_size);
+        let contents_padded = if item.is_dir {
+            format!("{:>width$}", count_items_in_dir(item).to_string(), width = max_contents)
+        } else {
+            format!("{:>width$}", "", width = max_contents)
+        };
 
         let perm_colored = colorize_perms(&item.perms);
 
-        // Color size: dim if small, bold if large
-        let size_colored = if item.is_dir {
-            format!("{}{}{}", color(DIM), size_padded, color(RESET))
-        } else if item.size > 1024 * 1024 {
+        // Color size: bold if large
+        let size_colored = if item.size > 1024 * 1024 {
             format!("{}{}{}", color(BOLD), size_padded, color(RESET))
         } else {
-            size_padded.to_string()
+            size_padded
         };
 
-        // lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
-        println!("{} {} {} {} {} {}{}{}",
-            perm_colored, owner_padded, group_padded, size_colored, modified,
+        // lsd/exa order: PERM OWNER GROUP SIZE CONTENTS DATE NAME
+        println!("{} {} {} {} {} {} {}{}{}",
+            perm_colored, owner_padded, group_padded, size_colored, contents_padded, modified,
             git_icon, icon_str, name_display);
     }
 
