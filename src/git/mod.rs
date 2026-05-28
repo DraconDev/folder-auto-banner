@@ -72,26 +72,48 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
     let mut staged = 0;
     let mut modified = 0;
     let mut untracked = 0;
+    let mut file_statuses = std::collections::HashMap::new();
 
     let statuses = repo.statuses(None).ok();
     if let Some(statuses) = statuses {
         for entry in statuses.iter() {
             let status = entry.status();
+            let path = entry.path().unwrap_or("").to_string();
+
             if status.contains(git2::Status::INDEX_NEW)
                 || status.contains(git2::Status::INDEX_MODIFIED)
                 || status.contains(git2::Status::INDEX_DELETED)
                 || status.contains(git2::Status::INDEX_RENAMED)
             {
                 staged += 1;
+                let fs = if status.contains(git2::Status::INDEX_NEW) {
+                    FileStatus::Added
+                } else if status.contains(git2::Status::INDEX_DELETED) {
+                    FileStatus::Deleted
+                } else if status.contains(git2::Status::INDEX_RENAMED) {
+                    FileStatus::Renamed
+                } else {
+                    FileStatus::Added
+                };
+                file_statuses.insert(path, fs);
             }
             if status.contains(git2::Status::WT_MODIFIED)
                 || status.contains(git2::Status::WT_DELETED)
                 || status.contains(git2::Status::WT_RENAMED)
             {
                 modified += 1;
+                let fs = if status.contains(git2::Status::WT_DELETED) {
+                    FileStatus::Deleted
+                } else if status.contains(git2::Status::WT_RENAMED) {
+                    FileStatus::Renamed
+                } else {
+                    FileStatus::Modified
+                };
+                file_statuses.insert(path, fs);
             }
             if status.contains(git2::Status::WT_NEW) {
                 untracked += 1;
+                file_statuses.insert(path, FileStatus::Untracked);
             }
         }
     }
@@ -123,6 +145,7 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         untracked,
         last_commit_msg,
         is_dirty,
+        file_statuses,
     })
 }
 
