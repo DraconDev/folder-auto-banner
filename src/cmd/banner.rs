@@ -390,6 +390,13 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
         }
     }
 
+    // Video files: extract duration from container headers
+    if lower.ends_with(".mp4") || lower.ends_with(".mov") || lower.ends_with(".m4v") {
+        if let Some(dur) = extract_video_duration(&entry.path) {
+            return dur;
+        }
+    }
+
     // Text files under 1MB: count lines
     if entry.size < 1024 * 1024 {
         if let Ok(content) = std::fs::read_to_string(&entry.path) {
@@ -458,6 +465,93 @@ fn count_sqlite_tables(path: &std::path::Path) -> Option<usize> {
 
     let count = String::from_utf8_lossy(&output.stdout).trim().parse().ok()?;
     Some(count)
+}
+
+/// Extract video duration from MP4/MOV container headers
+/// Reads first 256KB to find moov atom, parses mvhd for timescale/duration
+fn extract_video_duration(path: &std::path::Path) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut buf = [0u8; 262144]; // 256KB
+    let bytes_read = file.read(&mut buf).ok()?;
+    
+    // Look for moov atom in the first 256KB
+    let mut moov_offset = None;
+    let mut i = 0;
+    while i < bytes_read.saturating_sub(8) {
+        let size = u32::from_be_bytes([buf[i], buf[i+1], buf[i+2], buf[i+3]]) as usize;
+        if size < 8 || size > bytes_read { break; }
+        
+        if buf[i+4] == 0x6D && buf[i+5] == 0x6F && buf[i+6] == 0x6F && buf[i+7] == 0x76 {
+            moov_offset = Some(i);
+            break;
+        }
+        i += size;
+    }
+    
+    // If moov not found at start, check last 256KB (moov can be at end for fast-start)
+    if moov_offset.is_none() {
+        let file_len = file.metadata().ok()?.len();
+        if file_len > 262144 {
+            file.seek(SeekFrom::Start(file_len - 262144)).ok()?;
+            let bytes_read = file.read(&mut buf).ok()?;
+            let mut i = 0;
+            while i < bytes_read.saturating_sub(8) {
+                let size = u32::from_be_bytes([buf[i], buf[i+1], buf[i+2], buf[i+3]]) as usize;
+                if size < 8 || size > bytes_read { break; }
+                
+                if buf[i+4] == 0x6D && buf[i+5] == 0x6F && buf[i+6] == 0x6F && buf[i+7] == 0x76 {
+                    moov_offset = Some(i);
+                    break;
+                }
+                i += size;
+            }
+        }
+    }
+    
+    // Now find mvhd inside moov
+    let moov = moov_offset?;
+    let moov_size = u32::from_be_bytes([buf[moov], buf[moov+1], buf[moov+2], buf[moov+3]]) as usize;
+    
+    // Scan inside moov for mvhd
+    let mut i = moov + 8;
+    let moov_end = moov + moov_size;
+    
+    while i < moov_end.saturating_sub(8) && i < bytes_read.saturating_sub(8) {
+        let atom_size = u32::from_be_bytes([buf[i], buf[i+1], buf[i+2], buf[i+3]]) as usize;
+        if atom_size < 8 || atom_size > moov_size { break; }
+        
+        // Check for "mvhd" atom
+        if buf[i+4] == 0x6D && buf[i+5] == 0x76 && buf[i+6] == 0x68 && buf[i+7] == 0x64 {
+            let version = buf[i+8];
+            
+            let (timescale, duration) = if version == 0 {
+                let ts = u32::from_be_bytes([buf[i+20], buf[i+21], buf[i+22], buf[i+23]]);
+                let dur = u32::from_be_bytes([buf[i+24], buf[i+25], buf[i+26], buf[i+27]]);
+                (ts as u64, dur as u64)
+            } else {
+                let ts = u32::from_be_bytes([buf[i+28], buf[i+29], buf[i+30], buf[i+31]]);
+                let dur = u64::from_be_bytes([buf[i+32], buf[i+33], buf[i+34], buf[i+35], 
+                                              buf[i+36], buf[i+37], buf[i+38], buf[i+39]]);
+                (ts as u64, dur)
+            };
+            
+            if timescale > 0 && duration > 0 {
+                let seconds = duration / timescale;
+                let mins = seconds / 60;
+                let secs = seconds % 60;
+                if mins > 0 {
+                    return Some(format!("{}:{:02}", mins, secs));
+                }
+                return Some(format!("{}s", seconds));
+            }
+        }
+        
+        i += atom_size;
+    }
+    
+    None
 }
 
 /// Colorize permission string like exa — each char colored by meaning
