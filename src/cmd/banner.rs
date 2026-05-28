@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use std::path::Path;
+use chrono::{Utc, DateTime};
 
 use crate::fs::{DirSummary, format_size_compact, format_exact_time};
 use crate::git::GitInfo;
@@ -27,6 +28,29 @@ const MAGENTA: &str = "\x1b[35m";
 const RED: &str = "\x1b[31m";
 const CYAN: &str = "\x1b[36m";
 const GRAY: &str = "\x1b[90m";
+const WHITE: &str = "\x1b[97m";
+
+/// Color date based on age: today=white, this week=bright, this month=normal, older=dim
+fn colorize_date(dt: &DateTime<Utc>, formatted: &str) -> String {
+    let now = Utc::now();
+    let age = now.signed_duration_since(*dt);
+    
+    let code = if age.num_days() == 0 {
+        WHITE // today - bright white
+    } else if age.num_days() <= 7 {
+        BOLD // this week - bold
+    } else if age.num_days() <= 30 {
+        "" // this month - normal
+    } else {
+        DIM // older - dim
+    };
+    
+    if code.is_empty() {
+        formatted.to_string()
+    } else {
+        format!("{}{}{}", color(code), formatted, color(RESET))
+    }
+}
 
 /// Run the banner command
 pub fn run_banner(
@@ -222,7 +246,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         };
 
         let modified = item.modified.as_ref()
-            .map(|dt| format_exact_time(dt))
+            .map(|dt| {
+                let formatted = format_exact_time(dt);
+                colorize_date(dt, &formatted)
+            })
             .unwrap_or_default();
 
         // Pad columns for alignment
