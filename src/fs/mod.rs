@@ -298,26 +298,6 @@ pub fn format_size_compact(bytes: u64) -> String {
 pub fn format_exact_time(dt: &DateTime<Utc>) -> String {
     dt.format("%d %b %H:%M").to_string()
 }
-    } else if bytes < 1024 * 1024 * 1024 {
-        // MiB - no decimals for values >= 10
-        let mb = bytes as f64 / (1024.0 * 1024.0);
-        if mb >= 10.0 && mb.fract() == 0.0 {
-            format!("{} MiB", mb as u64)
-        } else if mb >= 10.0 {
-            format!("{:.1} MiB", mb)
-        } else {
-            format!("{:.2} MiB", mb)
-        }
-    } else {
-        // GiB
-        let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
-        if gb >= 10.0 {
-            format!("{:.1} GiB", gb)
-        } else {
-            format!("{:.2} GiB", gb)
-        }
-    }
-}
 
 /// Format relative time
 pub fn format_relative_time(dt: &DateTime<Utc>) -> String {
@@ -339,10 +319,6 @@ pub fn format_relative_time(dt: &DateTime<Utc>) -> String {
     }
 }
 
-/// Format exact date/time like lsd: "May 27 23:06"
-pub fn format_exact_time(dt: &DateTime<Utc>) -> String {
-    dt.format("%b %d %H:%M").to_string()
-}
 impl DirSummary {
     /// Get file type breakdown
     pub fn by_type(&self) -> Vec<(String, usize)> {
