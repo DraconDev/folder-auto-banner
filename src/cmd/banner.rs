@@ -10,7 +10,11 @@ use crate::fs::{DirSummary, format_size_compact, format_exact_time};
 use crate::git::GitInfo;
 use crate::icon;
 
-// ANSI color codes
+// ANSI color codes — only emitted when stdout is a tty
+fn color(code: &str) -> &str {
+    if atty::is(atty::Stream::Stdout) { code } else { "" }
+}
+
 const RESET: &str = "\x1b[0m";
 const DIM: &str = "\x1b[2m";
 const BOLD: &str = "\x1b[1m";
@@ -178,14 +182,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         max_size = max_size.max(size_str.len());
     }
 
-    // Print each row — lsd/exa order: PERM OWNER SIZE DATE NAME
+    // Print each row — lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
     for item in display_items {
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
-        // Per-file git status icon (no trailing space — format string adds it)
-        let git_icon = git_info.file_statuses.get(item.name.as_str()).map(|fs| {
-            format!("{}{}{}", fs.color(), fs.icon(), RESET)
-        }).unwrap_or_default();
+        // Per-file git status — try relative path first, then filename
+        let git_icon = {
+            let rel = item.path.strip_prefix(path).unwrap_or(&item.path);
+            let rel_str = rel.to_string_lossy();
+            git_info.file_statuses.get(rel_str.as_ref())
+                .or_else(|| git_info.file_statuses.get(item.name.as_str()))
+                .map(|fs| format!("{}{}{}", fs.color(), fs.icon(), RESET))
+                .unwrap_or_default()
+        };
 
         // Color the name based on type (like lsd/exa)
         let (name_prefix, name_suffix) = if item.is_dir {
