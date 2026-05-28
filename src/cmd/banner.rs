@@ -368,14 +368,14 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
 
 /// Extract image resolution from PNG or JPEG header bytes
 fn extract_image_resolution(bytes: &[u8], ext: &str) -> Option<String> {
-    if ext == ".png" && bytes.len() >= 24 {
+    if ext.ends_with(".png") && bytes.len() >= 24 {
         // PNG: width at offset 16-19 (big endian), height at 20-23
         let w = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]) as usize;
         let h = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]) as usize;
         if w > 0 && h > 0 {
             return Some(format!("{}x{}", w, h));
         }
-    } else if (ext == ".jpg" || ext == ".jpeg") && bytes.len() >= 2 {
+    } else if ext.ends_with(".jpg") || ext.ends_with(".jpeg") {
         // JPEG: find SOF marker and read dimensions
         // Simple approach: scan for FF C0 through FF CF markers (SOF0-SOF15)
         let mut i = 2;
