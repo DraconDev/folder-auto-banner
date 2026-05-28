@@ -149,16 +149,6 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         (msg, hash)
     }).unwrap_or((None, None));
 
-    // Get stash count
-    let stash_count = {
-        let mut count = 0;
-        let _ = repo.stash_foreach(|_, _, _| {
-            count += 1;
-            true
-        });
-        count
-    };
-
     // Check merge/rebase state
     let merge_state = if repo.state() == git2::RepositoryState::Merge {
         Some("MERGING".to_string())
