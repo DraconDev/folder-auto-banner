@@ -1,6 +1,7 @@
 //! Port usage detection — finds listening ports for a project
 //!
-//! Uses `ss` or `lsof` to find ports associated with the project directory.
+//! Uses `ss` to get listening ports with PIDs, then checks if those processes
+//! have their working directory in the project folder via /proc/<pid>/cwd.
 //! Timeout: 500ms, Cache: 10 seconds
 
 use anyhow::Result;
@@ -17,46 +18,56 @@ pub struct PortInfo {
     pub ports: Vec<u16>,
 }
 
-/// Detect listening ports for a project
+/// Detect listening ports for a project by checking process working directories
 pub fn detect_ports(path: &Path) -> Result<PortInfo> {
-    let dir_name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default();
+    let abs_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
 
-    // Try `ss` first (Linux)
-    if let Ok(ports) = try_ss(&dir_name) {
-        if !ports.is_empty() {
-            return Ok(PortInfo { ports });
-        }
+    // Try `ss -tlnp` to get listening ports with PIDs
+    if let Ok(ports) = try_ss_with_cwd_check(&abs_path) {
+        return Ok(PortInfo { ports });
     }
 
-    // Fall back to `lsof`
-    if let Ok(ports) = try_lsof(&dir_name) {
+    // Fall back to `lsof -i -P -n +D <path>` (slower, but works on macOS)
+    if let Ok(ports) = try_lsof_with_dir(&abs_path) {
         return Ok(PortInfo { ports });
     }
 
     Ok(PortInfo { ports: Vec::new() })
 }
 
-fn try_ss(dir_name: &str) -> Result<Vec<u16>> {
-    let output = run_with_timeout(
-        "ss",
-        &["-tlnp"],
-        PORT_TIMEOUT,
-    )?;
+/// Use `ss -tlnp` to get listening ports, then check if PID's cwd matches project dir
+fn try_ss_with_cwd_check(project_path: &Path) -> Result<Vec<u16>> {
+    let output = run_with_timeout("ss", &["-tlnp"], PORT_TIMEOUT)?;
 
     let mut ports = Vec::new();
+
     for line in output.lines() {
-        if line.contains(dir_name) {
-            // Extract port from address like 0.0.0.0:3000 or [::]:8080
-            if let Some(addr) = line.split_whitespace().nth(3) {
-                if let Some(port_str) = addr.rsplit(':').next() {
-                    if let Ok(port) = port_str.parse::<u16>() {
-                        if !ports.contains(&port) {
-                            ports.push(port);
-                        }
-                    }
+        // Skip header line
+        if line.starts_with("State") || line.starts_with("Recv-Q") {
+            continue;
+        }
+
+        // Parse ss output: State Recv-Q Send-Q Local Address:Port Peer Address:Port Process
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 6 {
+            continue;
+        }
+
+        // Extract port from local address (e.g., "0.0.0.0:3000" or "[::]:8080")
+        let addr = parts[3];
+        let port_str = addr.rsplit(':').next().unwrap_or("");
+        let port: u16 = match port_str.parse() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        // Extract PID from the last field (e.g., "users:(\"node\",pid=12345,fd=10)")
+        let process_info = parts.last().unwrap_or(&"");
+        if let Some(pid) = extract_pid(process_info) {
+            // Check if this process's cwd is in the project directory
+            if pid_cwd_matches(pid, project_path) {
+                if !ports.contains(&port) {
+                    ports.push(port);
                 }
             }
         }
@@ -66,20 +77,51 @@ fn try_ss(dir_name: &str) -> Result<Vec<u16>> {
     Ok(ports)
 }
 
-fn try_lsof(dir_name: &str) -> Result<Vec<u16>> {
+/// Extract PID from ss process info string like `users:(\"node\",pid=12345,fd=10)`
+fn extract_pid(info: &str) -> Option<u32> {
+    let pid_start = info.find("pid=")?;
+    let pid_str = &info[pid_start + 4..];
+    let pid_end = pid_str.find(|c: char| !c.is_ascii_digit())?;
+    pid_str[..pid_end].parse().ok()
+}
+
+/// Check if a process's working directory matches or is inside the project directory
+fn pid_cwd_matches(pid: u32, project_path: &Path) -> bool {
+    let cwd_link = format!("/proc/{}/cwd", pid);
+    match std::fs::read_link(&cwd_link) {
+        Ok(cwd) => {
+            let cwd_abs = cwd.canonicalize().unwrap_or(cwd);
+            cwd_abs == project_path || cwd_abs.starts_with(project_path)
+        }
+        Err(_) => false,
+    }
+}
+
+/// Fallback: use `lsof +D <path>` to find processes with cwd in project dir
+fn try_lsof_with_dir(project_path: &Path) -> Result<Vec<u16>> {
+    let path_str = project_path.to_string_lossy().to_string();
+
+    // lsof +D finds processes with cwd or open files in the directory
     let output = run_with_timeout(
         "lsof",
-        &["-i", "-P", "-n"],
+        &["-i", "-P", "-n", "-F", "pcftn", "+D", &path_str],
         PORT_TIMEOUT,
     )?;
 
     let mut ports = Vec::new();
+    let mut _current_pid: Option<u32> = None;
+    let mut _current_name: Option<String> = None;
+
     for line in output.lines() {
-        if line.contains(dir_name) {
-            // Extract port from address like *:3000 or 127.0.0.1:8080
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if let Some(addr) = parts.get(8) {
-                if let Some(port_str) = addr.rsplit(':').next() {
+        let field = &line[..1.min(line.len())];
+        let value = &line[1.min(line.len())..];
+
+        match field {
+            "p" => _current_pid = value.parse().ok(),
+            "c" => _current_name = Some(value.to_string()),
+            "n" => {
+                // Network connection: "*:3000" or "127.0.0.1:8080"
+                if let Some(port_str) = value.rsplit(':').next() {
                     if let Ok(port) = port_str.parse::<u16>() {
                         if !ports.contains(&port) {
                             ports.push(port);
@@ -87,6 +129,7 @@ fn try_lsof(dir_name: &str) -> Result<Vec<u16>> {
                     }
                 }
             }
+            _ => {}
         }
     }
 
