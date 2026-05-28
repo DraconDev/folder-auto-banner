@@ -242,6 +242,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             format!("{}{}{}", color(DIM), owner_padded, color(RESET))
         };
         let group_colored = format!("{}{}{}", color(DIM), group_padded, color(RESET));
+        let perm_colored = colorize_perms(&item.perms);
 
         // Color size: dim <1KB, normal 1KB-1MB, bold 1-100MB, bright+color >100MB
         let size_colored = if item.size > 100 * 1024 * 1024 {
