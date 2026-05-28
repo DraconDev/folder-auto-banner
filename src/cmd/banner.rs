@@ -228,7 +228,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
         // lsd/exa order: PERM OWNER GROUP SIZE DATE NAME
-        println!("{} {} {} {} {} {}{}",
+        println!("{} {} {} {} {} {}{}{}",
             perm_padded, owner_padded, group_padded, size_padded, modified,
             git_icon, icon_str, name_display);
     }
