@@ -36,6 +36,7 @@ const BINARY_EXTS: &[&str] = &[
     "woff", "woff2", "ttf", "eot",
     "pdf", "doc", "docx", "xls", "xlsx",
     "sqlite", "sqlite3", "db",
+    "lock",  // Cargo.lock, package-lock.json etc.
 ];
 
 /// Code metrics result

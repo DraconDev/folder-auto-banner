@@ -1,6 +1,6 @@
 //! Build status detection — checks if a project builds cleanly
 //!
-//! Runs language-specific build checks with a 500ms timeout.
+//! Runs language-specific build checks with a 2s timeout.
 //! Results are cached for 30 seconds.
 
 use anyhow::Result;
@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use super::fs::ProjectType;
 
-const BUILD_TIMEOUT: Duration = Duration::from_millis(500);
+const BUILD_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Build status result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,16 +159,12 @@ fn run_with_timeout(
 
     // Poll with short intervals up to timeout
     loop {
-        if let Some(status) = child.try_wait()? {
-            let stdout = child
-                .wait_with_output()
-                .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-                .unwrap_or_default();
-            let stderr = String::new(); // already consumed
+        if let Some(_status) = child.try_wait()? {
+            let output = child.wait_with_output()?;
             return Ok(CommandOutput {
-                status,
-                stdout,
-                stderr,
+                status: output.status,
+                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
             });
         }
 
