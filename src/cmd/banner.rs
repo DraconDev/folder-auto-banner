@@ -244,9 +244,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             size_padded
         };
 
-        // lsd/exa order: PERM OWNER GROUP CONTENTS SIZE DATE NAME
+        // PERM OWNER GROUP DATE CONTENTS SIZE NAME
         println!("{} {} {} {} {} {} {}{}{}",
-            perm_colored, owner_padded, group_padded, contents_padded, size_colored, modified,
+            perm_colored, owner_padded, group_padded, modified, contents_padded, size_colored,
             git_icon, icon_str, name_display);
     }
 
@@ -341,10 +341,15 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .unwrap_or(0)
 }
 
-/// Get contents description for a file — line count for text, resolution for image, empty for others
+/// Get contents description for a file — line count for text, resolution for image, etc.
 fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     let name = &entry.name;
     let lower = name.to_lowercase();
+
+    // Symlinks: show dash
+    if entry.is_symlink {
+        return String::new();
+    }
 
     // Image files: try to get resolution from header
     if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
@@ -352,6 +357,22 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
             if let Some(res) = extract_image_resolution(&bytes, &lower) {
                 return res;
             }
+        }
+    }
+
+    // ZIP files: count entries
+    if lower.ends_with(".zip") {
+        if let Ok(bytes) = std::fs::read(&entry.path) {
+            if let Some(count) = count_zip_entries(&bytes) {
+                return count.to_string();
+            }
+        }
+    }
+
+    // SQLite DB: show table count
+    if lower.ends_with(".db") || lower.ends_with(".sqlite") || lower.ends_with(".sqlite3") {
+        if let Some(count) = count_sqlite_tables(&entry.path) {
+            return format!("{}t", count);
         }
     }
 
