@@ -475,19 +475,17 @@ fn extract_video_duration(path: &std::path::Path) -> Option<String> {
     let mut file = std::fs::File::open(path).ok()?;
     let file_len = file.metadata().ok()?.len();
     
-    // For large files, read more from start (moov can be huge for long videos)
-    let start_read = if file_len > 500 * 1024 * 1024 {
-        50 * 1024 * 1024 // 50MB for very large files
-    } else if file_len > 100 * 1024 * 1024 {
-        20 * 1024 * 1024 // 20MB for files > 100MB
-    } else if file_len > 10 * 1024 * 1024 {
-        10 * 1024 * 1024 // 10MB for files > 10MB
-    } else {
-        file_len as usize
-    };
+    // For files under 100MB, just read the whole thing - fast and reliable
+    if file_len <= 100 * 1024 * 1024 {
+        let mut buf = Vec::with_capacity(file_len as usize);
+        file.read_to_end(&mut buf).ok()?;
+        return parse_mp4_duration(&buf);
+    }
     
-    let start_read = (start_read as u64).min(file_len) as usize;
-    let mut buf = vec![0u8; start_read];
+    // For very large files, read 50MB from start and 50MB from end
+    let chunk_size = 50 * 1024 * 1024;
+    
+    let mut buf = vec![0u8; chunk_size];
     let bytes_read = file.read(&mut buf).ok()?;
     buf.truncate(bytes_read);
     
@@ -495,20 +493,8 @@ fn extract_video_duration(path: &std::path::Path) -> Option<String> {
         return Some(dur);
     }
     
-    // If not found at start, try end of file
-    let end_read = if file_len > 500 * 1024 * 1024 {
-        50 * 1024 * 1024
-    } else if file_len > 100 * 1024 * 1024 {
-        20 * 1024 * 1024
-    } else if file_len > 10 * 1024 * 1024 {
-        10 * 1024 * 1024
-    } else {
-        file_len as usize
-    };
-    
-    let end_read = (end_read as u64).min(file_len) as usize;
-    file.seek(SeekFrom::Start(file_len - end_read as u64)).ok()?;
-    let mut buf = vec![0u8; end_read];
+    file.seek(SeekFrom::Start(file_len - chunk_size as u64)).ok()?;
+    let mut buf = vec![0u8; chunk_size];
     let bytes_read = file.read(&mut buf).ok()?;
     buf.truncate(bytes_read);
     
