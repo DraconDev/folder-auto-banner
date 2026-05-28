@@ -126,6 +126,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     if git_info.behind > 0 {
         git_status.push(format!("{}↓{}{}", color(RED), git_info.behind, color(RESET)));
     }
+    if git_info.stash_count > 0 {
+        git_status.push(format!("{}≡{}{}", color(MAGENTA), git_info.stash_count, color(RESET)));
+    }
+    if let Some(ref state) = git_info.merge_state {
+        git_status.push(format!("{}{}{}", color(RED), state, color(RESET)));
+    }
     let git_status_str = git_status.join(" ");
 
     let header = if git_info.is_repo {
@@ -135,12 +141,30 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         if !branch_display.is_empty() {
             parts.push(format!("{} │", branch_display));
         }
+        if let Some(ref tag) = git_info.tag {
+            parts.push(format!("{}{}{} │", color(YELLOW), tag, color(RESET)));
+        }
         parts.push(format!("{} │", project_label));
         parts.push(format!("{} │", size_str));
         parts.push(format!("{} files │", summary.files));
         parts.push(format!("{} dirs", summary.dirs));
         if !git_status_str.is_empty() {
             parts.push(format!("│ {}", git_status_str));
+        }
+        // Last commit info
+        if let (Some(ref hash), Some(ref msg)) = (&git_info.last_commit_hash, &git_info.last_commit_msg) {
+            let short_msg = if msg.len() > 30 {
+                format!("{}…", &msg[..29])
+            } else {
+                msg.clone()
+            };
+            parts.push(format!("│ {}{}{} {}", color(DIM), hash, color(RESET), short_msg));
+        }
+        // Diff stats
+        if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
+            parts.push(format!("│ {}+{}{} {}-{}{}", 
+                color(GREEN), git_info.lines_added, color(RESET),
+                color(RED), git_info.lines_deleted, color(RESET)));
         }
         parts.join(" ")
     } else {

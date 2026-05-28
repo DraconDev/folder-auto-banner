@@ -17,6 +17,12 @@ pub struct GitInfo {
     pub modified: usize,
     pub untracked: usize,
     pub last_commit_msg: Option<String>,
+    pub last_commit_hash: Option<String>,
+    pub stash_count: usize,
+    pub merge_state: Option<String>,
+    pub tag: Option<String>,
+    pub lines_added: usize,
+    pub lines_deleted: usize,
     pub is_dirty: bool,
     pub file_statuses: std::collections::HashMap<String, FileStatus>,
 }
@@ -57,9 +63,19 @@ impl FileStatus {
 
 /// Get Git info for a directory
 pub fn get_git_info(path: &Path) -> Result<GitInfo> {
-    let repo = match Repository::discover(path) {
+    let mut repo = match Repository::discover(path) {
         Ok(r) => r,
         Err(_) => return Ok(GitInfo::default()),
+    };
+
+    // Get stash count first (needs mutable borrow)
+    let stash_count = {
+        let mut count = 0;
+        let _ = repo.stash_foreach(|_, _, _| {
+            count += 1;
+            true
+        });
+        count
     };
 
     let head = repo.head().ok();
@@ -124,12 +140,76 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         (0, 0)
     };
 
-    // Get last commit message
-    let last_commit_msg = repo.head().ok().and_then(|h| {
+    // Get last commit message and hash
+    let (last_commit_msg, last_commit_hash) = repo.head().ok().and_then(|h| {
         h.peel_to_commit().ok()
-    }).and_then(|commit| {
-        commit.message().map(|m| m.lines().next().unwrap_or("").to_string())
+    }).map(|commit| {
+        let msg = commit.message().map(|m| m.lines().next().unwrap_or("").to_string());
+        let hash = commit.as_object().short_id().ok().map(|id| id.as_str().unwrap_or("").to_string());
+        (msg, hash)
+    }).unwrap_or((None, None));
+
+    // Get stash count
+    let stash_count = {
+        let mut count = 0;
+        let _ = repo.stash_foreach(|_, _, _| {
+            count += 1;
+            true
+        });
+        count
+    };
+
+    // Check merge/rebase state
+    let merge_state = if repo.state() == git2::RepositoryState::Merge {
+        Some("MERGING".to_string())
+    } else if repo.state() == git2::RepositoryState::Rebase
+        || repo.state() == git2::RepositoryState::RebaseInteractive
+        || repo.state() == git2::RepositoryState::RebaseMerge {
+        Some("REBASING".to_string())
+    } else if repo.state() == git2::RepositoryState::CherryPick {
+        Some("CHERRY-PICKING".to_string())
+    } else if repo.state() == git2::RepositoryState::Revert {
+        Some("REVERTING".to_string())
+    } else {
+        None
+    };
+
+    // Get tag at HEAD
+    let tag = repo.head().ok().and_then(|h| {
+        let head_oid = h.target()?;
+        // Check all tags
+        let tags = repo.tag_names(None).ok()?;
+        for tag_name in tags.iter().flatten() {
+            if let Ok(tag_ref) = repo.find_reference(&format!("refs/tags/{}", tag_name)) {
+                if tag_ref.target() == Some(head_oid) {
+                    return Some(tag_name.to_string());
+                }
+            }
+        }
+        None
     });
+
+    // Get diff stats (lines added/deleted)
+    let (lines_added, lines_deleted) = if let Ok(head) = repo.head() {
+        if let Ok(commit) = head.peel_to_commit() {
+            if let Ok(tree) = commit.tree() {
+                if let Ok(diff) = repo.diff_tree_to_workdir(Some(&tree), None) {
+                    let stats = diff.stats().ok();
+                    let added = stats.as_ref().map(|s| s.insertions()).unwrap_or(0);
+                    let deleted = stats.as_ref().map(|s| s.deletions()).unwrap_or(0);
+                    (added, deleted)
+                } else {
+                    (0, 0)
+                }
+            } else {
+                (0, 0)
+            }
+        } else {
+            (0, 0)
+        }
+    } else {
+        (0, 0)
+    };
 
     let is_dirty = staged > 0 || modified > 0 || untracked > 0;
 
@@ -142,6 +222,12 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         modified,
         untracked,
         last_commit_msg,
+        last_commit_hash,
+        stash_count,
+        merge_state,
+        tag,
+        lines_added,
+        lines_deleted,
         is_dirty,
         file_statuses,
     })
