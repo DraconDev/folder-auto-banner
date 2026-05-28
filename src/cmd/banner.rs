@@ -7,7 +7,7 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::fs::{DirSummary, format_size_compact, format_exact_time};
-use crate::git::GitInfo;
+use crate::git::{GitInfo, FileStatus};
 use crate::icon;
 
 // ANSI color codes
@@ -15,8 +15,14 @@ const RESET: &str = "\x1b[0m";
 const DIM: &str = "\x1b[2m";
 const BOLD: &str = "\x1b[1m";
 const BLUE: &str = "\x1b[34m";
+const BLUE_BOLD: &str = "\x1b[1;34m";
 const GREEN: &str = "\x1b[32m";
+const GREEN_BOLD: &str = "\x1b[1;32m";
+const YELLOW: &str = "\x1b[33m";
 const MAGENTA: &str = "\x1b[35m";
+const RED: &str = "\x1b[31m";
+const CYAN: &str = "\x1b[36m";
+const GRAY: &str = "\x1b[90m";
 
 /// Run the banner command
 pub fn run_banner(
@@ -64,46 +70,64 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let git_branch = git_info.branch.as_deref().unwrap_or("");
     let hidden_count = summary.top_items.iter().filter(|item| item.name.starts_with('.')).count();
 
-    let header = if git_info.is_repo {
-        let status_parts = [
-            if git_info.modified > 0 { format!("{} modified", git_info.modified) } else { String::new() },
-            if git_info.untracked > 0 { format!("{} untracked", git_info.untracked) } else { String::new() },
-            if git_info.staged > 0 { format!("{} staged", git_info.staged) } else { String::new() },
-            if git_info.ahead > 0 { format!("↑{}", git_info.ahead) } else { String::new() },
-            if git_info.behind > 0 { format!("↓{}", git_info.behind) } else { String::new() },
-        ].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" │ ");
-
-        if git_branch.is_empty() {
-            if status_parts.is_empty() {
-                format!("{} {} │ {} │ {} │ {} files │ {} dirs",
-                    project_icon, path_display, project_label, size_str,
-                    summary.files, summary.dirs)
-            } else {
-                format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {}",
-                    project_icon, path_display, project_label, size_str,
-                    summary.files, summary.dirs, status_parts)
-            }
+    // Build git branch with color: blue if clean, yellow if dirty
+    let branch_display = if !git_branch.is_empty() {
+        if git_info.is_dirty {
+            format!("{}[{}{}{}]", YELLOW, git_branch, YELLOW, RESET)
         } else {
-            if status_parts.is_empty() {
-                format!("{} {} [{}] │ {} │ {} │ {} files │ {} dirs",
-                    project_icon, path_display, git_branch, project_label, size_str,
-                    summary.files, summary.dirs)
-            } else {
-                format!("{} {} [{}] │ {} │ {} │ {} files │ {} dirs │ {}",
-                    project_icon, path_display, git_branch, project_label, size_str,
-                    summary.files, summary.dirs, status_parts)
-            }
+            format!("{}[{}{}{}]", BLUE_BOLD, git_branch, BLUE_BOLD, RESET)
         }
     } else {
-        if hidden_count > 0 {
-            format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} hidden │ {} total",
-                project_icon, path_display, project_label, size_str,
-                summary.files, summary.dirs, hidden_count, summary.total_items)
-        } else {
-            format!("{} {} │ {} │ {} │ {} files │ {} dirs │ {} items",
-                project_icon, path_display, project_label, size_str,
-                summary.files, summary.dirs, summary.total_items)
+        String::new()
+    };
+
+    // Build git status indicators (p10k-style)
+    let mut git_status = Vec::new();
+    if git_info.modified > 0 {
+        git_status.push(format!("{}*{}{}", YELLOW, git_info.modified, RESET));
+    }
+    if git_info.staged > 0 {
+        git_status.push(format!("{}+{}{}", GREEN, git_info.staged, RESET));
+    }
+    if git_info.untracked > 0 {
+        git_status.push(format!("{}?{}{}", DIM, git_info.untracked, RESET));
+    }
+    if git_info.ahead > 0 {
+        git_status.push(format!("{}↑{}{}", CYAN, git_info.ahead, RESET));
+    }
+    if git_info.behind > 0 {
+        git_status.push(format!("{}↓{}{}", RED, git_info.behind, RESET));
+    }
+    let git_status_str = git_status.join(" ");
+
+    let header = if git_info.is_repo {
+        let mut parts = vec![
+            format!("{} {} {}", project_icon, path_display, BOLD),
+        ];
+        if !branch_display.is_empty() {
+            parts.push(format!("{} │", branch_display));
         }
+        parts.push(format!("{} │", project_label));
+        parts.push(format!("{} │", size_str));
+        parts.push(format!("{} files │", summary.files));
+        parts.push(format!("{} dirs", summary.dirs));
+        if !git_status_str.is_empty() {
+            parts.push(format!("│ {}", git_status_str));
+        }
+        parts.join(" ")
+    } else {
+        let mut parts = vec![
+            format!("{} {} {}", project_icon, path_display, BOLD),
+        ];
+        parts.push(format!("{} │", project_label));
+        parts.push(format!("{} │", size_str));
+        parts.push(format!("{} files │", summary.files));
+        parts.push(format!("{} dirs", summary.dirs));
+        if hidden_count > 0 {
+            parts.push(format!("│ {} hidden", hidden_count));
+        }
+        parts.push(format!("│ {} total", summary.total_items));
+        parts.join(" ")
     };
 
     println!("{}", header);
