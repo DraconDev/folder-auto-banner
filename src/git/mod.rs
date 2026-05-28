@@ -78,7 +78,7 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
     if let Some(statuses) = statuses {
         for entry in statuses.iter() {
             let status = entry.status();
-            let path = entry.path().unwrap_or("").to_string();
+            let file_path = entry.path().unwrap_or("").to_string();
 
             if status.contains(git2::Status::INDEX_NEW)
                 || status.contains(git2::Status::INDEX_MODIFIED)
@@ -95,9 +95,8 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
                 } else {
                     FileStatus::Added
                 };
-                file_statuses.insert(path, fs);
-            }
-            if status.contains(git2::Status::WT_MODIFIED)
+                file_statuses.insert(file_path, fs);
+            } else if status.contains(git2::Status::WT_MODIFIED)
                 || status.contains(git2::Status::WT_DELETED)
                 || status.contains(git2::Status::WT_RENAMED)
             {
@@ -109,11 +108,10 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
                 } else {
                     FileStatus::Modified
                 };
-                file_statuses.insert(path, fs);
-            }
-            if status.contains(git2::Status::WT_NEW) {
+                file_statuses.insert(file_path, fs);
+            } else if status.contains(git2::Status::WT_NEW) {
                 untracked += 1;
-                file_statuses.insert(path, FileStatus::Untracked);
+                file_statuses.insert(file_path, FileStatus::Untracked);
             }
         }
     }

@@ -176,32 +176,37 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         max_size = max_size.max(size_str.len());
     }
 
-    // Print each row — compact lsd-style: PERM OWNER [icon] NAME  SIZE  MODIFIED
+    // Print each row — compact lsd-style with git status and rich colors
     for item in display_items {
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
-        // Color the name based on type
-        let name_color = if item.is_dir {
-            BLUE
+        // Per-file git status icon
+        let git_icon = git_info.file_statuses.get(item.name.as_str()).map(|fs| {
+            format!("{}{}{} ", fs.color(), fs.icon(), RESET)
+        }).unwrap_or_default();
+
+        // Color the name based on type (like lsd/exa)
+        let (name_prefix, name_suffix) = if item.is_dir {
+            (BLUE_BOLD, RESET)
         } else if item.is_symlink {
-            MAGENTA
+            (MAGENTA, RESET)
         } else if item.is_exec {
-            GREEN
+            (GREEN_BOLD, RESET)
         } else if item.name.starts_with('.') {
-            DIM
+            (DIM, RESET)
         } else {
-            ""
+            ("", "")
         };
 
         // Build name with optional symlink target
         let name_display = if item.is_symlink {
             if let Some(target) = &item.symlink_target {
-                format!("{}{}{} {}→{} {}", name_color, item.name, RESET, DIM, RESET, target)
+                format!("{}{}{} {}→{} {}", name_prefix, item.name, name_suffix, DIM, RESET, target)
             } else {
-                format!("{}{}{}", name_color, item.name, RESET)
+                format!("{}{}{}", name_prefix, item.name, name_suffix)
             }
         } else {
-            format!("{}{}{}", name_color, item.name, RESET)
+            format!("{}{}{}", name_prefix, item.name, name_suffix)
         };
 
         let size_or_count = if item.is_dir {
@@ -214,13 +219,13 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             .map(|dt| format_exact_time(dt))
             .unwrap_or_default();
 
-        // Pad PERM, OWNER, SIZE for alignment (name doesn't need padding)
+        // Pad PERM, OWNER, SIZE for alignment
         let perm_padded = format!("{:<width$}", item.perms, width = max_perm);
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
-        println!("{} {} {} {} {} {}",
-            perm_padded, owner_padded, icon_str, name_display, size_padded, modified);
+        println!("{} {} {} {}{} {} {}",
+            perm_padded, owner_padded, git_icon, icon_str, name_display, size_padded, modified);
     }
 
     if !show_hidden && !hidden_items.is_empty() {
