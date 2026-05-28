@@ -105,11 +105,28 @@ pub struct DirSummary {
     pub top_items: Vec<DirEntry>,
     pub project_type: ProjectType,
     pub last_modified: Option<DateTime<Utc>>,
+    pub build_status: Option<crate::build_status::BuildStatus>,
+    pub todo_info: Option<crate::todo_scanner::TodoInfo>,
+    pub code_metrics: Option<crate::code_metrics::CodeMetrics>,
+    pub port_info: Option<crate::port_usage::PortInfo>,
+    pub docker_info: Option<crate::docker::DockerInfo>,
 }
 
 impl DirSummary {
     /// Scan a directory and gather metadata
     pub fn scan(path: &Path) -> Result<Self> {
+        Self::scan_with_options(path, true, true, true, true, true)
+    }
+
+    /// Scan a directory with feature flags
+    pub fn scan_with_options(
+        path: &Path,
+        check_build: bool,
+        scan_todos: bool,
+        check_ports: bool,
+        check_docker: bool,
+        check_metrics: bool,
+    ) -> Result<Self> {
         let project_type = ProjectType::detect(path);
         let mut total_size: u64 = 0;
         let mut files = 0;

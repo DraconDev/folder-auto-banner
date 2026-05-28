@@ -104,7 +104,7 @@ fn run_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -> Result<Strin
     let mut child = command.spawn()?;
 
     loop {
-        if let Some(output) = child.try_wait()? {
+        if let Some(_output) = child.try_wait()? {
             let result = child.wait_with_output()?;
             return Ok(String::from_utf8_lossy(&result.stdout).to_string());
         }
