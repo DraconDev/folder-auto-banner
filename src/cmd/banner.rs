@@ -344,3 +344,21 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .map(|d| d.count())
         .unwrap_or(0)
 }
+
+/// Colorize permission string like exa — each char colored by meaning
+/// d=blue, l=magenta, r=green, w=yellow, x=red, -=dim
+fn colorize_perms(perms: &str) -> String {
+    let mut result = String::with_capacity(perms.len() * 10);
+    for c in perms.chars() {
+        match c {
+            'd' => result.push_str(&format!("{}d{}", color(BLUE_BOLD), color(RESET))),
+            'l' => result.push_str(&format!("{}l{}", color(MAGENTA), color(RESET))),
+            'r' => result.push_str(&format!("{}r{}", color(GREEN), color(RESET))),
+            'w' => result.push_str(&format!("{}w{}", color(YELLOW), color(RESET))),
+            'x' | 's' | 'S' | 't' | 'T' => result.push_str(&format!("{}{}{}", color(RED), c, color(RESET))),
+            '-' => result.push_str(&format!("{}-{}", color(DIM), color(RESET))),
+            _ => result.push(c),
+        }
+    }
+    result
+}
