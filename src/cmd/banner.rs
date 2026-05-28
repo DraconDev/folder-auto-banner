@@ -176,7 +176,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         max_size = max_size.max(size_str.len());
     }
 
-    // Print each row — compact lsd-style with git status and rich colors
+    // Print each row — lsd/exa order: PERM OWNER SIZE DATE NAME
     for item in display_items {
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
@@ -219,13 +219,14 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             .map(|dt| format_exact_time(dt))
             .unwrap_or_default();
 
-        // Pad PERM, OWNER, SIZE for alignment
+        // Pad columns for alignment
         let perm_padded = format!("{:<width$}", item.perms, width = max_perm);
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let size_padded = format!("{:>width$}", size_or_count, width = max_size);
 
-        println!("{} {} {} {}{} {} {}",
-            perm_padded, owner_padded, git_icon, icon_str, name_display, size_padded, modified);
+        // lsd/exa order: PERM OWNER SIZE DATE NAME
+        println!("{} {} {} {}  {} {}{}",
+            perm_padded, owner_padded, size_padded, modified, git_icon, icon_str, name_display);
     }
 
     if !show_hidden && !hidden_items.is_empty() {
