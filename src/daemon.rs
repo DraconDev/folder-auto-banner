@@ -294,7 +294,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
     let git_info = git::get_git_info(path).ok();
 
-    // Return immediately with empty dir_sizes — compute in background
+    // Return immediately — sizes come from global cache
     Ok(BannerData {
         path: path.to_path_buf(),
         summary,
@@ -302,67 +302,6 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
         dir_sizes: HashMap::new(),
         cached_at: chrono::Utc::now(),
     })
-}
-
-/// Compute directory sizes in background and update cache
-fn compute_dir_sizes_background(
-    path: PathBuf,
-    items: Vec<crate::fs::DirEntry>,
-    cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
-) {
-    thread::spawn(move || {
-        tracing::info!(
-            "Computing sizes for {} directories in {}",
-            items.len(),
-            path.display()
-        );
-
-        // Run du for all directories at once (much faster than one-by-one)
-        let mut du_args: Vec<String> = vec!["-s".to_string(), "--bytes".to_string()];
-        for item in &items {
-            du_args.push(item.path.to_string_lossy().to_string());
-        }
-
-        let mut dir_sizes = HashMap::new();
-
-        match std::process::Command::new("du").args(&du_args).output() {
-            Ok(output) => {
-                if !output.stderr.is_empty() {
-                    tracing::debug!(
-                        "du stderr: {}",
-                        String::from_utf8_lossy(&output.stderr).trim()
-                    );
-                }
-                if let Ok(stdout) = String::from_utf8(output.stdout) {
-                    for line in stdout.lines() {
-                        let parts: Vec<&str> = line.splitn(2, '\t').collect();
-                        if parts.len() >= 2 {
-                            if let Ok(size) = parts[0].parse::<u64>() {
-                                let dir_path = PathBuf::from(parts[1]);
-                                dir_sizes.insert(dir_path, size);
-                            }
-                        }
-                    }
-                }
-                tracing::info!(
-                    "Computed sizes for {} directories in {}",
-                    dir_sizes.len(),
-                    path.display()
-                );
-            }
-            Err(e) => {
-                tracing::error!("Failed to run du: {}", e);
-            }
-        }
-
-        // Update the cache entry with computed sizes
-        let mut cache = cache.lock().unwrap();
-        if let Some(entry) = cache.get_mut(&path) {
-            entry.data.dir_sizes = dir_sizes;
-        } else {
-            tracing::warn!("Cache entry for {} expired before sizes were computed", path.display());
-        }
-    });
 }
 
 fn compute_dir_size(path: &Path) -> u64 {
