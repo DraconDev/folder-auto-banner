@@ -511,7 +511,7 @@ fn output_rich(
 
         // Color the name based on type (like lsd/exa)
         let (name_prefix, name_suffix) = if item.is_dir {
-            (color(BLUE_BOLD), color(RESET))
+            (color(GREEN_BOLD), color(RESET))
         } else if item.is_symlink {
             (color(MAGENTA), color(RESET))
         } else if item.is_exec {
