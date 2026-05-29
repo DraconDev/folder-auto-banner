@@ -304,6 +304,19 @@ fn main() -> Result<()> {
         )
         .init();
 
+    // Set resource limits: low CPU priority and idle IO priority
+    #[cfg(unix)]
+    {
+        // nice: 10 = lower priority (range -20 to 19, higher = lower priority)
+        unsafe { libc::nice(10); }
+        // ionice: 3 = idle priority class
+        let _ = std::process::Command::new("ionice")
+            .args(["-c", "3", "-p", &std::process::id().to_string()])
+            .output();
+    }
+
+    tracing::info!("cfmd started with resource limits (nice=10, ionice=idle)");
+
     let daemon = Daemon::new()?;
     daemon.run()
 }

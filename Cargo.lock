@@ -261,6 +261,7 @@ dependencies = [
  "ignore",
  "indicatif",
  "inotify",
+ "libc",
  "path-absolutize",
  "serde",
  "serde_json",
