@@ -19,14 +19,14 @@
 
 - [x] Design daemon architecture (IPC, lifecycle, data structures)
 - [x] Create daemon binary (cfmd) with Unix socket server
+- [x] Implement inotify-based directory watching (recompute on change)
 - [x] Implement pre-computation: directory sizes, git status, TODO/LOC
 - [x] Implement IPC protocol (request/response for cached data)
 - [x] Modify banner to read from daemon cache (fallback to direct scan)
+- [x] Add daemon management commands (start, stop, status, restart, clear-cache)
+- [x] Add systemd/user service file for auto-start
+- [x] Add resource limits (nice=10, ionice=idle)
 - [x] Test: daemon startup, cache population, banner speed
-- [ ] Implement inotify-based directory watching (recompute on change)
-- [ ] Add daemon management commands (start, stop, status, restart)
-- [ ] Add systemd/user service file for auto-start
-- [ ] Add resource limits (CPU, memory, IO throttling)
 
 ## UX improvements
 
