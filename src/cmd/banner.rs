@@ -57,7 +57,32 @@ pub fn run_banner(
         .canonicalize()
         .unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
 
-    // Check env vars for disabling features
+    // Try daemon cache first (auto-start daemon if not running)
+    crate::daemon_client::ensure_daemon_running();
+    if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
+        // Use cached data — directory sizes from daemon are pre-computed
+        let mut summary = cached.summary;
+        // Inject daemon-computed directory sizes into items
+        for item in &mut summary.top_items {
+            if item.is_dir {
+                if let Some(&size) = cached.dir_sizes.get(&item.path) {
+                    item.size = size;
+                }
+            }
+        }
+        let git_info = cached.git_info.unwrap_or_default();
+
+        if json {
+            output_json(&path, &summary, &git_info);
+        } else if raw {
+            output_raw(&summary);
+        } else {
+            output_rich(&path, &summary, &git_info, compact, sort, reverse);
+        }
+        return Ok(());
+    }
+
+    // Fallback: direct scan (daemon not available)
     let _no_build_check =
         no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";
     let no_todos = no_todos || std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
