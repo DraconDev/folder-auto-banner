@@ -1105,9 +1105,22 @@ fn extract_webm_duration(path: &std::path::Path) -> Option<String> {
             if mins >= 60 {
                 let hours = mins / 60;
                 let mins = mins % 60;
-                return Some(format!("{}{}:{:02}:{:02}{}", color(BLUE), hours, mins, secs, color(RESET)));
+                return Some(format!(
+                    "{}{}:{:02}:{:02}{}",
+                    color(BLUE),
+                    hours,
+                    mins,
+                    secs,
+                    color(RESET)
+                ));
             } else if mins > 0 {
-                return Some(format!("{}{}:{:02}{}", color(BLUE), mins, secs, color(RESET)));
+                return Some(format!(
+                    "{}{}:{:02}{}",
+                    color(BLUE),
+                    mins,
+                    secs,
+                    color(RESET)
+                ));
             }
             return Some(format!("{}{}{}{}", color(BLUE), seconds, "s", color(RESET)));
         }
