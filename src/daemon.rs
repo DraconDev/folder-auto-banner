@@ -421,11 +421,13 @@ fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
         }
     }
 
-    // Also scan hidden dirs that are commonly large
-    for hidden in &[".cache", ".config", ".local", ".cargo", ".rustup", ".nix-profile"] {
-        let dir = home.join(hidden);
-        if dir.is_dir() {
-            dirs_to_scan.push(dir);
+    // Also scan ALL hidden dirs in home
+    if let Ok(entries) = std::fs::read_dir(&home) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') && entry.metadata().map(|m| m.is_dir()).unwrap_or(false) {
+                dirs_to_scan.push(entry.path());
+            }
         }
     }
 
