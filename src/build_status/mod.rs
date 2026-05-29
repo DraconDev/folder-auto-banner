@@ -74,7 +74,8 @@ fn check_node_build(path: &Path) -> Result<BuildStatus> {
     // Fall back to checking if package.json has a build script
     if let Ok(pkg) = std::fs::read_to_string(path.join("package.json")) {
         if pkg.contains("\"build\"") {
-            let output = run_with_timeout("npm", &["run", "build", "--dry-run"], path, BUILD_TIMEOUT)?;
+            let output =
+                run_with_timeout("npm", &["run", "build", "--dry-run"], path, BUILD_TIMEOUT)?;
             let ok = output.status.success();
             return Ok(BuildStatus {
                 ok,
@@ -111,11 +112,7 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
     // Find Python files to compile-check
     let py_files: Vec<String> = std::fs::read_dir(path)?
         .flatten()
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .ends_with(".py")
-        })
+        .filter(|e| e.file_name().to_string_lossy().ends_with(".py"))
         .map(|e| e.path().to_string_lossy().to_string())
         .take(50)
         .collect();

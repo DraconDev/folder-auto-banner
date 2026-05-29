@@ -29,14 +29,11 @@ const SKIP_DIRS: &[&str] = &[
 ];
 
 const BINARY_EXTS: &[&str] = &[
-    "exe", "bin", "o", "so", "dll", "dylib", "a", "lib", "obj", "pdb",
-    "png", "jpg", "jpeg", "gif", "webp", "ico", "svg", "bmp", "tiff",
-    "mp3", "mp4", "avi", "mkv", "mov", "webm", "flac", "wav", "ogg",
-    "zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz",
-    "woff", "woff2", "ttf", "eot",
-    "pdf", "doc", "docx", "xls", "xlsx",
-    "sqlite", "sqlite3", "db",
-    "lock",  // Cargo.lock, package-lock.json etc.
+    "exe", "bin", "o", "so", "dll", "dylib", "a", "lib", "obj", "pdb", "png", "jpg", "jpeg", "gif",
+    "webp", "ico", "svg", "bmp", "tiff", "mp3", "mp4", "avi", "mkv", "mov", "webm", "flac", "wav",
+    "ogg", "zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz", "woff", "woff2", "ttf", "eot",
+    "pdf", "doc", "docx", "xls", "xlsx", "sqlite", "sqlite3", "db",
+    "lock", // Cargo.lock, package-lock.json etc.
 ];
 
 /// Code metrics result

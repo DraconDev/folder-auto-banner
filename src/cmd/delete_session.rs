@@ -15,7 +15,7 @@ pub fn run_delete_session(name: &str) -> Result<()> {
     let sessions_dir = proj_dirs.data_dir().join("sessions");
 
     let session_file = sessions_dir.join(format!("{}.json", sanitize_filename(name)));
-    
+
     if !session_file.exists() {
         println!("❌ Session '{}' not found", name);
         println!("💡 Use 'fm sessions' to see available sessions");
@@ -30,6 +30,12 @@ pub fn run_delete_session(name: &str) -> Result<()> {
 
 fn sanitize_filename(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }

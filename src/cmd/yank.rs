@@ -1,11 +1,11 @@
 //! Yank command — copy files to clipboard
-//! 
+//!
 //! Stores file paths in ~/.local/share/cfm/clipboard.json
 
 use anyhow::Result;
 use std::path::PathBuf;
 
-use crate::state::{ClipboardState, ClipboardEntry};
+use crate::state::{ClipboardEntry, ClipboardState};
 
 pub fn run_yank(paths: &[PathBuf]) -> Result<()> {
     if paths.is_empty() {
@@ -15,10 +15,10 @@ pub fn run_yank(paths: &[PathBuf]) -> Result<()> {
 
     // Load existing clipboard or create new
     let mut state = ClipboardState::load().unwrap_or_default();
-    
+
     // Get current directory for relative path resolution
     let cwd = std::env::current_dir()?;
-    
+
     // Resolve and validate all paths
     let mut valid_paths = Vec::new();
     for path in paths {
@@ -27,7 +27,7 @@ pub fn run_yank(paths: &[PathBuf]) -> Result<()> {
         } else {
             cwd.join(path)
         };
-        
+
         if resolved.exists() {
             valid_paths.push(resolved);
         } else {

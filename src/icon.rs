@@ -86,9 +86,7 @@ fn exact_name_icon(name: &str, use_nerd: bool) -> Option<String> {
             Some(nerd_or_emoji("\u{f72b}", "📖", use_nerd))
         }
         "changelog.md" | "changelog" => Some(nerd_or_emoji("\u{f72b}", "📋", use_nerd)),
-        "license" | "license.md" | "license.txt" => {
-            Some(nerd_or_emoji("\u{f719}", "📜", use_nerd))
-        }
+        "license" | "license.md" | "license.txt" => Some(nerd_or_emoji("\u{f719}", "📜", use_nerd)),
         "todo.md" => Some(nerd_or_emoji("\u{f4a3}", "📝", use_nerd)),
 
         // Nix
@@ -129,9 +127,7 @@ fn extension_icon(ext: &str, use_nerd: bool) -> Option<String> {
 
         // Web
         ".html" | ".htm" => Some(nerd_or_emoji("\u{f6a8}", "🌐", use_nerd)),
-        ".css" | ".scss" | ".sass" | ".less" => {
-            Some(nerd_or_emoji("\u{f368}", "🎨", use_nerd))
-        }
+        ".css" | ".scss" | ".sass" | ".less" => Some(nerd_or_emoji("\u{f368}", "🎨", use_nerd)),
         ".vue" => Some(nerd_or_emoji("\u{f584}", "💚", use_nerd)),
         ".svelte" => Some(nerd_or_emoji("\u{e73c}", "🧡", use_nerd)),
 
@@ -143,9 +139,7 @@ fn extension_icon(ext: &str, use_nerd: bool) -> Option<String> {
         ".ini" | ".conf" | ".cfg" => Some(nerd_or_emoji("\u{f724}", "📋", use_nerd)),
 
         // Shell / scripts
-        ".sh" | ".bash" | ".zsh" | ".fish" => {
-            Some(nerd_or_emoji("\u{e795}", "🐚", use_nerd))
-        }
+        ".sh" | ".bash" | ".zsh" | ".fish" => Some(nerd_or_emoji("\u{e795}", "🐚", use_nerd)),
         ".ps1" | ".bat" | ".cmd" => Some(nerd_or_emoji("\u{e795}", "🐚", use_nerd)),
 
         // Docs / text
@@ -155,9 +149,8 @@ fn extension_icon(ext: &str, use_nerd: bool) -> Option<String> {
         ".doc" | ".docx" | ".odt" => Some(nerd_or_emoji("\u{f724}", "📘", use_nerd)),
 
         // Images
-        ".png" | ".jpg" | ".jpeg" | ".gif" | ".svg" | ".webp" | ".ico" | ".bmp" | ".tiff" | ".avif" => {
-            Some(nerd_or_emoji("\u{f1c5}", "🖼️", use_nerd))
-        }
+        ".png" | ".jpg" | ".jpeg" | ".gif" | ".svg" | ".webp" | ".ico" | ".bmp" | ".tiff"
+        | ".avif" => Some(nerd_or_emoji("\u{f1c5}", "🖼️", use_nerd)),
 
         // Audio
         ".mp3" | ".wav" | ".flac" | ".ogg" | ".aac" | ".m4a" => {
@@ -175,15 +168,11 @@ fn extension_icon(ext: &str, use_nerd: bool) -> Option<String> {
         }
 
         // Binary / build
-        ".o" | ".so" | ".dll" | ".dylib" | ".a" => {
-            Some(nerd_or_emoji("\u{f12f}", "🔧", use_nerd))
-        }
+        ".o" | ".so" | ".dll" | ".dylib" | ".a" => Some(nerd_or_emoji("\u{f12f}", "🔧", use_nerd)),
         ".exe" | ".bin" | ".wasm" => Some(nerd_or_emoji("\u{e0e9}", "⚡", use_nerd)),
 
         // Database
-        ".db" | ".sqlite" | ".sqlite3" => {
-            Some(nerd_or_emoji("\u{f1c0}", "🗃️", use_nerd))
-        }
+        ".db" | ".sqlite" | ".sqlite3" => Some(nerd_or_emoji("\u{f1c0}", "🗃️", use_nerd)),
 
         // Lock files
         ".lock" => Some(nerd_or_emoji("\u{f023}", "🔒", use_nerd)),

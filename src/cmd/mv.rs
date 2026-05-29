@@ -1,12 +1,11 @@
 //! Move command — move files with collision detection
-//! 
+//!
 //! Usage: fm mv [options] <source> <dest>
 //!        fm mv [options] <source>... <dest_dir>
 
 use anyhow::Result;
-use std::path::{PathBuf, Path};
 use std::fs;
-
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub enum CollisionAction {
@@ -43,7 +42,8 @@ pub fn run_mv(
         }
 
         let dest_path = if dest_is_dir {
-            let file_name = source.file_name()
+            let file_name = source
+                .file_name()
                 .ok_or_else(|| anyhow::anyhow!("Invalid source: {}", source.display()))?;
             dest.join(file_name)
         } else {
@@ -88,9 +88,11 @@ fn perform_move(source: &Path, dest: &Path, verbose: bool) -> Result<()> {
     match fs::rename(source, dest) {
         Ok(_) => {
             if verbose {
-                println!("✓ {} -> {}", 
+                println!(
+                    "✓ {} -> {}",
                     source.file_name().unwrap_or_default().to_string_lossy(),
-                    dest.file_name().unwrap_or_default().to_string_lossy());
+                    dest.file_name().unwrap_or_default().to_string_lossy()
+                );
             }
             Ok(())
         }
@@ -103,9 +105,11 @@ fn perform_move(source: &Path, dest: &Path, verbose: bool) -> Result<()> {
             }
             delete_recursive(source)?;
             if verbose {
-                println!("✓ {} -> {} (cross-device)", 
+                println!(
+                    "✓ {} -> {} (cross-device)",
                     source.file_name().unwrap_or_default().to_string_lossy(),
-                    dest.file_name().unwrap_or_default().to_string_lossy());
+                    dest.file_name().unwrap_or_default().to_string_lossy()
+                );
             }
             Ok(())
         }
@@ -120,7 +124,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
         let ty = entry.file_type()?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
-        
+
         if ty.is_dir() {
             copy_dir_recursive(&src_path, &dst_path)?;
         } else {
@@ -155,7 +159,12 @@ fn generate_unique_name(path: &Path) -> PathBuf {
     let mut counter = 1;
     loop {
         let new_name = match ext.as_ref() {
-            Some(ext) => format!("{stem} ({counter}).{ext}", stem = stem, counter = counter, ext = ext),
+            Some(ext) => format!(
+                "{stem} ({counter}).{ext}",
+                stem = stem,
+                counter = counter,
+                ext = ext
+            ),
             None => format!("{} ({})", stem, counter),
         };
         let new_path = parent.join(&new_name);

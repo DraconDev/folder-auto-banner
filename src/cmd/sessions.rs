@@ -26,11 +26,11 @@ pub fn run_sessions() -> Result<()> {
 
     // Read all session files
     let mut sessions: Vec<Session> = Vec::new();
-    
+
     for entry in fs::read_dir(&sessions_dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.extension().map(|e| e == "json").unwrap_or(false) {
             if let Ok(content) = fs::read_to_string(&path) {
                 if let Ok(session) = serde_json::from_str::<Session>(&content) {
@@ -54,12 +54,16 @@ pub fn run_sessions() -> Result<()> {
 
     for session in &sessions {
         let exists = if session.cwd.exists() { "✓" } else { "✗" };
-        let branch = session.git_branch.as_ref().map(|b| format!(" [{}]", b)).unwrap_or_default();
-        
+        let branch = session
+            .git_branch
+            .as_ref()
+            .map(|b| format!(" [{}]", b))
+            .unwrap_or_default();
+
         println!("  📁 {} {}{}", exists, session.name, branch);
         println!("     Path: {}", session.cwd.display());
         println!("     Saved: {}", session.timestamp);
-        
+
         if let Some(ref desc) = session.description {
             println!("     Note: {}", desc);
         }

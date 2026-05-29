@@ -1,5 +1,5 @@
 //! Diff command — compare two directories
-//! 
+//!
 //! Shows differences between two directories:
 //! - Unique files to each
 //! - Modified files (different content)
@@ -23,22 +23,39 @@ pub fn run_diff(dir1: &Path, dir2: &Path, shallow: bool, json: bool) -> Result<(
     // Scan both directories
     let files1 = scan_dir(dir1, shallow);
     let files2 = scan_dir(dir2, shallow);
-    
+
     let keys1: Vec<_> = files1.keys().cloned().collect();
     let keys2: Vec<_> = files2.keys().cloned().collect();
-    
+
     let keys1_set: std::collections::HashSet<_> = keys1.iter().collect();
     let keys2_set: std::collections::HashSet<_> = keys2.iter().collect();
-    
+
     // Find unique and common files
-    let unique_to_1: Vec<String> = keys1_set.difference(&keys2_set).map(|s| (*s).clone()).collect();
-    let unique_to_2: Vec<String> = keys2_set.difference(&keys1_set).map(|s| (*s).clone()).collect();
-    let common: Vec<String> = keys1_set.intersection(&keys2_set).map(|s| (*s).clone()).collect();
+    let unique_to_1: Vec<String> = keys1_set
+        .difference(&keys2_set)
+        .map(|s| (*s).clone())
+        .collect();
+    let unique_to_2: Vec<String> = keys2_set
+        .difference(&keys1_set)
+        .map(|s| (*s).clone())
+        .collect();
+    let common: Vec<String> = keys1_set
+        .intersection(&keys2_set)
+        .map(|s| (*s).clone())
+        .collect();
 
     if json {
         output_json(dir1, dir2, &unique_to_1, &unique_to_2, &common);
     } else {
-        output_rich(dir1, dir2, &unique_to_1, &unique_to_2, &common, &files1, &files2);
+        output_rich(
+            dir1,
+            dir2,
+            &unique_to_1,
+            &unique_to_2,
+            &common,
+            &files1,
+            &files2,
+        );
     }
 
     Ok(())
@@ -77,7 +94,7 @@ fn scan_dir_recursive(
             Ok(p) => p.to_string_lossy().to_string(),
             Err(_) => continue,
         };
-        
+
         if relative.is_empty() || relative.starts_with('.') {
             continue;
         }
@@ -107,16 +124,30 @@ fn output_rich(
     // Summary
     println!();
     println!("📊 SUMMARY");
-    println!("  {} only:     {}", dir1.file_name().unwrap_or_default().to_string_lossy(), unique_to_1.len());
-    println!("  {} only:     {}", dir2.file_name().unwrap_or_default().to_string_lossy(), unique_to_2.len());
+    println!(
+        "  {} only:     {}",
+        dir1.file_name().unwrap_or_default().to_string_lossy(),
+        unique_to_1.len()
+    );
+    println!(
+        "  {} only:     {}",
+        dir2.file_name().unwrap_or_default().to_string_lossy(),
+        unique_to_2.len()
+    );
     println!("  Common:     {}", common.len());
 
     // Unique to dir1
     if !unique_to_1.is_empty() {
         println!();
-        println!("📁 Only in {}:", dir1.file_name().unwrap_or_default().to_string_lossy());
+        println!(
+            "📁 Only in {}:",
+            dir1.file_name().unwrap_or_default().to_string_lossy()
+        );
         for file in unique_to_1.iter().take(20) {
-            let size = files1.get(file).map(|f| format_size(f.size)).unwrap_or_default();
+            let size = files1
+                .get(file)
+                .map(|f| format_size(f.size))
+                .unwrap_or_default();
             println!("  + {} ({})", file, size);
         }
         if unique_to_1.len() > 20 {
@@ -127,9 +158,15 @@ fn output_rich(
     // Unique to dir2
     if !unique_to_2.is_empty() {
         println!();
-        println!("📁 Only in {}:", dir2.file_name().unwrap_or_default().to_string_lossy());
+        println!(
+            "📁 Only in {}:",
+            dir2.file_name().unwrap_or_default().to_string_lossy()
+        );
         for file in unique_to_2.iter().take(20) {
-            let size = files2.get(file).map(|f| format_size(f.size)).unwrap_or_default();
+            let size = files2
+                .get(file)
+                .map(|f| format_size(f.size))
+                .unwrap_or_default();
             println!("  + {} ({})", file, size);
         }
         if unique_to_2.len() > 20 {
@@ -138,7 +175,8 @@ fn output_rich(
     }
 
     // Check common files for size differences
-    let size_diff: Vec<&String> = common.iter()
+    let size_diff: Vec<&String> = common
+        .iter()
         .filter(|f| {
             let s1 = files1.get(*f).map(|i| i.size).unwrap_or(0);
             let s2 = files2.get(*f).map(|i| i.size).unwrap_or(0);
@@ -154,9 +192,10 @@ fn output_rich(
             let s2 = files2.get(*file).map(|i| i.size).unwrap_or(0);
             let diff = s2 as i64 - s1 as i64;
             let sign = if diff > 0 { "+" } else { "" };
-            println!("  {} {} → {} ({}{})", 
-                file, 
-                format_size(s1), 
+            println!(
+                "  {} {} → {} ({}{})",
+                file,
+                format_size(s1),
                 format_size(s2),
                 sign,
                 format_size(diff.unsigned_abs())
@@ -171,7 +210,7 @@ fn format_size(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
     const GB: u64 = MB * 1024;
-    
+
     if bytes >= GB {
         format!("{:.1} GB", bytes as f64 / GB as f64)
     } else if bytes >= MB {

@@ -1,5 +1,5 @@
 //! Git integration — branch, status, ahead/behind, dirty state
-//! 
+//!
 //! Uses git2 crate for fast, native Git operations.
 
 use anyhow::Result;
@@ -51,12 +51,12 @@ impl FileStatus {
 
     pub fn color(&self) -> &'static str {
         match self {
-            FileStatus::Modified => "\x1b[33m",   // yellow
-            FileStatus::Added => "\x1b[32m",      // green
-            FileStatus::Deleted => "\x1b[31m",    // red
-            FileStatus::Renamed => "\x1b[36m",    // cyan
-            FileStatus::Untracked => "\x1b[2m",   // dim
-            FileStatus::Conflict => "\x1b[31m",   // red
+            FileStatus::Modified => "\x1b[33m", // yellow
+            FileStatus::Added => "\x1b[32m",    // green
+            FileStatus::Deleted => "\x1b[31m",  // red
+            FileStatus::Renamed => "\x1b[36m",  // cyan
+            FileStatus::Untracked => "\x1b[2m", // dim
+            FileStatus::Conflict => "\x1b[31m", // red
         }
     }
 }
@@ -80,9 +80,9 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
 
     let head = repo.head().ok();
 
-    let branch = head.as_ref().and_then(|h| {
-        h.shorthand().map(|s| s.to_string())
-    });
+    let branch = head
+        .as_ref()
+        .and_then(|h| h.shorthand().map(|s| s.to_string()));
 
     // Get status
     let mut staged = 0;
@@ -138,10 +138,11 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
             // Try to find upstream branch
             let branch_name = head.shorthand().unwrap_or("");
             let upstream_ref_name = format!("refs/remotes/origin/{}", branch_name);
-            
+
             if let Ok(upstream_ref) = repo.find_reference(&upstream_ref_name) {
                 if let Some(upstream_oid) = upstream_ref.target() {
-                    repo.graph_ahead_behind(head_oid, upstream_oid).unwrap_or((0, 0))
+                    repo.graph_ahead_behind(head_oid, upstream_oid)
+                        .unwrap_or((0, 0))
                 } else {
                     (0, 0)
                 }
@@ -156,20 +157,30 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
     };
 
     // Get last commit message and hash
-    let (last_commit_msg, last_commit_hash) = repo.head().ok().and_then(|h| {
-        h.peel_to_commit().ok()
-    }).map(|commit| {
-        let msg = commit.message().map(|m| m.lines().next().unwrap_or("").to_string());
-        let hash = commit.as_object().short_id().ok().map(|id| id.as_str().unwrap_or("").to_string());
-        (msg, hash)
-    }).unwrap_or((None, None));
+    let (last_commit_msg, last_commit_hash) = repo
+        .head()
+        .ok()
+        .and_then(|h| h.peel_to_commit().ok())
+        .map(|commit| {
+            let msg = commit
+                .message()
+                .map(|m| m.lines().next().unwrap_or("").to_string());
+            let hash = commit
+                .as_object()
+                .short_id()
+                .ok()
+                .map(|id| id.as_str().unwrap_or("").to_string());
+            (msg, hash)
+        })
+        .unwrap_or((None, None));
 
     // Check merge/rebase state
     let merge_state = if repo.state() == git2::RepositoryState::Merge {
         Some("MERGING".to_string())
     } else if repo.state() == git2::RepositoryState::Rebase
         || repo.state() == git2::RepositoryState::RebaseInteractive
-        || repo.state() == git2::RepositoryState::RebaseMerge {
+        || repo.state() == git2::RepositoryState::RebaseMerge
+    {
         Some("REBASING".to_string())
     } else if repo.state() == git2::RepositoryState::CherryPick {
         Some("CHERRY-PICKING".to_string())

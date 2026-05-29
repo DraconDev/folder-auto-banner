@@ -4,16 +4,20 @@
 //! This is the main feature that makes cfm magical.
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use std::path::Path;
-use chrono::{Utc, DateTime};
 
-use crate::fs::{DirSummary, format_size_compact, format_exact_time};
+use crate::fs::{format_exact_time, format_size_compact, DirSummary};
 use crate::git::GitInfo;
 use crate::icon;
 
 // ANSI color codes — only emitted when stdout is a tty
 fn color(code: &str) -> &str {
-    if atty::is(atty::Stream::Stdout) { code } else { "" }
+    if atty::is(atty::Stream::Stdout) {
+        code
+    } else {
+        ""
+    }
 }
 
 const RESET: &str = "\x1b[0m";
@@ -34,7 +38,7 @@ const WHITE: &str = "\x1b[97m";
 fn colorize_date(dt: &DateTime<Utc>, formatted: &str) -> String {
     let now = Utc::now();
     let age = now.signed_duration_since(*dt);
-    
+
     let code = if age.num_days() == 0 {
         WHITE // today - bright white
     } else if age.num_days() <= 7 {
@@ -44,7 +48,7 @@ fn colorize_date(dt: &DateTime<Utc>, formatted: &str) -> String {
     } else {
         DIM // older - dim
     };
-    
+
     if code.is_empty() {
         formatted.to_string()
     } else {
@@ -67,10 +71,14 @@ pub fn run_banner(
     reverse: bool,
 ) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    let path = path.unwrap_or(cwd.as_path()).canonicalize().unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
+    let path = path
+        .unwrap_or(cwd.as_path())
+        .canonicalize()
+        .unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
 
     // Check env vars for disabling features
-    let no_build_check = no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";
+    let no_build_check =
+        no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";
     let no_todos = no_todos || std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
     let no_ports = no_ports || std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
     let no_docker = no_docker || std::env::var("CFM_NO_DOCKER").unwrap_or_default() == "1";
@@ -98,7 +106,14 @@ pub fn run_banner(
 }
 
 /// Output rich formatted banner — compact lsd-style layout
-fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: bool, sort: Option<&str>, reverse: bool) {
+fn output_rich(
+    path: &Path,
+    summary: &DirSummary,
+    git_info: &GitInfo,
+    _compact: bool,
+    sort: Option<&str>,
+    reverse: bool,
+) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
@@ -117,14 +132,30 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     };
 
     let git_branch = git_info.branch.as_deref().unwrap_or("");
-    let hidden_count = summary.top_items.iter().filter(|item| item.name.starts_with('.')).count();
+    let hidden_count = summary
+        .top_items
+        .iter()
+        .filter(|item| item.name.starts_with('.'))
+        .count();
 
     // Build git branch with color: blue if clean, yellow if dirty
     let branch_display = if !git_branch.is_empty() {
         if git_info.is_dirty {
-            format!("{}[{}{}{}]", color(YELLOW), git_branch, color(YELLOW), color(RESET))
+            format!(
+                "{}[{}{}{}]",
+                color(YELLOW),
+                git_branch,
+                color(YELLOW),
+                color(RESET)
+            )
         } else {
-            format!("{}[{}{}{}]", color(BLUE_BOLD), git_branch, color(BLUE_BOLD), color(RESET))
+            format!(
+                "{}[{}{}{}]",
+                color(BLUE_BOLD),
+                git_branch,
+                color(BLUE_BOLD),
+                color(RESET)
+            )
         }
     } else {
         String::new()
@@ -133,22 +164,52 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     // Build git status indicators (p10k-style)
     let mut git_status = Vec::new();
     if git_info.modified > 0 {
-        git_status.push(format!("{}*{}{}", color(YELLOW), git_info.modified, color(RESET)));
+        git_status.push(format!(
+            "{}*{}{}",
+            color(YELLOW),
+            git_info.modified,
+            color(RESET)
+        ));
     }
     if git_info.staged > 0 {
-        git_status.push(format!("{}+{}{}", color(GREEN), git_info.staged, color(RESET)));
+        git_status.push(format!(
+            "{}+{}{}",
+            color(GREEN),
+            git_info.staged,
+            color(RESET)
+        ));
     }
     if git_info.untracked > 0 {
-        git_status.push(format!("{}?{}{}", color(DIM), git_info.untracked, color(RESET)));
+        git_status.push(format!(
+            "{}?{}{}",
+            color(DIM),
+            git_info.untracked,
+            color(RESET)
+        ));
     }
     if git_info.ahead > 0 {
-        git_status.push(format!("{}↑{}{}", color(CYAN), git_info.ahead, color(RESET)));
+        git_status.push(format!(
+            "{}↑{}{}",
+            color(CYAN),
+            git_info.ahead,
+            color(RESET)
+        ));
     }
     if git_info.behind > 0 {
-        git_status.push(format!("{}↓{}{}", color(RED), git_info.behind, color(RESET)));
+        git_status.push(format!(
+            "{}↓{}{}",
+            color(RED),
+            git_info.behind,
+            color(RESET)
+        ));
     }
     if git_info.stash_count > 0 {
-        git_status.push(format!("{}≡{}{}", color(MAGENTA), git_info.stash_count, color(RESET)));
+        git_status.push(format!(
+            "{}≡{}{}",
+            color(MAGENTA),
+            git_info.stash_count,
+            color(RESET)
+        ));
     }
     if let Some(ref state) = git_info.merge_state {
         git_status.push(format!("{}{}{}", color(RED), state, color(RESET)));
@@ -156,9 +217,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let git_status_str = git_status.join(" ");
 
     let header = if git_info.is_repo {
-        let mut parts = vec![
-            format!("{} {} {}", project_icon, path_display, color(BOLD)),
-        ];
+        let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
         if !branch_display.is_empty() {
             parts.push(format!("{} │", branch_display));
         }
@@ -182,28 +241,53 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
                 } else {
                     String::new()
                 };
-                parts.push(format!("│ {}✗ build errors{}{}", color(RED), err_str, color(RESET)));
+                parts.push(format!(
+                    "│ {}✗ build errors{}{}",
+                    color(RED),
+                    err_str,
+                    color(RESET)
+                ));
             }
         }
         // TODO count
         if let Some(ref todos) = summary.todo_info {
             if todos.count > 0 {
-                parts.push(format!("│ {}📝 {} TODOs{}", color(YELLOW), todos.count, color(RESET)));
+                parts.push(format!(
+                    "│ {}📝 {} TODOs{}",
+                    color(YELLOW),
+                    todos.count,
+                    color(RESET)
+                ));
             }
         }
         // Port usage
         if let Some(ref ports) = summary.port_info {
             if !ports.ports.is_empty() {
                 let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                parts.push(format!("│ {}🔌 {}{}", color(CYAN), port_str.join(", "), color(RESET)));
+                parts.push(format!(
+                    "│ {}🔌 {}{}",
+                    color(CYAN),
+                    port_str.join(", "),
+                    color(RESET)
+                ));
             }
         }
         // Docker info
         if let Some(ref docker) = summary.docker_info {
-            let running = docker.containers.iter().filter(|c| c.status.contains("Up")).count();
+            let running = docker
+                .containers
+                .iter()
+                .filter(|c| c.status.contains("Up"))
+                .count();
             let total = docker.containers.len();
             if total > 0 {
-                parts.push(format!("│ {}🐳 {} containers ({} running){}", color(BLUE), total, running, color(RESET)));
+                parts.push(format!(
+                    "│ {}🐳 {} containers ({} running){}",
+                    color(BLUE),
+                    total,
+                    running,
+                    color(RESET)
+                ));
             } else if docker.has_compose || docker.has_dockerfile {
                 parts.push(format!("│ {}🐳 docker{}", color(DIM), color(RESET)));
             }
@@ -213,36 +297,61 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             if metrics.total_loc > 0 {
                 let loc_str = format_loc(metrics.total_loc);
                 if metrics.by_extension.len() > 1 {
-                    let ext_str: Vec<String> = metrics.by_extension.iter()
+                    let ext_str: Vec<String> = metrics
+                        .by_extension
+                        .iter()
                         .take(3)
                         .map(|(ext, loc)| format!("{}: {}", ext, format_loc(*loc)))
                         .collect();
-                    parts.push(format!("│ {}📊 {} LOC ({}){}", color(GREEN), loc_str, ext_str.join(", "), color(RESET)));
+                    parts.push(format!(
+                        "│ {}📊 {} LOC ({}){}",
+                        color(GREEN),
+                        loc_str,
+                        ext_str.join(", "),
+                        color(RESET)
+                    ));
                 } else {
-                    parts.push(format!("│ {}📊 {} LOC{}", color(GREEN), loc_str, color(RESET)));
+                    parts.push(format!(
+                        "│ {}📊 {} LOC{}",
+                        color(GREEN),
+                        loc_str,
+                        color(RESET)
+                    ));
                 }
             }
         }
         // Last commit info
-        if let (Some(ref hash), Some(ref msg)) = (&git_info.last_commit_hash, &git_info.last_commit_msg) {
+        if let (Some(ref hash), Some(ref msg)) =
+            (&git_info.last_commit_hash, &git_info.last_commit_msg)
+        {
             let short_msg = if msg.len() > 30 {
                 format!("{}…", &msg[..29])
             } else {
                 msg.clone()
             };
-            parts.push(format!("│ {}{}{} {}", color(DIM), hash, color(RESET), short_msg));
+            parts.push(format!(
+                "│ {}{}{} {}",
+                color(DIM),
+                hash,
+                color(RESET),
+                short_msg
+            ));
         }
         // Diff stats
         if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
-            parts.push(format!("│ {}+{}{} {}-{}{}", 
-                color(GREEN), git_info.lines_added, color(RESET),
-                color(RED), git_info.lines_deleted, color(RESET)));
+            parts.push(format!(
+                "│ {}+{}{} {}-{}{}",
+                color(GREEN),
+                git_info.lines_added,
+                color(RESET),
+                color(RED),
+                git_info.lines_deleted,
+                color(RESET)
+            ));
         }
         parts.join(" ")
     } else {
-        let mut parts = vec![
-            format!("{} {} {}", project_icon, path_display, color(BOLD)),
-        ];
+        let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
         parts.push(format!("{} │", project_label));
         parts.push(format!("{} │", size_str));
         parts.push(format!("{} files │", summary.files));
@@ -261,22 +370,42 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         // TODO count (non-git)
         if let Some(ref todos) = summary.todo_info {
             if todos.count > 0 {
-                parts.push(format!("│ {}📝 {} TODOs{}", color(YELLOW), todos.count, color(RESET)));
+                parts.push(format!(
+                    "│ {}📝 {} TODOs{}",
+                    color(YELLOW),
+                    todos.count,
+                    color(RESET)
+                ));
             }
         }
         // Port usage (non-git)
         if let Some(ref ports) = summary.port_info {
             if !ports.ports.is_empty() {
                 let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                parts.push(format!("│ {}🔌 {}{}", color(CYAN), port_str.join(", "), color(RESET)));
+                parts.push(format!(
+                    "│ {}🔌 {}{}",
+                    color(CYAN),
+                    port_str.join(", "),
+                    color(RESET)
+                ));
             }
         }
         // Docker info (non-git)
         if let Some(ref docker) = summary.docker_info {
-            let running = docker.containers.iter().filter(|c| c.status.contains("Up")).count();
+            let running = docker
+                .containers
+                .iter()
+                .filter(|c| c.status.contains("Up"))
+                .count();
             let total = docker.containers.len();
             if total > 0 {
-                parts.push(format!("│ {}🐳 {} containers ({} running){}", color(BLUE), total, running, color(RESET)));
+                parts.push(format!(
+                    "│ {}🐳 {} containers ({} running){}",
+                    color(BLUE),
+                    total,
+                    running,
+                    color(RESET)
+                ));
             } else if docker.has_compose || docker.has_dockerfile {
                 parts.push(format!("│ {}🐳 docker{}", color(DIM), color(RESET)));
             }
@@ -285,7 +414,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         if let Some(ref metrics) = summary.code_metrics {
             if metrics.total_loc > 0 {
                 let loc_str = format_loc(metrics.total_loc);
-                parts.push(format!("│ {}📊 {} LOC{}", color(GREEN), loc_str, color(RESET)));
+                parts.push(format!(
+                    "│ {}📊 {} LOC{}",
+                    color(GREEN),
+                    loc_str,
+                    color(RESET)
+                ));
             }
         }
         parts.push(format!("│ {} total", summary.total_items));
@@ -310,7 +444,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     let show_hidden = total_visible < 30;
 
     let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden {
-        visible_items.iter().chain(hidden_items.iter()).copied().collect()
+        visible_items
+            .iter()
+            .chain(hidden_items.iter())
+            .copied()
+            .collect()
     } else {
         visible_items.to_vec()
     };
@@ -330,8 +468,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let ordering = match sort_mode {
             "size" => a.size.cmp(&b.size),
             "date" => {
-                let a_time = a.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
-                let b_time = b.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                let a_time = a
+                    .modified
+                    .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                let b_time = b
+                    .modified
+                    .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
                 a_time.cmp(&b_time)
             }
             "type" => {
@@ -357,7 +499,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
     // Compute max column widths for alignment
     let mut max_owner = 5; // "OWNER"
     let mut max_group = 5; // "GROUP"
-    let mut max_size = 4;  // "SIZE"
+    let mut max_size = 4; // "SIZE"
     let mut max_contents = 4; // dynamic
 
     for item in &display_items {
@@ -381,7 +523,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         let git_icon = {
             let rel = item.path.strip_prefix(path).unwrap_or(&item.path);
             let rel_str = rel.to_string_lossy();
-            git_info.file_statuses.get(rel_str.as_ref())
+            git_info
+                .file_statuses
+                .get(rel_str.as_ref())
                 .or_else(|| git_info.file_statuses.get(item.name.as_str()))
                 .map(|fs| format!("{}{}{}", color(fs.color()), fs.icon(), color(RESET)))
                 .unwrap_or_default()
@@ -405,34 +549,37 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
                     (color(YELLOW), color(RESET))
                 }
                 // Documentation - blue
-                ".md" | ".txt" | ".rst" | ".doc" | ".docx" | ".pdf" => {
-                    (color(BLUE), color(RESET))
-                }
+                ".md" | ".txt" | ".rst" | ".doc" | ".docx" | ".pdf" => (color(BLUE), color(RESET)),
                 // Source code - green
-                ".rs" | ".py" | ".js" | ".ts" | ".jsx" | ".tsx" | ".go" | ".rb" | ".java" | ".c" | ".cpp" | ".h" => {
-                    (color(GREEN), color(RESET))
-                }
+                ".rs" | ".py" | ".js" | ".ts" | ".jsx" | ".tsx" | ".go" | ".rb" | ".java"
+                | ".c" | ".cpp" | ".h" => (color(GREEN), color(RESET)),
                 // Images - magenta
                 ".png" | ".jpg" | ".jpeg" | ".gif" | ".svg" | ".webp" | ".ico" => {
                     (color(MAGENTA), color(RESET))
                 }
                 // Videos - cyan
-                ".mp4" | ".mkv" | ".avi" | ".mov" | ".webm" => {
-                    (color(CYAN), color(RESET))
-                }
+                ".mp4" | ".mkv" | ".avi" | ".mov" | ".webm" => (color(CYAN), color(RESET)),
                 // Archives - red
                 ".zip" | ".tar" | ".gz" | ".bz2" | ".xz" | ".7z" | ".rar" | ".tgz" => {
                     (color(RED), color(RESET))
                 }
                 // Default - no color
-                _ => ("", "")
+                _ => ("", ""),
             }
         };
 
         // Build name with optional symlink target
         let name_display = if item.is_symlink {
             if let Some(target) = &item.symlink_target {
-                format!("{}{}{} {}→{} {}", name_prefix, item.name, name_suffix, color(DIM), color(RESET), target)
+                format!(
+                    "{}{}{} {}→{} {}",
+                    name_prefix,
+                    item.name,
+                    name_suffix,
+                    color(DIM),
+                    color(RESET),
+                    target
+                )
             } else {
                 format!("{}{}{}", name_prefix, item.name, name_suffix)
             }
@@ -440,7 +587,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
             format!("{}{}{}", name_prefix, item.name, name_suffix)
         };
 
-        let modified = item.modified.as_ref()
+        let modified = item
+            .modified
+            .as_ref()
             .map(|dt| {
                 let formatted = format_exact_time(dt);
                 colorize_date(dt, &formatted)
@@ -450,7 +599,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         // Pad columns for alignment
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let group_padded = format!("{:<width$}", item.group, width = max_group);
-        let size_padded = format!("{:>width$}", format_size_compact(item.size), width = max_size);
+        let size_padded = format!(
+            "{:>width$}",
+            format_size_compact(item.size),
+            width = max_size
+        );
         let contents_raw = if item.is_dir {
             count_items_in_dir(item).to_string()
         } else {
@@ -482,17 +635,34 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, _compact: 
         } else {
             let colored = get_file_contents(item);
             // Re-pad with colored version (ANSI codes don't affect width)
-            format!("{:>width$}", colored, width = max_contents + (colored.len() - contents_raw.len()))
+            format!(
+                "{:>width$}",
+                colored,
+                width = max_contents + (colored.len() - contents_raw.len())
+            )
         };
 
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
-        println!("{} {} {} {} {} {} {}{}{}",
-            perm_colored, owner_colored, group_colored, modified, size_colored, contents_colored,
-            git_icon, icon_str, name_display);
+        println!(
+            "{} {} {} {} {} {} {}{}{}",
+            perm_colored,
+            owner_colored,
+            group_colored,
+            modified,
+            size_colored,
+            contents_colored,
+            git_icon,
+            icon_str,
+            name_display
+        );
     }
 
     if !show_hidden && !hidden_items.is_empty() {
-        println!("  ... and {} hidden items ({} total items)", hidden_items.len(), summary.total_items);
+        println!(
+            "  ... and {} hidden items ({} total items)",
+            hidden_items.len(),
+            summary.total_items
+        );
     }
 }
 
@@ -542,20 +712,24 @@ fn output_raw(summary: &DirSummary) {
 fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
     use serde_json::json;
 
-    let items: Vec<_> = summary.top_items.iter().map(|item| {
-        json!({
-            "name": item.name,
-            "path": item.path.to_string_lossy(),
-            "is_dir": item.is_dir,
-            "is_symlink": item.is_symlink,
-            "is_exec": item.is_exec,
-            "size": item.size,
-            "perms": item.perms,
-            "owner": item.owner,
-            "group": item.group,
-            "symlink_target": item.symlink_target,
+    let items: Vec<_> = summary
+        .top_items
+        .iter()
+        .map(|item| {
+            json!({
+                "name": item.name,
+                "path": item.path.to_string_lossy(),
+                "is_dir": item.is_dir,
+                "is_symlink": item.is_symlink,
+                "is_exec": item.is_exec,
+                "size": item.size,
+                "perms": item.perms,
+                "owner": item.owner,
+                "group": item.group,
+                "symlink_target": item.symlink_target,
+            })
         })
-    }).collect();
+        .collect();
 
     let output = json!({
         "path": path.to_string_lossy(),
@@ -626,7 +800,7 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
             return format!("{}{}{}", color(MAGENTA), dur, color(RESET));
         }
     }
-    
+
     // WebM/MKV: extract duration from EBML headers
     if lower.ends_with(".webm") || lower.ends_with(".mkv") {
         if let Some(dur) = extract_webm_duration(&entry.path) {
@@ -684,7 +858,7 @@ fn get_file_contents_raw(entry: &crate::fs::DirEntry) -> String {
             return dur;
         }
     }
-    
+
     if lower.ends_with(".webm") || lower.ends_with(".mkv") {
         if let Some(dur) = extract_webm_duration(&entry.path) {
             return dur;
@@ -715,9 +889,15 @@ fn extract_image_resolution(bytes: &[u8], ext: &str) -> Option<String> {
         // Simple approach: scan for FF C0 through FF CF markers (SOF0-SOF15)
         let mut i = 2;
         while i < bytes.len().saturating_sub(9) {
-            if bytes[i] == 0xFF && bytes[i+1] >= 0xC0 && bytes[i+1] <= 0xCF && bytes[i+1] != 0xC4 && bytes[i+1] != 0xC8 && bytes[i+1] != 0xCC {
-                let h = ((bytes[i+5] as usize) << 8) | (bytes[i+6] as usize);
-                let w = ((bytes[i+7] as usize) << 8) | (bytes[i+8] as usize);
+            if bytes[i] == 0xFF
+                && bytes[i + 1] >= 0xC0
+                && bytes[i + 1] <= 0xCF
+                && bytes[i + 1] != 0xC4
+                && bytes[i + 1] != 0xC8
+                && bytes[i + 1] != 0xCC
+            {
+                let h = ((bytes[i + 5] as usize) << 8) | (bytes[i + 6] as usize);
+                let w = ((bytes[i + 7] as usize) << 8) | (bytes[i + 8] as usize);
                 if w > 0 && h > 0 {
                     return Some(format!("{}x{}", w, h));
                 }
@@ -733,30 +913,43 @@ fn count_zip_entries(bytes: &[u8]) -> Option<usize> {
     let mut count = 0;
     let mut i = 0;
     while i < bytes.len().saturating_sub(4) {
-        if bytes[i] == 0x50 && bytes[i+1] == 0x4B && bytes[i+2] == 0x03 && bytes[i+3] == 0x04 {
+        if bytes[i] == 0x50 && bytes[i + 1] == 0x4B && bytes[i + 2] == 0x03 && bytes[i + 3] == 0x04
+        {
             count += 1;
             i += 4;
         } else {
             i += 1;
         }
     }
-    if count > 0 { Some(count) } else { None }
+    if count > 0 {
+        Some(count)
+    } else {
+        None
+    }
 }
 
 /// Count SQLite tables by reading schema
 fn count_sqlite_tables(path: &std::path::Path) -> Option<usize> {
     let bytes = std::fs::read(path).ok()?;
-    if bytes.len() < 16 { return None; }
+    if bytes.len() < 16 {
+        return None;
+    }
     let header = std::str::from_utf8(&bytes[..16]).ok()?;
-    if !header.starts_with("SQLite format 3") { return None; }
+    if !header.starts_with("SQLite format 3") {
+        return None;
+    }
 
     use std::process::Command;
     let output = Command::new("sqlite3")
         .arg(path)
         .arg("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
-        .output().ok()?;
+        .output()
+        .ok()?;
 
-    let count = String::from_utf8_lossy(&output.stdout).trim().parse().ok()?;
+    let count = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse()
+        .ok()?;
     Some(count)
 }
 
@@ -764,33 +957,34 @@ fn count_sqlite_tables(path: &std::path::Path) -> Option<usize> {
 /// Scans first chunk and last chunk to find moov > mvhd atom
 fn extract_video_duration(path: &std::path::Path) -> Option<String> {
     use std::io::{Read, Seek, SeekFrom};
-    
+
     let mut file = std::fs::File::open(path).ok()?;
     let file_len = file.metadata().ok()?.len();
-    
+
     // For files under 100MB, just read the whole thing - fast and reliable
     if file_len <= 100 * 1024 * 1024 {
         let mut buf = Vec::with_capacity(file_len as usize);
         file.read_to_end(&mut buf).ok()?;
         return parse_mp4_duration(&buf);
     }
-    
+
     // For very large files, read 50MB from start and 50MB from end
     let chunk_size = 50 * 1024 * 1024;
-    
+
     let mut buf = vec![0u8; chunk_size];
     let bytes_read = file.read(&mut buf).ok()?;
     buf.truncate(bytes_read);
-    
+
     if let Some(dur) = parse_mp4_duration(&buf) {
         return Some(dur);
     }
-    
-    file.seek(SeekFrom::Start(file_len - chunk_size as u64)).ok()?;
+
+    file.seek(SeekFrom::Start(file_len - chunk_size as u64))
+        .ok()?;
     let mut buf = vec![0u8; chunk_size];
     let bytes_read = file.read(&mut buf).ok()?;
     buf.truncate(bytes_read);
-    
+
     parse_mp4_duration(&buf)
 }
 
@@ -798,34 +992,66 @@ fn extract_video_duration(path: &std::path::Path) -> Option<String> {
 fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
     let mut i = 0;
     while i < buf.len().saturating_sub(8) {
-        let size = u32::from_be_bytes([buf[i], buf[i+1], buf[i+2], buf[i+3]]) as usize;
-        if size < 8 { break; }
-        
+        let size = u32::from_be_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]) as usize;
+        if size < 8 {
+            break;
+        }
+
         // Check for "moov" atom
-        if buf[i+4] == 0x6D && buf[i+5] == 0x6F && buf[i+6] == 0x6F && buf[i+7] == 0x76 {
+        if buf[i + 4] == 0x6D && buf[i + 5] == 0x6F && buf[i + 6] == 0x6F && buf[i + 7] == 0x76 {
             // Found moov, scan inside for mvhd
             let mut j = i + 8;
             let moov_end = i + size;
-            
+
             while j < moov_end.saturating_sub(8) && j < buf.len().saturating_sub(8) {
-                let atom_size = u32::from_be_bytes([buf[j], buf[j+1], buf[j+2], buf[j+3]]) as usize;
-                if atom_size < 8 || atom_size > size { break; }
-                
+                let atom_size =
+                    u32::from_be_bytes([buf[j], buf[j + 1], buf[j + 2], buf[j + 3]]) as usize;
+                if atom_size < 8 || atom_size > size {
+                    break;
+                }
+
                 // Check for "mvhd" atom
-                if buf[j+4] == 0x6D && buf[j+5] == 0x76 && buf[j+6] == 0x68 && buf[j+7] == 0x64 {
-                    let version = buf[j+8];
-                    
+                if buf[j + 4] == 0x6D
+                    && buf[j + 5] == 0x76
+                    && buf[j + 6] == 0x68
+                    && buf[j + 7] == 0x64
+                {
+                    let version = buf[j + 8];
+
                     let (timescale, duration) = if version == 0 {
-                        let ts = u32::from_be_bytes([buf[j+20], buf[j+21], buf[j+22], buf[j+23]]);
-                        let dur = u32::from_be_bytes([buf[j+24], buf[j+25], buf[j+26], buf[j+27]]);
+                        let ts = u32::from_be_bytes([
+                            buf[j + 20],
+                            buf[j + 21],
+                            buf[j + 22],
+                            buf[j + 23],
+                        ]);
+                        let dur = u32::from_be_bytes([
+                            buf[j + 24],
+                            buf[j + 25],
+                            buf[j + 26],
+                            buf[j + 27],
+                        ]);
                         (ts as u64, dur as u64)
                     } else {
-                        let ts = u32::from_be_bytes([buf[j+28], buf[j+29], buf[j+30], buf[j+31]]);
-                        let dur = u64::from_be_bytes([buf[j+32], buf[j+33], buf[j+34], buf[j+35], 
-                                                      buf[j+36], buf[j+37], buf[j+38], buf[j+39]]);
+                        let ts = u32::from_be_bytes([
+                            buf[j + 28],
+                            buf[j + 29],
+                            buf[j + 30],
+                            buf[j + 31],
+                        ]);
+                        let dur = u64::from_be_bytes([
+                            buf[j + 32],
+                            buf[j + 33],
+                            buf[j + 34],
+                            buf[j + 35],
+                            buf[j + 36],
+                            buf[j + 37],
+                            buf[j + 38],
+                            buf[j + 39],
+                        ]);
                         (ts as u64, dur)
                     };
-                    
+
                     if timescale > 0 && duration > 0 {
                         let seconds = duration / timescale;
                         let mins = seconds / 60;
@@ -843,7 +1069,7 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                 j += atom_size;
             }
         }
-        
+
         i += size;
     }
     None
@@ -852,47 +1078,55 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
 /// Extract video duration from WebM/MKV (EBML) container headers
 fn extract_webm_duration(path: &std::path::Path) -> Option<String> {
     let buf = std::fs::read(path).ok()?;
-    
+
     // WebM/MKV uses EBML format
     // Look for Duration element (0x4489) and TimecodeScale (0x2AD7B1)
     let mut timecode_scale: u64 = 1000000; // default 1ms
     let mut duration: f64 = 0.0;
     let mut found_duration = false;
-    
+
     let mut i = 0;
     while i < buf.len().saturating_sub(12) {
         // Check for TimecodeScale element (0x2AD7B1)
-        if buf[i] == 0x2A && buf[i+1] == 0xD7 && buf[i+2] == 0xB1 {
-            let size = buf[i+3] as usize;
+        if buf[i] == 0x2A && buf[i + 1] == 0xD7 && buf[i + 2] == 0xB1 {
+            let size = buf[i + 3] as usize;
             if size <= 8 && i + 4 + size <= buf.len() {
                 let mut val: u64 = 0;
                 for j in 0..size {
-                    val = (val << 8) | (buf[i+4+j] as u64);
+                    val = (val << 8) | (buf[i + 4 + j] as u64);
                 }
                 if val > 0 {
                     timecode_scale = val;
                 }
             }
         }
-        
+
         // Check for Duration element (0x4489)
-        if buf[i] == 0x44 && buf[i+1] == 0x89 {
-            let size = buf[i+2] as usize;
+        if buf[i] == 0x44 && buf[i + 1] == 0x89 {
+            let size = buf[i + 2] as usize;
             if size == 4 && i + 3 + 4 <= buf.len() {
-                let bits = u32::from_be_bytes([buf[i+3], buf[i+4], buf[i+5], buf[i+6]]);
+                let bits = u32::from_be_bytes([buf[i + 3], buf[i + 4], buf[i + 5], buf[i + 6]]);
                 duration = f32::from_bits(bits) as f64;
                 found_duration = true;
             } else if size == 8 && i + 3 + 8 <= buf.len() {
-                let bits = u64::from_be_bytes([buf[i+3], buf[i+4], buf[i+5], buf[i+6], 
-                                               buf[i+7], buf[i+8], buf[i+9], buf[i+10]]);
+                let bits = u64::from_be_bytes([
+                    buf[i + 3],
+                    buf[i + 4],
+                    buf[i + 5],
+                    buf[i + 6],
+                    buf[i + 7],
+                    buf[i + 8],
+                    buf[i + 9],
+                    buf[i + 10],
+                ]);
                 duration = f64::from_bits(bits);
                 found_duration = true;
             }
         }
-        
+
         i += 1;
     }
-    
+
     if found_duration && duration > 0.0 {
         let seconds = (duration * timecode_scale as f64 / 1_000_000_000.0) as u64;
         if seconds > 0 {
@@ -908,7 +1142,7 @@ fn extract_webm_duration(path: &std::path::Path) -> Option<String> {
             return Some(format!("{}s", seconds));
         }
     }
-    
+
     None
 }
 
@@ -922,7 +1156,9 @@ fn colorize_perms(perms: &str) -> String {
             'l' => result.push_str(&format!("{}l{}", color(MAGENTA), color(RESET))),
             'r' => result.push_str(&format!("{}r{}", color(GREEN), color(RESET))),
             'w' => result.push_str(&format!("{}w{}", color(YELLOW), color(RESET))),
-            'x' | 's' | 'S' | 't' | 'T' => result.push_str(&format!("{}{}{}", color(RED), c, color(RESET))),
+            'x' | 's' | 'S' | 't' | 'T' => {
+                result.push_str(&format!("{}{}{}", color(RED), c, color(RESET)))
+            }
             '-' => result.push_str(&format!("{}-{}", color(DIM), color(RESET))),
             _ => result.push(c),
         }

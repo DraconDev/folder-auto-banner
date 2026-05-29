@@ -1,11 +1,11 @@
 //! Load session command — restore a saved session
-//! 
+//!
 //! Prints cd commands to restore saved workspace state
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Session {
@@ -23,7 +23,7 @@ pub fn run_load_session(name: &str) -> Result<()> {
     let sessions_dir = proj_dirs.data_dir().join("sessions");
 
     let session_file = sessions_dir.join(format!("{}.json", sanitize_filename(name)));
-    
+
     if !session_file.exists() {
         println!("❌ Session '{}' not found", name);
         println!("💡 Use 'fm sessions' to see available sessions");
@@ -35,7 +35,10 @@ pub fn run_load_session(name: &str) -> Result<()> {
 
     // Check if directory exists
     if !session.cwd.exists() {
-        println!("⚠️  Session directory no longer exists: {}", session.cwd.display());
+        println!(
+            "⚠️  Session directory no longer exists: {}",
+            session.cwd.display()
+        );
         println!("   Saving session would update the path");
     }
 
@@ -51,6 +54,12 @@ pub fn run_load_session(name: &str) -> Result<()> {
 
 fn sanitize_filename(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }

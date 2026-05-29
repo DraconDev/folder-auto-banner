@@ -1,5 +1,5 @@
 //! Paste command — paste files from clipboard
-//! 
+//!
 //! Copies files from clipboard to current directory
 
 use anyhow::Result;
@@ -10,7 +10,7 @@ use crate::state::ClipboardState;
 pub fn run_paste(move_files: bool, overwrite: bool) -> Result<()> {
     // Load clipboard
     let mut state = ClipboardState::load().unwrap_or_default();
-    
+
     if state.entries.is_empty() {
         println!("📋 Clipboard is empty. Use 'fm yank <files>' first.");
         return Ok(());
@@ -37,9 +37,9 @@ pub fn run_paste(move_files: bool, overwrite: bool) -> Result<()> {
                 continue;
             }
         };
-        
+
         let dest = cwd.join(file_name);
-        
+
         // Check if destination exists
         if dest.exists() && !overwrite {
             println!("⚠️  Skipping (exists): {}", file_name.to_string_lossy());
@@ -49,7 +49,7 @@ pub fn run_paste(move_files: bool, overwrite: bool) -> Result<()> {
 
         // Copy or move
         let action = if move_files { "Moving" } else { "Copying" };
-        
+
         match if move_files {
             fs::rename(src_path, &dest)
         } else {
@@ -67,22 +67,41 @@ pub fn run_paste(move_files: bool, overwrite: bool) -> Result<()> {
                             if let Err(de) = fs::remove_file(src_path) {
                                 eprintln!("⚠️  Copied but failed to remove original: {}", de);
                             } else {
-                                println!("{} (cross-device): {}", action, file_name.to_string_lossy());
+                                println!(
+                                    "{} (cross-device): {}",
+                                    action,
+                                    file_name.to_string_lossy()
+                                );
                                 copied += 1;
                             }
                         }
                         Err(ce) => {
-                            eprintln!("❌ {} failed: {} -> {}", action, file_name.to_string_lossy(), ce);
+                            eprintln!(
+                                "❌ {} failed: {} -> {}",
+                                action,
+                                file_name.to_string_lossy(),
+                                ce
+                            );
                         }
                     }
                 } else {
-                    eprintln!("❌ {} failed: {} -> {}", action, file_name.to_string_lossy(), e);
+                    eprintln!(
+                        "❌ {} failed: {} -> {}",
+                        action,
+                        file_name.to_string_lossy(),
+                        e
+                    );
                 }
             }
         }
     }
 
-    println!("\n✅ {} file(s) {}, {} skipped", copied, if move_files { "moved" } else { "copied" }, skipped);
+    println!(
+        "\n✅ {} file(s) {}, {} skipped",
+        copied,
+        if move_files { "moved" } else { "copied" },
+        skipped
+    );
 
     // If move, clear the clipboard after successful move
     if move_files && copied > 0 {

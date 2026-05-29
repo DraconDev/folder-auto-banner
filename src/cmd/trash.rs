@@ -1,13 +1,13 @@
 //! Trash command — move files to trash instead of deleting
-//! 
+//!
 //! Moves files to ~/.local/share/cfm/trash/ with metadata for recovery
-//! 
+//!
 //! Usage: fm trash [options] <files>...
 
 use anyhow::Result;
-use std::path::{PathBuf, Path};
+use serde::{Deserialize, Serialize};
 use std::fs;
-use serde::{Serialize, Deserialize};
+use std::path::{Path, PathBuf};
 
 const TRASH_DIR: &str = ".local/share/cfm/trash";
 const TRASH_MANIFEST: &str = ".local/share/cfm/trash/manifest.json";
@@ -104,9 +104,13 @@ fn save_manifest(trash_base: &Path, manifest: &TrashManifest) -> Result<()> {
     Ok(())
 }
 
-fn trash_file(path: &Path, trash_base: &Path, manifest: &mut TrashManifest, verbose: bool) -> Result<()> {
-    let original_path = path.canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf());
+fn trash_file(
+    path: &Path,
+    trash_base: &Path,
+    manifest: &mut TrashManifest,
+    verbose: bool,
+) -> Result<()> {
+    let original_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let original_size = if path.is_file() {
         fs::metadata(path)?.len()
     } else {
@@ -116,7 +120,7 @@ fn trash_file(path: &Path, trash_base: &Path, manifest: &mut TrashManifest, verb
     // Generate unique ID and trash path
     let id = generate_id();
     let trash_path = trash_base.join(&id);
-    
+
     // Move file to trash
     let result: Result<(), anyhow::Error> = if path.is_dir() {
         match fs::rename(path, &trash_path) {
@@ -159,7 +163,8 @@ fn trash_file(path: &Path, trash_base: &Path, manifest: &mut TrashManifest, verb
 fn calculate_dir_size(path: &Path) -> u64 {
     fs::read_dir(path)
         .map(|entries| {
-            entries.filter_map(|e| e.ok())
+            entries
+                .filter_map(|e| e.ok())
                 .map(|e| {
                     if e.path().is_dir() {
                         calculate_dir_size(&e.path())
@@ -179,7 +184,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
         let ty = entry.file_type()?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
-        
+
         if ty.is_dir() {
             copy_dir_recursive(&src_path, &dst_path)?;
         } else {

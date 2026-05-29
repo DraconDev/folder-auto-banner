@@ -19,13 +19,14 @@ pub fn run_pins() -> Result<()> {
 
     for pin in &state.pins {
         let created = pin.created_at.format("%Y-%m-%d").to_string();
-        let last_accessed = pin.last_accessed
+        let last_accessed = pin
+            .last_accessed
             .map(|d| d.format("%Y-%m-%d %H:%M").to_string())
             .unwrap_or_else(|| "never".to_string());
-        
+
         println!("  📍 {} -> {}", pin.name, pin.path.display());
         println!("     Created: {}, Last used: {}", created, last_accessed);
-        
+
         if pin.access_count > 1 {
             println!("     Used {} times", pin.access_count);
         }

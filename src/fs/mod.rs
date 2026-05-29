@@ -1,11 +1,11 @@
 //! Filesystem utilities — directory metadata, file types, project detection
-//! 
+//!
 //! Fast, parallel directory walking using ignore crate.
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
-use chrono::{DateTime, Utc};
 
 /// Project type detection
 #[derive(Debug, Clone, PartialEq)]
@@ -36,7 +36,9 @@ impl ProjectType {
             match name_str.as_str() {
                 "cargo.toml" => return ProjectType::Rust,
                 "package.json" => return ProjectType::Node,
-                "pyproject.toml" | "setup.py" | "requirements.txt" | "Pipfile" => return ProjectType::Python,
+                "pyproject.toml" | "setup.py" | "requirements.txt" | "Pipfile" => {
+                    return ProjectType::Python
+                }
                 "go.mod" => return ProjectType::Go,
                 "gemfile" => return ProjectType::Ruby,
                 "pom.xml" | "build.gradle" => return ProjectType::Java,
@@ -135,7 +137,7 @@ impl DirSummary {
         let mut last_modified: Option<DateTime<Utc>> = None;
 
         let walker = WalkBuilder::new(path)
-            .max_depth(Some(1))  // Only immediate directory
+            .max_depth(Some(1)) // Only immediate directory
             .hidden(false)
             .ignore(false)
             .build();
@@ -170,7 +172,8 @@ impl DirSummary {
             total_size += size;
 
             // Get modified time
-            let modified = metadata.as_ref()
+            let modified = metadata
+                .as_ref()
                 .and_then(|m| m.modified().ok())
                 .map(DateTime::<Utc>::from);
 
@@ -201,11 +204,20 @@ impl DirSummary {
                 #[cfg(not(unix))]
                 {
                     let read_only = meta.permissions().readonly();
-                    let perms_str = if read_only { "r--r--r--".to_string() } else { "rw-rw-rw-".to_string() };
+                    let perms_str = if read_only {
+                        "r--r--r--".to_string()
+                    } else {
+                        "rw-rw-rw-".to_string()
+                    };
                     (perms_str, false, "?".to_string(), "?".to_string())
                 }
             } else {
-                ("----------".to_string(), false, "?".to_string(), "?".to_string())
+                (
+                    "----------".to_string(),
+                    false,
+                    "?".to_string(),
+                    "?".to_string(),
+                )
             };
 
             // Symlink target
@@ -234,12 +246,10 @@ impl DirSummary {
         }
 
         // Sort: directories first, then by name
-        top_items.sort_by(|a, b| {
-            match (a.is_dir, b.is_dir) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-            }
+        top_items.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
         });
 
         // Run optional checks with caching
@@ -376,7 +386,7 @@ pub fn format_size(bytes: u64) -> String {
     // Truncate to 1 decimal place for compactness
     let s = format!("{}", adjusted);
     if let Some(dot) = s.find('.') {
-        let after_dot = &s[dot+1..];
+        let after_dot = &s[dot + 1..];
         if after_dot.len() > 1 {
             let truncated: String = s.chars().take(dot + 2).collect();
             return truncated;
@@ -446,7 +456,7 @@ impl DirSummary {
         let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         for entry in &self.top_items {
             let ext = if let Some(dot) = entry.name.rfind('.') {
-                entry.name[dot+1..].to_lowercase()
+                entry.name[dot + 1..].to_lowercase()
             } else {
                 "other".to_string()
             };

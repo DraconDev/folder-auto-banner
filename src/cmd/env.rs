@@ -1,5 +1,5 @@
 //! Environment command — inject project-specific aliases
-//! 
+//!
 //! Outputs shell aliases based on project type.
 
 use anyhow::Result;
@@ -14,11 +14,11 @@ pub fn run_env(path: Option<&Path>, _format: Option<&str>) -> Result<()> {
     let project_type = ProjectType::detect(path);
 
     let aliases = generate_aliases(&project_type);
-    
+
     for alias in aliases {
         println!("{}", alias);
     }
-    
+
     Ok(())
 }
 

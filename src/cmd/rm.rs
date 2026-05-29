@@ -1,17 +1,12 @@
 //! Remove command — safe file removal with options
-//! 
+//!
 //! Usage: fm rm [options] <files>...
 
 use anyhow::Result;
-use std::path::{PathBuf, Path};
 use std::fs;
+use std::path::{Path, PathBuf};
 
-pub fn run_rm(
-    paths: &[PathBuf],
-    recursive: bool,
-    force: bool,
-    verbose: bool,
-) -> Result<()> {
+pub fn run_rm(paths: &[PathBuf], recursive: bool, force: bool, verbose: bool) -> Result<()> {
     if paths.is_empty() {
         println!("❌ No files specified");
         return Ok(());
@@ -81,27 +76,17 @@ pub fn run_rm(
 /// Check if path is protected (home, root, etc.)
 fn is_protected_path(path: &Path) -> bool {
     let path_str = path.to_string_lossy().to_lowercase();
-    
+
     // Check for dangerous paths
     let dangerous = [
-        "/",
-        "/home",
-        "/root",
-        "/usr",
-        "/bin",
-        "/sbin",
-        "/etc",
-        "/var",
-        "/sys",
-        "/proc",
-        "/dev",
+        "/", "/home", "/root", "/usr", "/bin", "/sbin", "/etc", "/var", "/sys", "/proc", "/dev",
     ];
-    
+
     for d in &dangerous {
         if path_str == *d || path_str.starts_with(&format!("{}/", d)) {
             return true;
         }
     }
-    
+
     false
 }

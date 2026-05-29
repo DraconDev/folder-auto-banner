@@ -1,5 +1,5 @@
 //! Open command — open files with default application
-//! 
+//!
 //! Cross-platform: xdg-open on Linux, open on macOS, start on Windows
 
 use anyhow::Result;
@@ -50,7 +50,7 @@ pub fn run_open(paths: &[PathBuf], verbose: bool) -> Result<()> {
 fn open_path(path: &PathBuf) -> Result<()> {
     // Try xdg-open first, then fallback to sensible-browser or other common openers
     let openers = ["xdg-open", "gio open", "gnome-open", "kde-open"];
-    
+
     for opener in &openers {
         let parts: Vec<&str> = opener.split_whitespace().collect();
         let mut cmd = Command::new(parts[0]);
@@ -58,30 +58,27 @@ fn open_path(path: &PathBuf) -> Result<()> {
             cmd.arg(arg);
         }
         cmd.arg(path);
-        
+
         match cmd.spawn() {
             Ok(_) => return Ok(()),
             Err(_) => continue,
         }
     }
-    
-    Err(anyhow::anyhow!("No opener found. Install xdg-utils (xdg-open)"))
+
+    Err(anyhow::anyhow!(
+        "No opener found. Install xdg-utils (xdg-open)"
+    ))
 }
 
 #[cfg(target_os = "macos")]
 fn open_path(path: &PathBuf) -> Result<()> {
-    Command::new("open")
-        .arg(path)
-        .spawn()?;
+    Command::new("open").arg(path).spawn()?;
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
 fn open_path(path: &PathBuf) -> Result<()> {
-    Command::new("start")
-        .arg("")
-        .arg(path)
-        .spawn()?;
+    Command::new("start").arg("").arg(path).spawn()?;
     Ok(())
 }
 

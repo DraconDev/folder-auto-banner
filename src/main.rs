@@ -1,20 +1,20 @@
 #![allow(dead_code)]
 
+mod build_status;
+mod cache;
 mod cli;
 mod cmd;
-mod git;
-mod fs;
-mod icon;
-mod state;
-mod cache;
-mod build_status;
-mod todo_scanner;
-mod port_usage;
-mod docker;
 mod code_metrics;
+mod docker;
+mod fs;
+mod git;
+mod icon;
+mod port_usage;
+mod state;
+mod todo_scanner;
 
-use clap::Parser;
 use anyhow::Result;
+use clap::Parser;
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();

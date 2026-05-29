@@ -1,13 +1,13 @@
 //! CLI module — argument parsing and command routing
-//! 
+//!
 //! All commands follow the "ephemeral" rule: wake up, read state, print output, exit.
 
-use clap::{Parser, Subcommand, ValueHint};
 use anyhow::Result;
+use clap::{Parser, Subcommand, ValueHint};
 use std::path::{Path, PathBuf};
 
 /// cfm — Contextual File Manager
-/// 
+///
 /// An ephemeral, zero-hostage intelligence layer for the shell.
 /// Type `fm`. Get context.
 #[derive(Parser, Debug)]
@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
     name = "fm",
     about = "cfm — Contextual File Manager\nAn ephemeral, zero-hostage intelligence layer for the shell.",
     version,
-    author,
+    author
 )]
 pub struct Cli {
     /// Enable debug output
@@ -284,7 +284,7 @@ pub enum Commands {
         /// Name for the session
         #[arg(required = true)]
         name: String,
-        
+
         /// Optional description
         #[arg(long = "desc")]
         description: Option<String>,
@@ -376,42 +376,93 @@ impl Cli {
                 .with_env_filter("cfm=debug,cfm=trace")
                 .init();
         } else {
-            tracing_subscriber::fmt()
-                .with_env_filter("cfm=warn")
-                .init();
+            tracing_subscriber::fmt().with_env_filter("cfm=warn").init();
         }
 
-    match &self.command {
+        match &self.command {
             // Banner (also default when no subcommand)
-            Some(Banner { path, raw, json, compact, no_build_check, no_todos, no_ports, no_docker, no_metrics, sort, reverse }) => {
+            Some(Banner {
+                path,
+                raw,
+                json,
+                compact,
+                no_build_check,
+                no_todos,
+                no_ports,
+                no_docker,
+                no_metrics,
+                sort,
+                reverse,
+            }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
-                crate::cmd::banner::run_banner(p, *raw, *json, *compact, *no_build_check, *no_todos, *no_ports, *no_docker, *no_metrics, sort.as_deref(), *reverse)
+                crate::cmd::banner::run_banner(
+                    p,
+                    *raw,
+                    *json,
+                    *compact,
+                    *no_build_check,
+                    *no_todos,
+                    *no_ports,
+                    *no_docker,
+                    *no_metrics,
+                    sort.as_deref(),
+                    *reverse,
+                )
             }
             None => {
                 // `fm` with no args = `fm banner`
                 let p: Option<&Path> = self.path.as_deref();
-                crate::cmd::banner::run_banner(p, false, false, false, false, false, false, false, false, None, false)
+                crate::cmd::banner::run_banner(
+                    p, false, false, false, false, false, false, false, false, None, false,
+                )
             }
 
             // Phase 4: Env
-            Some(Env { path, format }) => crate::cmd::env::run_env(path.as_ref().map(|p| p.as_path()), format.as_deref()),
+            Some(Env { path, format }) => {
+                crate::cmd::env::run_env(path.as_ref().map(|p| p.as_path()), format.as_deref())
+            }
 
             // Phase 6: Clipboard
             Some(Yank { paths }) => crate::cmd::yank::run_yank(paths),
-            Some(Paste { move_files, overwrite }) => crate::cmd::paste::run_paste(*move_files, *overwrite),
+            Some(Paste {
+                move_files,
+                overwrite,
+            }) => crate::cmd::paste::run_paste(*move_files, *overwrite),
             Some(Clipboard { clear }) => crate::cmd::clipboard::run_clipboard(*clear),
 
             // Phase 5: File ops
-            Some(Mv { sources, dest, overwrite, rename, skip: _, dry_run: _ }) => {
-                crate::cmd::mv::run_mv(sources, dest, *overwrite, *rename, true)  // verbose=true
+            Some(Mv {
+                sources,
+                dest,
+                overwrite,
+                rename,
+                skip: _,
+                dry_run: _,
+            }) => {
+                crate::cmd::mv::run_mv(sources, dest, *overwrite, *rename, true)
+                // verbose=true
             }
-            Some(Cp { sources, dest, overwrite, dry_run: _ }) => {
-                crate::cmd::cp::run_cp(sources, dest, *overwrite, false, true, true)  // rename=false, verbose=true, preserve=true
+            Some(Cp {
+                sources,
+                dest,
+                overwrite,
+                dry_run: _,
+            }) => {
+                crate::cmd::cp::run_cp(sources, dest, *overwrite, false, true, true)
+                // rename=false, verbose=true, preserve=true
             }
 
             // Phase 7: Safe ops
-            Some(Rm { paths, force, dry_run: _ }) => crate::cmd::rm::run_rm(paths, false, *force, true),  // recursive=false, verbose=true
-            Some(Trash { paths, force: _, dry_run: _ }) => crate::cmd::trash::run_trash(paths, true),  // verbose=true
+            Some(Rm {
+                paths,
+                force,
+                dry_run: _,
+            }) => crate::cmd::rm::run_rm(paths, false, *force, true), // recursive=false, verbose=true
+            Some(Trash {
+                paths,
+                force: _,
+                dry_run: _,
+            }) => crate::cmd::trash::run_trash(paths, true), // verbose=true
             Some(Open { paths, dry_run: _ }) => crate::cmd::open::run_open(paths, true),
 
             // Phase 8: Smart piping
@@ -432,18 +483,27 @@ impl Cli {
             Some(Unpin { name }) => crate::cmd::unpin::run_unpin(name),
 
             // Phase 11: Sessions
-            Some(SaveSession { name, description }) => crate::cmd::save_session::run_save_session(name, description.as_deref()),
-            Some(LoadSession { name, print_cd: _ }) => crate::cmd::load_session::run_load_session(name),
+            Some(SaveSession { name, description }) => {
+                crate::cmd::save_session::run_save_session(name, description.as_deref())
+            }
+            Some(LoadSession { name, print_cd: _ }) => {
+                crate::cmd::load_session::run_load_session(name)
+            }
             Some(Sessions) => crate::cmd::sessions::run_sessions(),
             Some(DeleteSession { name }) => crate::cmd::delete_session::run_delete_session(name),
 
             // Phase 12: Diff
-            Some(Diff { dir1, dir2, shallow, json }) => {
-                crate::cmd::diff::run_diff(dir1, dir2, *shallow, *json)
-            }
+            Some(Diff {
+                dir1,
+                dir2,
+                shallow,
+                json,
+            }) => crate::cmd::diff::run_diff(dir1, dir2, *shallow, *json),
 
             // Phase 3: Shell integration
-            Some(InstallHook { shell }) => crate::cmd::install_hook::run_install_hook(shell.as_deref()),
+            Some(InstallHook { shell }) => {
+                crate::cmd::install_hook::run_install_hook(shell.as_deref())
+            }
             Some(UninstallHook) => crate::cmd::uninstall_hook::run_uninstall_hook(),
             Some(Completion { shell }) => crate::cmd::completion::run_completion(shell),
 

@@ -32,7 +32,11 @@ impl Cache {
     }
 
     /// Get a cached value if it exists and is not expired
-    pub fn get<T: serde::Serialize + for<'de> serde::Deserialize<'de>>(&self, key: &str, ttl: Duration) -> Option<T> {
+    pub fn get<T: serde::Serialize + for<'de> serde::Deserialize<'de>>(
+        &self,
+        key: &str,
+        ttl: Duration,
+    ) -> Option<T> {
         let path = self.path_for(key);
         let content = std::fs::read_to_string(&path).ok()?;
 

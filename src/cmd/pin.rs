@@ -1,10 +1,10 @@
 //! Pin command — bookmark a directory
-//! 
+//!
 //! Saves directory paths to ~/.local/share/cfm/pins.json
 
 use anyhow::Result;
 
-use crate::state::{PinsState, Pin};
+use crate::state::{Pin, PinsState};
 
 pub fn run_pin(name: &str) -> Result<()> {
     // Validate name (no spaces, no special chars except - and _)
@@ -12,7 +12,7 @@ pub fn run_pin(name: &str) -> Result<()> {
         println!("❌ Pin name cannot be empty");
         return Ok(());
     }
-    
+
     if name.contains(' ') || name.contains('/') || name.contains('\\') {
         println!("❌ Pin name cannot contain spaces, / or \\");
         return Ok(());
@@ -27,7 +27,7 @@ pub fn run_pin(name: &str) -> Result<()> {
 
     // Check if pin already exists
     let existing_idx = state.pins.iter().position(|p| p.name == name);
-    
+
     if let Some(idx) = existing_idx {
         // Update existing pin
         state.pins[idx].path = path.clone();

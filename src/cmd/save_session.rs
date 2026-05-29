@@ -1,11 +1,11 @@
 //! Save session command — save current workspace state
-//! 
+//!
 //! Saves: cwd, git branch, timestamp to session file
 
 use anyhow::Result;
-use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Session {
@@ -18,11 +18,11 @@ pub struct Session {
 
 pub fn run_save_session(name: &str, description: Option<&str>) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    
+
     // Get git branch if in a repo
     let git_info = crate::git::get_git_info(&cwd).ok();
     let git_branch = git_info.as_ref().and_then(|i| i.branch.clone());
-    
+
     let session = Session {
         name: name.to_string(),
         cwd: cwd.clone(),
@@ -56,6 +56,12 @@ pub fn run_save_session(name: &str, description: Option<&str>) -> Result<()> {
 
 fn sanitize_filename(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }

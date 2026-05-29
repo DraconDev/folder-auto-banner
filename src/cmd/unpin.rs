@@ -15,7 +15,7 @@ pub fn run_unpin(name: &str) -> Result<()> {
 
     // Find and remove pin
     let idx = state.pins.iter().position(|p| p.name == name);
-    
+
     match idx {
         Some(i) => {
             let pin = state.pins.remove(i);
@@ -23,7 +23,10 @@ pub fn run_unpin(name: &str) -> Result<()> {
             println!("📌 Unpinned: {} (was: {})", name, pin.path.display());
         }
         None => {
-            println!("❌ Pin '{}' not found. Use 'fm pins' to see available pins.", name);
+            println!(
+                "❌ Pin '{}' not found. Use 'fm pins' to see available pins.",
+                name
+            );
         }
     }
 

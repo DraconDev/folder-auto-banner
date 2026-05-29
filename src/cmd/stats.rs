@@ -1,5 +1,5 @@
 //! Stats command — deep directory analysis
-//! 
+//!
 //! Analyzes directory and provides:
 //! - Total size
 //! - File count by type
@@ -9,8 +9,8 @@
 
 use anyhow::Result;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::fs::format_size;
 
@@ -52,7 +52,7 @@ fn analyze_dir(path: &Path, stats: &mut DirStats, depth: usize) -> Result<()> {
     if depth > 100 {
         return Ok(()); // Safety limit
     }
-    
+
     stats.max_depth = stats.max_depth.max(depth);
 
     let entries = match fs::read_dir(path) {
@@ -78,14 +78,14 @@ fn analyze_dir(path: &Path, stats: &mut DirStats, depth: usize) -> Result<()> {
             analyze_dir(&entry_path, stats, depth + 1)?;
         } else if entry_path.is_file() {
             stats.total_files += 1;
-            
+
             let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-            
+
             // Check for binary first (needs the path)
             if is_likely_binary(&entry_path) {
                 stats.binary_files += 1;
             }
-            
+
             stats.total_size += size;
 
             // Track by extension
@@ -125,7 +125,7 @@ fn is_likely_binary(path: &Path) -> bool {
 fn output_rich(stats: &DirStats, path: &Path) {
     println!("📊 Statistics: {}", path.display());
     println!("{}", "─".repeat(60));
-    
+
     // Overview
     println!();
     println!("📁 OVERVIEW");
@@ -136,18 +136,24 @@ fn output_rich(stats: &DirStats, path: &Path) {
     if stats.hidden_files > 0 {
         println!("  Hidden:       {}", stats.hidden_files);
     }
-    
+
     // File types
     println!();
     println!("📋 FILE TYPES (by count)");
     let mut types: Vec<_> = stats.by_extension.iter().collect();
     types.sort_by_key(|b| std::cmp::Reverse(b.1.count));
-    
+
     for (ext, fc) in types.iter().take(10) {
         let bar = make_bar(fc.count, stats.total_files, 20);
-        println!("  {:15} {:>5} {:>8} {}", ext, fc.count, format_size(fc.size), bar);
+        println!(
+            "  {:15} {:>5} {:>8} {}",
+            ext,
+            fc.count,
+            format_size(fc.size),
+            bar
+        );
     }
-    
+
     // Largest files
     if !stats.largest_files.is_empty() {
         println!();
@@ -158,21 +164,26 @@ fn output_rich(stats: &DirStats, path: &Path) {
             }
         }
     }
-    
+
     // Code breakdown (if project detected)
-    let code_exts = ["rs", "ts", "js", "py", "go", "java", "c", "cpp", "h", "hpp", "rb", "rs"];
-    let code_count: usize = code_exts.iter()
+    let code_exts = [
+        "rs", "ts", "js", "py", "go", "java", "c", "cpp", "h", "hpp", "rb", "rs",
+    ];
+    let code_count: usize = code_exts
+        .iter()
         .filter_map(|ext| stats.by_extension.get(*ext))
         .map(|fc| fc.count)
         .sum();
-    
+
     if code_count > 0 {
         println!();
-        println!("💻 CODE FILES: {} ({}%)", 
-            code_count, 
-            (code_count as f64 / stats.total_files as f64 * 100.0) as usize);
+        println!(
+            "💻 CODE FILES: {} ({}%)",
+            code_count,
+            (code_count as f64 / stats.total_files as f64 * 100.0) as usize
+        );
     }
-    
+
     println!();
 }
 
@@ -193,16 +204,19 @@ fn output_json(stats: &DirStats, path: &Path) {
     println!("  \"total_dirs\": {},", stats.total_dirs);
     println!("  \"max_depth\": {},", stats.max_depth);
     println!("  \"hidden_files\": {},", stats.hidden_files);
-    
+
     println!("  \"by_extension\": {{");
     let mut types: Vec<_> = stats.by_extension.iter().collect();
     types.sort_by_key(|b| std::cmp::Reverse(b.1.count));
-    
+
     for (i, (ext, fc)) in types.iter().enumerate() {
         let comma = if i < types.len() - 1 { "," } else { "" };
-        println!("    \"{}\": {{ \"count\": {}, \"size\": {} }}{}", ext, fc.count, fc.size, comma);
+        println!(
+            "    \"{}\": {{ \"count\": {}, \"size\": {} }}{}",
+            ext, fc.count, fc.size, comma
+        );
     }
     println!("  }}");
-    
+
     println!("}}");
 }
