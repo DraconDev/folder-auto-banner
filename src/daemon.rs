@@ -99,8 +99,9 @@ impl Daemon {
                 Ok((stream, _)) => {
                     last_activity = Instant::now();
                     let cache = self.cache.clone();
+                    let dir_sizes = self.dir_sizes.clone();
                     thread::spawn(move || {
-                        if let Err(e) = handle_client(stream, cache) {
+                        if let Err(e) = handle_client(stream, cache, dir_sizes) {
                             tracing::error!("Client error: {}", e);
                         }
                     });
@@ -214,6 +215,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
 fn handle_client(
     stream: UnixStream,
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+    dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
 ) -> Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
@@ -241,19 +243,18 @@ fn handle_client(
             }
 
             // Cache miss — compute (fast, without dir sizes)
-            let data = compute_banner_data(&path)?;
+            let mut data = compute_banner_data(&path)?;
 
-            // Spawn background computation for directory sizes
-            let dir_items: Vec<_> = data
-                .summary
-                .top_items
-                .iter()
-                .filter(|i| i.is_dir)
-                .cloned()
-                .collect();
-            if !dir_items.is_empty() {
-                compute_dir_sizes_background(path.clone(), dir_items, cache.clone());
+            // Inject sizes from global cache
+            let global_sizes = dir_sizes.lock().unwrap();
+            for item in &mut data.summary.top_items {
+                if item.is_dir {
+                    if let Some(&size) = global_sizes.get(&item.path) {
+                        item.size = size;
+                    }
+                }
             }
+            drop(global_sizes);
 
             // Store in cache
             {
@@ -270,7 +271,8 @@ fn handle_client(
             Response::Banner(Box::new(data))
         }
         Request::DirSize { path } => {
-            let size = compute_dir_size(&path);
+            let sizes = dir_sizes.lock().unwrap();
+            let size = sizes.get(&path).copied().unwrap_or_else(|| compute_dir_size(&path));
             Response::DirSize { path, size }
         }
         Request::Ping => Response::Pong,
