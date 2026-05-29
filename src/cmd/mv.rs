@@ -1,6 +1,6 @@
 //! Move command — move files with collision detection
 //!
-//! Usage: fm mv [options] <source> <dest>
+//! Usage: `fm mv [options] <source> <dest>`
 //!        fm mv [options] <source>... <dest_dir>
 
 use anyhow::Result;
