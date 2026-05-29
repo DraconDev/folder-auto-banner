@@ -31,6 +31,7 @@ const CYAN: &str = "\x1b[36m";
 const GRAY: &str = "\x1b[90m";
 const WHITE: &str = "\x1b[97m";
 const ORANGE: &str = "\x1b[38;5;214m";
+const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating rows
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
@@ -496,7 +497,9 @@ fn output_rich(
     }
 
     // Print each row — PERM OWNER GROUP CONTENTS SIZE DATE NAME
-    for item in display_items {
+    for (idx, item) in display_items.iter().enumerate() {
+        let row_tint = if idx % 2 == 0 { ROW_TINT } else { "" };
+        let tint_reset = if idx % 2 == 0 { color(RESET) } else { "" };
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
         // Per-file git status — try relative path first, then filename
@@ -620,7 +623,8 @@ fn output_rich(
 
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
         println!(
-            "{} {} {} {} {} {} {}{}{}",
+            "{}{} {} {} {} {} {} {}{}{}{}",
+            row_tint,
             perm_colored,
             owner_colored,
             group_colored,
@@ -629,7 +633,8 @@ fn output_rich(
             contents_colored,
             git_icon,
             icon_str,
-            name_display
+            name_display,
+            tint_reset
         );
     }
 
