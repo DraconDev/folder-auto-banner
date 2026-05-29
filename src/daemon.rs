@@ -229,14 +229,25 @@ fn handle_client(
         Request::Banner { path } => {
             let path = path.canonicalize().unwrap_or(path);
 
-            // Check cache
+            // Check cache — but still inject global sizes
             {
                 let cache = cache.lock().unwrap();
                 if let Some(entry) = cache.get(&path) {
                     if entry.computed_at.elapsed() < CACHE_TTL {
+                        let mut data = entry.data.clone();
+                        drop(cache);
+                        // Inject sizes from global cache (may have been updated since cached)
+                        let global_sizes = dir_sizes.lock().unwrap();
+                        for item in &mut data.summary.top_items {
+                            if item.is_dir {
+                                if let Some(&size) = global_sizes.get(&item.path) {
+                                    item.size = size;
+                                }
+                            }
+                        }
                         return send_response(
                             &mut writer,
-                            &Response::Banner(Box::new(entry.data.clone())),
+                            &Response::Banner(Box::new(data)),
                         );
                     }
                 }
