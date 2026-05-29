@@ -44,8 +44,6 @@ byte-unit = "5"
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
 
-# Async
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 # Error handling
 anyhow = "1"
@@ -56,7 +54,6 @@ toml = "0.8"
 
 # Path handling
 path-absolutize = "3.1"
-atty = "0.2"
 
 # Glob patterns
 glob = "0.3"

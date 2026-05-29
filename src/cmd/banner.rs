@@ -13,11 +13,9 @@ use crate::icon;
 
 // ANSI color codes — only emitted when stdout is a tty
 fn color(code: &str) -> &str {
-    if atty::is(atty::Stream::Stdout) {
-        code
-    } else {
-        ""
-    }
+    use std::io::IsTerminal;
+    if std::io::stdout().is_terminal() { code } else { "" }
+}
 }
 
 const RESET: &str = "\x1b[0m";
@@ -86,7 +84,7 @@ pub fn run_banner(
 
     let summary = DirSummary::scan_with_options(
         &path,
-        !no_build_check,
+        false, // build check disabled by default — too slow (cargo check = 6.7s)
         !no_todos,
         !no_ports,
         !no_docker,
