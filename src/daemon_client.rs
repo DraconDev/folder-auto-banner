@@ -48,6 +48,31 @@ pub fn is_daemon_running() -> bool {
     let Ok(stream) = UnixStream::connect(&socket) else {
         return false;
     };
+    stream.set_read_timeout(Some(Duration::from_millis(500))).ok();
+    stream.set_write_timeout(Some(Duration::from_millis(500))).ok();
+
+    let request = Request::Ping;
+    serde_json::to_writer(&stream, &request).ok();
+    let response: Result<Response, _> = serde_json::from_reader(&stream);
+    matches!(response, Ok(Response::Pong))
+}
+
+/// Send shutdown signal to daemon
+pub fn send_shutdown() {
+    let Ok(socket) = socket_path() else {
+        return;
+    };
+    if let Ok(stream) = UnixStream::connect(&socket) {
+        stream.set_read_timeout(Some(Duration::from_millis(500))).ok();
+        stream.set_write_timeout(Some(Duration::from_millis(500))).ok();
+        let request = Request::Shutdown;
+        serde_json::to_writer(&stream, &request).ok();
+    }
+}
+    // Try to connect and ping
+    let Ok(stream) = UnixStream::connect(&socket) else {
+        return false;
+    };
     stream
         .set_read_timeout(Some(Duration::from_millis(500)))
         .ok();
