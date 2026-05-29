@@ -307,19 +307,22 @@ fn compute_dir_sizes_background(
 }
 
 fn compute_dir_size(path: &Path) -> u64 {
-    let mut total = 0u64;
-    if let Ok(entries) = std::fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if let Ok(metadata) = entry.metadata() {
-                if metadata.is_file() {
-                    total += metadata.len();
-                } else if metadata.is_dir() {
-                    total += compute_dir_size(&entry.path());
+    // Use `du -s` which is much faster than recursive Rust
+    if let Ok(output) = std::process::Command::new("du")
+        .args(["-s", "--bytes"])
+        .arg(path)
+        .output()
+    {
+        if let Ok(stdout) = String::from_utf8(output.stdout) {
+            if let Some(size_str) = stdout.split_whitespace().next() {
+                if let Ok(size) = size_str.parse::<u64>() {
+                    return size;
                 }
             }
         }
     }
-    total
+    // Fallback: just the directory inode size
+    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }
 
 fn main() -> Result<()> {
