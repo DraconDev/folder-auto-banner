@@ -24,11 +24,13 @@ const BLUE_BOLD: &str = "\x1b[1;34m";
 const GREEN: &str = "\x1b[32m";
 const GREEN_BOLD: &str = "\x1b[1;32m";
 const YELLOW: &str = "\x1b[33m";
+const YELLOW_BOLD: &str = "\x1b[1;33m";
 const MAGENTA: &str = "\x1b[35m";
 const RED: &str = "\x1b[31m";
 const CYAN: &str = "\x1b[36m";
 const GRAY: &str = "\x1b[90m";
 const WHITE: &str = "\x1b[97m";
+const ORANGE: &str = "\x1b[38;5;214m";
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
@@ -511,35 +513,39 @@ fn output_rich(
 
         // Color the name based on type (like lsd/exa)
         let (name_prefix, name_suffix) = if item.is_dir {
-            (color(GREEN_BOLD), color(RESET))
+            (color(BLUE_BOLD), color(RESET))
         } else if item.is_symlink {
             (color(MAGENTA), color(RESET))
         } else if item.is_exec {
-            (color(GREEN_BOLD), color(RESET))
+            (color(YELLOW_BOLD), color(RESET))
         } else if item.name.starts_with('.') {
             (color(DIM), color(RESET))
         } else {
             // Color by file extension
             let ext = item.name.rfind('.').map(|i| &item.name[i..]).unwrap_or("");
             match ext {
-                // Config files - yellow
+                // Scripts - red (execution risk)
+                ".sh" | ".bash" | ".py" | ".rb" | ".pl" | ".php" | ".js" | ".ts"
+                | ".jsx" | ".tsx" | ".ruby" | ".perl" | ".lua" | ".r" | ".R"
+                | ".ps1" | ".bat" | ".cmd" => (color(RED), color(RESET)),
+                // Config files - dim
                 ".json" | ".yaml" | ".yml" | ".toml" | ".ini" | ".conf" | ".cfg" | ".env" => {
-                    (color(YELLOW), color(RESET))
+                    (color(DIM), color(RESET))
                 }
-                // Documentation - blue
-                ".md" | ".txt" | ".rst" | ".doc" | ".docx" | ".pdf" => (color(BLUE), color(RESET)),
+                // Documentation - cyan
+                ".md" | ".txt" | ".rst" | ".doc" | ".docx" | ".pdf" => (color(CYAN), color(RESET)),
                 // Source code - green
-                ".rs" | ".py" | ".js" | ".ts" | ".jsx" | ".tsx" | ".go" | ".rb" | ".java"
-                | ".c" | ".cpp" | ".h" => (color(GREEN), color(RESET)),
+                ".rs" | ".go" | ".java" | ".c" | ".cpp" | ".h" | ".hpp" | ".cs"
+                | ".swift" | ".kt" | ".scala" | ".zig" | ".nim" => (color(GREEN), color(RESET)),
                 // Images - magenta
                 ".png" | ".jpg" | ".jpeg" | ".gif" | ".svg" | ".webp" | ".ico" => {
                     (color(MAGENTA), color(RESET))
                 }
                 // Videos - cyan
-                ".mp4" | ".mkv" | ".avi" | ".mov" | ".webm" => (color(CYAN), color(RESET)),
-                // Archives - red
+                ".mp4" | ".mkv" | ".avi" | ".mov" | ".webm" | ".flv" => (color(CYAN), color(RESET)),
+                // Archives - dim
                 ".zip" | ".tar" | ".gz" | ".bz2" | ".xz" | ".7z" | ".rar" | ".tgz" => {
-                    (color(RED), color(RESET))
+                    (color(DIM), color(RESET))
                 }
                 // Default - no color
                 _ => ("", ""),
@@ -596,12 +602,12 @@ fn output_rich(
         let owner_colored = format!("{}{}{}", color(BLUE), owner_padded, color(RESET));
         let group_colored = format!("{}{}{}", color(BLUE), group_padded, color(RESET));
 
-        // Size: red
-        let size_colored = format!("{}{}{}", color(RED), size_padded, color(RESET));
+        // Size: orange
+        let size_colored = format!("{}{}{}", color(ORANGE), size_padded, color(RESET));
 
-        // Contents: red
+        // Contents: orange
         let contents_colored = if item.is_dir {
-            format!("{}{}{}", color(RED), contents_padded, color(RESET))
+            format!("{}{}{}", color(ORANGE), contents_padded, color(RESET))
         } else {
             let colored = get_file_contents(item);
             let padded = format!(
