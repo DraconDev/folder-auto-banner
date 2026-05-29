@@ -28,7 +28,9 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let socket = socket_path().ok()?;
     let stream = UnixStream::connect(&socket).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
-    stream.set_write_timeout(Some(Duration::from_secs(5))).ok()?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .ok()?;
 
     let request = Request::Banner {
         path: path.to_path_buf(),
