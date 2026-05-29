@@ -69,7 +69,7 @@ impl Daemon {
 
         // Start inotify watcher thread
         let cache_clone = self.cache.clone();
-        let watcher_handle = thread::spawn(move || {
+        let _watcher_handle = thread::spawn(move || {
             watch_loop(cache_clone);
         });
 
@@ -125,7 +125,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
             let cache = cache.lock().unwrap();
             for path in cache.keys() {
                 if !watched.contains_key(path) {
-                    match inotify.add_watch(
+                    match inotify.watches().add(
                         path,
                         WatchMask::CREATE | WatchMask::DELETE | WatchMask::MODIFY | WatchMask::MOVE,
                     ) {
@@ -150,7 +150,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                     let mut invalidated = Vec::new();
 
                     {
-                        let cache = cache.lock().unwrap();
+                        let cache_guard = cache.lock().unwrap();
                         for (path, wd) in &watched {
                             if event.wd == *wd {
                                 invalidated.push(path.clone());
@@ -160,9 +160,9 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
 
                     // Invalidate affected cache entries
                     if !invalidated.is_empty() {
-                        let mut cache = cache.lock().unwrap();
+                        let mut cache_guard = cache.lock().unwrap();
                         for path in &invalidated {
-                            cache.remove(path);
+                            cache_guard.remove(path);
                             tracing::info!("Cache invalidated: {}", path.display());
                         }
                     }
@@ -186,7 +186,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                 .collect();
             for path in to_remove {
                 if let Some(wd) = watched.remove(&path) {
-                    inotify.rm_watch(wd).ok();
+                    inotify.watches().remove(wd).ok();
                     tracing::info!("Stopped watching: {}", path.display());
                 }
             }
