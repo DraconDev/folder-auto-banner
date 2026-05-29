@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::fs::{DirSummary, DirEntry};
+use crate::fs::DirSummary;
 use crate::git::GitInfo;
 
 // IPC Protocol

@@ -5,6 +5,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use ignore::WalkBuilder;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// Project type detection
