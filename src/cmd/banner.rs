@@ -528,9 +528,10 @@ fn output_rich(
             let ext = item.name.rfind('.').map(|i| &item.name[i..]).unwrap_or("");
             match ext {
                 // Scripts - red (execution risk)
-                ".sh" | ".bash" | ".py" | ".rb" | ".pl" | ".php" | ".js" | ".ts"
-                | ".jsx" | ".tsx" | ".ruby" | ".perl" | ".lua" | ".r" | ".R"
-                | ".ps1" | ".bat" | ".cmd" => (color(RED), color(RESET)),
+                ".sh" | ".bash" | ".py" | ".rb" | ".pl" | ".php" | ".js" | ".ts" | ".jsx"
+                | ".tsx" | ".ruby" | ".perl" | ".lua" | ".r" | ".R" | ".ps1" | ".bat" | ".cmd" => {
+                    (color(RED), color(RESET))
+                }
                 // Config files - dim
                 ".json" | ".yaml" | ".yml" | ".toml" | ".ini" | ".conf" | ".cfg" | ".env" => {
                     (color(DIM), color(RESET))
@@ -538,8 +539,8 @@ fn output_rich(
                 // Documentation - cyan
                 ".md" | ".txt" | ".rst" | ".doc" | ".docx" | ".pdf" => (color(CYAN), color(RESET)),
                 // Source code - green
-                ".rs" | ".go" | ".java" | ".c" | ".cpp" | ".h" | ".hpp" | ".cs"
-                | ".swift" | ".kt" | ".scala" | ".zig" | ".nim" => (color(GREEN), color(RESET)),
+                ".rs" | ".go" | ".java" | ".c" | ".cpp" | ".h" | ".hpp" | ".cs" | ".swift"
+                | ".kt" | ".scala" | ".zig" | ".nim" => (color(GREEN), color(RESET)),
                 // Images - magenta
                 ".png" | ".jpg" | ".jpeg" | ".gif" | ".svg" | ".webp" | ".ico" => {
                     (color(MAGENTA), color(RESET))
@@ -1051,7 +1052,13 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                                 color(RESET)
                             ));
                         }
-                        return Some(format!("{}{}{}{}", color(ORANGE), seconds, "s", color(RESET)));
+                        return Some(format!(
+                            "{}{}{}{}",
+                            color(ORANGE),
+                            seconds,
+                            "s",
+                            color(RESET)
+                        ));
                     }
                 }
             }
