@@ -1000,7 +1000,7 @@ fn extract_video_duration(path: &std::path::Path) -> Option<String> {
 
 /// Parse MP4 buffer for moov > mvhd and extract duration
 fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
-    let mut i = 0;
+    let i = 0;
     while i < buf.len().saturating_sub(8) {
         let size = u32::from_be_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]) as usize;
         if size < 8 {
