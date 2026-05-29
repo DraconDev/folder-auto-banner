@@ -109,7 +109,7 @@ impl Daemon {
 
 /// inotify watcher loop — monitors cached directories for changes
 fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
-    let inotify = match Inotify::init() {
+    let mut inotify = match Inotify::init() {
         Ok(i) => i,
         Err(e) => {
             tracing::error!("Failed to init inotify: {}", e);
@@ -141,17 +141,16 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
             }
         }
 
-        // Read inotify events (non-blocking with timeout)
+        // Read inotify events (non-blocking)
         let mut buffer = [0u8; 4096];
-        match inotify.read_events_timeout(&mut buffer, Duration::from_millis(1000)) {
+        match inotify.read_events(&mut buffer) {
             Ok(events) => {
                 for event in events {
                     // Find which cached directory this event belongs to
-                    let cache_clone = cache.clone();
                     let mut invalidated = Vec::new();
 
                     {
-                        let cache = cache_clone.lock().unwrap();
+                        let cache = cache.lock().unwrap();
                         for (path, wd) in &watched {
                             if event.wd == *wd {
                                 invalidated.push(path.clone());
@@ -169,8 +168,11 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                     }
                 }
             }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                // No events — continue
+            }
             Err(_) => {
-                // Timeout or error — continue loop
+                // Error — continue loop
             }
         }
 
@@ -179,7 +181,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
             let cache = cache.lock().unwrap();
             let to_remove: Vec<PathBuf> = watched
                 .keys()
-                .filter(|p| !cache.contains_key(p))
+                .filter(|p| !cache.contains_key(*p))
                 .cloned()
                 .collect();
             for path in to_remove {
