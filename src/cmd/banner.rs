@@ -14,7 +14,11 @@ use crate::icon;
 // ANSI color codes — only emitted when stdout is a tty
 fn color(code: &str) -> &str {
     use std::io::IsTerminal;
-    if std::io::stdout().is_terminal() { code } else { "" }
+    if std::io::stdout().is_terminal() {
+        code
+    } else {
+        ""
+    }
 }
 
 const RESET: &str = "\x1b[0m";
