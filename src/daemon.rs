@@ -384,6 +384,106 @@ fn compute_dir_size(path: &Path) -> u64 {
     std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }
 
+const SIZE_CACHE_FILE: &str = "dir_sizes.json";
+
+fn size_cache_path(socket_dir: &Path) -> PathBuf {
+    socket_dir.join(SIZE_CACHE_FILE)
+}
+
+fn load_size_cache(socket_dir: &Path) -> HashMap<PathBuf, u64> {
+    let path = size_cache_path(socket_dir);
+    if let Ok(data) = std::fs::read_to_string(&path) {
+        if let Ok(map) = serde_json::from_str::<HashMap<String, u64>>(&data) {
+            let result: HashMap<PathBuf, u64> = map.into_iter().map(|(k, v)| (PathBuf::from(k), v)).collect();
+            tracing::info!("Loaded {} cached directory sizes from disk", result.len());
+            return result;
+        }
+    }
+    HashMap::new()
+}
+
+fn save_size_cache(socket_dir: &Path, sizes: &HashMap<PathBuf, u64>) {
+    let path = size_cache_path(socket_dir);
+    let map: HashMap<String, u64> = sizes.iter().map(|(k, v)| (k.to_string_lossy().to_string(), *v)).collect();
+    if let Ok(data) = serde_json::to_string(&map) {
+        if std::fs::write(&path, data).is_ok() {
+            tracing::info!("Saved {} directory sizes to disk", sizes.len());
+        }
+    }
+}
+
+/// Proactively scan home directory and populate global size cache
+fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
+    let home = match std::env::var("HOME") {
+        Ok(h) => PathBuf::from(h),
+        Err(_) => return,
+    };
+
+    tracing::info!("Starting proactive scan of {}", home.display());
+
+    // Find all directories in home (up to 2 levels deep for speed)
+    let mut dirs_to_scan: Vec<PathBuf> = Vec::new();
+
+    // Level 1: direct children of home
+    if let Ok(entries) = std::fs::read_dir(&home) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
+                    dirs_to_scan.push(entry.path());
+                }
+            }
+        }
+    }
+
+    // Level 2: subdirectories of visible dirs (for projects like ~/Dev/project)
+    let level1: Vec<PathBuf> = dirs_to_scan.clone();
+    for dir in &level1 {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten().take(50) {
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.is_dir() {
+                        dirs_to_scan.push(entry.path());
+                    }
+                }
+            }
+        }
+    }
+
+    // Also scan hidden dirs that are commonly large
+    for hidden in &[".cache", ".config", ".local", ".cargo", ".rustup", ".nix-profile"] {
+        let dir = home.join(hidden);
+        if dir.is_dir() {
+            dirs_to_scan.push(dir);
+        }
+    }
+
+    tracing::info!("Scanning {} directories", dirs_to_scan.len());
+
+    // Run du for all directories at once
+    let mut du_args: Vec<String> = vec!["-s".to_string(), "--bytes".to_string()];
+    for dir in &dirs_to_scan {
+        du_args.push(dir.to_string_lossy().to_string());
+    }
+
+    if let Ok(output) = std::process::Command::new("du").args(&du_args).output() {
+        if let Ok(stdout) = String::from_utf8(output.stdout) {
+            let mut sizes = dir_sizes.lock().unwrap();
+            let mut count = 0;
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.splitn(2, '\t').collect();
+                if parts.len() >= 2 {
+                    if let Ok(size) = parts[0].parse::<u64>() {
+                        let dir_path = PathBuf::from(parts[1]);
+                        sizes.insert(dir_path, size);
+                        count += 1;
+                    }
+                }
+            }
+            tracing::info!("Proactive scan complete: {} directory sizes cached", count);
+        }
+    }
+}
+
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
