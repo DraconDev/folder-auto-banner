@@ -1066,14 +1066,30 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                         let seconds = duration / timescale;
                         let mins = seconds / 60;
                         let secs = seconds % 60;
-if mins >= 60 {
-                        let hours = mins / 60;
-                        let mins = mins % 60;
-                        return Some(format!("{}{}:{:02}:{:02}{}", color(RED), hours, mins, secs, color(RESET)));
-                    } else if mins > 0 {
-                        return Some(format!("{}{}:{:02}{}", color(RED), mins, secs, color(RESET)));
+                        if mins >= 60 {
+                            let hours = mins / 60;
+                            let mins = mins % 60;
+                            return Some(format!(
+                                "{}{}:{:02}:{:02}{}",
+                                color(RED),
+                                hours,
+                                mins,
+                                secs,
+                                color(RESET)
+                            ));
+                        } else if mins > 0 {
+                            return Some(format!(
+                                "{}{}:{:02}{}",
+                                color(RED),
+                                mins,
+                                secs,
+                                color(RESET)
+                            ));
+                        }
+                        return Some(format!("{}{}{}{}", color(RED), seconds, "s", color(RESET)));
                     }
-                    return Some(format!("{}{}{}{}", color(RED), seconds, "s", color(RESET)));
+                }
+            }
         }
     }
 
