@@ -593,9 +593,7 @@ fn output_rich(
         let size_colored = format!("{}{}{}", color(ORANGE), size_padded, color(RESET));
 
         // Contents: orange
-        let contents_colored = if item.is_symlink {
-            String::new()
-        } else if item.is_dir {
+        let contents_colored = if item.is_dir {
             format!("{}{}{}", color(ORANGE), contents_padded, color(RESET))
         } else {
             let colored = get_file_contents(item);
@@ -728,11 +726,6 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     let name = &entry.name;
     let lower = name.to_lowercase();
 
-    // Symlinks: no contents (size already shows in size column)
-    if entry.is_symlink {
-        return String::new();
-    }
-
     // Image files: try to get resolution from header
     if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
         if let Ok(bytes) = std::fs::read(&entry.path) {
@@ -787,10 +780,6 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
 fn get_file_contents_raw(entry: &crate::fs::DirEntry) -> String {
     let name = &entry.name;
     let lower = name.to_lowercase();
-
-    if entry.is_symlink {
-        return String::new();
-    }
 
     if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
         if let Ok(bytes) = std::fs::read(&entry.path) {
