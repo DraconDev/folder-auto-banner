@@ -502,8 +502,8 @@ fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
     tracing::info!("Scanning {} directories", dirs_to_scan.len());
 
     // Run du in batches to avoid ARG_MAX limits
+    // Lock per-batch to avoid blocking banner requests for the entire scan
     let batch_size = 50;
-    let mut sizes = dir_sizes.lock().unwrap();
     let mut count = 0;
 
     for chunk in dirs_to_scan.chunks(batch_size) {
@@ -513,18 +513,25 @@ fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
         }
 
         if let Ok(output) = std::process::Command::new("du").args(&du_args).output() {
+            let mut batch_sizes = Vec::new();
             if let Ok(stdout) = String::from_utf8(output.stdout) {
                 for line in stdout.lines() {
                     let parts: Vec<&str> = line.splitn(2, '\t').collect();
                     if parts.len() >= 2 {
                         if let Ok(size) = parts[0].parse::<u64>() {
                             let dir_path = PathBuf::from(parts[1]);
-                            sizes.insert(dir_path, size);
+                            batch_sizes.push((dir_path, size));
                             count += 1;
                         }
                     }
                 }
             }
+            // Brief lock to insert batch, then release
+            let mut sizes = dir_sizes.lock().unwrap();
+            for (path, size) in batch_sizes {
+                sizes.insert(path, size);
+            }
+            drop(sizes);
         }
     }
 
@@ -534,6 +541,7 @@ fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
     let socket_dir =
         directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
     if let Some(dir) = socket_dir {
+        let sizes = dir_sizes.lock().unwrap();
         save_size_cache(&dir, &sizes);
     }
 }
