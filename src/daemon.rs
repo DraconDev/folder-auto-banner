@@ -108,6 +108,7 @@ impl Daemon {
         });
 
         let mut last_activity = Instant::now();
+        let mut last_save = Instant::now();
 
         loop {
             match listener.accept() {
@@ -127,6 +128,18 @@ impl Daemon {
                         tracing::info!("Idle timeout, shutting down");
                         break;
                     }
+
+                    // Periodic save every 5 minutes
+                    if last_save.elapsed() > Duration::from_secs(300) {
+                        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+                            .map(|p| p.data_dir().to_path_buf());
+                        if let Some(dir) = socket_dir {
+                            let cache = self.cache.lock().unwrap();
+                            save_banner_cache(&dir, &cache);
+                        }
+                        last_save = Instant::now();
+                    }
+
                     thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => {
