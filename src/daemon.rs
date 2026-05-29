@@ -290,6 +290,12 @@ fn compute_dir_sizes_background(
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
 ) {
     thread::spawn(move || {
+        tracing::info!(
+            "Computing sizes for {} directories in {}",
+            items.len(),
+            path.display()
+        );
+
         // Run du for all directories at once (much faster than one-by-one)
         let mut du_args: Vec<String> = vec!["-s".to_string(), "--bytes".to_string()];
         for item in &items {
@@ -298,17 +304,33 @@ fn compute_dir_sizes_background(
 
         let mut dir_sizes = HashMap::new();
 
-        if let Ok(output) = std::process::Command::new("du").args(&du_args).output() {
-            if let Ok(stdout) = String::from_utf8(output.stdout) {
-                for line in stdout.lines() {
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if parts.len() >= 2 {
-                        if let Ok(size) = parts[0].parse::<u64>() {
-                            let dir_path = PathBuf::from(parts[1]);
-                            dir_sizes.insert(dir_path, size);
+        match std::process::Command::new("du").args(&du_args).output() {
+            Ok(output) => {
+                if !output.stderr.is_empty() {
+                    tracing::debug!(
+                        "du stderr: {}",
+                        String::from_utf8_lossy(&output.stderr).trim()
+                    );
+                }
+                if let Ok(stdout) = String::from_utf8(output.stdout) {
+                    for line in stdout.lines() {
+                        let parts: Vec<&str> = line.splitn(2, '\t').collect();
+                        if parts.len() >= 2 {
+                            if let Ok(size) = parts[0].parse::<u64>() {
+                                let dir_path = PathBuf::from(parts[1]);
+                                dir_sizes.insert(dir_path, size);
+                            }
                         }
                     }
                 }
+                tracing::info!(
+                    "Computed sizes for {} directories in {}",
+                    dir_sizes.len(),
+                    path.display()
+                );
+            }
+            Err(e) => {
+                tracing::error!("Failed to run du: {}", e);
             }
         }
 
@@ -316,11 +338,8 @@ fn compute_dir_sizes_background(
         let mut cache = cache.lock().unwrap();
         if let Some(entry) = cache.get_mut(&path) {
             entry.data.dir_sizes = dir_sizes;
-            tracing::info!(
-                "Computed sizes for {} directories in {}",
-                entry.data.dir_sizes.len(),
-                path.display()
-            );
+        } else {
+            tracing::warn!("Cache entry for {} expired before sizes were computed", path.display());
         }
     });
 }
