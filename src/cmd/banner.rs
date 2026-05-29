@@ -731,43 +731,43 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     let name = &entry.name;
     let lower = name.to_lowercase();
 
-    // Symlinks: show target length in dim
+    // Symlinks: show target length
     if entry.is_symlink {
         if let Some(target) = &entry.symlink_target {
-            return format!("{}{}→{}", color(DIM), target.len(), color(RESET));
+            return format!("{}{}→{}", color(BLUE), target.len(), color(RESET));
         }
         return String::new();
     }
 
-    // Image files: try to get resolution from header (yellow)
+    // Image files: try to get resolution from header
     if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
         if let Ok(bytes) = std::fs::read(&entry.path) {
             if let Some(res) = extract_image_resolution(&bytes, &lower) {
-                return format!("{}{}{}", color(YELLOW), res, color(RESET));
+                return format!("{}{}{}", color(BLUE), res, color(RESET));
             }
         }
     }
 
-    // ZIP files: count entries (yellow)
+    // ZIP files: count entries
     if lower.ends_with(".zip") {
         if let Ok(bytes) = std::fs::read(&entry.path) {
             if let Some(count) = count_zip_entries(&bytes) {
-                return format!("{}{}{}", color(YELLOW), count, color(RESET));
+                return format!("{}{}{}", color(BLUE), count, color(RESET));
             }
         }
     }
 
-    // SQLite DB: show table count (cyan)
+    // SQLite DB: show table count
     if lower.ends_with(".db") || lower.ends_with(".sqlite") || lower.ends_with(".sqlite3") {
         if let Some(count) = count_sqlite_tables(&entry.path) {
-            return format!("{}{}t{}", color(CYAN), count, color(RESET));
+            return format!("{}{}t{}", color(BLUE), count, color(RESET));
         }
     }
 
-    // Video files: extract duration from container headers (magenta)
+    // Video files: extract duration from container headers
     if lower.ends_with(".mp4") || lower.ends_with(".mov") || lower.ends_with(".m4v") {
         if let Some(dur) = extract_video_duration(&entry.path) {
-            return format!("{}{}{}", color(MAGENTA), dur, color(RESET));
+            return format!("{}{}{}", color(BLUE), dur, color(RESET));
         }
     }
 
@@ -778,11 +778,11 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
         }
     }
 
-    // Text files under 1MB: count lines (cyan)
+    // Text files under 1MB: count lines
     if entry.size < 1024 * 1024 {
         if let Ok(content) = std::fs::read_to_string(&entry.path) {
             let lines = content.lines().count();
-            return format!("{}{}{}", color(CYAN), lines, color(RESET));
+            return format!("{}{}{}", color(BLUE), lines, color(RESET));
         }
     }
 
@@ -1105,11 +1105,11 @@ fn extract_webm_duration(path: &std::path::Path) -> Option<String> {
             if mins >= 60 {
                 let hours = mins / 60;
                 let mins = mins % 60;
-                return Some(format!("{}:{:02}:{:02}", hours, mins, secs));
+                return Some(format!("{}{}:{:02}:{:02}{}", color(BLUE), hours, mins, secs, color(RESET)));
             } else if mins > 0 {
-                return Some(format!("{}:{:02}", mins, secs));
+                return Some(format!("{}{}:{:02}{}", color(BLUE), mins, secs, color(RESET)));
             }
-            return Some(format!("{}s", seconds));
+            return Some(format!("{}{}{}{}", color(BLUE), seconds, "s", color(RESET)));
         }
     }
 
