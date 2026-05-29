@@ -229,14 +229,14 @@ fn handle_client(
         Request::Banner { path } => {
             let path = path.canonicalize().unwrap_or(path);
 
-            // Check cache — but still inject global sizes
+            // Check cache — if hit, inject sizes and return immediately
             {
                 let cache = cache.lock().unwrap();
                 if let Some(entry) = cache.get(&path) {
                     if entry.computed_at.elapsed() < CACHE_TTL {
                         let mut data = entry.data.clone();
                         drop(cache);
-                        // Inject sizes from global cache (may have been updated since cached)
+                        // Inject sizes from global cache
                         let global_sizes = dir_sizes.lock().unwrap();
                         for item in &mut data.summary.top_items {
                             if item.is_dir {
@@ -253,27 +253,19 @@ fn handle_client(
                 }
             }
 
-            // Cache miss — compute (fast, without dir sizes)
+            // Cache miss — do full scan
             let mut data = compute_banner_data(&path)?;
 
             // Inject sizes from global cache
             let global_sizes = dir_sizes.lock().unwrap();
-            let mut injected = 0;
             for item in &mut data.summary.top_items {
                 if item.is_dir {
                     if let Some(&size) = global_sizes.get(&item.path) {
                         item.size = size;
-                        injected += 1;
                     }
                 }
             }
             drop(global_sizes);
-            tracing::debug!(
-                "Injected {} sizes for {} items in {}",
-                injected,
-                data.summary.top_items.len(),
-                path.display()
-            );
 
             // Store in cache
             {
