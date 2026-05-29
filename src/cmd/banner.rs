@@ -813,7 +813,7 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
 
     // WebM/MKV: extract duration from EBML headers
     if lower.ends_with(".webm") || lower.ends_with(".mkv") {
-        if let Some(dur) = extract_webm_duration(&entry.path) {
+        if let Some(dur) = extract_video_duration(&entry.path) {
             return dur;
         }
     }
@@ -870,7 +870,7 @@ fn get_file_contents_raw(entry: &crate::fs::DirEntry) -> String {
     }
 
     if lower.ends_with(".webm") || lower.ends_with(".mkv") {
-        if let Some(dur) = extract_webm_duration(&entry.path) {
+        if let Some(dur) = extract_video_duration(&entry.path) {
             return dur;
         }
     }
@@ -1010,7 +1010,7 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
         // Check for "moov" atom
         if buf[i + 4] == 0x6D && buf[i + 5] == 0x6F && buf[i + 6] == 0x6F && buf[i + 7] == 0x76 {
             // Found moov, scan inside for mvhd
-            let mut j = i + 8;
+            let j = i + 8;
             let moov_end = i + size;
 
             while j < moov_end.saturating_sub(8) && j < buf.len().saturating_sub(8) {
