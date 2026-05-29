@@ -593,7 +593,9 @@ fn output_rich(
         let size_colored = format!("{}{}{}", color(ORANGE), size_padded, color(RESET));
 
         // Contents: orange
-        let contents_colored = if item.is_dir {
+        let contents_colored = if item.is_symlink {
+            String::new()
+        } else if item.is_dir {
             format!("{}{}{}", color(ORANGE), contents_padded, color(RESET))
         } else {
             let colored = get_file_contents(item);
