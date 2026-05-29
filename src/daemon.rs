@@ -36,6 +36,8 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 
 struct Daemon {
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+    /// Global directory size cache — populated by proactive scan
+    dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     socket_path: PathBuf,
 }
 
@@ -55,8 +57,12 @@ impl Daemon {
             std::fs::remove_file(&socket_path)?;
         }
 
+        // Load persistent size cache from disk
+        let dir_sizes = load_size_cache(&socket_dir);
+
         Ok(Self {
             cache: Arc::new(Mutex::new(HashMap::new())),
+            dir_sizes: Arc::new(Mutex::new(dir_sizes)),
             socket_path,
         })
     }
@@ -71,6 +77,19 @@ impl Daemon {
         let cache_clone = self.cache.clone();
         let _watcher_handle = thread::spawn(move || {
             watch_loop(cache_clone);
+        });
+
+        // Start proactive scan of home directory in background
+        let dir_sizes_clone = self.dir_sizes.clone();
+        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+            .map(|p| p.data_dir().to_path_buf());
+        thread::spawn(move || {
+            proactive_scan(dir_sizes_clone.clone());
+            // Save to disk when done
+            if let Some(dir) = socket_dir {
+                let sizes = dir_sizes_clone.lock().unwrap();
+                save_size_cache(&dir, &sizes);
+            }
         });
 
         let mut last_activity = Instant::now();
