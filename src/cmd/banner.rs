@@ -596,7 +596,11 @@ fn output_rich(
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let group_padded = format!("{:<width$}", item.group, width = max_group);
         let size_str = if item.is_dir {
-            "-".to_string()
+            if item.size > 0 {
+                format_size_compact(item.size)
+            } else {
+                "-".to_string()
+            }
         } else {
             format_size_compact(item.size)
         };
