@@ -44,14 +44,12 @@ else
     echo "⚠️  No daemon binary found. Daemon features disabled."
 fi
 
-# Install systemd user service (optional, via --with-service flag)
-if [ "${1:-}" = "--with-service" ]; then
-    mkdir -p "$HOME/.config/systemd/user"
-    cp cfmd.service "$HOME/.config/systemd/user/cfmd.service"
-    systemctl --user daemon-reload 2>/dev/null || true
-    echo "✅ Systemd user service installed"
-    echo "   Enable with: systemctl --user enable --now cfmd"
-fi
+# Install systemd user service
+mkdir -p "$HOME/.config/systemd/user"
+cp cfmd.service "$HOME/.config/systemd/user/cfmd.service"
+systemctl --user daemon-reload 2>/dev/null || true
+echo "✅ Systemd user service installed"
+echo "   Enable with: systemctl --user enable --now cfmd"
 
 # Add PATH to shell configs (only if not already there)
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
