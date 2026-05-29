@@ -99,7 +99,7 @@ pub struct DirEntry {
 }
 
 /// Directory summary
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirSummary {
     pub total_items: usize,
     pub total_size: u64,
