@@ -247,14 +247,22 @@ fn handle_client(
 
             // Inject sizes from global cache
             let global_sizes = dir_sizes.lock().unwrap();
+            let mut injected = 0;
             for item in &mut data.summary.top_items {
                 if item.is_dir {
                     if let Some(&size) = global_sizes.get(&item.path) {
                         item.size = size;
+                        injected += 1;
                     }
                 }
             }
             drop(global_sizes);
+            tracing::debug!(
+                "Injected {} sizes for {} items in {}",
+                injected,
+                data.summary.top_items.len(),
+                path.display()
+            );
 
             // Store in cache
             {
