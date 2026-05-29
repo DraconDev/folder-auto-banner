@@ -44,32 +44,6 @@ pub fn is_daemon_running() -> bool {
     if !socket.exists() {
         return false;
     }
-    // Try to connect and ping
-    let Ok(stream) = UnixStream::connect(&socket) else {
-        return false;
-    };
-    stream.set_read_timeout(Some(Duration::from_millis(500))).ok();
-    stream.set_write_timeout(Some(Duration::from_millis(500))).ok();
-
-    let request = Request::Ping;
-    serde_json::to_writer(&stream, &request).ok();
-    let response: Result<Response, _> = serde_json::from_reader(&stream);
-    matches!(response, Ok(Response::Pong))
-}
-
-/// Send shutdown signal to daemon
-pub fn send_shutdown() {
-    let Ok(socket) = socket_path() else {
-        return;
-    };
-    if let Ok(stream) = UnixStream::connect(&socket) {
-        stream.set_read_timeout(Some(Duration::from_millis(500))).ok();
-        stream.set_write_timeout(Some(Duration::from_millis(500))).ok();
-        let request = Request::Shutdown;
-        serde_json::to_writer(&stream, &request).ok();
-    }
-}
-    // Try to connect and ping
     let Ok(stream) = UnixStream::connect(&socket) else {
         return false;
     };
@@ -86,13 +60,29 @@ pub fn send_shutdown() {
     matches!(response, Ok(Response::Pong))
 }
 
+/// Send shutdown signal to daemon
+pub fn send_shutdown() {
+    let Ok(socket) = socket_path() else {
+        return;
+    };
+    if let Ok(stream) = UnixStream::connect(&socket) {
+        stream
+            .set_read_timeout(Some(Duration::from_millis(500)))
+            .ok();
+        stream
+            .set_write_timeout(Some(Duration::from_millis(500)))
+            .ok();
+        let request = Request::Shutdown;
+        serde_json::to_writer(&stream, &request).ok();
+    }
+}
+
 /// Start daemon in background (auto-start)
 pub fn ensure_daemon_running() {
     if is_daemon_running() {
         return;
     }
 
-    // Start daemon in background
     let Ok(exe) = std::env::current_exe() else {
         return;
     };
@@ -111,7 +101,6 @@ pub fn ensure_daemon_running() {
     {
         Ok(_) => {
             tracing::info!("Started cfmd daemon");
-            // Give daemon a moment to start
             std::thread::sleep(Duration::from_millis(100));
         }
         Err(e) => {
