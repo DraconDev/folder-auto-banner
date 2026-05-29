@@ -16,7 +16,6 @@ fn color(code: &str) -> &str {
     use std::io::IsTerminal;
     if std::io::stdout().is_terminal() { code } else { "" }
 }
-}
 
 const RESET: &str = "\x1b[0m";
 const DIM: &str = "\x1b[2m";
