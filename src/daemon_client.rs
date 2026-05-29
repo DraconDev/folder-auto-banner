@@ -42,7 +42,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     }
 }
 
-/// Check if daemon is running
+/// Check if daemon is running. Cleans up stale sockets automatically.
 pub fn is_daemon_running() -> bool {
     let Ok(socket) = socket_path() else {
         return false;
@@ -50,14 +50,26 @@ pub fn is_daemon_running() -> bool {
     if !socket.exists() {
         return false;
     }
-    let Ok(stream) = UnixStream::connect(&socket) else {
-        return false;
+    let stream = match UnixStream::connect(&socket) {
+        Ok(s) => s,
+        Err(_) => {
+            // Socket file exists but nobody is listening — remove stale socket
+            let _ = std::fs::remove_file(&socket);
+            return false;
+        }
     };
-    stream.set_read_timeout(Some(Duration::from_secs(1))).ok();
-    stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
+    stream.set_read_timeout(Some(Duration::from_secs(500))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(500))).ok();
 
     let request = Request::Ping;
-    matches!(send_and_recv(&stream, &request), Ok(Response::Pong))
+    match send_and_recv(&stream, &request) {
+        Ok(Response::Pong) => true,
+        _ => {
+            // Socket connected but daemon is unresponsive — remove stale socket
+            let _ = std::fs::remove_file(&socket);
+            false
+        }
+    }
 }
 
 /// Send shutdown signal to daemon
@@ -89,6 +101,13 @@ pub fn ensure_daemon_running() {
         return;
     }
 
+    // Clean up stale socket before spawning
+    if let Ok(socket) = socket_path() {
+        if socket.exists() {
+            let _ = std::fs::remove_file(&socket);
+        }
+    }
+
     match std::process::Command::new(&daemon_bin)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
@@ -98,7 +117,7 @@ pub fn ensure_daemon_running() {
         Ok(_) => {
             tracing::info!("Started cfmd daemon");
             // Give daemon time to bind socket
-            std::thread::sleep(Duration::from_millis(500));
+            std::thread::sleep(Duration::from_millis(1000));
         }
         Err(e) => {
             tracing::warn!("Failed to start cfmd: {}", e);
