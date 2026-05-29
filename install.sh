@@ -25,12 +25,16 @@ if [ -f "target/release/fm" ]; then
     cp target/release/fm "$BIN_PATH"
     chmod +x "$BIN_PATH"
     echo "✅ Binary installed to $BIN_PATH"
-elif [ -f "$HOME/.cargo/bin/fm" ]; then
-    echo "✅ Using cargo-installed binary at ~/.cargo/bin/fm"
-    BIN_PATH="$HOME/.cargo/bin/fm"
 else
     echo "❌ No binary found. Run 'cargo build --release' first."
     exit 1
+fi
+
+# Copy daemon binary
+if [ -f "target/release/cfmd" ]; then
+    cp target/release/cfmd "$BIN_DIR/cfmd"
+    chmod +x "$BIN_DIR/cfmd"
+    echo "✅ Daemon binary installed to $BIN_DIR/cfmd"
 fi
 
 # Add PATH to shell configs (only if not already there)
