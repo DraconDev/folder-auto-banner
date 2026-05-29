@@ -412,28 +412,40 @@ fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
 
     tracing::info!("Scanning {} directories", dirs_to_scan.len());
 
-    // Run du for all directories at once
-    let mut du_args: Vec<String> = vec!["-s".to_string(), "--bytes".to_string()];
-    for dir in &dirs_to_scan {
-        du_args.push(dir.to_string_lossy().to_string());
-    }
+    // Run du in batches to avoid ARG_MAX limits
+    let batch_size = 50;
+    let mut sizes = dir_sizes.lock().unwrap();
+    let mut count = 0;
 
-    if let Ok(output) = std::process::Command::new("du").args(&du_args).output() {
-        if let Ok(stdout) = String::from_utf8(output.stdout) {
-            let mut sizes = dir_sizes.lock().unwrap();
-            let mut count = 0;
-            for line in stdout.lines() {
-                let parts: Vec<&str> = line.splitn(2, '\t').collect();
-                if parts.len() >= 2 {
-                    if let Ok(size) = parts[0].parse::<u64>() {
-                        let dir_path = PathBuf::from(parts[1]);
-                        sizes.insert(dir_path, size);
-                        count += 1;
+    for chunk in dirs_to_scan.chunks(batch_size) {
+        let mut du_args: Vec<String> = vec!["-s".to_string(), "--bytes".to_string()];
+        for dir in chunk {
+            du_args.push(dir.to_string_lossy().to_string());
+        }
+
+        if let Ok(output) = std::process::Command::new("du").args(&du_args).output() {
+            if let Ok(stdout) = String::from_utf8(output.stdout) {
+                for line in stdout.lines() {
+                    let parts: Vec<&str> = line.splitn(2, '\t').collect();
+                    if parts.len() >= 2 {
+                        if let Ok(size) = parts[0].parse::<u64>() {
+                            let dir_path = PathBuf::from(parts[1]);
+                            sizes.insert(dir_path, size);
+                            count += 1;
+                        }
                     }
                 }
             }
-            tracing::info!("Proactive scan complete: {} directory sizes cached", count);
         }
+    }
+
+    tracing::info!("Proactive scan complete: {} directory sizes cached", count);
+
+    // Save to disk
+    let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+        .map(|p| p.data_dir().to_path_buf());
+    if let Some(dir) = socket_dir {
+        save_size_cache(&dir, &sizes);
     }
 }
 
