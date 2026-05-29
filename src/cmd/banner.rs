@@ -1035,7 +1035,7 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                             let mins = mins % 60;
                             return Some(format!(
                                 "{}{}:{:02}:{:02}{}",
-                                color(ORANGE),
+                                color(RED),
                                 hours,
                                 mins,
                                 secs,
@@ -1044,7 +1044,7 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                         } else if mins > 0 {
                             return Some(format!(
                                 "{}{}:{:02}{}",
-                                color(ORANGE),
+                                color(RED),
                                 mins,
                                 secs,
                                 color(RESET)
@@ -1052,7 +1052,7 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                         }
                         return Some(format!(
                             "{}{}{}{}",
-                            color(ORANGE),
+                            color(RED),
                             seconds,
                             "s",
                             color(RESET)
