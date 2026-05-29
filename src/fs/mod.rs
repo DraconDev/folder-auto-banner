@@ -169,6 +169,13 @@ impl DirSummary {
                 }
             });
 
+            // For symlinks, update is_dir based on the target
+            let is_dir = if is_symlink {
+                metadata.as_ref().map(|m| m.is_dir()).unwrap_or(is_dir)
+            } else {
+                is_dir
+            };
+
             let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
             total_size += size;
 
