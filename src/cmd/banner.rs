@@ -517,7 +517,7 @@ fn output_rich(
         } else if item.is_symlink {
             (color(MAGENTA), color(RESET))
         } else if item.is_exec {
-            (color(YELLOW_BOLD), color(RESET))
+            (color(RED), color(RESET))
         } else if item.name.starts_with('.') {
             (color(DIM), color(RESET))
         } else {
