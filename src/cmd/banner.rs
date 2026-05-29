@@ -122,19 +122,9 @@ fn output_rich(
     // Build git branch with color: blue if clean, yellow if dirty
     let branch_display = if !git_branch.is_empty() {
         if git_info.is_dirty {
-            format!(
-                "{}[{}*{}]",
-                color(YELLOW),
-                git_branch,
-                color(RESET)
-            )
+            format!("{}[{}*{}]", color(YELLOW), git_branch, color(RESET))
         } else {
-            format!(
-                "{}[{}{}]",
-                color(BLUE_BOLD),
-                git_branch,
-                color(RESET)
-            )
+            format!("{}[{}{}]", color(BLUE_BOLD), git_branch, color(RESET))
         }
     } else {
         String::new()
@@ -205,8 +195,18 @@ fn output_rich(
         }
         parts.push(format!("{} │", project_label));
         parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
-        parts.push(format!("{}📄 {} files{} │", color(DIM), summary.files, color(RESET)));
-        parts.push(format!("{}📂 {} dirs{}", color(DIM), summary.dirs, color(RESET)));
+        parts.push(format!(
+            "{}📄 {} files{} │",
+            color(DIM),
+            summary.files,
+            color(RESET)
+        ));
+        parts.push(format!(
+            "{}📂 {} dirs{}",
+            color(DIM),
+            summary.dirs,
+            color(RESET)
+        ));
         if !git_status_str.is_empty() {
             parts.push(format!("│ {}", git_status_str));
         }
@@ -296,7 +296,11 @@ fn output_rich(
             ));
         }
         // Clean indicator
-        if !git_info.is_dirty && git_info.modified == 0 && git_info.staged == 0 && git_info.untracked == 0 {
+        if !git_info.is_dirty
+            && git_info.modified == 0
+            && git_info.staged == 0
+            && git_info.untracked == 0
+        {
             parts.push(format!("│ {}✓ clean{}", color(GREEN), color(RESET)));
         }
         parts.join(" ")
@@ -304,8 +308,18 @@ fn output_rich(
         let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
         parts.push(format!("{} │", project_label));
         parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
-        parts.push(format!("{}📄 {} files{} │", color(DIM), summary.files, color(RESET)));
-        parts.push(format!("{}📂 {} dirs{}", color(DIM), summary.dirs, color(RESET)));
+        parts.push(format!(
+            "{}📄 {} files{} │",
+            color(DIM),
+            summary.files,
+            color(RESET)
+        ));
+        parts.push(format!(
+            "{}📂 {} dirs{}",
+            color(DIM),
+            summary.dirs,
+            color(RESET)
+        ));
         if hidden_count > 0 {
             parts.push(format!("│ {} hidden", hidden_count));
         }
