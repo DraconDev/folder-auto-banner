@@ -148,13 +148,9 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                 for event in events {
                     // Find which cached directory this event belongs to
                     let mut invalidated = Vec::new();
-
-                    {
-                        let cache_guard = cache.lock().unwrap();
-                        for (path, wd) in &watched {
-                            if event.wd == *wd {
-                                invalidated.push(path.clone());
-                            }
+                    for (path, wd) in &watched {
+                        if event.wd == *wd {
+                            invalidated.push(path.clone());
                         }
                     }
 
