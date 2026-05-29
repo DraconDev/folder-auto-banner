@@ -123,18 +123,16 @@ fn output_rich(
     let branch_display = if !git_branch.is_empty() {
         if git_info.is_dirty {
             format!(
-                "{}[{}{}{}]",
+                "{}[{}*{}]",
                 color(YELLOW),
                 git_branch,
-                color(YELLOW),
                 color(RESET)
             )
         } else {
             format!(
-                "{}[{}{}{}]",
+                "{}[{}{}]",
                 color(BLUE_BOLD),
                 git_branch,
-                color(BLUE_BOLD),
                 color(RESET)
             )
         }
