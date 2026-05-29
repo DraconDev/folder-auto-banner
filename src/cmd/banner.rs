@@ -303,9 +303,9 @@ fn output_rich(
     } else {
         let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
         parts.push(format!("{} │", project_label));
-        parts.push(format!("{} │", size_str));
-        parts.push(format!("{} files │", summary.files));
-        parts.push(format!("{} dirs", summary.dirs));
+        parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
+        parts.push(format!("{}📄 {} files{} │", color(DIM), summary.files, color(RESET)));
+        parts.push(format!("{}📂 {} dirs{}", color(DIM), summary.dirs, color(RESET)));
         if hidden_count > 0 {
             parts.push(format!("│ {} hidden", hidden_count));
         }
@@ -365,7 +365,7 @@ fn output_rich(
             if metrics.total_loc > 0 {
                 let loc_str = format_loc(metrics.total_loc);
                 parts.push(format!(
-                    "│ {}📊 {} LOC{}",
+                    "│ {}📊 {} lines{}",
                     color(GREEN),
                     loc_str,
                     color(RESET)
