@@ -14,3 +14,23 @@
 - [x] Add `✓ clean` when repo is clean
 - [x] Fix symlinks: show target's contents (line count for files, item count for dirs)
 - [x] Build, install, verify output
+
+## Daemon (cfmd)
+
+- [x] Design daemon architecture (IPC, lifecycle, data structures)
+- [x] Create daemon binary (cfmd) with Unix socket server
+- [x] Implement pre-computation: directory sizes, git status, TODO/LOC
+- [x] Implement IPC protocol (request/response for cached data)
+- [x] Modify banner to read from daemon cache (fallback to direct scan)
+- [x] Test: daemon startup, cache population, banner speed
+- [ ] Implement inotify-based directory watching (recompute on change)
+- [ ] Add daemon management commands (start, stop, status, restart)
+- [ ] Add systemd/user service file for auto-start
+- [ ] Add resource limits (CPU, memory, IO throttling)
+
+## UX improvements
+
+- [x] Alternating row tints (subtle gray on odd/even rows)
+- [x] Color scheme: dirs=blue, scripts=red, size/contents=orange
+- [x] Directory size: show `-` instead of misleading inode size
+- [x] Symlinks: follow target for contents and metadata
