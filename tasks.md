@@ -1,16 +1,15 @@
 # cfm tasks
 
-## Cuts (do now)
+## Header redesign
 
-- [ ] Remove `build_status` check from default banner path (cargo check = 6.7s, blocks prompt)
-- [ ] Make build status opt-in: `fm build-status` command only
-- [ ] Remove `tokio` from Cargo.toml (zero async code, compile bloat)
-- [ ] Replace `atty` with `std::io::IsTerminal` (Rust 1.70+)
-- [ ] Fix `ProjectType::detect` to walk ancestor directories (currently shows "Generic" in subdirs)
-- [ ] Consolidate duplicate `Session` struct (defined in save_session.rs, load_session.rs, sessions.rs — should live in state/mod.rs)
-
-## Audit (after cuts)
-
-- [ ] Run cargo clippy, cargo test, cargo fmt
-- [ ] Verify banner renders instantly on cold cache
-- [ ] Check binary size before/after
+- [x] Replace `12M` with `💾 12MB` (add icon + full unit for clarity)
+- [x] Replace `15 files` with `📄 15 files` (correct file icon)
+- [x] Replace `5 dirs` with `📂 5 dirs` (correct folder icon)
+- [x] Change `16k LOC` to `16k lines` (clearer than jargon)
+- [x] Drop LOC breakdown `(md: 10k, rs: 5.9k, no-ext: 149)` from header
+- [x] Drop commit hash from header
+- [x] Drop `FILES:1 DIRS:src` from header (unclear meaning)
+- [x] Drop `DELTA:` label from git delta, keep just `+13 -6`
+- [x] Show `*` suffix on branch name when repo is dirty
+- [x] Add `✓ clean` when repo is clean
+- [x] Build, install, verify output
