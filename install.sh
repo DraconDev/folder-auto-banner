@@ -37,6 +37,14 @@ if [ -f "target/release/cfmd" ]; then
     echo "✅ Daemon binary installed to $BIN_DIR/cfmd"
 fi
 
+# Install systemd user service (optional)
+if [ -d "$HOME/.config/systemd/user" ] || [ "$1" = "--with-service" ]; then
+    mkdir -p "$HOME/.config/systemd/user"
+    cp cfmd.service "$HOME/.config/systemd/user/cfmd.service"
+    systemctl --user daemon-reload 2>/dev/null
+    echo "✅ Systemd user service installed (enable with: systemctl --user enable --now cfmd)"
+fi
+
 # Add PATH to shell configs (only if not already there)
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     if [ -f "$rc" ]; then
