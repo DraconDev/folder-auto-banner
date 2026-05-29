@@ -8,19 +8,27 @@ BIN_PATH="$BIN_DIR/fm"
 
 mkdir -p "$BIN_DIR"
 
-# Remove old binary if it exists (clean teardown)
-if [ -f "$BIN_PATH" ]; then
-    echo "   Removing old version from ~/.local/bin..."
-    rm -f "$BIN_PATH"
-fi
+# Kill any running daemon before replacing binaries
+pkill -f "cfmd" 2>/dev/null || true
+sleep 0.5
 
-# Also remove any cargo-installed version that would take precedence
-if [ -f "$HOME/.cargo/bin/fm" ]; then
-    echo "   Removing old version from ~/.cargo/bin..."
-    rm -f "$HOME/.cargo/bin/fm"
-fi
+# Remove old fm binary from all known locations
+for loc in "$BIN_DIR/fm" "$HOME/.cargo/bin/fm" "$HOME/bin/fm" "/usr/local/bin/fm"; do
+    if [ -f "$loc" ]; then
+        echo "   Removing old fm from $loc..."
+        rm -f "$loc"
+    fi
+done
 
-# Copy the new binary
+# Remove old cfmd binary from all known locations
+for loc in "$BIN_DIR/cfmd" "$HOME/.cargo/bin/cfmd" "$HOME/bin/cfmd" "/usr/local/bin/cfmd"; do
+    if [ -f "$loc" ]; then
+        echo "   Removing old cfmd from $loc..."
+        rm -f "$loc"
+    fi
+done
+
+# Copy the new binaries
 if [ -f "target/release/fm" ]; then
     cp target/release/fm "$BIN_PATH"
     chmod +x "$BIN_PATH"
@@ -30,14 +38,13 @@ else
     exit 1
 fi
 
-# Copy daemon binary
 if [ -f "target/release/cfmd" ]; then
-    # Kill running daemon if upgrading
-    if [ -f "$BIN_DIR/cfmd" ]; then
-        pkill -f "$BIN_DIR/cfmd" 2>/dev/null || true
-        sleep 0.5
-    fi
     cp target/release/cfmd "$BIN_DIR/cfmd"
+    chmod +x "$BIN_DIR/cfmd"
+    echo "✅ Daemon binary installed to $BIN_DIR/cfmd"
+else
+    echo "⚠️  No daemon binary found. Daemon features disabled."
+fi
     chmod +x "$BIN_DIR/cfmd"
     echo "✅ Daemon binary installed to $BIN_DIR/cfmd"
 else
