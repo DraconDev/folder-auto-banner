@@ -136,7 +136,13 @@ impl Daemon {
             }
         }
 
-        // Cleanup
+        // Cleanup — save banner cache to disk before exiting
+        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+            .map(|p| p.data_dir().to_path_buf());
+        if let Some(dir) = socket_dir {
+            let cache = self.cache.lock().unwrap();
+            save_banner_cache(&dir, &cache);
+        }
         std::fs::remove_file(&self.socket_path).ok();
         Ok(())
     }
