@@ -74,16 +74,19 @@ impl Daemon {
         tracing::info!("cfmd listening on {}", self.socket_path.display());
 
         // Load persisted banner cache from disk
-        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
-            .map(|p| p.data_dir().to_path_buf());
+        let socket_dir =
+            directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
         if let Some(ref dir) = socket_dir {
             let persisted = load_banner_cache(dir);
             let mut cache = self.cache.lock().unwrap();
             for (path, data) in persisted {
-                cache.insert(path, CacheEntry {
-                    data,
-                    computed_at: Instant::now(),
-                });
+                cache.insert(
+                    path,
+                    CacheEntry {
+                        data,
+                        computed_at: Instant::now(),
+                    },
+                );
             }
             tracing::info!("Loaded {} banner caches from disk", cache.len());
         }
@@ -96,8 +99,8 @@ impl Daemon {
 
         // Start proactive scan of home directory in background
         let dir_sizes_clone = self.dir_sizes.clone();
-        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
-            .map(|p| p.data_dir().to_path_buf());
+        let socket_dir =
+            directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
         thread::spawn(move || {
             proactive_scan(dir_sizes_clone.clone());
             // Save to disk when done
@@ -150,8 +153,8 @@ impl Daemon {
         }
 
         // Cleanup — save banner cache to disk before exiting
-        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
-            .map(|p| p.data_dir().to_path_buf());
+        let socket_dir =
+            directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
         if let Some(dir) = socket_dir {
             let cache = self.cache.lock().unwrap();
             save_banner_cache(&dir, &cache);
@@ -279,10 +282,7 @@ fn handle_client(
                                 }
                             }
                         }
-                        return send_response(
-                            &mut writer,
-                            &Response::Banner(Box::new(data)),
-                        );
+                        return send_response(&mut writer, &Response::Banner(Box::new(data)));
                     }
                 }
             }
@@ -317,7 +317,10 @@ fn handle_client(
         }
         Request::DirSize { path } => {
             let sizes = dir_sizes.lock().unwrap();
-            let size = sizes.get(&path).copied().unwrap_or_else(|| compute_dir_size(&path));
+            let size = sizes
+                .get(&path)
+                .copied()
+                .unwrap_or_else(|| compute_dir_size(&path));
             Response::DirSize { path, size }
         }
         Request::Ping => Response::Pong,
@@ -383,7 +386,10 @@ fn load_size_cache(socket_dir: &Path) -> HashMap<PathBuf, u64> {
     let path = size_cache_path(socket_dir);
     if let Ok(data) = std::fs::read_to_string(&path) {
         if let Ok(map) = serde_json::from_str::<HashMap<String, u64>>(&data) {
-            let result: HashMap<PathBuf, u64> = map.into_iter().map(|(k, v)| (PathBuf::from(k), v)).collect();
+            let result: HashMap<PathBuf, u64> = map
+                .into_iter()
+                .map(|(k, v)| (PathBuf::from(k), v))
+                .collect();
             tracing::info!("Loaded {} cached directory sizes from disk", result.len());
             return result;
         }
@@ -393,7 +399,10 @@ fn load_size_cache(socket_dir: &Path) -> HashMap<PathBuf, u64> {
 
 fn save_size_cache(socket_dir: &Path, sizes: &HashMap<PathBuf, u64>) {
     let path = size_cache_path(socket_dir);
-    let map: HashMap<String, u64> = sizes.iter().map(|(k, v)| (k.to_string_lossy().to_string(), *v)).collect();
+    let map: HashMap<String, u64> = sizes
+        .iter()
+        .map(|(k, v)| (k.to_string_lossy().to_string(), *v))
+        .collect();
     if let Ok(data) = serde_json::to_string(&map) {
         if std::fs::write(&path, data).is_ok() {
             tracing::info!("Saved {} directory sizes to disk", sizes.len());
@@ -405,7 +414,10 @@ fn load_banner_cache(socket_dir: &Path) -> HashMap<PathBuf, BannerData> {
     let path = banner_cache_path(socket_dir);
     if let Ok(data) = std::fs::read_to_string(&path) {
         if let Ok(map) = serde_json::from_str::<HashMap<String, BannerData>>(&data) {
-            let result: HashMap<PathBuf, BannerData> = map.into_iter().map(|(k, v)| (PathBuf::from(k), v)).collect();
+            let result: HashMap<PathBuf, BannerData> = map
+                .into_iter()
+                .map(|(k, v)| (PathBuf::from(k), v))
+                .collect();
             tracing::info!("Loaded {} cached banners from disk", result.len());
             return result;
         }
@@ -415,7 +427,10 @@ fn load_banner_cache(socket_dir: &Path) -> HashMap<PathBuf, BannerData> {
 
 fn save_banner_cache(socket_dir: &Path, cache: &HashMap<PathBuf, CacheEntry>) {
     let path = banner_cache_path(socket_dir);
-    let map: HashMap<String, &BannerData> = cache.iter().map(|(k, v)| (k.to_string_lossy().to_string(), &v.data)).collect();
+    let map: HashMap<String, &BannerData> = cache
+        .iter()
+        .map(|(k, v)| (k.to_string_lossy().to_string(), &v.data))
+        .collect();
     if let Ok(data) = serde_json::to_string(&map) {
         if std::fs::write(&path, data).is_ok() {
             tracing::info!("Saved {} banner caches to disk", cache.len());
@@ -516,8 +531,8 @@ fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
     tracing::info!("Proactive scan complete: {} directory sizes cached", count);
 
     // Save to disk
-    let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
-        .map(|p| p.data_dir().to_path_buf());
+    let socket_dir =
+        directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
     if let Some(dir) = socket_dir {
         save_size_cache(&dir, &sizes);
     }

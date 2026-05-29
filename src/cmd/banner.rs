@@ -1050,13 +1050,7 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                                 color(RESET)
                             ));
                         }
-                        return Some(format!(
-                            "{}{}{}{}",
-                            color(RED),
-                            seconds,
-                            "s",
-                            color(RESET)
-                        ));
+                        return Some(format!("{}{}{}{}", color(RED), seconds, "s", color(RESET)));
                     }
                 }
             }
