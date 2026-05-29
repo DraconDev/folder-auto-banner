@@ -74,7 +74,7 @@ pub fn run_banner(
         .unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
 
     // Check env vars for disabling features
-    let no_build_check =
+    let _no_build_check =
         no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";
     let no_todos = no_todos || std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
     let no_ports = no_ports || std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
