@@ -8,7 +8,7 @@ use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 
 /// Project type detection
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ProjectType {
     Rust,
     Node,
@@ -82,7 +82,7 @@ impl ProjectType {
 }
 
 /// Directory entry metadata
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirEntry {
     pub name: String,
     pub path: PathBuf,

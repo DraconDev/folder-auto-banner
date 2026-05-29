@@ -7,7 +7,7 @@ use git2::Repository;
 use std::path::Path;
 
 /// Git status for a directory
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GitInfo {
     pub is_repo: bool,
     pub branch: Option<String>,
@@ -27,7 +27,7 @@ pub struct GitInfo {
     pub file_statuses: std::collections::HashMap<String, FileStatus>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FileStatus {
     Modified,
     Added,
