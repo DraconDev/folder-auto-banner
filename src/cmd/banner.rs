@@ -787,7 +787,7 @@ fn get_file_contents_raw(entry: &crate::fs::DirEntry) -> String {
     let lower = name.to_lowercase();
 
     if entry.is_symlink {
-        return format_size_compact(entry.size);
+        return String::new();
     }
 
     if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
