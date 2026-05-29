@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
+use inotify::{Inotify, WatchMask};
 use std::collections::HashMap;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -66,6 +67,12 @@ impl Daemon {
 
         tracing::info!("cfmd listening on {}", self.socket_path.display());
 
+        // Start inotify watcher thread
+        let cache_clone = self.cache.clone();
+        let watcher_handle = thread::spawn(move || {
+            watch_loop(cache_clone);
+        });
+
         let mut last_activity = Instant::now();
 
         loop {
@@ -100,6 +107,93 @@ impl Daemon {
     }
 }
 
+/// inotify watcher loop — monitors cached directories for changes
+fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
+    let inotify = match Inotify::init() {
+        Ok(i) => i,
+        Err(e) => {
+            tracing::error!("Failed to init inotify: {}", e);
+            return;
+        }
+    };
+
+    let mut watched: HashMap<PathBuf, inotify::WatchDescriptor> = HashMap::new();
+
+    loop {
+        // Check for new directories to watch
+        {
+            let cache = cache.lock().unwrap();
+            for path in cache.keys() {
+                if !watched.contains_key(path) {
+                    match inotify.add_watch(
+                        path,
+                        WatchMask::CREATE | WatchMask::DELETE | WatchMask::MODIFY | WatchMask::MOVE,
+                    ) {
+                        Ok(wd) => {
+                            tracing::info!("Watching: {}", path.display());
+                            watched.insert(path.clone(), wd);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to watch {}: {}", path.display(), e);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Read inotify events (non-blocking with timeout)
+        let mut buffer = [0u8; 4096];
+        match inotify.read_events_timeout(&mut buffer, Duration::from_millis(1000)) {
+            Ok(events) => {
+                for event in events {
+                    // Find which cached directory this event belongs to
+                    let cache_clone = cache.clone();
+                    let mut invalidated = Vec::new();
+
+                    {
+                        let cache = cache_clone.lock().unwrap();
+                        for (path, wd) in &watched {
+                            if event.wd == *wd {
+                                invalidated.push(path.clone());
+                            }
+                        }
+                    }
+
+                    // Invalidate affected cache entries
+                    if !invalidated.is_empty() {
+                        let mut cache = cache.lock().unwrap();
+                        for path in &invalidated {
+                            cache.remove(path);
+                            tracing::info!("Cache invalidated: {}", path.display());
+                        }
+                    }
+                }
+            }
+            Err(_) => {
+                // Timeout or error — continue loop
+            }
+        }
+
+        // Remove stale watchers for directories no longer in cache
+        {
+            let cache = cache.lock().unwrap();
+            let to_remove: Vec<PathBuf> = watched
+                .keys()
+                .filter(|p| !cache.contains_key(p))
+                .cloned()
+                .collect();
+            for path in to_remove {
+                if let Some(wd) = watched.remove(&path) {
+                    inotify.rm_watch(wd).ok();
+                    tracing::info!("Stopped watching: {}", path.display());
+                }
+            }
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
 fn handle_client(
     stream: UnixStream,
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
@@ -121,10 +215,7 @@ fn handle_client(
                 let cache = cache.lock().unwrap();
                 if let Some(entry) = cache.get(&path) {
                     if entry.computed_at.elapsed() < CACHE_TTL {
-                        return send_response(
-                            &mut writer,
-                            &Response::Banner(Box::new(entry.data.clone())),
-                        );
+                        return send_response(&mut writer, &Response::Banner(Box::new(entry.data.clone())));
                     }
                 }
             }
