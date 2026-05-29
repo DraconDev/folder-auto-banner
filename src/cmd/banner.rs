@@ -60,16 +60,8 @@ pub fn run_banner(
     // Try daemon cache first (auto-start daemon if not running)
     crate::daemon_client::ensure_daemon_running();
     if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
-        // Use cached data — directory sizes from daemon are pre-computed
-        let mut summary = cached.summary;
-        // Inject daemon-computed directory sizes into items
-        for item in &mut summary.top_items {
-            if item.is_dir {
-                if let Some(&size) = cached.dir_sizes.get(&item.path) {
-                    item.size = size;
-                }
-            }
-        }
+        // Daemon already injects directory sizes into item.size from global cache
+        let summary = cached.summary;
         let git_info = cached.git_info.unwrap_or_default();
 
         if json {
