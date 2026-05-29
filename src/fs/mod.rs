@@ -22,29 +22,30 @@ pub enum ProjectType {
 }
 
 impl ProjectType {
-    /// Detect project type from directory contents
+    /// Detect project type from directory contents, walking up to ancestors
     pub fn detect(path: &Path) -> Self {
-        let dir = match std::fs::read_dir(path) {
-            Ok(d) => d,
-            Err(_) => return ProjectType::Generic,
-        };
+        let mut current = Some(path);
+        while let Some(dir) = current {
+            if let Ok(d) = std::fs::read_dir(dir) {
+                for entry in d.flatten() {
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy().to_lowercase();
 
-        for entry in dir.flatten() {
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy().to_lowercase();
-
-            match name_str.as_str() {
-                "cargo.toml" => return ProjectType::Rust,
-                "package.json" => return ProjectType::Node,
-                "pyproject.toml" | "setup.py" | "requirements.txt" | "Pipfile" => {
-                    return ProjectType::Python
+                    match name_str.as_str() {
+                        "cargo.toml" => return ProjectType::Rust,
+                        "package.json" => return ProjectType::Node,
+                        "pyproject.toml" | "setup.py" | "requirements.txt" | "pipfile" => {
+                            return ProjectType::Python
+                        }
+                        "go.mod" => return ProjectType::Go,
+                        "gemfile" => return ProjectType::Ruby,
+                        "pom.xml" | "build.gradle" => return ProjectType::Java,
+                        "cmakelists.txt" => return ProjectType::CMake,
+                        _ => {}
+                    }
                 }
-                "go.mod" => return ProjectType::Go,
-                "gemfile" => return ProjectType::Ruby,
-                "pom.xml" | "build.gradle" => return ProjectType::Java,
-                "CMakeLists.txt" => return ProjectType::CMake,
-                _ => {}
             }
+            current = dir.parent();
         }
 
         ProjectType::Generic
