@@ -12,4 +12,5 @@
 - [x] Drop `DELTA:` label from git delta, keep just `+13 -6`
 - [x] Show `*` suffix on branch name when repo is dirty
 - [x] Add `✓ clean` when repo is clean
+- [x] Fix symlinks: show target's contents (line count for files, item count for dirs)
 - [x] Build, install, verify output
