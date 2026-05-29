@@ -14,7 +14,7 @@ use crate::icon;
 // ANSI color codes — only emitted when stdout is a tty
 fn color(code: &str) -> &str {
     use std::io::IsTerminal;
-    if std::io::stdout().is_terminal() {
+    if std::io::stdout().is_terminal() || std::io::stderr().is_terminal() {
         code
     } else {
         ""
@@ -35,26 +35,8 @@ const CYAN: &str = "\x1b[36m";
 const GRAY: &str = "\x1b[90m";
 const WHITE: &str = "\x1b[97m";
 
-/// Color date based on age: today=white, this week=bright, this month=normal, older=dim
-fn colorize_date(dt: &DateTime<Utc>, formatted: &str) -> String {
-    let now = Utc::now();
-    let age = now.signed_duration_since(*dt);
-
-    let code = if age.num_days() == 0 {
-        WHITE // today - bright white
-    } else if age.num_days() <= 7 {
-        BOLD // this week - bold
-    } else if age.num_days() <= 30 {
-        "" // this month - normal
-    } else {
-        DIM // older - dim
-    };
-
-    if code.is_empty() {
-        formatted.to_string()
-    } else {
-        format!("{}{}{}", color(code), formatted, color(RESET))
-    }
+fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
+    format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -615,32 +597,24 @@ fn output_rich(
         // Colorize permissions
         let perm_colored = colorize_perms(&item.perms);
 
-        // Owner/group: dimmed (like exa/lsd)
-        let owner_colored = format!("{}{}{}", color(DIM), owner_padded, color(RESET));
-        let group_colored = format!("{}{}{}", color(DIM), group_padded, color(RESET));
+        // Owner/group: red
+        let owner_colored = format!("{}{}{}", color(RED), owner_padded, color(RESET));
+        let group_colored = format!("{}{}{}", color(RED), group_padded, color(RESET));
 
-        // Size: dim <1KB, bold 1-100MB, yellow >100MB, normal otherwise
-        let size_colored = if item.size > 100 * 1024 * 1024 {
-            format!("{}{}{}", color(YELLOW), size_padded, color(RESET))
-        } else if item.size > 1024 * 1024 {
-            format!("{}{}{}", color(BOLD), size_padded, color(RESET))
-        } else if item.size < 1024 {
-            format!("{}{}{}", color(DIM), size_padded, color(RESET))
-        } else {
-            size_padded
-        };
+        // Size: blue
+        let size_colored = format!("{}{}{}", color(BLUE), size_padded, color(RESET));
 
-        // Contents: color by type
+        // Contents: blue
         let contents_colored = if item.is_dir {
-            contents_padded
+            format!("{}{}{}", color(BLUE), contents_padded, color(RESET))
         } else {
             let colored = get_file_contents(item);
-            // Re-pad with colored version (ANSI codes don't affect width)
-            format!(
+            let padded = format!(
                 "{:>width$}",
                 colored,
                 width = max_contents + (colored.len() - contents_raw.len())
-            )
+            );
+            format!("{}{}{}", color(BLUE), padded, color(RESET))
         };
 
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
