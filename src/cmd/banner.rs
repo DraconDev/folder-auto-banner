@@ -13,13 +13,7 @@ use crate::icon;
 
 // ANSI color codes — only emitted when stdout is a tty
 fn color(code: &str) -> &str {
-    use std::io::IsTerminal;
-    let force = std::env::var("FORCE_COLOR").unwrap_or_default() == "1";
-    if force || std::io::stdout().is_terminal() || std::io::stderr().is_terminal() {
-        code
-    } else {
-        ""
-    }
+    code
 }
 
 const RESET: &str = "\x1b[0m";

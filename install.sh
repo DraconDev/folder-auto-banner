@@ -10,8 +10,14 @@ mkdir -p "$BIN_DIR"
 
 # Remove old binary if it exists (clean teardown)
 if [ -f "$BIN_PATH" ]; then
-    echo "   Removing old version..."
+    echo "   Removing old version from ~/.local/bin..."
     rm -f "$BIN_PATH"
+fi
+
+# Also remove any cargo-installed version that would take precedence
+if [ -f "$HOME/.cargo/bin/fm" ]; then
+    echo "   Removing old version from ~/.cargo/bin..."
+    rm -f "$HOME/.cargo/bin/fm"
 fi
 
 # Copy the new binary
