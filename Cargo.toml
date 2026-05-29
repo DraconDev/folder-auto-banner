@@ -12,6 +12,10 @@ categories = ["command-line-utilities"]
 name = "fm"
 path = "src/main.rs"
 
+[[bin]]
+name = "cfmd"
+path = "src/daemon.rs"
+
 [dependencies]
 # CLI parsing
 clap = { version = "4", features = ["derive", "env"] }
@@ -57,6 +61,9 @@ path-absolutize = "3.1"
 
 # Glob patterns
 glob = "0.3"
+
+# Filesystem watching (for daemon)
+inotify = "0.11"
 
 [dev-dependencies]
 tempfile = "3"
