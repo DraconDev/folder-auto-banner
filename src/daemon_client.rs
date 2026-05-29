@@ -3,7 +3,7 @@ use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::daemon::{BannerData, Request, Response};
+use crate::daemon_types::{BannerData, Request, Response};
 
 const SOCKET_NAME: &str = "cfmd.sock";
 

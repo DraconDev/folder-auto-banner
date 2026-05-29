@@ -1,6 +1,4 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -11,6 +9,7 @@ use std::time::{Duration, Instant};
 mod build_status;
 mod cache;
 mod code_metrics;
+mod daemon_types;
 mod docker;
 mod fs;
 mod git;
@@ -19,38 +18,8 @@ mod port_usage;
 mod state;
 mod todo_scanner;
 
+use daemon_types::{BannerData, Request, Response};
 use fs::DirSummary;
-use git::GitInfo;
-
-// IPC Protocol
-#[derive(Debug, Serialize, Deserialize)]
-enum Request {
-    /// Get cached banner data for a directory
-    Banner { path: PathBuf },
-    /// Get directory size (recursive)
-    DirSize { path: PathBuf },
-    /// Ping (health check)
-    Ping,
-    /// Shutdown daemon
-    Shutdown,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-enum Response {
-    Banner(BannerData),
-    DirSize { path: PathBuf, size: u64 },
-    Pong,
-    Error { message: String },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BannerData {
-    pub path: PathBuf,
-    pub summary: DirSummary,
-    pub git_info: Option<GitInfo>,
-    pub dir_sizes: HashMap<PathBuf, u64>,
-    pub cached_at: DateTime<Utc>,
-}
 
 // Cache entry with TTL
 struct CacheEntry {
@@ -210,7 +179,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
         summary,
         git_info,
         dir_sizes,
-        cached_at: Utc::now(),
+        cached_at: chrono::Utc::now(),
     })
 }
 

@@ -5,6 +5,8 @@ mod cache;
 mod cli;
 mod cmd;
 mod code_metrics;
+mod daemon_client;
+mod daemon_types;
 mod docker;
 mod fs;
 mod git;
