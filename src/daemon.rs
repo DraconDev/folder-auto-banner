@@ -221,8 +221,20 @@ fn handle_client(
                 }
             }
 
-            // Cache miss — compute
+            // Cache miss — compute (fast, without dir sizes)
             let data = compute_banner_data(&path)?;
+
+            // Spawn background computation for directory sizes
+            let dir_items: Vec<_> = data
+                .summary
+                .top_items
+                .iter()
+                .filter(|i| i.is_dir)
+                .cloned()
+                .collect();
+            if !dir_items.is_empty() {
+                compute_dir_sizes_background(path.clone(), dir_items, cache.clone());
+            }
 
             // Store in cache
             {
@@ -259,25 +271,39 @@ fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
-
     let git_info = git::get_git_info(path).ok();
 
-    // Compute directory sizes for all subdirectories
-    let mut dir_sizes = HashMap::new();
-    for item in &summary.top_items {
-        if item.is_dir {
-            let size = compute_dir_size(&item.path);
-            dir_sizes.insert(item.path.clone(), size);
-        }
-    }
-
+    // Return immediately with empty dir_sizes — compute in background
     Ok(BannerData {
         path: path.to_path_buf(),
         summary,
         git_info,
-        dir_sizes,
+        dir_sizes: HashMap::new(),
         cached_at: chrono::Utc::now(),
     })
+}
+
+/// Compute directory sizes in background and update cache
+fn compute_dir_sizes_background(
+    path: PathBuf,
+    items: Vec<crate::fs::DirEntry>,
+    cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+) {
+    thread::spawn(move || {
+        let mut dir_sizes = HashMap::new();
+        for item in &items {
+            if item.is_dir {
+                let size = compute_dir_size(&item.path);
+                dir_sizes.insert(item.path.clone(), size);
+            }
+        }
+
+        // Update the cache entry with computed sizes
+        let mut cache = cache.lock().unwrap();
+        if let Some(entry) = cache.get_mut(&path) {
+            entry.data.dir_sizes = dir_sizes;
+        }
+    });
 }
 
 fn compute_dir_size(path: &Path) -> u64 {
