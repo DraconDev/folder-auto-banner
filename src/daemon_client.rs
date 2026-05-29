@@ -55,10 +55,7 @@ pub fn is_daemon_running() -> bool {
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
     let request = Request::Ping;
-    match send_and_recv(&stream, &request) {
-        Ok(Response::Pong) => true,
-        _ => false,
-    }
+    matches!(send_and_recv(&stream, &request), Ok(Response::Pong))
 }
 
 /// Send shutdown signal to daemon
