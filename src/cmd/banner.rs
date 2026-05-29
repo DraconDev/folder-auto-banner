@@ -204,9 +204,9 @@ fn output_rich(
             parts.push(format!("{}{}{} │", color(YELLOW), tag, color(RESET)));
         }
         parts.push(format!("{} │", project_label));
-        parts.push(format!("{} │", size_str));
-        parts.push(format!("{} files │", summary.files));
-        parts.push(format!("{} dirs", summary.dirs));
+        parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
+        parts.push(format!("{}📄 {} files{} │", color(DIM), summary.files, color(RESET)));
+        parts.push(format!("{}📂 {} dirs{}", color(DIM), summary.dirs, color(RESET)));
         if !git_status_str.is_empty() {
             parts.push(format!("│ {}", git_status_str));
         }
@@ -271,50 +271,17 @@ fn output_rich(
                 parts.push(format!("│ {}🐳 docker{}", color(DIM), color(RESET)));
             }
         }
-        // Code metrics
+        // Code metrics — just total lines, no breakdown
         if let Some(ref metrics) = summary.code_metrics {
             if metrics.total_loc > 0 {
                 let loc_str = format_loc(metrics.total_loc);
-                if metrics.by_extension.len() > 1 {
-                    let ext_str: Vec<String> = metrics
-                        .by_extension
-                        .iter()
-                        .take(3)
-                        .map(|(ext, loc)| format!("{}: {}", ext, format_loc(*loc)))
-                        .collect();
-                    parts.push(format!(
-                        "│ {}📊 {} LOC ({}){}",
-                        color(GREEN),
-                        loc_str,
-                        ext_str.join(", "),
-                        color(RESET)
-                    ));
-                } else {
-                    parts.push(format!(
-                        "│ {}📊 {} LOC{}",
-                        color(GREEN),
-                        loc_str,
-                        color(RESET)
-                    ));
-                }
+                parts.push(format!(
+                    "│ {}📊 {} lines{}",
+                    color(GREEN),
+                    loc_str,
+                    color(RESET)
+                ));
             }
-        }
-        // Last commit info
-        if let (Some(ref hash), Some(ref msg)) =
-            (&git_info.last_commit_hash, &git_info.last_commit_msg)
-        {
-            let short_msg = if msg.len() > 30 {
-                format!("{}…", &msg[..29])
-            } else {
-                msg.clone()
-            };
-            parts.push(format!(
-                "│ {}{}{} {}",
-                color(DIM),
-                hash,
-                color(RESET),
-                short_msg
-            ));
         }
         // Diff stats
         if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
@@ -327,6 +294,10 @@ fn output_rich(
                 git_info.lines_deleted,
                 color(RESET)
             ));
+        }
+        // Clean indicator
+        if !git_info.is_dirty && git_info.modified == 0 && git_info.staged == 0 && git_info.untracked == 0 {
+            parts.push(format!("│ {}✓ clean{}", color(GREEN), color(RESET)));
         }
         parts.join(" ")
     } else {
