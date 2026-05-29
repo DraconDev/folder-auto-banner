@@ -15,21 +15,25 @@ fn socket_path() -> Result<std::path::PathBuf> {
     Ok(path)
 }
 
+fn send_and_recv(stream: &UnixStream, request: &Request) -> Result<Response> {
+    serde_json::to_writer(stream, request)?;
+    // Shutdown write end so daemon sees EOF on read
+    stream.shutdown(std::net::Shutdown::Write)?;
+    let response: Response = serde_json::from_reader(stream)?;
+    Ok(response)
+}
+
 /// Try to get cached banner data from daemon
 pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let socket = socket_path().ok()?;
     let stream = UnixStream::connect(&socket).ok()?;
-    stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
-    stream
-        .set_write_timeout(Some(Duration::from_secs(2)))
-        .ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+    stream.set_write_timeout(Some(Duration::from_secs(5))).ok()?;
 
     let request = Request::Banner {
         path: path.to_path_buf(),
     };
-    serde_json::to_writer(&stream, &request).ok()?;
-
-    let response: Response = serde_json::from_reader(&stream).ok()?;
+    let response = send_and_recv(&stream, &request).ok()?;
     match response {
         Response::Banner(data) => Some(*data),
         _ => None,
@@ -47,17 +51,14 @@ pub fn is_daemon_running() -> bool {
     let Ok(stream) = UnixStream::connect(&socket) else {
         return false;
     };
-    stream
-        .set_read_timeout(Some(Duration::from_millis(500)))
-        .ok();
-    stream
-        .set_write_timeout(Some(Duration::from_millis(500)))
-        .ok();
+    stream.set_read_timeout(Some(Duration::from_secs(1))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
     let request = Request::Ping;
-    serde_json::to_writer(&stream, &request).ok();
-    let response: Result<Response, _> = serde_json::from_reader(&stream);
-    matches!(response, Ok(Response::Pong))
+    match send_and_recv(&stream, &request) {
+        Ok(Response::Pong) => true,
+        _ => false,
+    }
 }
 
 /// Send shutdown signal to daemon
@@ -66,14 +67,10 @@ pub fn send_shutdown() {
         return;
     };
     if let Ok(stream) = UnixStream::connect(&socket) {
-        stream
-            .set_read_timeout(Some(Duration::from_millis(500)))
-            .ok();
-        stream
-            .set_write_timeout(Some(Duration::from_millis(500)))
-            .ok();
+        stream.set_read_timeout(Some(Duration::from_secs(1))).ok();
+        stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
         let request = Request::Shutdown;
-        serde_json::to_writer(&stream, &request).ok();
+        let _ = send_and_recv(&stream, &request);
     }
 }
 
@@ -101,7 +98,8 @@ pub fn ensure_daemon_running() {
     {
         Ok(_) => {
             tracing::info!("Started cfmd daemon");
-            std::thread::sleep(Duration::from_millis(100));
+            // Give daemon time to bind socket
+            std::thread::sleep(Duration::from_millis(500));
         }
         Err(e) => {
             tracing::warn!("Failed to start cfmd: {}", e);
