@@ -596,8 +596,8 @@ fn output_rich(
         let owner_colored = format!("{}{}{}", color(BLUE), owner_padded, color(RESET));
         let group_colored = format!("{}{}{}", color(BLUE), group_padded, color(RESET));
 
-        // Size: blue
-        let size_colored = format!("{}{}{}", color(BLUE), size_padded, color(RESET));
+        // Size: red
+        let size_colored = format!("{}{}{}", color(RED), size_padded, color(RESET));
 
         // Contents: red
         let contents_colored = if item.is_dir {
