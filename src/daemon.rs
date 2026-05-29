@@ -388,6 +388,20 @@ fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
         }
     }
 
+    // Level 3: subdirectories of level 2 dirs (for projects like ~/Dev/project/src)
+    let level2: Vec<PathBuf> = dirs_to_scan[level1.len()..].to_vec();
+    for dir in &level2 {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten().take(20) {
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.is_dir() {
+                        dirs_to_scan.push(entry.path());
+                    }
+                }
+            }
+        }
+    }
+
     // Also scan hidden dirs that are commonly large
     for hidden in &[".cache", ".config", ".local", ".cargo", ".rustup", ".nix-profile"] {
         let dir = home.join(hidden);
