@@ -45,11 +45,6 @@ if [ -f "target/release/cfmd" ]; then
 else
     echo "⚠️  No daemon binary found. Daemon features disabled."
 fi
-    chmod +x "$BIN_DIR/cfmd"
-    echo "✅ Daemon binary installed to $BIN_DIR/cfmd"
-else
-    echo "⚠️  No daemon binary found. Daemon features disabled."
-fi
 
 # Install systemd user service
 mkdir -p "$HOME/.config/systemd/user"
