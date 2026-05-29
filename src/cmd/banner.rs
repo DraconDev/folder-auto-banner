@@ -570,11 +570,12 @@ fn output_rich(
         // Pad columns for alignment
         let owner_padded = format!("{:<width$}", item.owner, width = max_owner);
         let group_padded = format!("{:<width$}", item.group, width = max_group);
-        let size_padded = format!(
-            "{:>width$}",
-            format_size_compact(item.size),
-            width = max_size
-        );
+        let size_str = if item.is_dir {
+            "-".to_string()
+        } else {
+            format_size_compact(item.size)
+        };
+        let size_padded = format!("{:>width$}", size_str, width = max_size);
         let contents_raw = if item.is_dir {
             count_items_in_dir(item).to_string()
         } else {
