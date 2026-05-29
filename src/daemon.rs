@@ -73,6 +73,21 @@ impl Daemon {
 
         tracing::info!("cfmd listening on {}", self.socket_path.display());
 
+        // Load persisted banner cache from disk
+        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+            .map(|p| p.data_dir().to_path_buf());
+        if let Some(ref dir) = socket_dir {
+            let persisted = load_banner_cache(dir);
+            let mut cache = self.cache.lock().unwrap();
+            for (path, data) in persisted {
+                cache.insert(path, CacheEntry {
+                    data,
+                    computed_at: Instant::now(),
+                });
+            }
+            tracing::info!("Loaded {} banner caches from disk", cache.len());
+        }
+
         // Start inotify watcher thread
         let cache_clone = self.cache.clone();
         let _watcher_handle = thread::spawn(move || {
@@ -335,9 +350,14 @@ fn compute_dir_size(path: &Path) -> u64 {
 }
 
 const SIZE_CACHE_FILE: &str = "dir_sizes.json";
+const BANNER_CACHE_FILE: &str = "banner_cache.json";
 
 fn size_cache_path(socket_dir: &Path) -> PathBuf {
     socket_dir.join(SIZE_CACHE_FILE)
+}
+
+fn banner_cache_path(socket_dir: &Path) -> PathBuf {
+    socket_dir.join(BANNER_CACHE_FILE)
 }
 
 fn load_size_cache(socket_dir: &Path) -> HashMap<PathBuf, u64> {
@@ -358,6 +378,28 @@ fn save_size_cache(socket_dir: &Path, sizes: &HashMap<PathBuf, u64>) {
     if let Ok(data) = serde_json::to_string(&map) {
         if std::fs::write(&path, data).is_ok() {
             tracing::info!("Saved {} directory sizes to disk", sizes.len());
+        }
+    }
+}
+
+fn load_banner_cache(socket_dir: &Path) -> HashMap<PathBuf, BannerData> {
+    let path = banner_cache_path(socket_dir);
+    if let Ok(data) = std::fs::read_to_string(&path) {
+        if let Ok(map) = serde_json::from_str::<HashMap<String, BannerData>>(&data) {
+            let result: HashMap<PathBuf, BannerData> = map.into_iter().map(|(k, v)| (PathBuf::from(k), v)).collect();
+            tracing::info!("Loaded {} cached banners from disk", result.len());
+            return result;
+        }
+    }
+    HashMap::new()
+}
+
+fn save_banner_cache(socket_dir: &Path, cache: &HashMap<PathBuf, CacheEntry>) {
+    let path = banner_cache_path(socket_dir);
+    let map: HashMap<String, &BannerData> = cache.iter().map(|(k, v)| (k.to_string_lossy().to_string(), &v.data)).collect();
+    if let Ok(data) = serde_json::to_string(&map) {
+        if std::fs::write(&path, data).is_ok() {
+            tracing::info!("Saved {} banner caches to disk", cache.len());
         }
     }
 }
