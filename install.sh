@@ -32,17 +32,25 @@ fi
 
 # Copy daemon binary
 if [ -f "target/release/cfmd" ]; then
+    # Kill running daemon if upgrading
+    if [ -f "$BIN_DIR/cfmd" ]; then
+        pkill -f "$BIN_DIR/cfmd" 2>/dev/null || true
+        sleep 0.5
+    fi
     cp target/release/cfmd "$BIN_DIR/cfmd"
     chmod +x "$BIN_DIR/cfmd"
     echo "✅ Daemon binary installed to $BIN_DIR/cfmd"
+else
+    echo "⚠️  No daemon binary found. Daemon features disabled."
 fi
 
-# Install systemd user service (optional)
-if [ -d "$HOME/.config/systemd/user" ] || [ "$1" = "--with-service" ]; then
+# Install systemd user service (optional, via --with-service flag)
+if [ "${1:-}" = "--with-service" ]; then
     mkdir -p "$HOME/.config/systemd/user"
     cp cfmd.service "$HOME/.config/systemd/user/cfmd.service"
-    systemctl --user daemon-reload 2>/dev/null
-    echo "✅ Systemd user service installed (enable with: systemctl --user enable --now cfmd)"
+    systemctl --user daemon-reload 2>/dev/null || true
+    echo "✅ Systemd user service installed"
+    echo "   Enable with: systemctl --user enable --now cfmd"
 fi
 
 # Add PATH to shell configs (only if not already there)
