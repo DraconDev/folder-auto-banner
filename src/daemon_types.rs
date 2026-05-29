@@ -21,7 +21,7 @@ pub enum Request {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Response {
-    Banner(BannerData),
+    Banner(Box<BannerData>),
     DirSize { path: PathBuf, size: u64 },
     Pong,
     Error { message: String },

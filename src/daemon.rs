@@ -121,7 +121,10 @@ fn handle_client(
                 let cache = cache.lock().unwrap();
                 if let Some(entry) = cache.get(&path) {
                     if entry.computed_at.elapsed() < CACHE_TTL {
-                        return send_response(&mut writer, &Response::Banner(entry.data.clone()));
+                        return send_response(
+                            &mut writer,
+                            &Response::Banner(Box::new(entry.data.clone())),
+                        );
                     }
                 }
             }
@@ -141,7 +144,7 @@ fn handle_client(
                 );
             }
 
-            Response::Banner(data)
+            Response::Banner(Box::new(data))
         }
         Request::DirSize { path } => {
             let size = compute_dir_size(&path);

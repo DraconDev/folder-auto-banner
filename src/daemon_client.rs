@@ -20,7 +20,9 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let socket = socket_path().ok()?;
     let stream = UnixStream::connect(&socket).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
-    stream.set_write_timeout(Some(Duration::from_secs(2))).ok()?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .ok()?;
 
     let request = Request::Banner {
         path: path.to_path_buf(),
@@ -29,7 +31,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
 
     let response: Response = serde_json::from_reader(&stream).ok()?;
     match response {
-        Response::Banner(data) => Some(data),
+        Response::Banner(data) => Some(*data),
         _ => None,
     }
 }
@@ -46,8 +48,12 @@ pub fn is_daemon_running() -> bool {
     let Ok(stream) = UnixStream::connect(&socket) else {
         return false;
     };
-    stream.set_read_timeout(Some(Duration::from_millis(500))).ok();
-    stream.set_write_timeout(Some(Duration::from_millis(500))).ok();
+    stream
+        .set_read_timeout(Some(Duration::from_millis(500)))
+        .ok();
+    stream
+        .set_write_timeout(Some(Duration::from_millis(500)))
+        .ok();
 
     let request = Request::Ping;
     serde_json::to_writer(&stream, &request).ok();
