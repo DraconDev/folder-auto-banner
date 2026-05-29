@@ -731,9 +731,9 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     let name = &entry.name;
     let lower = name.to_lowercase();
 
-    // Symlinks: show actual file size
+    // Symlinks: no contents (size already shows in size column)
     if entry.is_symlink {
-        return format!("{}{}{}", color(RED), format_size_compact(entry.size), color(RESET));
+        return String::new();
     }
 
     // Image files: try to get resolution from header
