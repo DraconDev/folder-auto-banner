@@ -4,11 +4,16 @@
 //! - "emoji" (default): emoji icons (works everywhere)
 //! - "nerd": Nerd Font glyphs (requires terminal with Nerd Font support)
 
-/// Get icon for a file/directory entry
+/// Get icon for a file/directory entry, reading mode from CFM_ICONS env var
 pub fn icon_for(name: &str, is_dir: bool, is_exec: bool, is_symlink: bool) -> String {
     let use_nerd = std::env::var("CFM_ICONS")
         .map(|v| v == "nerd")
         .unwrap_or(false);
+    icon_for_mode(name, is_dir, is_exec, is_symlink, use_nerd)
+}
+
+/// Get icon for a file/directory entry with explicit nerd mode
+pub fn icon_for_mode(name: &str, is_dir: bool, is_exec: bool, is_symlink: bool, use_nerd: bool) -> String {
 
     if is_symlink {
         return "🔗".to_string();
@@ -198,34 +203,29 @@ mod tests {
 
     #[test]
     fn test_exact_name() {
-        std::env::remove_var("CFM_ICONS");
-        assert_eq!(icon_for("Cargo.toml", false, false, false), "🦀");
-        assert_eq!(icon_for("package.json", false, false, false), "📦");
-        assert_eq!(icon_for("README.md", false, false, false), "📖");
+        assert_eq!(icon_for_mode("Cargo.toml", false, false, false, false), "🦀");
+        assert_eq!(icon_for_mode("package.json", false, false, false, false), "📦");
+        assert_eq!(icon_for_mode("README.md", false, false, false, false), "📖");
     }
 
     #[test]
     fn test_extension() {
-        std::env::remove_var("CFM_ICONS");
-        assert_eq!(icon_for("main.rs", false, false, false), "🦀");
-        assert_eq!(icon_for("app.py", false, false, false), "🐍");
-        assert_eq!(icon_for("index.html", false, false, false), "🌐");
-        assert_eq!(icon_for("style.css", false, false, false), "🎨");
+        assert_eq!(icon_for_mode("main.rs", false, false, false, false), "🦀");
+        assert_eq!(icon_for_mode("app.py", false, false, false, false), "🐍");
+        assert_eq!(icon_for_mode("index.html", false, false, false, false), "🌐");
+        assert_eq!(icon_for_mode("style.css", false, false, false, false), "🎨");
     }
 
     #[test]
     fn test_fallback() {
-        std::env::remove_var("CFM_ICONS");
-        assert_eq!(icon_for("foo", false, false, false), "📄");
-        assert_eq!(icon_for("foo", false, true, false), "⚡");
+        assert_eq!(icon_for_mode("foo", false, false, false, false), "📄");
+        assert_eq!(icon_for_mode("foo", false, true, false, false), "⚡");
     }
 
     #[test]
     fn test_nerd_mode() {
-        std::env::set_var("CFM_ICONS", "nerd");
-        let result = icon_for("Cargo.toml", false, false, false);
+        let result = icon_for_mode("Cargo.toml", false, false, false, true);
         assert!(!result.is_empty());
-        assert_ne!(result, "🦀"); // should be different from emoji
-        std::env::remove_var("CFM_ICONS");
+        assert_ne!(result, "🦀"); // nerd glyph differs from emoji
     }
 }
