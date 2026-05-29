@@ -52,7 +52,7 @@ fn colorize_date(dt: &DateTime<Utc>, formatted: &str) -> String {
     }
 }
 
-/// Run the banner command
+#[allow(clippy::too_many_arguments)]
 pub fn run_banner(
     path: Option<&Path>,
     raw: bool,
@@ -510,7 +510,7 @@ fn truncate_ansi(s: &str, width: usize) -> String {
         if c == '\x1b' {
             result.push(c);
             chars.next();
-            while let Some(next) = chars.next() {
+            for next in chars.by_ref() {
                 result.push(next);
                 if next == 'm' {
                     break;

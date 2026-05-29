@@ -120,7 +120,7 @@ pub fn scan_metrics(path: &Path) -> Result<CodeMetrics> {
 
     // Sort by LOC descending, take top 5
     let mut by_extension: Vec<(String, usize)> = by_extension.into_iter().collect();
-    by_extension.sort_by(|a, b| b.1.cmp(&a.1));
+    by_extension.sort_by_key(|b| std::cmp::Reverse(b.1));
     by_extension.truncate(5);
 
     Ok(CodeMetrics {

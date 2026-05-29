@@ -65,10 +65,8 @@ fn try_ss_with_cwd_check(project_path: &Path) -> Result<Vec<u16>> {
         let process_info = parts.last().unwrap_or(&"");
         if let Some(pid) = extract_pid(process_info) {
             // Check if this process's cwd is in the project directory
-            if pid_cwd_matches(pid, project_path) {
-                if !ports.contains(&port) {
-                    ports.push(port);
-                }
+            if pid_cwd_matches(pid, project_path) && !ports.contains(&port) {
+                ports.push(port);
             }
         }
     }
