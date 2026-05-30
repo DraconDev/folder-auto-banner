@@ -233,14 +233,15 @@
 ## 🟤 Testing
 
 ### Unit tests
+- [x] Add tests for `utils.rs`, `cache/mod.rs`, `state/mod.rs`, `cmd/file_metadata.rs`, `fs/mod.rs`
 - [ ] Add tests for `cmd/` implementations (mv, cp, rm, trash, yank, paste, pin, jump)
-- [ ] Add tests for `fs/mod.rs` (DirSummary scanning, project detection)
 
 ### Integration tests
+- [x] Test all commands with `--help` flag
+- [x] Test banner with `--hidden`, `--filter`, `--max`, `--group`, `--sort`, `--reverse`
+- [x] Test banner with `--json` and `--raw` output
 - [ ] Test file operations (copy, move, delete, trash) end-to-end
 - [ ] Test state persistence across invocations
-- [ ] Test daemon IPC protocol
-- [ ] Test banner rendering (rich, JSON, raw modes)
 
 ### Edge cases
 - [ ] Test with 1000+ items in directory
@@ -257,11 +258,13 @@
 ## ⚪ Polish
 
 ### Documentation
+- [x] Update README with architecture overview and 30 commands
+- [x] Update CHANGELOG with v0.2.0 changes
 - [ ] Add CONTRIBUTING.md with architecture overview
 - [ ] Document all 30 commands with usage examples
 - [ ] Add man pages for `fm` and `cfmd`
 - [ ] Document Config struct fields and env var overrides
-- [ ] Remove development artifacts from repo (`note.md`, `session-ses_18cd.md`)
+- [x] Remove development artifacts from repo (`note.md`, `session-ses_18cd.md`)
 
 ### CI/CD
 - [ ] Add cross-compilation matrix (macOS, Linux ARM)
