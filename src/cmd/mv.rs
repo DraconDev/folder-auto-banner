@@ -50,6 +50,13 @@ pub fn run_mv(
             continue;
         }
 
+        // Check if source is a protected path
+        if crate::utils::is_protected_path(source) {
+            eprintln!("❌ Refusing to move protected path: {}", source.display());
+            skipped += 1;
+            continue;
+        }
+
         let dest_path = if dest_is_dir {
             let file_name = source
                 .file_name()

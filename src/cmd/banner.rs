@@ -526,9 +526,9 @@ fn output_rich(
         let mut dirs: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_dir).copied().collect();
         let mut files: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_file && !i.is_symlink).copied().collect();
         let mut symlinks: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_symlink).copied().collect();
-        dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        symlinks.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        dirs.sort_by_key(|i| i.name.to_lowercase());
+        files.sort_by_key(|i| i.name.to_lowercase());
+        symlinks.sort_by_key(|i| i.name.to_lowercase());
         display_items = dirs.into_iter().chain(files).chain(symlinks).collect();
     }
 

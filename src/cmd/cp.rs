@@ -54,6 +54,13 @@ pub fn run_cp(opts: &CpOptions) -> Result<()> {
             continue;
         }
 
+        // Check if source is a protected path
+        if crate::utils::is_protected_path(source) {
+            eprintln!("❌ Refusing to copy protected path: {}", source.display());
+            skipped += 1;
+            continue;
+        }
+
         let dest_path = if dest_is_dir {
             let file_name = source
                 .file_name()
