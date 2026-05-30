@@ -57,10 +57,7 @@ pub fn run_banner(
         .canonicalize()
         .unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
 
-    // Try daemon cache first (auto-start daemon if not running)
-    crate::daemon_client::ensure_daemon_running();
-
-    // Request from daemon — it will scan if needed and cache the result
+    // Try daemon cache — if daemon isn't running, start it and retry
     if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
         let summary = cached.summary;
         let git_info = cached.git_info.unwrap_or_default();
@@ -78,7 +75,7 @@ pub fn run_banner(
         return Ok(());
     }
 
-    // Daemon not available — error, don't scan
+    // Daemon not available or cache miss — try direct scan
     eprintln!("cfmd: daemon not available, falling back to direct scan");
     let _no_build_check =
         no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";

@@ -23,14 +23,24 @@ fn send_and_recv(stream: &UnixStream, request: &Request) -> Result<Response> {
     Ok(response)
 }
 
-/// Try to get cached banner data from daemon
+/// Try to get cached banner data from daemon.
+/// Auto-starts daemon if socket doesn't exist or is stale.
 pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let socket = socket_path().ok()?;
-    let stream = UnixStream::connect(&socket).ok()?;
+
+    // Try connecting — if it fails, start daemon and retry once
+    let stream = match UnixStream::connect(&socket) {
+        Ok(s) => s,
+        Err(_) => {
+            // Socket missing or stale — clean up and start daemon
+            let _ = std::fs::remove_file(&socket);
+            ensure_daemon_running();
+            UnixStream::connect(&socket).ok()?
+        }
+    };
+
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
-    stream
-        .set_write_timeout(Some(Duration::from_secs(5)))
-        .ok()?;
+    stream.set_write_timeout(Some(Duration::from_secs(1))).ok()?;
 
     let request = Request::Banner {
         path: path.to_path_buf(),
