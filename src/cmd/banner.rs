@@ -781,9 +781,7 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
 }
 
 fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
-    std::fs::read_dir(&entry.path)
-        .map(|d| d.count())
-        .unwrap_or(0)
+    crate::cmd::file_metadata::count_items_in_dir(entry)
 }
 
 /// Aggregate git status for a directory — returns the most severe status
@@ -823,106 +821,12 @@ fn aggregate_dir_git_status(
 /// Get contents description for a file — line count for text, resolution for image, etc.
 /// Returns plain text (no ANSI codes) — coloring is applied by the renderer.
 fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
-    let name = &entry.name;
-    let lower = name.to_lowercase();
-
-    // Image files: try to get resolution from header
-    if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
-        if let Ok(bytes) = std::fs::read(&entry.path) {
-            if let Some(res) = extract_image_resolution(&bytes, &lower) {
-                return res;
-            }
-        }
-    }
-
-    // ZIP files: count entries
-    if lower.ends_with(".zip") {
-        if let Ok(bytes) = std::fs::read(&entry.path) {
-            if let Some(count) = count_zip_entries(&bytes) {
-                return count.to_string();
-            }
-        }
-    }
-
-    // SQLite DB: show table count
-    if lower.ends_with(".db") || lower.ends_with(".sqlite") || lower.ends_with(".sqlite3") {
-        if let Some(count) = count_sqlite_tables(&entry.path) {
-            return format!("{}t", count);
-        }
-    }
-
-    // Video files: extract duration from container headers
-    if lower.ends_with(".mp4") || lower.ends_with(".mov") || lower.ends_with(".m4v") {
-        if let Some(dur) = extract_video_duration(&entry.path) {
-            return dur;
-        }
-    }
-
-    // Text files under 1MB: count lines
-    if entry.size < 1024 * 1024 {
-        if let Ok(content) = std::fs::read_to_string(&entry.path) {
-            let lines = content.lines().count();
-            return lines.to_string();
-        }
-    }
-
-    // WebM/MKV: extract duration from EBML headers
-    if lower.ends_with(".webm") || lower.ends_with(".mkv") {
-        if let Some(dur) = extract_video_duration(&entry.path) {
-            return dur;
-        }
-    }
-
-    String::new()
+    crate::cmd::file_metadata::get_file_contents(entry)
 }
 
 /// Get raw contents description without ANSI colors (for width calculation)
 fn get_file_contents_raw(entry: &crate::fs::DirEntry) -> String {
-    let name = &entry.name;
-    let lower = name.to_lowercase();
-
-    if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
-        if let Ok(bytes) = std::fs::read(&entry.path) {
-            if let Some(res) = extract_image_resolution(&bytes, &lower) {
-                return res;
-            }
-        }
-    }
-
-    if lower.ends_with(".zip") {
-        if let Ok(bytes) = std::fs::read(&entry.path) {
-            if let Some(count) = count_zip_entries(&bytes) {
-                return count.to_string();
-            }
-        }
-    }
-
-    if lower.ends_with(".db") || lower.ends_with(".sqlite") || lower.ends_with(".sqlite3") {
-        if let Some(count) = count_sqlite_tables(&entry.path) {
-            return format!("{}t", count);
-        }
-    }
-
-    if lower.ends_with(".mp4") || lower.ends_with(".mov") || lower.ends_with(".m4v") {
-        if let Some(dur) = extract_video_duration(&entry.path) {
-            return dur;
-        }
-    }
-
-    if lower.ends_with(".webm") || lower.ends_with(".mkv") {
-        if let Some(dur) = extract_video_duration(&entry.path) {
-            return dur;
-        }
-    }
-
-    if entry.size < 1024 * 1024 {
-        if let Ok(content) = std::fs::read_to_string(&entry.path) {
-            let lines = content.lines().count();
-            return lines.to_string();
-        }
-    }
-
-    String::new()
+    crate::cmd::file_metadata::get_file_contents(entry)
 }
 
 /// Extract image resolution from PNG or JPEG header bytes

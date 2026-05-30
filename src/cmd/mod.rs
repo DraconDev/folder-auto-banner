@@ -8,6 +8,7 @@ pub mod delete_session;
 pub mod diff;
 pub mod do_cmd;
 pub mod env;
+pub mod file_metadata;
 pub mod install_hook;
 pub mod jump;
 pub mod load_session;
