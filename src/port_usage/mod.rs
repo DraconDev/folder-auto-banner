@@ -101,7 +101,7 @@ fn try_lsof_with_dir(project_path: &Path) -> Result<Vec<u16>> {
     let path_str = project_path.to_string_lossy().to_string();
 
     // lsof +D finds processes with cwd or open files in the directory
-    let output = run_with_timeout(
+    let output = utils::run_with_timeout_stdout(
         "lsof",
         &["-i", "-P", "-n", "-F", "pcftn", "+D", &path_str],
         PORT_TIMEOUT,
