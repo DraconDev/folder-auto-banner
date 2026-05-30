@@ -758,12 +758,18 @@ fn output_rich(
         // Build name with optional symlink target
         let name_display = if item.is_symlink {
             if let Some(target) = &item.symlink_target {
+                let indicator = if item.symlink_valid {
+                    "→"
+                } else {
+                    "✗→"
+                };
                 format!(
-                    "{}{}{} {}→{} {}",
+                    "{}{}{} {}{}{} {}",
                     name_prefix,
                     item.name,
                     name_suffix,
                     color(DIM),
+                    indicator,
                     color(RESET),
                     target
                 )
