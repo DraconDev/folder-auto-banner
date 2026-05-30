@@ -267,107 +267,52 @@ impl DirSummary {
         let cache = crate::cache::Cache::new().ok();
         let cache_key = |feature: &str| crate::cache::cache_key(path, feature);
 
-        let build_status = if check_build {
-            if let Some(ref cache) = cache {
-                let key = cache_key("build");
-                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(30)) {
-                    Some(cached)
-                } else {
-                    let result = crate::build_status::check_build(path, &project_type);
-                    if let Some(ref r) = result {
-                        if let Err(e) = cache.set(&key, r.clone()) {
-                            tracing::warn!("Failed to cache build status: {}", e);
+        let cached_compute =
+            |cache: &Option<crate::cache::Cache>, key: &str, ttl_secs: u64, compute: impl FnOnce() -> Option<T>| {
+                if let Some(ref cache) = cache {
+                    let key = cache_key(key);
+                    if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(ttl_secs)) {
+                        Some(cached)
+                    } else {
+                        let result = compute();
+                        if let Some(ref r) = result {
+                            if let Err(e) = cache.set(&key, r.clone()) {
+                                tracing::warn!("Failed to cache {}: {}", key, e);
+                            }
                         }
+                        result
                     }
-                    result
+                } else {
+                    compute()
                 }
-            } else {
-                crate::build_status::check_build(path, &project_type)
-            }
+            };
+
+        let build_status = if check_build {
+            cached_compute(&cache, "build", 30, || crate::build_status::check_build(path, &project_type))
         } else {
             None
         };
 
         let todo_info = if scan_todos {
-            if let Some(ref cache) = cache {
-                let key = cache_key("todos");
-                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(60)) {
-                    Some(cached)
-                } else {
-                    let result = crate::todo_scanner::scan_todos(path).ok();
-                    if let Some(ref r) = result {
-                        if let Err(e) = cache.set(&key, r.clone()) {
-                            tracing::warn!("Failed to cache todo info: {}", e);
-                        }
-                    }
-                    result
-                }
-            } else {
-                crate::todo_scanner::scan_todos(path).ok()
-            }
+            cached_compute(&cache, "todos", 60, || crate::todo_scanner::scan_todos(path).ok())
         } else {
             None
         };
 
         let code_metrics = if check_metrics {
-            if let Some(ref cache) = cache {
-                let key = cache_key("metrics");
-                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(60)) {
-                    Some(cached)
-                } else {
-                    let result = crate::code_metrics::scan_metrics(path).ok();
-                    if let Some(ref r) = result {
-                        if let Err(e) = cache.set(&key, r.clone()) {
-                            tracing::warn!("Failed to cache code metrics: {}", e);
-                        }
-                    }
-                    result
-                }
-            } else {
-                crate::code_metrics::scan_metrics(path).ok()
-            }
+            cached_compute(&cache, "metrics", 60, || crate::code_metrics::scan_metrics(path).ok())
         } else {
             None
         };
 
         let port_info = if check_ports {
-            if let Some(ref cache) = cache {
-                let key = cache_key("ports");
-                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(10)) {
-                    Some(cached)
-                } else {
-                    let result = crate::port_usage::detect_ports(path).ok();
-                    if let Some(ref r) = result {
-                        if let Err(e) = cache.set(&key, r.clone()) {
-                            tracing::warn!("Failed to cache port info: {}", e);
-                        }
-                    }
-                    result
-                }
-            } else {
-                crate::port_usage::detect_ports(path).ok()
-            }
+            cached_compute(&cache, "ports", 10, || crate::port_usage::detect_ports(path).ok())
         } else {
             None
         };
 
         let docker_info = if check_docker {
-            if let Some(ref cache) = cache {
-                let key = cache_key("docker");
-                if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(10)) {
-                    Some(cached)
-                } else {
-                    let result = crate::docker::detect_docker(path).ok();
-                    if let Some(ref r) = result {
-                        if let Err(e) = cache.set(&key, r.clone()) {
-                            tracing::warn!("Failed to cache docker info: {}", e);
-                        }
-                    }
-                    result
-                }
-            } else {
-                crate::docker::detect_docker(path).ok()
-            }
+            cached_compute(&cache, "docker", 10, || crate::docker::detect_docker(path).ok())
         } else {
             None
         };
