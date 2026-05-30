@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 mod build_status;
 mod cache;
 mod cli;
