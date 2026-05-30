@@ -641,9 +641,9 @@ fn output_rich(
         // Size: orange
         let size_colored = format!("{}{}{}", color(ORANGE), size_padded, color(RESET));
 
-        // Contents: red
+        // Contents: orange (like size)
         let contents_colored = if item.is_dir {
-            format!("{}{}{}", color(RED), contents_padded, color(RESET))
+            format!("{}{}{}", color(ORANGE), contents_padded, color(RESET))
         } else {
             let colored = get_file_contents(item);
             let padded = format!(
@@ -651,7 +651,7 @@ fn output_rich(
                 colored,
                 width = max_contents + (colored.len() - contents_raw.len())
             );
-            format!("{}{}{}", color(RED), padded, color(RESET))
+            format!("{}{}{}", color(ORANGE), padded, color(RESET))
         };
 
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
