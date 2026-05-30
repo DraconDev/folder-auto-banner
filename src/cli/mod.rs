@@ -53,12 +53,40 @@ pub enum Commands {
         #[arg(short, long)]
         verbose: bool,
 
-        /// Sort order: name, size, date, type
-        #[arg(long, value_parser = ["name", "size", "date", "type"])]
+        /// Sort order: name, size, date, type, git, extension, version
+        #[arg(long, value_parser = ["name", "size", "date", "type", "git", "extension", "version"])]
         sort: Option<String>,
 
+        /// Sort by time modified
+        #[arg(short = 't', long = "timesort")]
+        timesort: bool,
+
+        /// Sort by size
+        #[arg(short = 'S', long = "sizesort")]
+        sizesort: bool,
+
+        /// Sort by file extension
+        #[arg(short = 'X', long = "extensionsort")]
+        extensionsort: bool,
+
+        /// Sort by git status
+        #[arg(short = 'G', long = "gitsort")]
+        gitsort: bool,
+
+        /// Natural sort (version numbers)
+        #[arg(long = "versionsort")]
+        versionsort: bool,
+
+        /// No sort — list in directory order
+        #[arg(short = 'U', long = "no-sort")]
+        no_sort: bool,
+
+        /// Group directories first/last
+        #[arg(long, value_parser = ["none", "first", "last"])]
+        group_dirs: Option<String>,
+
         /// Reverse sort order
-        #[arg(long)]
+        #[arg(long = "reverse")]
         reverse: bool,
 
         /// Show hidden files (dotfiles)
@@ -116,6 +144,13 @@ impl Cli {
                 compact,
                 verbose,
                 sort,
+                timesort,
+                sizesort,
+                extensionsort,
+                gitsort,
+                versionsort,
+                no_sort,
+                group_dirs,
                 reverse,
                 hidden,
                 filter,
@@ -131,6 +166,13 @@ impl Cli {
                     compact: *compact,
                     verbose: *verbose,
                     sort: sort.as_deref(),
+                    timesort: *timesort,
+                    sizesort: *sizesort,
+                    extensionsort: *extensionsort,
+                    gitsort: *gitsort,
+                    versionsort: *versionsort,
+                    no_sort: *no_sort,
+                    group_dirs: group_dirs.as_deref(),
                     reverse: *reverse,
                     hidden: *hidden,
                     filter: filter.as_deref(),

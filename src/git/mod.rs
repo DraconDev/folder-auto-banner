@@ -19,6 +19,9 @@ pub struct GitInfo {
     pub untracked: usize,
     pub last_commit_msg: Option<String>,
     pub last_commit_hash: Option<String>,
+    pub last_commit_time: Option<i64>, // Unix timestamp
+    pub commits_today: usize,
+    pub branch_count: usize,
     pub stash_count: usize,
     pub merge_state: Option<String>,
     pub tag: Option<String>,

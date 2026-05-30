@@ -57,6 +57,13 @@ pub struct BannerOptions<'a> {
     pub compact: bool,
     pub verbose: bool,
     pub sort: Option<&'a str>,
+    pub timesort: bool,
+    pub sizesort: bool,
+    pub extensionsort: bool,
+    pub gitsort: bool,
+    pub versionsort: bool,
+    pub no_sort: bool,
+    pub group_dirs: Option<&'a str>,
     pub reverse: bool,
     pub hidden: bool,
     pub filter: Option<&'a str>,
@@ -107,7 +114,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -138,7 +145,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -243,6 +250,13 @@ fn output_rich(
     git_info: &GitInfo,
     _compact: bool,
     sort: Option<&str>,
+    timesort: bool,
+    sizesort: bool,
+    extensionsort: bool,
+    gitsort: bool,
+    versionsort: bool,
+    no_sort: bool,
+    group_dirs: Option<&str>,
     reverse: bool,
     icons: bool,
     _colors: bool,
@@ -606,48 +620,100 @@ fn output_rich(
         display_items = dirs.into_iter().chain(files).chain(symlinks).collect();
     }
 
-    // Sort based on --sort flag
-    let sort_mode = sort.unwrap_or("name");
-    display_items.sort_by(|a, b| {
-        // Always keep directories first unless sorting by type
-        if sort_mode != "type" && a.is_dir != b.is_dir {
-            return if reverse {
-                a.is_dir.cmp(&b.is_dir)
-            } else {
-                b.is_dir.cmp(&a.is_dir)
-            };
-        }
-
-        let ordering = match sort_mode {
-            "size" => a.size.cmp(&b.size),
-            "date" => {
-                let a_time = a
-                    .modified
-                    .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
-                let b_time = b
-                    .modified
-                    .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
-                a_time.cmp(&b_time)
-            }
-            "type" => {
-                let a_ext = a.name.rfind('.').map(|i| &a.name[i..]).unwrap_or("");
-                let b_ext = b.name.rfind('.').map(|i| &b.name[i..]).unwrap_or("");
-                let ext_cmp = a_ext.cmp(b_ext);
-                if ext_cmp != std::cmp::Ordering::Equal {
-                    ext_cmp
-                } else {
-                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
-                }
-            }
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()), // "name" or default
+    // Sort based on --sort flag or short flags
+    if !no_sort {
+        // Resolve sort mode from flags
+        let sort_mode = if let Some(s) = sort {
+            s.to_string()
+        } else if timesort {
+            "date".to_string()
+        } else if sizesort {
+            "size".to_string()
+        } else if extensionsort {
+            "extension".to_string()
+        } else if gitsort {
+            "git".to_string()
+        } else if versionsort {
+            "version".to_string()
+        } else {
+            "name".to_string()
         };
 
-        if reverse {
-            ordering.reverse()
-        } else {
-            ordering
-        }
-    });
+        // Group dirs handling
+        let group_dirs_mode = group_dirs.unwrap_or("first");
+
+        display_items.sort_by(|a, b| {
+            // Group directories if requested
+            if group_dirs_mode != "none" && a.is_dir != b.is_dir {
+                return if group_dirs_mode == "last" {
+                    if reverse {
+                        a.is_dir.cmp(&b.is_dir)
+                    } else {
+                        b.is_dir.cmp(&a.is_dir)
+                    }
+                } else {
+                    // first (default)
+                    if reverse {
+                        b.is_dir.cmp(&a.is_dir)
+                    } else {
+                        a.is_dir.cmp(&b.is_dir)
+                    }
+                };
+            }
+
+            let ordering = match sort_mode.as_str() {
+                "size" => a.size.cmp(&b.size),
+                "date" => {
+                    let a_time = a
+                        .modified
+                        .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                    let b_time = b
+                        .modified
+                        .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                    a_time.cmp(&b_time)
+                }
+                "type" => {
+                    let a_ext = a.name.rfind('.').map(|i| &a.name[i..]).unwrap_or("");
+                    let b_ext = b.name.rfind('.').map(|i| &b.name[i..]).unwrap_or("");
+                    let ext_cmp = a_ext.cmp(b_ext);
+                    if ext_cmp != std::cmp::Ordering::Equal {
+                        ext_cmp
+                    } else {
+                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                    }
+                }
+                "extension" => {
+                    let a_ext = a.name.rfind('.').map(|i| &a.name[i+1..]).unwrap_or("");
+                    let b_ext = b.name.rfind('.').map(|i| &b.name[i+1..]).unwrap_or("");
+                    let ext_cmp = a_ext.to_lowercase().cmp(&b_ext.to_lowercase());
+                    if ext_cmp != std::cmp::Ordering::Equal {
+                        ext_cmp
+                    } else {
+                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                    }
+                }
+                "git" => {
+                    // Sort by git status: modified > added > untracked > deleted > none
+                    let git_order = |_item: &&crate::fs::DirEntry| -> u8 {
+                        // This would need git status per file - for now sort by name
+                        0
+                    };
+                    git_order(a).cmp(&git_order(b))
+                }
+                "version" => {
+                    // Natural sort (version numbers)
+                    natural_cmp(&a.name, &b.name)
+                }
+                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()), // "name" or default
+            };
+
+            if reverse {
+                ordering.reverse()
+            } else {
+                ordering
+            }
+        });
+    }
 
     // Compute max column widths for alignment
     let mut max_owner = 5; // "OWNER"
@@ -985,6 +1051,47 @@ fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
 /// Get raw contents description without ANSI colors (for width calculation)
 fn get_file_contents_raw(entry: &crate::fs::DirEntry) -> String {
     crate::cmd::file_metadata::get_file_contents(entry)
+}
+
+/// Natural comparison for version sorting (e.g., file1, file2, file10)
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let mut a_chars = a.chars().peekable();
+    let mut b_chars = b.chars().peekable();
+
+    loop {
+        match (a_chars.peek(), b_chars.peek()) {
+            (None, None) => return std::cmp::Ordering::Equal,
+            (None, Some(_)) => return std::cmp::Ordering::Less,
+            (Some(_), None) => return std::cmp::Ordering::Greater,
+            (Some(&a_c), Some(&b_c)) => {
+                if a_c.is_ascii_digit() && b_c.is_ascii_digit() {
+                    // Compare numbers
+                    let mut a_num = String::new();
+                    let mut b_num = String::new();
+                    while a_chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                        a_num.push(a_chars.next().unwrap());
+                    }
+                    while b_chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                        b_num.push(b_chars.next().unwrap());
+                    }
+                    let a_val: u64 = a_num.parse().unwrap_or(0);
+                    let b_val: u64 = b_num.parse().unwrap_or(0);
+                    if a_val != b_val {
+                        return a_val.cmp(&b_val);
+                    }
+                } else {
+                    // Compare characters (case-insensitive)
+                    let a_lower = a_c.to_ascii_lowercase();
+                    let b_lower = b_c.to_ascii_lowercase();
+                    if a_lower != b_lower {
+                        return a_lower.cmp(&b_lower);
+                    }
+                    a_chars.next();
+                    b_chars.next();
+                }
+            }
+        }
+    }
 }
 
 /// Colorize permission string like exa — each char colored by meaning

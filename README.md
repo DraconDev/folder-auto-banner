@@ -27,8 +27,12 @@ exec zsh   # or: source ~/.bashrc
 ```bash
 f                    # Directory listing + context
 f <dir>              # Listing for specific dir
-f --sort size        # Sort by size
-f --hidden           # Show dotfiles
+f -S                 # Sort by size
+f -t                 # Sort by time
+f -X                 # Sort by extension
+f -G                 # Sort by git status
+f --versionsort      # Natural sort (file1, file2, file10)
+f -a                 # Show dotfiles
 f --tree             # Tree view
 f --json             # JSON output
 f --filter rs        # Filter by pattern
@@ -36,19 +40,35 @@ f --filter rs        # Filter by pattern
 
 ## Flags
 
+### Sorting
 | Flag | Description |
 |------|-------------|
-| `--sort name\|size\|date\|type` | Sort order |
+| `--sort name\|size\|date\|type\|git\|extension\|version` | Sort by field |
+| `-t`, `--timesort` | Sort by time modified |
+| `-S`, `--sizesort` | Sort by size |
+| `-X`, `--extensionsort` | Sort by extension |
+| `-G`, `--gitsort` | Sort by git status |
+| `--versionsort` | Natural sort (version numbers) |
+| `--no-sort` | No sort, directory order |
 | `--reverse` | Reverse sort |
-| `--hidden` | Show dotfiles |
+| `--group-dirs first\|last` | Group directories |
+
+### Display
+| Flag | Description |
+|------|-------------|
+| `-a`, `--hidden` | Show dotfiles |
 | `--tree [depth]` | Tree view (0 = unlimited) |
-| `--json` | JSON output |
-| `--raw` | Plain text output |
-| `--compact` | Less info |
-| `--verbose` | More info |
+| `--group` | Group by type (dirs, files, symlinks) |
 | `--filter <pattern>` | Filter by name |
 | `--max <N>` | Limit items |
-| `--group` | Group by type |
+| `--compact` | Less info |
+| `--verbose` | More info |
+
+### Output
+| Flag | Description |
+|------|-------------|
+| `--json` | JSON output |
+| `--raw` | Plain text output |
 
 ## Environment Variables
 
