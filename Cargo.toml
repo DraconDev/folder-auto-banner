@@ -17,6 +17,9 @@ name = "cfmd"
 path = "src/daemon.rs"
 
 [dependencies]
+# Shared library
+cfm-lib = { path = "cfm-lib" }
+
 # CLI parsing
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
@@ -47,7 +50,6 @@ byte-unit = "5"
 
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
-
 
 # Error handling
 anyhow = "1"

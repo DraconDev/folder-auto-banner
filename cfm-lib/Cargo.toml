@@ -1,0 +1,46 @@
+[package]
+name = "cfm-lib"
+version = "0.1.1"
+edition = "2021"
+description = "Contextual File Manager — shared library"
+license = "MIT"
+
+[dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Directories
+directories = "5"
+
+# Human-readable sizes
+byte-unit = "5"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1"
+tracing = "0.1"
+
+# Path handling
+path-absolutize = "3.1"
+
+# Glob patterns
+glob = "0.3"
+
+# Fast directory walking
+ignore = "0.4"
+
+# Git integration
+git2 = "0.19"
+
+# Filesystem watching (for daemon)
+inotify = "0.11"
+libc = "0.2"
+
+# CLI parsing (for daemon_types re-exports)
+clap = { version = "4", features = ["derive", "env"] }
+
+# Config parsing
+toml = "0.8"

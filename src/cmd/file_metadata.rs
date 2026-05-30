@@ -208,15 +208,29 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                     && buf[j + 7] == 0x64
                 {
                     let version = buf[j + 8];
-                    let timescale = if version == 0 {
-                        u32::from_be_bytes([buf[j + 20], buf[j + 21], buf[j + 22], buf[j + 23]])
+
+                    let (timescale, duration) = if version == 0 {
+                        let ts = u32::from_be_bytes([
+                            buf[j + 20],
+                            buf[j + 21],
+                            buf[j + 22],
+                            buf[j + 23],
+                        ]);
+                        let dur = u32::from_be_bytes([
+                            buf[j + 24],
+                            buf[j + 25],
+                            buf[j + 26],
+                            buf[j + 27],
+                        ]);
+                        (ts as u64, dur as u64)
                     } else {
-                        u32::from_be_bytes([buf[j + 28], buf[j + 29], buf[j + 30], buf[j + 31]])
-                    };
-                    let duration = if version == 0 {
-                        u32::from_be_bytes([buf[j + 24], buf[j + 25], buf[j + 26], buf[j + 27]])
-                    } else {
-                        u64::from_be_bytes([
+                        let ts = u32::from_be_bytes([
+                            buf[j + 28],
+                            buf[j + 29],
+                            buf[j + 30],
+                            buf[j + 31],
+                        ]);
+                        let dur = u64::from_be_bytes([
                             buf[j + 32],
                             buf[j + 33],
                             buf[j + 34],
@@ -225,14 +239,22 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                             buf[j + 37],
                             buf[j + 38],
                             buf[j + 39],
-                        ])
+                        ]);
+                        (ts as u64, dur)
                     };
 
-                    if timescale > 0 {
-                        let secs = duration as f64 / timescale as f64;
-                        let mins = secs as u64 / 60;
-                        let secs_remaining = secs as u64 % 60;
-                        return Some(format!("{}:{:02}", mins, secs_remaining));
+                    if timescale > 0 && duration > 0 {
+                        let seconds = duration / timescale;
+                        let mins = seconds / 60;
+                        let secs = seconds % 60;
+                        if mins >= 60 {
+                            let hours = mins / 60;
+                            let mins = mins % 60;
+                            return Some(format!("{}:{:02}:{:02}", hours, mins, secs));
+                        } else if mins > 0 {
+                            return Some(format!("{}:{:02}", mins, secs));
+                        }
+                        return Some(format!("{}s", seconds));
                     }
                 }
                 j += atom_size;

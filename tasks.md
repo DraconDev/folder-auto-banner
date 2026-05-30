@@ -121,7 +121,7 @@
 - [ ] Fix any dead code warnings that surface
 
 ### Decouple banner rendering from I/O
-- [ ] Extract data extraction (image headers, ZIP inspection, SQLite queries, MP4 parsing) from `banner.rs` into a `banner_data.rs` or per-format modules
+- [x] Extract data extraction (image headers, ZIP inspection, SQLite queries, MP4 parsing) from `banner.rs` into a `banner_data.rs` or per-format modules
 - [ ] Make `output_rich()` consume pre-extracted data, not read files directly
 - [ ] Split `banner.rs` (1,167 lines) into smaller focused modules
 
