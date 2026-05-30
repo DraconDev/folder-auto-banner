@@ -527,6 +527,7 @@ fn output_rich(
         let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
 
         // Per-file git status — try relative path first, then filename
+        // For directories, aggregate status from child files
         let git_icon = {
             let rel = item.path.strip_prefix(path).unwrap_or(&item.path);
             let rel_str = rel.to_string_lossy();
@@ -535,6 +536,14 @@ fn output_rich(
                 .get(rel_str.as_ref())
                 .or_else(|| git_info.file_statuses.get(item.name.as_str()))
                 .map(|fs| format!("{}{}{}", color(fs.color()), fs.icon(), color(RESET)))
+                .or_else(|| {
+                    // For directories: aggregate status from child files
+                    if item.is_dir {
+                        aggregate_dir_git_status(&git_info.file_statuses, &item.name)
+                    } else {
+                        None
+                    }
+                })
                 .unwrap_or_default()
         };
 
