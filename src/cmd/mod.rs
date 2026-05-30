@@ -3,6 +3,7 @@ pub mod clipboard;
 pub mod completion;
 pub mod config;
 pub mod cp;
+pub mod daemon_mgmt;
 pub mod delete_session;
 pub mod diff;
 pub mod do_cmd;

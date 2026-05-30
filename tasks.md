@@ -140,9 +140,9 @@
 - [x] Add proper serde support for serialization/deserialization
 
 ### Fix `cli/mod.rs` separation of concerns
-- [ ] Extract `run_daemon()` out of `cli/mod.rs` into a daemon command module
+- [x] Extract `run_daemon()` out of `cli/mod.rs` into a daemon command module
 - [x] Reduce `run_banner` parameter count (11 params → struct)
-- [ ] Reduce `run_cp` parameter count (6 params → struct)
+- [x] Reduce `run_cp` parameter count (6 params → struct)
 
 ---
 

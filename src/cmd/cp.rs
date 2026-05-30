@@ -17,21 +17,24 @@ pub enum CollisionAction {
     Ask,
 }
 
-pub fn run_cp(
-    sources: &[PathBuf],
-    dest: &Path,
-    overwrite: bool,
-    rename_on_collision: bool,
-    verbose: bool,
-    preserve: bool,
-    dry_run: bool,
-) -> Result<()> {
-    if sources.is_empty() {
+/// Options for the copy command
+pub struct CpOptions<'a> {
+    pub sources: &'a [PathBuf],
+    pub dest: &'a Path,
+    pub overwrite: bool,
+    pub rename_on_collision: bool,
+    pub verbose: bool,
+    pub preserve: bool,
+    pub dry_run: bool,
+}
+
+pub fn run_cp(opts: &CpOptions) -> Result<()> {
+    if opts.sources.is_empty() {
         println!("❌ No source files specified");
         return Ok(());
     }
 
-    if dry_run {
+    if opts.dry_run {
         println!("🔍 Dry run — no files will be copied");
         println!();
     }
@@ -41,9 +44,9 @@ pub fn run_cp(
     let mut overwritten = 0;
 
     // Determine if dest is a directory
-    let dest_is_dir = dest.is_dir() || dest.to_string_lossy().ends_with('/');
+    let dest_is_dir = opts.dest.is_dir() || opts.dest.to_string_lossy().ends_with('/');
 
-    for source in sources {
+    for source in opts.sources {
         if !source.exists() {
             eprintln!("⚠️  Source not found: {}", source.display());
             skipped += 1;
@@ -54,15 +57,15 @@ pub fn run_cp(
             let file_name = source
                 .file_name()
                 .ok_or_else(|| anyhow::anyhow!("Invalid source: {}", source.display()))?;
-            dest.join(file_name)
+            opts.dest.join(file_name)
         } else {
-            dest.to_path_buf()
+            opts.dest.to_path_buf()
         };
 
         // Check for collision
         if dest_path.exists() {
-            if overwrite {
-                if dry_run {
+            if opts.overwrite {
+                if opts.dry_run {
                     println!(
                         "  Would overwrite: {} -> {}",
                         source.display(),
@@ -74,17 +77,17 @@ pub fn run_cp(
                     fs::remove_file(&dest_path)?;
                 }
                 overwritten += 1;
-            } else if rename_on_collision {
+            } else if opts.rename_on_collision {
                 // Generate new name
                 let new_path = utils::generate_unique_name(&dest_path);
-                if dry_run {
+                if opts.dry_run {
                     println!(
                         "  Would copy: {} -> {}",
                         source.display(),
                         new_path.display()
                     );
                 } else {
-                    perform_copy(source, &new_path, preserve, verbose)?;
+                    perform_copy(source, &new_path, opts.preserve, opts.verbose)?;
                 }
                 copied += 1;
                 continue;
@@ -95,20 +98,20 @@ pub fn run_cp(
             }
         }
 
-        if dry_run {
+        if opts.dry_run {
             println!(
                 "  Would copy: {} -> {}",
                 source.display(),
                 dest_path.display()
             );
         } else {
-            perform_copy(source, &dest_path, preserve, verbose)?;
+            perform_copy(source, &dest_path, opts.preserve, opts.verbose)?;
         }
         copied += 1;
     }
 
     // Summary
-    if dry_run {
+    if opts.dry_run {
         println!();
         println!(
             "📋 Would copy {} file(s), {} overwrite(s), {} skip(s)",
