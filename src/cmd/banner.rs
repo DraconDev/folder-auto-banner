@@ -54,6 +54,7 @@ pub struct BannerOptions<'a> {
     pub raw: bool,
     pub json: bool,
     pub compact: bool,
+    #[allow(dead_code)]
     pub no_build_check: bool,
     pub no_todos: bool,
     pub no_ports: bool,
@@ -94,7 +95,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -125,7 +126,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -475,9 +476,9 @@ fn output_rich(
     }
 
     let total_visible = visible_items.len();
-    let show_hidden = opts.hidden || total_visible < 30;
+    let show_hidden_flag = show_hidden || total_visible < 30;
 
-    let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden {
+    let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden_flag {
         visible_items
             .iter()
             .chain(hidden_items.iter())
@@ -718,7 +719,7 @@ fn output_rich(
         );
     }
 
-    if !show_hidden && !hidden_items.is_empty() {
+    if !show_hidden_flag && !hidden_items.is_empty() {
         println!(
             "  ... and {} hidden items ({} total items)",
             hidden_items.len(),
