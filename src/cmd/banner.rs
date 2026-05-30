@@ -66,6 +66,13 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         .canonicalize()
         .unwrap_or_else(|_| opts.path.unwrap_or(cwd.as_path()).to_path_buf());
 
+    // Load config and apply env var overrides
+    let config = crate::state::Config::load().unwrap_or_default();
+    let icons = std::env::var("CFM_ICONS").map(|v| v == "1").unwrap_or(config.icons);
+    let colors = std::env::var("CFM_COLORS").map(|v| v == "1").unwrap_or(config.colors);
+    let compact = opts.compact || config.compact;
+    let max_items = config.max_display_items;
+
     // Try daemon cache — if daemon isn't running, start it and retry
     if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
         let summary = cached.summary;
@@ -76,7 +83,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -107,7 +114,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -142,6 +149,9 @@ fn output_rich(
     _compact: bool,
     sort: Option<&str>,
     reverse: bool,
+    icons: bool,
+    colors: bool,
+    max_items: usize,
 ) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
