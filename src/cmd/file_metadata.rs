@@ -117,8 +117,162 @@ fn count_zip_entries(bytes: &[u8]) -> Option<usize> {
     if count > 0 {
         Some(count)
     } else {
-        None
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_image_resolution_png() {
+        // Minimal PNG header: 8-byte signature + IHDR chunk
+        // Width at bytes 16-19, height at bytes 20-23 (big endian)
+        let mut png = vec![0u8; 24];
+        // PNG signature
+        png[0] = 0x89;
+        png[1] = 0x50; // P
+        png[2] = 0x4E; // N
+        png[3] = 0x47; // G
+        png[4] = 0x0D;
+        png[5] = 0x0A;
+        png[6] = 0x1A;
+        png[7] = 0x0A;
+        // Width = 1920 (0x00000780)
+        png[16] = 0x00;
+        png[17] = 0x00;
+        png[18] = 0x07;
+        png[19] = 0x80;
+        // Height = 1080 (0x00000438)
+        png[20] = 0x00;
+        png[21] = 0x00;
+        png[22] = 0x04;
+        png[23] = 0x38;
+
+        let result = extract_image_resolution(&png, ".png");
+        assert_eq!(result, Some("1920x1080".to_string()));
     }
+
+    #[test]
+    fn test_extract_image_resolution_too_short() {
+        let png = vec![0u8; 10];
+        let result = extract_image_resolution(&png, ".png");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_count_zip_entries() {
+        // Create a minimal ZIP with 3 local file headers
+        let mut zip = Vec::new();
+        for _ in 0..3 {
+            zip.extend_from_slice(&[0x50, 0x4B, 0x03, 0x04]); // Local file header signature
+            zip.extend_from_slice(&[0u8; 26]); // Rest of header
+        }
+        let result = count_zip_entries(&zip);
+        assert_eq!(result, Some(3));
+    }
+
+    #[test]
+    fn test_count_zip_entries_empty() {
+        let zip = vec![0u8; 100];
+        let result = count_zip_entries(&zip);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_count_items_in_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir_path = tmp.path();
+        std::fs::write(dir_path.join("file1.txt"), "a").unwrap();
+        std::fs::write(dir_path.join("file2.txt"), "b").unwrap();
+        std::fs::create_dir(dir_path.join("subdir")).unwrap();
+
+        let entry = crate::fs::DirEntry {
+            name: "test".to_string(),
+            path: dir_path.to_path_buf(),
+            is_dir: true,
+            is_file: false,
+            is_symlink: false,
+            is_exec: false,
+            size: 0,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+        };
+
+        let count = count_items_in_dir(&entry);
+        assert_eq!(count, 3); // 2 files + 1 dir
+    }
+
+    #[test]
+    fn test_count_items_in_nonexistent_dir() {
+        let entry = crate::fs::DirEntry {
+            name: "nonexistent".to_string(),
+            path: "/tmp/nonexistent_dir_12345".into(),
+            is_dir: true,
+            is_file: false,
+            is_symlink: false,
+            is_exec: false,
+            size: 0,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+        };
+
+        let count = count_items_in_dir(&entry);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_get_file_contents_text() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = tmp.path().join("test.txt");
+        std::fs::write(&file_path, "line1\nline2\nline3\n").unwrap();
+
+        let entry = crate::fs::DirEntry {
+            name: "test.txt".to_string(),
+            path: file_path,
+            is_dir: false,
+            is_file: true,
+            is_symlink: false,
+            is_exec: false,
+            size: 18,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+        };
+
+        let contents = get_file_contents(&entry);
+        assert_eq!(contents, "3"); // 3 lines
+    }
+
+    #[test]
+    fn test_get_file_contents_empty() {
+        let entry = crate::fs::DirEntry {
+            name: "unknown.xyz".to_string(),
+            path: "/tmp/nonexistent".into(),
+            is_dir: false,
+            is_file: true,
+            is_symlink: false,
+            is_exec: false,
+            size: 0,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+        };
+
+        let contents = get_file_contents(&entry);
+        assert_eq!(contents, "");
+    }
+}
 }
 
 /// Count SQLite tables by reading schema
