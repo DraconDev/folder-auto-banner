@@ -80,7 +80,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     let config = crate::state::Config::load().unwrap_or_default();
     let icons = std::env::var("CFM_ICONS").map(|v| v == "1").unwrap_or(config.icons);
     let colors = std::env::var("CFM_COLORS").map(|v| v == "1").unwrap_or(config.colors);
-    let compact = opts.compact || config.compact;
+    let _compact = opts.compact || config.compact;
     let max_items = config.max_display_items;
     set_colors_enabled(colors);
 
@@ -161,8 +161,8 @@ fn output_rich(
     sort: Option<&str>,
     reverse: bool,
     icons: bool,
-    colors: bool,
-    max_items: usize,
+    _colors: bool,
+    _max_items: usize,
 ) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
@@ -558,7 +558,7 @@ fn output_rich(
         let icon_str = if icons {
             icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink)
         } else {
-            ""
+            String::new()
         };
 
         // Per-file git status — try relative path first, then filename
