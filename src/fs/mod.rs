@@ -626,9 +626,7 @@ mod tests {
 
     #[test]
     fn test_format_exact_time() {
-        let dt = chrono::DateTime::parse_from_str("2024-01-15 10:30:00", "%Y-%m-%d %H:%M:%S")
-            .unwrap()
-            .with_timezone(&chrono::Utc);
+        let dt = chrono::Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap();
         let formatted = format_exact_time(&dt);
         assert_eq!(formatted, "2024-01-15 10:30:00");
     }
