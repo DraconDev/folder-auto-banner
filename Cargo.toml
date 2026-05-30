@@ -1,12 +1,13 @@
 [package]
 name = "cfm"
-version = "0.1.1"
+version = "0.3.0"
 edition = "2021"
-description = "Contextual File Manager — An ephemeral, zero-hostage intelligence layer for the shell"
+description = "Contextual File Manager — A directory listing with instant context"
 license = "MIT"
 repository = "https://github.com/dracon/cfm"
 keywords = ["cli", "file-manager", "shell", "productivity"]
 categories = ["command-line-utilities"]
+default-run = "f"
 
 [[bin]]
 name = "f"
