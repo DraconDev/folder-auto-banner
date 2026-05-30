@@ -96,6 +96,8 @@ pub enum Commands {
 
 impl Cli {
     pub fn run(&self) -> Result<()> {
+        use Commands::*;
+
         // Initialize logging if debug mode
         if self.debug {
             tracing_subscriber::fmt()
