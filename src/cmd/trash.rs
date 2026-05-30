@@ -64,6 +64,13 @@ pub fn run_trash(paths: &[PathBuf], verbose: bool, dry_run: bool) -> Result<()> 
             continue;
         }
 
+        // Check if it's a protected path
+        if crate::utils::is_protected_path(path) {
+            eprintln!("❌ Refusing to trash protected path: {}", path.display());
+            skipped += 1;
+            continue;
+        }
+
         if dry_run {
             println!("  Would trash: {}", path.display());
             trashed += 1;

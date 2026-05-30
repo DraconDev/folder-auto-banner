@@ -83,7 +83,12 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     // Load config and apply env var overrides
     let config = crate::state::Config::load().unwrap_or_default();
     let icons = std::env::var("CFM_ICONS").map(|v| v == "1").unwrap_or(config.icons);
-    let colors = std::env::var("CFM_COLORS").map(|v| v == "1").unwrap_or(config.colors);
+    let no_color = std::env::var("NO_COLOR").is_ok();
+    let colors = if no_color {
+        false
+    } else {
+        std::env::var("CFM_COLORS").map(|v| v == "1").unwrap_or(config.colors)
+    };
     let _compact = opts.compact || config.compact;
     let max_items = config.max_display_items;
     set_colors_enabled(colors);

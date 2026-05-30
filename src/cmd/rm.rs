@@ -4,7 +4,9 @@
 
 use anyhow::Result;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+use crate::utils;
 
 pub fn run_rm(
     paths: &[PathBuf],
@@ -43,7 +45,7 @@ pub fn run_rm(
         }
 
         // Check if it's a protected path
-        if is_protected_path(path) {
+        if utils::is_protected_path(path) {
             eprintln!("❌ Refusing to remove protected path: {}", path.display());
             skipped += 1;
             continue;
@@ -97,37 +99,4 @@ pub fn run_rm(
     Ok(())
 }
 
-/// Check if path is protected (home, root, etc.)
-fn is_protected_path(path: &Path) -> bool {
-    let path_str = path.to_string_lossy().to_lowercase();
 
-    // Check for dangerous system paths
-    let dangerous = [
-        "/", "/home", "/root", "/usr", "/bin", "/sbin", "/etc", "/var", "/sys", "/proc", "/dev",
-        "/boot", "/lib", "/lib64", "/opt", "/srv",
-    ];
-
-    for d in &dangerous {
-        if path_str == *d || path_str.starts_with(&format!("{}/", d)) {
-            return true;
-        }
-    }
-
-    // Check for sensitive user directories
-    if let Ok(home) = std::env::var("HOME") {
-        let home_lower = home.to_lowercase();
-        let sensitive = [
-            ".ssh", ".gnupg", ".config", ".local/share/keyrings",
-            ".mozilla", ".thunderbird", ".docker",
-        ];
-        for s in &sensitive {
-            let sensitive_path = format!("{}/{}", home_lower, s);
-            if path_str == sensitive_path || path_str.starts_with(&format!("{}/", sensitive_path))
-            {
-                return true;
-            }
-        }
-    }
-
-    false
-}

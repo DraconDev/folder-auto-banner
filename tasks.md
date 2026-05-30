@@ -184,7 +184,7 @@
 - [x] `--filter` flag (type, size range, name pattern)
 - [x] `--max N` flag (limit items shown)
 - [x] `--hidden` flag to always show dotfiles
-- [ ] `--group` flag to group by type (dirs, files, symlinks)
+- [x] `--group` flag to group by type (dirs, files, symlinks)
 
 ### Table Views
 - [ ] `--tree` recursive view (like `lsd --tree`)
@@ -207,10 +207,10 @@
 
 ### Color Themes
 - [ ] Support `LS_COLORS` environment variable
-- [ ] Support `NO_COLOR` environment variable
-- [ ] Configurable color scheme via config file
+- [x] Support `NO_COLOR` environment variable
+- [x] Configurable color scheme via config file
 - [ ] Dark/light theme support
-- [ ] Color the whole row like exa/lsd (permissions colored by type, size bold if >1MB, date bright if recent)
+- [x] Color the whole row like exa/lsd (permissions colored by type, size bold if >1MB, date bright if recent)
 
 ---
 
