@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2024-05-30
+
+### Added
+- `--hidden` flag to show dotfiles
+- `--filter` flag to filter items by pattern/extension
+- `--max N` flag to limit items displayed
+- `--group` flag to group items by type (dirs, files, symlinks)
+- Config file support (`~/.config/cfm/config.toml`)
+- `fm config` command with `--edit`, `--get`, `--set` options
+- `fm root` command to jump to git repo root
+- `fm uninstall-hook` command to remove shell hooks
+- `NO_COLOR` environment variable support
+- Path protection for `trash`, `mv`, `cp` commands
+- Shared library crate (`cfm-lib`)
+- Unit tests for utils, cache, state, file_metadata, fs modules
+- Integration tests for all commands
+
+### Fixed
+- Dry-run flag now works for all destructive commands (mv, cp, rm, trash, open, do)
+- Daemon mutex poisoning recovery with logging
+- Shell injection prevention in custom command execution
+- Copy verification before deletion in cross-device moves
+- Symlink loop prevention in recursive copy operations
+
+### Changed
+- Deduplicated ~500 lines of code into shared `utils.rs`
+- Config command now reads/writes actual TOML config
+- Extended path protection to cover `~/.ssh`, `~/.gnupg`, `~/.config`
+- Updated test count from 14 to 77
+- Updated README with architecture overview and 30 commands
+
 ## [0.1.1] - 2024-05-25
 
 ### Added
