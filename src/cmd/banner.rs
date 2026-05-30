@@ -49,6 +49,7 @@ const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating row
 
 /// Options for the banner command
 #[derive(Default)]
+#[allow(dead_code)]
 pub struct BannerOptions<'a> {
     pub path: Option<&'a Path>,
     pub raw: bool,
@@ -95,7 +96,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -126,7 +127,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -491,7 +492,7 @@ fn output_rich(
     };
 
     // Apply filter if specified
-    if let Some(pattern) = opts.filter {
+    if let Some(pattern) = filter {
         let lower_pattern = pattern.to_lowercase();
         display_items.retain(|item| {
             let name_lower = item.name.to_lowercase();
