@@ -54,7 +54,6 @@ pub struct BannerOptions<'a> {
     pub raw: bool,
     pub json: bool,
     pub compact: bool,
-    #[allow(dead_code)]
     pub no_build_check: bool,
     pub no_todos: bool,
     pub no_ports: bool,
@@ -63,6 +62,7 @@ pub struct BannerOptions<'a> {
     pub sort: Option<&'a str>,
     pub reverse: bool,
     pub hidden: bool,
+    pub filter: Option<&'a str>,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -488,6 +488,22 @@ fn output_rich(
     } else {
         visible_items.to_vec()
     };
+
+    // Apply filter if specified
+    if let Some(pattern) = opts.filter {
+        let lower_pattern = pattern.to_lowercase();
+        display_items.retain(|item| {
+            let name_lower = item.name.to_lowercase();
+            // Match by extension or name substring
+            name_lower.contains(&lower_pattern)
+                || item
+                    .name
+                    .rsplit('.')
+                    .next()
+                    .map(|ext| ext.to_lowercase().contains(&lower_pattern))
+                    .unwrap_or(false)
+        });
+    }
 
     // Sort based on --sort flag
     let sort_mode = sort.unwrap_or("name");
