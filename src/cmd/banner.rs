@@ -55,11 +55,7 @@ pub struct BannerOptions<'a> {
     pub raw: bool,
     pub json: bool,
     pub compact: bool,
-    pub no_build_check: bool,
-    pub no_todos: bool,
-    pub no_ports: bool,
-    pub no_docker: bool,
-    pub no_metrics: bool,
+    pub verbose: bool,
     pub sort: Option<&'a str>,
     pub reverse: bool,
     pub hidden: bool,
@@ -121,10 +117,10 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
 
     // Daemon not available or cache miss — try direct scan
     eprintln!("cfmd: daemon not available, falling back to direct scan");
-    let no_todos = opts.no_todos || std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
-    let no_ports = opts.no_ports || std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
-    let no_docker = opts.no_docker || std::env::var("CFM_NO_DOCKER").unwrap_or_default() == "1";
-    let no_metrics = opts.no_metrics || std::env::var("CFM_NO_METRICS").unwrap_or_default() == "1";
+    let no_todos = std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
+    let no_ports = std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
+    let no_docker = std::env::var("CFM_NO_DOCKER").unwrap_or_default() == "1";
+    let no_metrics = std::env::var("CFM_NO_METRICS").unwrap_or_default() == "1";
 
     let summary = DirSummary::scan_with_options(
         &path,
