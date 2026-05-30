@@ -187,7 +187,7 @@
 - [x] `--group` flag to group by type (dirs, files, symlinks)
 
 ### Table Views
-- [ ] `--tree` recursive view (like `lsd --tree`)
+- [x] `--tree` recursive view (like `lsd --tree`)
 - [ ] `--grid` compact multi-column layout (like `ls` default)
 - [ ] `--long` full mode (like `ls -l` with all columns)
 - [ ] `--short` minimal mode (just name + icon)

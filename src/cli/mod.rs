@@ -457,7 +457,7 @@ impl Cli {
                     filter: filter.as_deref(),
                     max: *max,
                     group: *group,
-                    tree: tree.clone(),
+                    tree: *tree,
                 })
             }
             None => {
