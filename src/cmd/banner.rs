@@ -550,7 +550,7 @@ fn output_rich(
                 .unwrap_or_else(|| {
                     // Tracked but clean — show dim dot
                     if git_info.is_repo {
-                        format!("{}●{}", color(DIM), color(RESET))
+                        format!("{}●{}", color(GREEN), color(RESET))
                     } else {
                         String::new()
                     }
