@@ -79,7 +79,10 @@ impl Daemon {
             directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
         if let Some(ref dir) = socket_dir {
             let persisted = load_banner_cache(dir);
-            let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+            let mut cache = self.cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Cache mutex poisoned, recovering: {}", e);
+                e.into_inner()
+            });
             for (path, data) in persisted {
                 cache.insert(
                     path,
@@ -107,7 +110,10 @@ impl Daemon {
             proactive_scan(dir_sizes_clone.clone(), cache_clone.clone());
             // Save to disk when done
             if let Some(dir) = socket_dir {
-                let sizes = dir_sizes_clone.lock().unwrap_or_else(|e| e.into_inner());
+                let sizes = dir_sizes_clone.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
                 save_size_cache(&dir, &sizes);
             }
         });
@@ -139,7 +145,10 @@ impl Daemon {
                         let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
                             .map(|p| p.data_dir().to_path_buf());
                         if let Some(dir) = socket_dir {
-                            let cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+                            let cache = self.cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
                             save_banner_cache(&dir, &cache);
                         }
                         last_save = Instant::now();
@@ -158,7 +167,10 @@ impl Daemon {
         let socket_dir =
             directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
         if let Some(dir) = socket_dir {
-            let cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+            let cache = self.cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             save_banner_cache(&dir, &cache);
         }
         std::fs::remove_file(&self.socket_path).ok();
@@ -181,7 +193,10 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
     loop {
         // Check for new directories to watch
         {
-            let cache = cache.lock().unwrap_or_else(|e| e.into_inner());
+            let cache = cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             for path in cache.keys() {
                 if !watched.contains_key(path) {
                     match inotify.watches().add(
@@ -215,7 +230,10 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
 
                     // Invalidate affected cache entries
                     if !invalidated.is_empty() {
-                        let mut cache_guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut cache_guard = cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
                         for path in &invalidated {
                             cache_guard.remove(path);
                             tracing::info!("Cache invalidated: {}", path.display());
@@ -233,7 +251,10 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
 
         // Remove stale watchers for directories no longer in cache
         {
-            let cache = cache.lock().unwrap_or_else(|e| e.into_inner());
+            let cache = cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             let to_remove: Vec<PathBuf> = watched
                 .keys()
                 .filter(|p| !cache.contains_key(*p))
@@ -270,13 +291,19 @@ fn handle_client(
 
             // Check cache — if hit, inject sizes and refresh git status
             {
-                let cache = cache.lock().unwrap_or_else(|e| e.into_inner());
+                let cache = cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
                 if let Some(entry) = cache.get(&path) {
                     if entry.computed_at.elapsed() < CACHE_TTL {
                         let mut data = entry.data.clone();
                         drop(cache);
                         // Inject sizes from global cache
-                        let global_sizes = dir_sizes.lock().unwrap_or_else(|e| e.into_inner());
+                        let global_sizes = dir_sizes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
                         for item in &mut data.summary.top_items {
                             if item.is_dir {
                                 if let Some(&size) = global_sizes.get(&item.path) {
@@ -296,7 +323,10 @@ fn handle_client(
             let mut data = compute_banner_data(&path)?;
 
             // Inject sizes from global cache
-            let global_sizes = dir_sizes.lock().unwrap_or_else(|e| e.into_inner());
+            let global_sizes = dir_sizes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             for item in &mut data.summary.top_items {
                 if item.is_dir {
                     if let Some(&size) = global_sizes.get(&item.path) {
@@ -308,7 +338,10 @@ fn handle_client(
 
             // Store in cache
             {
-                let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
+                let mut cache = cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
                 cache.insert(
                     path.clone(),
                     CacheEntry {
@@ -326,14 +359,20 @@ fn handle_client(
             // Pre-compute in background — don't block the client
             thread::spawn(move || {
                 let cache_hit = {
-                    let c = cache.lock().unwrap_or_else(|e| e.into_inner());
+                    let c = cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
                     c.get(&path)
                         .map(|e| e.computed_at.elapsed() < CACHE_TTL)
                         .unwrap_or(false)
                 };
                 if !cache_hit {
                     if let Ok(data) = compute_banner_data(&path) {
-                        let mut c = cache.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut c = cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
                         c.insert(
                             path,
                             CacheEntry {
@@ -347,7 +386,10 @@ fn handle_client(
             return Ok(()); // No response needed — fire and forget
         }
         Request::DirSize { path } => {
-            let sizes = dir_sizes.lock().unwrap_or_else(|e| e.into_inner());
+            let sizes = dir_sizes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             let size = sizes
                 .get(&path)
                 .copied()
@@ -564,7 +606,10 @@ fn proactive_scan(
                 }
             }
             // Brief lock to insert batch, then release
-            let mut sizes = dir_sizes.lock().unwrap_or_else(|e| e.into_inner());
+            let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             for (path, size) in batch_sizes {
                 sizes.insert(path, size);
             }
@@ -582,14 +627,20 @@ fn proactive_scan(
     for path in &banner_targets {
         // Skip if already cached
         {
-            let cache = banner_cache.lock().unwrap_or_else(|e| e.into_inner());
+            let cache = banner_cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             if cache.get(path).map(|e| e.computed_at.elapsed() < CACHE_TTL).unwrap_or(false) {
                 continue;
             }
         }
 
         if let Ok(data) = compute_banner_data(path) {
-            let mut cache = banner_cache.lock().unwrap_or_else(|e| e.into_inner());
+            let mut cache = banner_cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             cache.insert(
                 path.clone(),
                 CacheEntry {
@@ -607,7 +658,10 @@ fn proactive_scan(
     let socket_dir =
         directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
     if let Some(dir) = socket_dir {
-        let cache = banner_cache.lock().unwrap_or_else(|e| e.into_inner());
+        let cache = banner_cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
         save_banner_cache(&dir, &cache);
     }
 }
