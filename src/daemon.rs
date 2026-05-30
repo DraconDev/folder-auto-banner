@@ -504,6 +504,9 @@ fn proactive_scan(
         }
     }
 
+    // Track where level 1+2 end (most likely navigation targets)
+    let level2_end = dirs_to_scan.len();
+
     // Level 3: subdirectories of level 2 dirs (for projects like ~/Dev/project/src)
     let level2: Vec<PathBuf> = dirs_to_scan[level1.len()..].to_vec();
     for dir in &level2 {
