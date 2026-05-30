@@ -499,16 +499,16 @@ fn output_rich(
                     loc_str,
                     color(RESET)
                 ));
-                // Show top 3 languages
+                // Show top 3 languages with proper formatting
                 if !metrics.by_extension.is_empty() {
                     let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
                         let loc_str = format_loc(*loc);
-                        format!("{}{}", ext, loc_str)
+                        format!("{}{}{}", ext, color(DIM), loc_str)
                     }).collect();
                     parts.push(format!(
                         "│ {}{}{}",
                         color(DIM),
-                        lang_parts.join(" "),
+                        lang_parts.join(&format!("{} {}", color(RESET), color(DIM))),
                         color(RESET)
                     ));
                 }
