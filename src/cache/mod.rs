@@ -76,6 +76,7 @@ impl Cache {
     }
 
     /// Clear expired entries (best-effort cleanup)
+    #[allow(dead_code)]
     pub fn cleanup(&self, max_age: Duration) {
         if let Ok(entries) = std::fs::read_dir(&self.dir) {
             let now_ms = SystemTime::now()

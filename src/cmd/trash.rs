@@ -11,7 +11,9 @@ use std::path::{Path, PathBuf};
 
 use crate::utils;
 
+#[allow(dead_code)]
 const TRASH_DIR: &str = ".local/share/cfm/trash";
+#[allow(dead_code)]
 const TRASH_MANIFEST: &str = ".local/share/cfm/trash/manifest.json";
 
 #[derive(Debug, Serialize, Deserialize)]

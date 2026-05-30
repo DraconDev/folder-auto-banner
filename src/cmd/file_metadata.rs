@@ -7,6 +7,7 @@ use std::path::Path;
 
 /// Get contents description for a file — line count for text, resolution for image, etc.
 /// Returns plain text (no ANSI codes) — coloring is applied by the renderer.
+#[allow(dead_code)]
 pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     let name = &entry.name;
     let lower = name.to_lowercase();

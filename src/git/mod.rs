@@ -251,6 +251,7 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
 }
 
 /// Format git status as compact string (e.g., "[main ↑2 ↓0]")
+#[allow(dead_code)]
 pub fn format_git_status(info: &GitInfo) -> String {
     if !info.is_repo {
         return String::new();

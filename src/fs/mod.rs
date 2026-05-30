@@ -118,6 +118,7 @@ pub struct DirSummary {
 
 impl DirSummary {
     /// Scan a directory and gather metadata
+    #[allow(dead_code)]
     pub fn scan(path: &Path) -> Result<Self> {
         Self::scan_with_options(path, true, true, true, true, true)
     }
@@ -388,11 +389,13 @@ impl DirSummary {
     }
 
     /// Get top N items
+    #[allow(dead_code)]
     pub fn top_items(&self, n: usize) -> &[DirEntry] {
         &self.top_items[..n.min(self.top_items.len())]
     }
 
     /// Get remaining count
+    #[allow(dead_code)]
     pub fn remaining(&self, n: usize) -> usize {
         self.total_items.saturating_sub(n)
     }
@@ -451,6 +454,7 @@ pub fn format_exact_time(dt: &DateTime<Utc>) -> String {
 }
 
 /// Format relative time
+#[allow(dead_code)]
 pub fn format_relative_time(dt: &DateTime<Utc>) -> String {
     let now = Utc::now();
     let duration = now.signed_duration_since(*dt);
@@ -472,6 +476,7 @@ pub fn format_relative_time(dt: &DateTime<Utc>) -> String {
 
 impl DirSummary {
     /// Get file type breakdown
+    #[allow(dead_code)]
     pub fn by_type(&self) -> Vec<(String, usize)> {
         let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         for entry in &self.top_items {

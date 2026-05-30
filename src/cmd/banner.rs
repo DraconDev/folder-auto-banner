@@ -22,13 +22,17 @@ const BOLD: &str = "\x1b[1m";
 const BLUE: &str = "\x1b[34m";
 const BLUE_BOLD: &str = "\x1b[1;34m";
 const GREEN: &str = "\x1b[32m";
+#[allow(dead_code)]
 const GREEN_BOLD: &str = "\x1b[1;32m";
 const YELLOW: &str = "\x1b[33m";
+#[allow(dead_code)]
 const YELLOW_BOLD: &str = "\x1b[1;33m";
 const MAGENTA: &str = "\x1b[35m";
 const RED: &str = "\x1b[31m";
 const CYAN: &str = "\x1b[36m";
+#[allow(dead_code)]
 const GRAY: &str = "\x1b[90m";
+#[allow(dead_code)]
 const WHITE: &str = "\x1b[97m";
 const ORANGE: &str = "\x1b[38;5;214m";
 const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating rows
@@ -40,6 +44,7 @@ pub struct BannerOptions<'a> {
     pub raw: bool,
     pub json: bool,
     pub compact: bool,
+    #[allow(dead_code)]
     pub no_build_check: bool,
     pub no_todos: bool,
     pub no_ports: bool,
@@ -697,6 +702,7 @@ fn output_rich(
 }
 
 /// Truncate a string to a given display width, accounting for ANSI escape codes
+#[allow(dead_code)]
 fn truncate_ansi(s: &str, width: usize) -> String {
     if width == 0 {
         return String::new();
@@ -820,6 +826,7 @@ fn aggregate_dir_git_status(
 
 /// Get contents description for a file — line count for text, resolution for image, etc.
 /// Returns plain text (no ANSI codes) — coloring is applied by the renderer.
+#[allow(dead_code)]
 fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     crate::cmd::file_metadata::get_file_contents(entry)
 }

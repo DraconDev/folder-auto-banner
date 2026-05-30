@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use crate::utils;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum CollisionAction {
     Skip,
     Overwrite,
