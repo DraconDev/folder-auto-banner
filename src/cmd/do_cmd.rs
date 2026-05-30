@@ -161,7 +161,7 @@ pub fn run_do(action: Option<&str>, verbose: bool, dry_run: bool) -> Result<()> 
         }
         _ => {
             // Custom command: action is the command template
-            // Replace {} with path
+            // Replace {} with path — use shell-style splitting but protect paths
             let cmd_template = action;
 
             for path in &paths {
@@ -170,15 +170,28 @@ pub fn run_do(action: Option<&str>, verbose: bool, dry_run: bool) -> Result<()> 
                 if dry_run {
                     println!("  Would run: {}", cmd_str);
                 } else {
-                    let parts: Vec<&str> = cmd_str.split_whitespace().collect();
+                    // Split command, but rejoin anything after the first token that looks like
+                    // it could be part of a path argument. We use a simple heuristic:
+                    // if the template was `cmd {}`, after replacement it's `cmd /path/with spaces`,
+                    // so we split into at most 2 parts: the command and the rest.
+                    let (cmd_name, args_str) = match cmd_str.split_once(char::is_whitespace) {
+                        Some((name, rest)) => (name, Some(rest)),
+                        None => (cmd_str.as_str(), None),
+                    };
 
-                    if parts.is_empty() {
-                        continue;
-                    }
-
-                    let mut cmd = Command::new(parts[0]);
-                    for arg in &parts[1..] {
-                        cmd.arg(arg);
+                    let mut cmd = Command::new(cmd_name);
+                    // Pass the rest as a single argument (the path) to avoid splitting paths
+                    if let Some(rest) = args_str {
+                        // Check if there are multiple {} placeholders or other template tokens
+                        if cmd_template.matches("{}").count() > 1 {
+                            // Multiple placeholders — split on whitespace (user's responsibility)
+                            for arg in rest.split_whitespace() {
+                                cmd.arg(arg);
+                            }
+                        } else {
+                            // Single {} — treat the rest as one argument
+                            cmd.arg(rest);
+                        }
                     }
 
                     if verbose {

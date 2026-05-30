@@ -132,11 +132,24 @@ fn perform_move(source: &Path, dest: &Path, verbose: bool) -> Result<()> {
             Ok(())
         }
         Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
-            // Cross-device move: copy then delete
+            // Cross-device move: copy then delete with verification
             if source.is_dir() {
                 copy_dir_recursive(source, dest)?;
+                // Verify copy succeeded before deleting source
+                verify_dir_copy(source, dest)?;
             } else {
                 fs::copy(source, dest)?;
+                // Verify file copy
+                let src_meta = fs::metadata(source)?;
+                let dst_meta = fs::metadata(dest)?;
+                if src_meta.len() != dst_meta.len() {
+                    fs::remove_file(dest)?;
+                    return Err(anyhow::anyhow!(
+                        "Copy verification failed: size mismatch ({} vs {})",
+                        src_meta.len(),
+                        dst_meta.len()
+                    ));
+                }
             }
             delete_recursive(source)?;
             if verbose {
@@ -150,6 +163,32 @@ fn perform_move(source: &Path, dest: &Path, verbose: bool) -> Result<()> {
         }
         Err(e) => Err(e.into()),
     }
+}
+
+/// Verify that a directory copy is complete by checking item counts
+fn verify_dir_copy(src: &Path, dst: &Path) -> Result<()> {
+    let src_count = count_items(src)?;
+    let dst_count = count_items(dst)?;
+    if src_count != dst_count {
+        return Err(anyhow::anyhow!(
+            "Copy verification failed: source has {} items, destination has {}",
+            src_count,
+            dst_count
+        ));
+    }
+    Ok(())
+}
+
+fn count_items(path: &Path) -> Result<usize> {
+    let mut count = 0;
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        count += 1;
+        if entry.file_type()?.is_dir() {
+            count += count_items(&entry.path())?;
+        }
+    }
+    Ok(count)
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
