@@ -19,6 +19,9 @@ pub struct GitInfo {
     pub untracked: usize,
     pub last_commit_msg: Option<String>,
     pub last_commit_hash: Option<String>,
+    pub last_commit_time: Option<i64>, // Unix timestamp
+    pub commits_today: usize,
+    pub branch_count: usize,
     pub stash_count: usize,
     pub merge_state: Option<String>,
     pub tag: Option<String>,
@@ -157,8 +160,8 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         (0, 0)
     };
 
-    // Get last commit message and hash
-    let (last_commit_msg, last_commit_hash) = repo
+    // Get last commit message, hash, and time
+    let (last_commit_msg, last_commit_hash, last_commit_time) = repo
         .head()
         .ok()
         .and_then(|h| h.peel_to_commit().ok())
@@ -171,9 +174,49 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
                 .short_id()
                 .ok()
                 .map(|id| id.as_str().unwrap_or("").to_string());
-            (msg, hash)
+            let time = Some(commit.time().seconds());
+            (msg, hash, time)
         })
-        .unwrap_or((None, None));
+        .unwrap_or((None, None, None));
+
+    // Count commits today
+    let commits_today = {
+        let mut count = 0;
+        let today_start = {
+            let now = chrono::Utc::now();
+            let today = now.date_naive();
+            today.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp()
+        };
+        
+        let mut revwalk = repo.revwalk().ok();
+        if let Some(ref mut walk) = revwalk {
+            let _ = walk.push_head();
+            for (i, oid) in walk.enumerate() {
+                if i >= 1000 { break; } // Limit to avoid slow repos
+                if let Ok(oid) = oid {
+                    if let Ok(commit) = repo.find_commit(oid) {
+                        if commit.time().seconds() >= today_start {
+                            count += 1;
+                        } else {
+                            break; // Commits are chronological, stop when we hit yesterday
+                        }
+                    }
+                }
+            }
+        }
+        count
+    };
+
+    // Count branches
+    let branch_count = {
+        let mut count = 0;
+        if let Ok(branches) = repo.branches(Some(git2::BranchType::Local)) {
+            for _ in branches.flatten() {
+                count += 1;
+            }
+        }
+        count
+    };
 
     // Check merge/rebase state
     let merge_state = if repo.state() == git2::RepositoryState::Merge {
@@ -240,6 +283,9 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         untracked,
         last_commit_msg,
         last_commit_hash,
+        last_commit_time,
+        commits_today,
+        branch_count,
         stash_count,
         merge_state,
         tag,
@@ -251,6 +297,7 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
 }
 
 /// Format git status as compact string (e.g., "[main ↑2 ↓0]")
+#[allow(dead_code)]
 pub fn format_git_status(info: &GitInfo) -> String {
     if !info.is_repo {
         return String::new();
