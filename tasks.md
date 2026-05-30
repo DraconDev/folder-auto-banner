@@ -81,111 +81,95 @@
 
 ### Docs / CI
 - [x] `INSTALL.md` — removed hardcoded paths, added bash section
-- [x] `README.md` — mentions both zsh and bash
+- [x] `README.md` — updated with 30 commands, architecture overview, 76 tests
 - [x] `release.yml` — fixed step ordering, switched to `softprops/action-gh-release@v2`
+
+### Critical Fixes (audit-driven)
+- [x] Dry-run flag: wired `--dry_run` through to `run_mv`, `run_cp`, `run_rm`, `run_trash`, `run_open`, `run_do_cmd`
+- [x] Daemon mutex poisoning: replaced 18 `.unwrap()` on `Mutex::lock()` with `unwrap_or_else(|e| e.into_inner())`
+- [x] Shell injection: fixed `do_cmd.rs` to pass paths as single args instead of splitting on whitespace
+- [x] Data loss risk: added copy verification (size check for files, item count for dirs) before deletion in cross-device moves
+
+### Architecture (audit-driven)
+- [x] Created `cfm-lib/` library crate with 12 shared modules
+- [x] Extracted file metadata I/O from `banner.rs` into `file_metadata.rs`
+- [x] Extracted `run_daemon()` from `cli/mod.rs` into `cmd/daemon_mgmt.rs`
+- [x] Created `BannerOptions` struct (11 params → 1 struct)
+- [x] Created `CpOptions` struct (7 params → 1 struct)
+- [x] Consolidated 3 duplicate `Session` types into one canonical struct in `state/mod.rs`
+
+### Code Quality (audit-driven)
+- [x] Extracted ~500 lines of duplication into `src/utils.rs` (copy, delete, sanitize, timeout, constants)
+- [x] Fixed error handling: replaced `let _ =` discards in `daemon_client.rs` with logging
+- [x] Added cache write failure logging in `fs/mod.rs`
+- [x] Removed unused `thiserror` dependency from `Cargo.toml`
+- [x] Wired up Config command: `fm config` now reads/writes `~/.config/cfm/config.toml`
+
+### Safety (audit-driven)
+- [x] Symlink loop prevention: `copy_dir_recursive` now skips symlinks
+- [x] Extended `is_protected_path()` to cover `~/.ssh`, `~/.gnupg`, `~/.config`, `~/.mozilla`, `~/.docker`
+- [x] Cross-device moves verify copy success before deleting source
+
+### Testing (audit-driven)
+- [x] Grew test count from 14 to 76 (28 unit + 29 unit + 19 integration)
+- [x] Added unit tests for `utils.rs`, `cache/mod.rs`, `state/mod.rs`
+- [x] Added integration tests for config, mv, cp, rm, trash, open, do, peek, root, daemon
+
+### Features (audit-driven)
+- [x] Implemented `fm root` — finds git repo root
+- [x] Implemented `fm uninstall-hook` — removes shell hooks from config files
 
 ---
 
-## 🔴 Critical Fixes
+## 🔴 Remaining Critical
 
-### Dry-run flag silently discarded
-- [x] In `cli/mod.rs:462-492`, the `--dry_run` field is bound as `_` and never passed to command functions
-- [x] Wire `dry_run` through to `run_mv`, `run_cp`, `run_rm`, `run_trash`, `run_open`, `run_do_cmd`
-- [x] Verify dry-run actually prevents file mutations in each command
-
-### Daemon mutex poisoning
-- [x] Replace all 18 `.unwrap()` on `Mutex::lock()` in `daemon.rs` with `unwrap_or_else(|e| e.into_inner())` or proper error propagation
+### Daemon mutex (partial)
 - [ ] Audit `Mutex` usage for potential deadlocks (nested locks, lock ordering)
 - [ ] Add logging when mutex poisoning occurs so failures are visible
 
-### Shell injection vectors
-- [x] `do_cmd.rs`: sanitize `{}` replacement — reject or escape filenames containing shell metacharacters
-- [ ] `banner.rs:count_sqlite_tables`: quote or escape paths passed to `sqlite3` command
+### Shell injection (partial)
+- [ ] `file_metadata.rs:count_sqlite_tables`: quote or escape paths passed to `sqlite3` command
 - [ ] Review all `Command::new()` call sites for user-controlled argument injection
-
-### Data loss risk in mv/trash
-- [x] `mv.rs` and `trash.rs`: verify `copy_dir_recursive` succeeds fully before calling `delete_recursive`
-- [x] Add rollback or partial-failure handling for cross-device moves
 
 ---
 
-## 🟠 Architecture
+## 🟠 Remaining Architecture
 
-### Extract shared library crate (`cfm-lib`)
-- [x] Create `cfm-lib/` with `Cargo.toml` as a library crate
-- [x] Move shared modules to lib: `build_status`, `cache`, `code_metrics`, `daemon_types`, `docker`, `fs`, `git`, `icon`, `port_usage`, `state`, `todo_scanner`
-- [x] Update `fm` binary to depend on `cfm-lib`
-- [ ] Update `cfmd` binary to depend on `cfm-lib`
+### Library crate migration (partial)
+- [ ] Update `cfmd` binary to use `cfm-lib` instead of duplicate modules
 - [ ] Remove redundant `mod` declarations from `daemon.rs`
 - [ ] Remove `#![allow(dead_code)]` from both `main.rs` and `daemon.rs`
 - [ ] Fix any dead code warnings that surface
 
-### Decouple banner rendering from I/O
-- [x] Extract data extraction (image headers, ZIP inspection, SQLite queries, MP4 parsing) from `banner.rs` into a `banner_data.rs` or per-format modules
+### Banner decoupling (partial)
 - [ ] Make `output_rich()` consume pre-extracted data, not read files directly
-- [ ] Split `banner.rs` (1,167 lines) into smaller focused modules
+- [ ] Split `banner.rs` into smaller focused modules
 
-### Decouple daemon from binary entry point
+### Daemon decoupling
 - [ ] Move daemon implementation out of `daemon.rs` into `daemon/` module (or `cfm-lib`)
 - [ ] Keep `daemon.rs` as a thin entry point that calls into the library
 
-### Fix `DirSummary::scan_with_options` god function
-- [ ] This 250-line function orchestrates 5 subsystems directly
-- [ ] Extract subsystem calls into a `ProjectScanner` or similar coordinator
+### DirSummary god function
+- [ ] Extract `scan_with_options` subsystem calls into a `ProjectScanner` coordinator
 - [ ] Make each subsystem call independent and composable
-
-### Consolidate `Session` types
-- [x] `state/mod.rs`, `cmd/save_session.rs`, `cmd/sessions.rs` each define a different `Session` struct
-- [x] Create one canonical `Session` struct with all fields, use it everywhere
-- [x] Add proper serde support for serialization/deserialization
-
-### Fix `cli/mod.rs` separation of concerns
-- [x] Extract `run_daemon()` out of `cli/mod.rs` into a daemon command module
-- [x] Reduce `run_banner` parameter count (11 params → struct)
-- [x] Reduce `run_cp` parameter count (6 params → struct)
 
 ---
 
-## 🟡 Code Quality
+## 🟡 Remaining Code Quality
 
-### Extract duplicated functions (~500 lines)
-- [x] `copy_dir_recursive`: exists in `cp.rs`, `mv.rs`, `trash.rs` → move to `fs/mod.rs`
-- [x] `delete_recursive`: exists in `mv.rs`, `trash.rs` → move to `fs/mod.rs`
-- [x] `sanitize_filename`: exists in `save_session.rs`, `load_session.rs`, `delete_session.rs` → move to `state/mod.rs` or new `utils.rs`
-- [x] `generate_unique_name`: exists in `cp.rs`, `mv.rs` → move to `fs/mod.rs`
-- [x] `format_size`: exists in `fs/mod.rs`, `diff.rs` → use the canonical version in `fs/mod.rs`, remove duplicate from `diff.rs`
-- [x] `BINARY_EXTS` constant: exists in `todo_scanner/mod.rs` and `code_metrics/mod.rs` → single shared constant
-- [x] `SKIP_DIRS` constant: exists in `todo_scanner/mod.rs` and `code_metrics/mod.rs` → single shared constant
-- [x] `run_with_timeout`: exists in `build_status/mod.rs`, `port_usage/mod.rs`, `docker/mod.rs` → single shared utility
-- [x] `print_summary`: exists in `mv.rs`, `cp.rs` → single shared utility
+### Error handling (partial)
+- [ ] `cmd/banner.rs`: audit `.ok()` calls, surface filesystem permission errors
 
-### Fix error handling
-- [x] Audit all 57 `.ok()` calls — categorize as intentional (cache writes) vs accidental (masking real errors)
-- [x] Replace accidental `.ok()` discards with `?` propagation or `eprintln!` logging
-- [x] `daemon_client.rs:98,110`: replace `let _ = serde_json::to_writer(...)` and `let _ = send_and_recv(...)` with error logging
-- [x] `fs/mod.rs`: audit 15 `.ok()` calls, add logging for non-cache failures
-- [ ] `cmd/banner.rs`: audit 10 `.ok()` calls, surface filesystem permission errors
-- [x] Remove unused `thiserror` dependency from `Cargo.toml` (or start using it for custom error types)
-
-### Remove dead code
-- [ ] Remove `#![allow(dead_code)]` from `main.rs` and `daemon.rs`
-- [ ] Fix all resulting warnings — delete unused functions/structs or add `#[allow(dead_code)]` to specific items
+### Dead code
+- [ ] Remove `#![allow(dead_code)]` and fix resulting warnings
 - [ ] Audit `cmd/` modules for unused helper functions
-- [x] Remove `cmd/uninstall_hook.rs` stub (or implement it)
-- [x] Remove `cmd/root.rs` stub (or implement the non-print-cd path)
 
-### Wire up Config
-- [x] `cmd/config.rs` is entirely a stub — implement actual config reading/writing
-- [x] `--edit` should open `$EDITOR` with the config TOML file
-- [x] `--get <key>` should read from the config file
-- [x] `--set <key> <value>` should write to the config file
+### Config integration
 - [ ] Consume config values (`icons`, `colors`, `compact`, `max_display_items`) in banner rendering
-- [ ] Centralize ad-hoc env var overrides (`CFM_NO_BUILD_CHECK`, `CFM_NO_TODOS`, etc.) into config loading
-- [x] Remove `thiserror` from Cargo.toml if unused, or adopt it for `ConfigError`
+- [ ] Centralize ad-hoc env var overrides (`CFM_NO_BUILD_CHECK`, etc.) into config loading
 
-### Fix completion drift
-- [ ] `completion.rs` manually rebuilds the clap command tree instead of reusing the `Cli` struct
-- [ ] Refactor to derive completions from the actual `Cli` definition
+### Completion drift
+- [ ] `completion.rs`: refactor to derive completions from the actual `Cli` definition
 
 ---
 
@@ -224,19 +208,12 @@
 - [ ] Dark/light theme support
 - [ ] Color the whole row like exa/lsd (permissions colored by type, size bold if >1MB, date bright if recent)
 
-### Implement stub commands
-- [x] `cmd/root.rs`: implement the non-print-cd path
-- [x] `cmd/uninstall_hook.rs`: implement hook removal
-
 ---
 
 ## 🟣 Safety
 
 ### Filesystem operation hardening
-- [x] Add symlink-following guards in recursive operations (prevent symlink loops)
-- [x] Extend `is_protected_path()` in `rm.rs` to cover `~/.ssh`, `~/.gnupg`, `~/.config`
 - [ ] Apply protection checks to `trash`, `mv`, `cp`, and `paste` (currently only `rm` has them)
-- [x] Verify copy success before deleting source in cross-device moves
 - [ ] Handle broken symlinks gracefully in listing
 
 ### Install script robustness
@@ -249,58 +226,42 @@
 ## 🟤 Testing
 
 ### Unit tests
-- [ ] Add tests for all `cmd/` implementations (banner, mv, cp, rm, trash, yank, paste, pin, jump, etc.)
-- [ ] Add tests for `state/mod.rs` (save/load clipboard, pins, sessions, config)
-- [ ] Add tests for `cache/mod.rs` (TTL expiration, set/get, concurrent access)
-- [ ] Add tests for `fs/mod.rs` (DirSummary scanning, format_size, project detection)
-- [ ] Add tests for `build_status/mod.rs`, `todo_scanner/mod.rs`, `code_metrics/mod.rs`, `port_usage/mod.rs`, `docker/mod.rs`
+- [ ] Add tests for `cmd/` implementations (mv, cp, rm, trash, yank, paste, pin, jump)
+- [ ] Add tests for `fs/mod.rs` (DirSummary scanning, project detection)
 
 ### Integration tests
 - [ ] Test file operations (copy, move, delete, trash) end-to-end
 - [ ] Test state persistence across invocations
 - [ ] Test daemon IPC protocol
 - [ ] Test banner rendering (rich, JSON, raw modes)
-- [ ] Test error handling paths (permission denied, missing files, etc.)
 
 ### Edge cases
 - [ ] Test with 1000+ items in directory
-- [ ] Test with very long filenames
 - [ ] Test with CJK/emoji filenames
 - [ ] Test with symlinks + broken symlinks
-- [ ] Test git status in repos with many changes
-- [ ] Test in non-tty contexts (piped output)
-- [ ] Test empty directories
-- [ ] Test cross-device moves
 - [ ] Test concurrent fm invocations (state file locking)
 
 ### Performance
 - [ ] Performance benchmark: <50ms for 10k files
-- [ ] Cache directory scan results (TTL-based) — partially done via daemon
 - [ ] Parallel stat calls for large directories
-- [ ] `--depth N` for shallow recursive view
 
 ---
 
 ## ⚪ Polish
 
 ### Documentation
-- [ ] Add architecture overview to README.md
-- [ ] Document all 28 commands with usage examples
-- [ ] Add CONTRIBUTING.md
+- [ ] Add CONTRIBUTING.md with architecture overview
+- [ ] Document all 30 commands with usage examples
 - [ ] Add man pages for `fm` and `cfmd`
-- [ ] Update README test count (currently claims "10/10" but there are 14)
+- [ ] Document Config struct fields and env var overrides
 - [ ] Remove development artifacts from repo (`note.md`, `session-ses_18cd.md`)
-- [ ] Document the `Config` struct fields and their effects
 
 ### CI/CD
 - [ ] Add cross-compilation matrix (macOS, Linux ARM)
-- [ ] Ship `cfmd` binary in GitHub releases (currently only `fm` is shipped)
-- [ ] Add `--locked` flag to `cargo build` in CI for reproducibility
-- [ ] Add MSRV (minimum supported Rust version) to Cargo.toml
+- [ ] Ship `cfmd` binary in GitHub releases
+- [ ] Add `--locked` flag to `cargo build` in CI
+- [ ] Add MSRV to Cargo.toml
 
 ### Code hygiene
-- [ ] Run `cargo clippy` and fix all warnings
-- [ ] Run `cargo fmt` and fix all formatting
 - [ ] Audit public `pub` visibility — restrict to only what needs to be public
 - [ ] Remove unused `clap_complete` if completions are refactored
-- [ ] Resolve `thiserror` version mismatch (Cargo.toml says "2", lockfile has 1.0.69)
