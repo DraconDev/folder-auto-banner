@@ -4,7 +4,7 @@ set -euo pipefail
 echo "🔧 Installing cfm..."
 
 BIN_DIR="$HOME/.local/bin"
-BIN_PATH="$BIN_DIR/fm"
+BIN_PATH="$BIN_DIR/f"
 DAEMON_BIN="$BIN_DIR/cfmd"
 SOCKET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/cfm"
 SOCKET_PATH="$SOCKET_DIR/cfmd.sock"
@@ -23,7 +23,7 @@ if [ -f "$DAEMON_BIN" ] && pgrep -x cfmd > /dev/null 2>&1; then
     fi
     
     # Send shutdown signal via socket if possible
-    "$BIN_DIR/fm" daemon stop 2>/dev/null || true
+    "$BIN_DIR/f" daemon stop 2>/dev/null || true
     sleep 1
     
     # Force kill any remaining processes
@@ -45,9 +45,9 @@ if [ -S "$SOCKET_PATH" ]; then
 fi
 
 # --- Remove old binaries from all known locations ---
-for loc in "$BIN_DIR/fm" "$HOME/.cargo/bin/fm" "$HOME/bin/fm" "/usr/local/bin/fm"; do
+for loc in "$BIN_DIR/f" "$HOME/.cargo/bin/f" "$HOME/bin/f" "/usr/local/bin/f"; do
     if [ -f "$loc" ]; then
-        echo "   Removing old fm from $loc..."
+        echo "   Removing old f from $loc..."
         rm -f "$loc"
     fi
 done
@@ -60,15 +60,15 @@ for loc in "$BIN_DIR/cfmd" "$HOME/.cargo/bin/cfmd" "$HOME/bin/cfmd" "/usr/local/
 done
 
 # --- Build release if binaries don't exist ---
-if [ ! -f "target/release/fm" ] || [ ! -f "target/release/cfmd" ]; then
+if [ ! -f "target/release/f" ] || [ ! -f "target/release/cfmd" ]; then
     echo "   Building release binaries..."
     cargo build --release
 fi
 
 # --- Copy new binaries ---
-cp target/release/fm "$BIN_PATH"
+cp target/release/f "$BIN_PATH"
 chmod +x "$BIN_PATH"
-echo "✅ fm installed to $BIN_PATH"
+echo "✅ f installed to $BIN_PATH"
 
 cp target/release/cfmd "$DAEMON_BIN"
 chmod +x "$DAEMON_BIN"
@@ -101,8 +101,8 @@ for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
         sed -i '/add-zsh-hook \(chpwd\|precmd\) _cfm/d' "$rc" 2>/dev/null || true
         sed -i '/^# cfm shell integration\|^# cfm auto-banner hook/d' "$rc" 2>/dev/null || true
         # Remove orphaned function fragments from partial teardowns
-        sed -i '/^    command fm banner/d' "$rc" 2>/dev/null || true
-        sed -i '/command \/home\/.*\/bin\/fm banner/d' "$rc" 2>/dev/null || true
+        sed -i '/^    command f banner/d' "$rc" 2>/dev/null || true
+        sed -i '/command \/home\/.*\/bin\/f banner/d' "$rc" 2>/dev/null || true
         sed -i '/^}export PATH=/d' "$rc" 2>/dev/null || true
         sed -i '/^}autoload/d' "$rc" 2>/dev/null || true
         # Remove old ~/bin PATH exports (we use ~/.local/bin now)

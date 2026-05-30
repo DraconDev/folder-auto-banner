@@ -10,9 +10,9 @@ All notable changes to this project will be documented in this file.
 - `--max N` flag to limit items displayed
 - `--group` flag to group items by type (dirs, files, symlinks)
 - Config file support (`~/.config/cfm/config.toml`)
-- `fm config` command with `--edit`, `--get`, `--set` options
-- `fm root` command to jump to git repo root
-- `fm uninstall-hook` command to remove shell hooks
+- `f config` command with `--edit`, `--get`, `--set` options
+- `f root` command to jump to git repo root
+- `f uninstall-hook` command to remove shell hooks
 - `NO_COLOR` environment variable support
 - Path protection for `trash`, `mv`, `cp` commands
 - Shared library crate (`cfm-lib`)
@@ -45,14 +45,14 @@ All notable changes to this project will be documented in this file.
 - GitHub Actions CI/CD
 
 ### Commands
-- **Banner**: `fm`, `fm banner`, `fm banner --json`, `fm banner --raw`
-- **Env**: `fm env`
-- **File ops**: `fm mv`, `fm cp`, `fm rm`, `fm trash`
-- **Clipboard**: `fm yank`, `fm paste`, `fm clipboard`
-- **Pins**: `fm pin`, `fm pins`, `fm jump`, `fm unpin`, `fm root`
-- **Utils**: `fm open`, `fm do`, `fm stats`, `fm diff`
-- **Sessions**: `fm save-session`, `fm load-session`, `fm sessions`, `fm delete-session`
-- **Shell**: `fm install-hook`, `fm completion`, `fm config`
+- **Banner**: `f`, `f banner`, `f banner --json`, `f banner --raw`
+- **Env**: `f env`
+- **File ops**: `f mv`, `f cp`, `f rm`, `f trash`
+- **Clipboard**: `f yank`, `f paste`, `f clipboard`
+- **Pins**: `f pin`, `f pins`, `f jump`, `f unpin`, `f root`
+- **Utils**: `f open`, `f do`, `f stats`, `f diff`
+- **Sessions**: `f save-session`, `f load-session`, `f sessions`, `f delete-session`
+- **Shell**: `f install-hook`, `f completion`, `f config`
 
 ## [0.1.0] - 2024-05-24
 

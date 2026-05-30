@@ -39,8 +39,8 @@ Add the appropriate section to your shell config:
 autoload -U add-zsh-hook
 add-zsh-hook chpwd _cfm_hook
 _cfm_hook() {
-    eval "$(command fm env "$PWD")"
-    command fm banner "$PWD"
+    eval "$(command f env "$PWD")"
+    command f banner "$PWD"
 }
 _cfm_hook  # fire on new shell/tab startup
 ```
@@ -49,8 +49,8 @@ _cfm_hook  # fire on new shell/tab startup
 ```bash
 # cfm auto-banner hook
 _cfm_hook() {
-    eval "$(command fm env "$PWD")"
-    command fm banner "$PWD"
+    eval "$(command f env "$PWD")"
+    command f banner "$PWD"
 }
 PROMPT_COMMAND="_cfm_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 ```
@@ -62,17 +62,17 @@ Then reload: `exec zsh` or `source ~/.bashrc`
 ## Usage
 
 ```bash
-fm                          # Show banner for current directory
-fm banner /some/path        # Show banner for specific directory
-fm banner --json            # JSON output
-fm stats                    # Directory statistics
-fm yank file.txt            # Copy to clipboard
-fm paste                    # Paste from clipboard
-fm mv src/file target/      # Move file
-fm diff src cmd             # Compare directories
-fm pin myproject            # Pin current directory
-fm jump myproject           # Jump to pinned directory
-fm install-hook             # Print shell hook for manual setup
+f                          # Show banner for current directory
+f banner /some/path        # Show banner for specific directory
+f banner --json            # JSON output
+f stats                    # Directory statistics
+f yank file.txt            # Copy to clipboard
+f paste                    # Paste from clipboard
+f mv src/file target/      # Move file
+f diff src cmd             # Compare directories
+f pin myproject            # Pin current directory
+f jump myproject           # Jump to pinned directory
+f install-hook             # Print shell hook for manual setup
 ```
 
 ## Testing

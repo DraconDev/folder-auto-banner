@@ -22,17 +22,17 @@ exec zsh   # or: source ~/.bashrc
 
 | Category | Commands |
 |----------|----------|
-| Banner | `fm`, `fm banner` |
-| File Ops | `fm mv`, `fm cp`, `fm rm`, `fm trash`, `fm open` |
-| Clipboard | `fm yank`, `fm paste`, `fm clipboard` |
-| Piping | `fm do`, `fm peek` |
-| Stats | `fm stats` |
-| Spatial | `fm pin`, `fm jump`, `fm root`, `fm pins`, `fm unpin` |
-| Sessions | `fm save-session`, `fm load-session`, `fm sessions`, `fm delete-session` |
-| Diff | `fm diff` |
-| Shell | `fm install-hook`, `fm uninstall-hook`, `fm completion` |
-| Config | `fm config`, `fm config --edit`, `fm config --get`, `fm config --set` |
-| Daemon | `fm daemon start/stop/status/restart/clear-cache` |
+| Banner | `f`, `f banner` |
+| File Ops | `f mv`, `f cp`, `f rm`, `f trash`, `f open` |
+| Clipboard | `f yank`, `f paste`, `f clipboard` |
+| Piping | `f do`, `f peek` |
+| Stats | `f stats` |
+| Spatial | `f pin`, `f jump`, `f root`, `f pins`, `f unpin` |
+| Sessions | `f save-session`, `f load-session`, `f sessions`, `f delete-session` |
+| Diff | `f diff` |
+| Shell | `f install-hook`, `f uninstall-hook`, `f completion` |
+| Config | `f config`, `f config --edit`, `f config --get`, `f config --set` |
+| Daemon | `f daemon start/stop/status/restart/clear-cache` |
 
 ## Testing
 
@@ -43,7 +43,7 @@ cargo clippy  # 0 warnings
 
 ## Architecture
 
-- **`fm`** — CLI binary (ephemeral: wake up, read state, print output, exit)
+- **`f`** — CLI binary (ephemeral: wake up, read state, print output, exit)
 - **`cfmd`** — Background daemon (Unix socket IPC, inotify watching, proactive scanning)
 - **`cfm-lib`** — Shared library (modules used by both binaries)
 
