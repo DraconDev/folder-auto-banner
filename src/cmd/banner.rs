@@ -192,7 +192,7 @@ fn print_tree_recursive(path: &Path, prefix: &str, max_depth: usize, current_dep
         match (a_is_dir, b_is_dir) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
-            _ => a.file_name().to_lowercase().cmp(&b.file_name().to_lowercase()),
+            _ => a.file_name().to_string_lossy().to_lowercase().cmp(&b.file_name().to_string_lossy().to_lowercase()),
         }
     });
 
