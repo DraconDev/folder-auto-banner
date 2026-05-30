@@ -318,7 +318,6 @@ fn handle_client(
         Request::Warm { path } => {
             let path = path.canonicalize().unwrap_or(path);
             let cache = cache.clone();
-            let dir_sizes = dir_sizes.clone();
             // Pre-compute in background — don't block the client
             thread::spawn(move || {
                 let cache_hit = {
