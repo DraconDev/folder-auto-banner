@@ -113,3 +113,59 @@ fn test_banner_default_no_args() {
     let mut cmd = Command::cargo_bin("fm").unwrap();
     cmd.assert().success();
 }
+
+#[test]
+fn test_banner_hidden_flag() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--hidden"]).assert().success();
+}
+
+#[test]
+fn test_banner_filter_flag() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--filter", "rs"]).assert().success();
+}
+
+#[test]
+fn test_banner_max_flag() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--max", "5"]).assert().success();
+}
+
+#[test]
+fn test_banner_group_flag() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--group"]).assert().success();
+}
+
+#[test]
+fn test_banner_sort_flag() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--sort", "size"]).assert().success();
+}
+
+#[test]
+fn test_banner_reverse_flag() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--sort", "name", "--reverse"]).assert().success();
+}
+
+#[test]
+fn test_banner_json_output() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--json"]).assert().success();
+}
+
+#[test]
+fn test_banner_raw_output() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--raw"]).assert().success();
+}
+
+#[test]
+fn test_banner_combined_flags() {
+    let mut cmd = Command::cargo_bin("fm").unwrap();
+    cmd.args(["banner", "--hidden", "--filter", "rs", "--max", "10", "--sort", "size", "--group"])
+        .assert()
+        .success();
+}

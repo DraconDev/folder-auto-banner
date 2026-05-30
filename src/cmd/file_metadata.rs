@@ -117,7 +117,8 @@ fn count_zip_entries(bytes: &[u8]) -> Option<usize> {
     if count > 0 {
         Some(count)
     } else {
-    None
+        None
+    }
 }
 
 #[cfg(test)]
