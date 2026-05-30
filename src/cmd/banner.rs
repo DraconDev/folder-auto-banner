@@ -72,6 +72,9 @@ pub fn run_banner(
         } else {
             output_rich(&path, &summary, &git_info, compact, sort, reverse);
         }
+
+        // Warm daemon cache for likely next directories (parent + siblings)
+        warm_nearby_dirs(&path);
         return Ok(());
     }
 
@@ -94,6 +97,7 @@ pub fn run_banner(
     )?;
     let git_info = crate::git::get_git_info(&path)?;
 
+    // Display the banner
     if json {
         output_json(&path, &summary, &git_info);
     } else if raw {
@@ -102,7 +106,28 @@ pub fn run_banner(
         output_rich(&path, &summary, &git_info, compact, sort, reverse);
     }
 
+    // Warm daemon cache for likely next directories (parent + siblings)
+    warm_nearby_dirs(&path);
+
     Ok(())
+}
+
+/// Pre-compute banners for parent and sibling directories
+fn warm_nearby_dirs(path: &Path) {
+    let Some(parent) = path.parent() else { return };
+    if !parent.is_dir() { return; }
+
+    // Warm parent
+    crate::daemon_client::send_warm(parent);
+
+    // Warm siblings (up to 20, to avoid overwhelming the daemon)
+    if let Ok(entries) = std::fs::read_dir(parent) {
+        for entry in entries.flatten().take(20) {
+            if entry.path().is_dir() && entry.path() != path {
+                crate::daemon_client::send_warm(&entry.path());
+            }
+        }
+    }
 }
 
 /// Output rich formatted banner — compact lsd-style layout

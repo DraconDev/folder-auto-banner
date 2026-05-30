@@ -315,6 +315,33 @@ fn handle_client(
 
             Response::Banner(Box::new(data))
         }
+        Request::Warm { path } => {
+            let path = path.canonicalize().unwrap_or(path);
+            let cache = cache.clone();
+            let dir_sizes = dir_sizes.clone();
+            // Pre-compute in background — don't block the client
+            thread::spawn(move || {
+                let cache_hit = {
+                    let c = cache.lock().unwrap();
+                    c.get(&path)
+                        .map(|e| e.computed_at.elapsed() < CACHE_TTL)
+                        .unwrap_or(false)
+                };
+                if !cache_hit {
+                    if let Ok(data) = compute_banner_data(&path) {
+                        let mut c = cache.lock().unwrap();
+                        c.insert(
+                            path,
+                            CacheEntry {
+                                data,
+                                computed_at: Instant::now(),
+                            },
+                        );
+                    }
+                }
+            });
+            return Ok(()); // No response needed — fire and forget
+        }
         Request::DirSize { path } => {
             let sizes = dir_sizes.lock().unwrap();
             let size = sizes
