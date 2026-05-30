@@ -348,6 +348,7 @@ mod tests {
             owner: String::new(),
             group: String::new(),
             symlink_target: None,
+            symlink_valid: true,
         };
 
         let count = count_items_in_dir(&entry);
@@ -369,6 +370,7 @@ mod tests {
             owner: String::new(),
             group: String::new(),
             symlink_target: None,
+            symlink_valid: true,
         };
 
         let count = count_items_in_dir(&entry);
@@ -394,6 +396,7 @@ mod tests {
             owner: String::new(),
             group: String::new(),
             symlink_target: None,
+            symlink_valid: true,
         };
 
         let contents = get_file_contents(&entry);
@@ -415,6 +418,7 @@ mod tests {
             owner: String::new(),
             group: String::new(),
             symlink_target: None,
+            symlink_valid: true,
         };
 
         let contents = get_file_contents(&entry);
