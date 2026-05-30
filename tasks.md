@@ -112,9 +112,9 @@
 ## 🟠 Architecture
 
 ### Extract shared library crate (`cfm-lib`)
-- [ ] Create `cfm-lib/` with `Cargo.toml` as a library crate
-- [ ] Move shared modules to lib: `build_status`, `cache`, `code_metrics`, `daemon_types`, `docker`, `fs`, `git`, `icon`, `port_usage`, `state`, `todo_scanner`
-- [ ] Update `fm` binary to depend on `cfm-lib`
+- [x] Create `cfm-lib/` with `Cargo.toml` as a library crate
+- [x] Move shared modules to lib: `build_status`, `cache`, `code_metrics`, `daemon_types`, `docker`, `fs`, `git`, `icon`, `port_usage`, `state`, `todo_scanner`
+- [x] Update `fm` binary to depend on `cfm-lib`
 - [ ] Update `cfmd` binary to depend on `cfm-lib`
 - [ ] Remove redundant `mod` declarations from `daemon.rs`
 - [ ] Remove `#![allow(dead_code)]` from both `main.rs` and `daemon.rs`
