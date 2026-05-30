@@ -663,7 +663,7 @@ fn output_rich(
 
         // PERM OWNER GROUP DATE SIZE CONTENTS GIT NAME
         println!(
-            "{}{} {} {} {} {} {} {}{}{}{}",
+            "{}{} {} {} {} {} {} {} {}{}{}",
             row_tint,
             perm_colored,
             owner_colored,
