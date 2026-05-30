@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 /// Type `fm`. Get context.
 #[derive(Parser, Debug)]
 #[command(
-    name = "fm",
+    name = "f",
     about = "cfm — Contextual File Manager\nAn ephemeral, zero-hostage intelligence layer for the shell.",
     version,
     author
@@ -584,7 +584,7 @@ mod tests {
 
     #[test]
     fn test_banner_default() {
-        let cli = Cli::parse_from(["fm"]);
+        let cli = Cli::parse_from(["f"]);
         match cli.command {
             Some(Commands::Banner { .. }) => {}
             None => {} // No subcommand = banner
