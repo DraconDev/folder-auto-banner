@@ -154,6 +154,7 @@ fn warm_nearby_dirs(path: &Path) {
 }
 
 /// Output rich formatted banner — compact lsd-style layout
+#[allow(clippy::too_many_arguments)]
 fn output_rich(
     path: &Path,
     summary: &DirSummary,

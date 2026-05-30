@@ -124,22 +124,22 @@
 ## 🔴 Remaining Critical
 
 ### Daemon mutex (partial)
-- [ ] Audit `Mutex` usage for potential deadlocks (nested locks, lock ordering)
-- [ ] Add logging when mutex poisoning occurs so failures are visible
+- [x] Audit `Mutex` usage for potential deadlocks (nested locks, lock ordering) — all safe, drops before re-acquire
+- [x] Add logging when mutex poisoning occurs so failures are visible
 
 ### Shell injection (partial)
-- [ ] `file_metadata.rs:count_sqlite_tables`: quote or escape paths passed to `sqlite3` command
-- [ ] Review all `Command::new()` call sites for user-controlled argument injection
+- [x] `file_metadata.rs:count_sqlite_tables`: uses `.arg()` not shell interpolation — safe
+- [x] Review all `Command::new()` call sites — all use hardcoded command names
 
 ---
 
 ## 🟠 Remaining Architecture
 
 ### Library crate migration (partial)
-- [ ] Update `cfmd` binary to use `cfm-lib` instead of duplicate modules
-- [ ] Remove redundant `mod` declarations from `daemon.rs`
-- [ ] Remove `#![allow(dead_code)]` from both `main.rs` and `daemon.rs`
-- [ ] Fix any dead code warnings that surface
+- [x] Update `cfmd` binary to use `cfm-lib` instead of duplicate modules
+- [x] Remove redundant `mod` declarations from `daemon.rs`
+- [x] Remove `#![allow(dead_code)]` from both `main.rs` and `daemon.rs`
+- [x] Fix any dead code warnings that surface
 
 ### Banner decoupling (partial)
 - [ ] Make `output_rich()` consume pre-extracted data, not read files directly
@@ -165,8 +165,12 @@
 - [ ] Audit `cmd/` modules for unused helper functions
 
 ### Config integration
-- [ ] Consume config values (`icons`, `colors`, `compact`, `max_display_items`) in banner rendering
-- [ ] Centralize ad-hoc env var overrides (`CFM_NO_BUILD_CHECK`, etc.) into config loading
+- [x] Consume config values (`icons`, `colors`, `compact`, `max_display_items`) in banner rendering
+- [x] Centralize ad-hoc env var overrides (`CFM_NO_BUILD_CHECK`, etc.) into config loading
+
+### Features
+- [x] `--sort name|size|modified|type` flag (already implemented)
+- [x] `--hidden` flag to always show dotfiles
 
 ### Completion drift
 - [ ] `completion.rs`: refactor to derive completions from the actual `Cli` definition
@@ -176,10 +180,10 @@
 ## 🔵 Features
 
 ### Sorting & Filtering
-- [ ] `--sort name|size|modified|type` flag
+- [x] `--sort name|size|modified|type` flag
 - [ ] `--filter` flag (type, size range, name pattern)
 - [ ] `--max N` flag (limit items shown)
-- [ ] `--hidden` flag to always show dotfiles
+- [x] `--hidden` flag to always show dotfiles
 - [ ] `--group` flag to group by type (dirs, files, symlinks)
 
 ### Table Views
