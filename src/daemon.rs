@@ -99,10 +99,11 @@ impl Daemon {
 
         // Start proactive scan of home directory in background
         let dir_sizes_clone = self.dir_sizes.clone();
+        let cache_clone = self.cache.clone();
         let socket_dir =
             directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
         thread::spawn(move || {
-            proactive_scan(dir_sizes_clone.clone());
+            proactive_scan(dir_sizes_clone.clone(), cache_clone.clone());
             // Save to disk when done
             if let Some(dir) = socket_dir {
                 let sizes = dir_sizes_clone.lock().unwrap();
@@ -569,14 +570,6 @@ fn proactive_scan(
 
     tracing::info!("Proactive scan complete: {} directory sizes cached", count);
 
-    // Save sizes to disk
-    let socket_dir =
-        directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
-    if let Some(dir) = socket_dir {
-        let sizes = dir_sizes.lock().unwrap();
-        save_size_cache(&dir, &sizes);
-    }
-
     // Pre-compute banner data for level 1 + level 2 dirs (most likely navigation targets)
     let banner_targets: Vec<PathBuf> = dirs_to_scan[..level2_end.min(dirs_to_scan.len())].to_vec();
     tracing::info!("Pre-computing banners for {} directories", banner_targets.len());
@@ -607,6 +600,8 @@ fn proactive_scan(
     tracing::info!("Pre-computed {} banner caches", banner_count);
 
     // Save banner cache to disk
+    let socket_dir =
+        directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
     if let Some(dir) = socket_dir {
         let cache = banner_cache.lock().unwrap();
         save_banner_cache(&dir, &cache);
