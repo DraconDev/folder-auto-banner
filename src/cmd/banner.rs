@@ -54,7 +54,6 @@ pub struct BannerOptions<'a> {
     pub raw: bool,
     pub json: bool,
     pub compact: bool,
-    #[allow(dead_code)]
     pub no_build_check: bool,
     pub no_todos: bool,
     pub no_ports: bool,
@@ -62,6 +61,7 @@ pub struct BannerOptions<'a> {
     pub no_metrics: bool,
     pub sort: Option<&'a str>,
     pub reverse: bool,
+    pub hidden: bool,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -474,7 +474,7 @@ fn output_rich(
     }
 
     let total_visible = visible_items.len();
-    let show_hidden = total_visible < 30;
+    let show_hidden = opts.hidden || total_visible < 30;
 
     let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden {
         visible_items

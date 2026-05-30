@@ -78,6 +78,10 @@ pub enum Commands {
         /// Reverse sort order
         #[arg(long)]
         reverse: bool,
+
+        /// Show hidden files (dotfiles)
+        #[arg(long)]
+        hidden: bool,
     },
 
     // === Phase 4: Context-Aware Environment ===
@@ -414,6 +418,7 @@ impl Cli {
                 no_metrics,
                 sort,
                 reverse,
+                hidden,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
                 crate::cmd::banner::run_banner(&crate::cmd::banner::BannerOptions {
@@ -428,6 +433,7 @@ impl Cli {
                     no_metrics: *no_metrics,
                     sort: sort.as_deref(),
                     reverse: *reverse,
+                    hidden: *hidden,
                 })
             }
             None => {
