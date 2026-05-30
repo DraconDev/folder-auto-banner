@@ -274,7 +274,9 @@ impl DirSummary {
                 } else {
                     let result = crate::build_status::check_build(path, &project_type);
                     if let Some(ref r) = result {
-                        let _ = cache.set(&key, r.clone());
+                        if let Err(e) = cache.set(&key, r.clone()) {
+                            tracing::warn!("Failed to cache build status: {}", e);
+                        }
                     }
                     result
                 }
@@ -293,7 +295,9 @@ impl DirSummary {
                 } else {
                     let result = crate::todo_scanner::scan_todos(path).ok();
                     if let Some(ref r) = result {
-                        let _ = cache.set(&key, r.clone());
+                        if let Err(e) = cache.set(&key, r.clone()) {
+                            tracing::warn!("Failed to cache todo info: {}", e);
+                        }
                     }
                     result
                 }
@@ -312,7 +316,9 @@ impl DirSummary {
                 } else {
                     let result = crate::code_metrics::scan_metrics(path).ok();
                     if let Some(ref r) = result {
-                        let _ = cache.set(&key, r.clone());
+                        if let Err(e) = cache.set(&key, r.clone()) {
+                            tracing::warn!("Failed to cache code metrics: {}", e);
+                        }
                     }
                     result
                 }
@@ -331,7 +337,9 @@ impl DirSummary {
                 } else {
                     let result = crate::port_usage::detect_ports(path).ok();
                     if let Some(ref r) = result {
-                        let _ = cache.set(&key, r.clone());
+                        if let Err(e) = cache.set(&key, r.clone()) {
+                            tracing::warn!("Failed to cache port info: {}", e);
+                        }
                     }
                     result
                 }
@@ -350,7 +358,9 @@ impl DirSummary {
                 } else {
                     let result = crate::docker::detect_docker(path).ok();
                     if let Some(ref r) = result {
-                        let _ = cache.set(&key, r.clone());
+                        if let Err(e) = cache.set(&key, r.clone()) {
+                            tracing::warn!("Failed to cache docker info: {}", e);
+                        }
                     }
                     result
                 }
