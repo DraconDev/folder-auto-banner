@@ -12,8 +12,18 @@ use crate::git::GitInfo;
 use crate::icon;
 
 // ANSI color codes — only emitted when stdout is a tty
+static COLORS_ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
 fn color(code: &str) -> &str {
-    code
+    if COLORS_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+        code
+    } else {
+        ""
+    }
+}
+
+fn set_colors_enabled(enabled: bool) {
+    COLORS_ENABLED.store(enabled, std::sync::atomic::Ordering::Relaxed);
 }
 
 const RESET: &str = "\x1b[0m";
@@ -72,6 +82,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     let colors = std::env::var("CFM_COLORS").map(|v| v == "1").unwrap_or(config.colors);
     let compact = opts.compact || config.compact;
     let max_items = config.max_display_items;
+    set_colors_enabled(colors);
 
     // Try daemon cache — if daemon isn't running, start it and retry
     if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
