@@ -506,6 +506,7 @@ fn output_rich(
     let mut max_group = 5; // "GROUP"
     let mut max_size = 4; // "SIZE"
     let mut max_contents = 4; // dynamic
+    let mut max_git = 1; // git status icon (always 1 char)
 
     for item in &display_items {
         max_owner = max_owner.max(item.owner.len());
@@ -518,6 +519,8 @@ fn output_rich(
             get_file_contents_raw(item).len()
         };
         max_contents = max_contents.max(contents_len.max(4));
+        // Git status is always 1 char, but we need a column for it
+        max_git = 1;
     }
 
     // Print each row — PERM OWNER GROUP CONTENTS SIZE DATE NAME
@@ -651,7 +654,14 @@ fn output_rich(
         let contents_colored =
             format!("{}{}{}", color(ORANGE), contents_padded, color(RESET));
 
-        // PERM OWNER GROUP DATE SIZE CONTENTS NAME
+        // Git status: colored dot (right-aligned in column)
+        let git_colored = if git_icon.is_empty() {
+            format!("{:width$}", "", width = max_git)
+        } else {
+            format!("{}", git_icon)
+        };
+
+        // PERM OWNER GROUP DATE SIZE CONTENTS GIT NAME
         println!(
             "{}{} {} {} {} {} {} {}{}{}{}",
             row_tint,
@@ -661,7 +671,7 @@ fn output_rich(
             modified,
             size_colored,
             contents_colored,
-            git_icon,
+            git_colored,
             icon_str,
             name_display,
             tint_reset
