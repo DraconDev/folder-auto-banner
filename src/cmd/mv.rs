@@ -21,10 +21,16 @@ pub fn run_mv(
     overwrite: bool,
     rename_on_collision: bool,
     verbose: bool,
+    dry_run: bool,
 ) -> Result<()> {
     if sources.is_empty() {
         println!("❌ No source files specified");
         return Ok(());
+    }
+
+    if dry_run {
+        println!("🔍 Dry run — no files will be moved");
+        println!();
     }
 
     let mut moved = 0;
@@ -53,8 +59,13 @@ pub fn run_mv(
         // Check for collision
         if dest_path.exists() {
             if overwrite {
-                // Remove destination first
-                if dest_path.is_dir() {
+                if dry_run {
+                    println!(
+                        "  Would overwrite: {} -> {}",
+                        source.display(),
+                        dest_path.display()
+                    );
+                } else if dest_path.is_dir() {
                     fs::remove_dir_all(&dest_path)?;
                 } else {
                     fs::remove_file(&dest_path)?;
@@ -63,7 +74,15 @@ pub fn run_mv(
             } else if rename_on_collision {
                 // Generate new name
                 let new_path = generate_unique_name(&dest_path);
-                perform_move(source, &new_path, verbose)?;
+                if dry_run {
+                    println!(
+                        "  Would move: {} -> {}",
+                        source.display(),
+                        new_path.display()
+                    );
+                } else {
+                    perform_move(source, &new_path, verbose)?;
+                }
                 moved += 1;
                 continue;
             } else {
@@ -73,12 +92,28 @@ pub fn run_mv(
             }
         }
 
-        perform_move(source, &dest_path, verbose)?;
+        if dry_run {
+            println!(
+                "  Would move: {} -> {}",
+                source.display(),
+                dest_path.display()
+            );
+        } else {
+            perform_move(source, &dest_path, verbose)?;
+        }
         moved += 1;
     }
 
     // Summary
-    print_summary("Moved", moved, skipped, overwritten);
+    if dry_run {
+        println!();
+        println!(
+            "📋 Would move {} file(s), {} overwrite(s), {} skip(s)",
+            moved, overwritten, skipped
+        );
+    } else {
+        print_summary("Moved", moved, skipped, overwritten);
+    }
 
     Ok(())
 }

@@ -6,10 +6,21 @@ use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub fn run_rm(paths: &[PathBuf], recursive: bool, force: bool, verbose: bool) -> Result<()> {
+pub fn run_rm(
+    paths: &[PathBuf],
+    recursive: bool,
+    force: bool,
+    verbose: bool,
+    dry_run: bool,
+) -> Result<()> {
     if paths.is_empty() {
         println!("❌ No files specified");
         return Ok(());
+    }
+
+    if dry_run {
+        println!("🔍 Dry run — no files will be removed");
+        println!();
     }
 
     let mut removed = 0;
@@ -38,36 +49,49 @@ pub fn run_rm(paths: &[PathBuf], recursive: bool, force: bool, verbose: bool) ->
             continue;
         }
 
-        match if path.is_dir() {
-            fs::remove_dir_all(path)
+        if dry_run {
+            println!("  Would remove: {}", path.display());
+            removed += 1;
         } else {
-            fs::remove_file(path)
-        } {
-            Ok(_) => {
-                if verbose {
-                    println!("✓ Removed: {}", path.display());
+            match if path.is_dir() {
+                fs::remove_dir_all(path)
+            } else {
+                fs::remove_file(path)
+            } {
+                Ok(_) => {
+                    if verbose {
+                        println!("✓ Removed: {}", path.display());
+                    }
+                    removed += 1;
                 }
-                removed += 1;
-            }
-            Err(e) => {
-                eprintln!("❌ Failed to remove {}: {}", path.display(), e);
-                skipped += 1;
+                Err(e) => {
+                    eprintln!("❌ Failed to remove {}: {}", path.display(), e);
+                    skipped += 1;
+                }
             }
         }
     }
 
     // Summary
-    println!();
-    if removed > 0 {
-        print!("✅ Removed {} file(s)", removed);
-        if skipped > 0 {
-            print!(", {} skipped", skipped);
-        }
+    if dry_run {
         println!();
-    } else if skipped > 0 {
-        println!("⚠️  {} file(s) skipped", skipped);
+        println!(
+            "📋 Would remove {} file(s), {} skip(s)",
+            removed, skipped
+        );
     } else {
-        println!("📋 Nothing to do");
+        println!();
+        if removed > 0 {
+            print!("✅ Removed {} file(s)", removed);
+            if skipped > 0 {
+                print!(", {} skipped", skipped);
+            }
+            println!();
+        } else if skipped > 0 {
+            println!("⚠️  {} file(s) skipped", skipped);
+        } else {
+            println!("📋 Nothing to do");
+        }
     }
 
     Ok(())

@@ -16,7 +16,7 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::Command;
 
-pub fn run_do(action: Option<&str>, verbose: bool) -> Result<()> {
+pub fn run_do(action: Option<&str>, verbose: bool, dry_run: bool) -> Result<()> {
     // Read paths from stdin
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
@@ -35,6 +35,11 @@ pub fn run_do(action: Option<&str>, verbose: bool) -> Result<()> {
     println!("📥 Received {} path(s)", paths.len());
 
     let action = action.unwrap_or("list");
+
+    if dry_run {
+        println!("🔍 Dry run — no actions will be executed");
+        println!();
+    }
 
     match action {
         "list" => {
@@ -66,32 +71,45 @@ pub fn run_do(action: Option<&str>, verbose: bool) -> Result<()> {
         "delete" | "trash" => {
             for path in &paths {
                 if path.exists() {
-                    // Use trash directory
-                    if let Some(proj_dirs) = directories::ProjectDirs::from("com", "cfm", "cfm") {
-                        let trash_dir = proj_dirs.data_dir().join("trash");
-                        std::fs::create_dir_all(&trash_dir)?;
+                    if dry_run {
+                        println!("  Would trash: {}", path.display());
+                    } else {
+                        // Use trash directory
+                        if let Some(proj_dirs) =
+                            directories::ProjectDirs::from("com", "cfm", "cfm")
+                        {
+                            let trash_dir = proj_dirs.data_dir().join("trash");
+                            std::fs::create_dir_all(&trash_dir)?;
 
-                        let id = format!(
-                            "{:x}",
-                            std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_nanos()
-                        );
-                        let dest = trash_dir.join(&id);
+                            let id = format!(
+                                "{:x}",
+                                std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_nanos()
+                            );
+                            let dest = trash_dir.join(&id);
 
-                        if let Err(e) = std::fs::rename(path, &dest) {
-                            eprintln!("❌ Failed to trash {}: {}", path.display(), e);
-                        } else if verbose {
-                            println!("🗑️  Trashed: {}", path.display());
+                            if let Err(e) = std::fs::rename(path, &dest) {
+                                eprintln!("❌ Failed to trash {}: {}", path.display(), e);
+                            } else if verbose {
+                                println!("🗑️  Trashed: {}", path.display());
+                            }
                         }
                     }
                 }
             }
-            println!(
-                "🗑️  Trashed {} file(s)",
-                paths.iter().filter(|p| p.exists()).count()
-            );
+            if dry_run {
+                println!(
+                    "📋 Would trash {} file(s)",
+                    paths.iter().filter(|p| p.exists()).count()
+                );
+            } else {
+                println!(
+                    "🗑️  Trashed {} file(s)",
+                    paths.iter().filter(|p| p.exists()).count()
+                );
+            }
         }
         "open" => {
             // Open all files (cross-platform)
@@ -101,22 +119,30 @@ pub fn run_do(action: Option<&str>, verbose: bool) -> Result<()> {
                     continue;
                 }
 
-                #[cfg(target_os = "linux")]
-                let _ = Command::new("xdg-open").arg(path).spawn();
+                if dry_run {
+                    println!("  Would open: {}", path.display());
+                } else {
+                    #[cfg(target_os = "linux")]
+                    let _ = Command::new("xdg-open").arg(path).spawn();
 
-                #[cfg(target_os = "macos")]
-                let _ = Command::new("open").arg(path).spawn();
+                    #[cfg(target_os = "macos")]
+                    let _ = Command::new("open").arg(path).spawn();
 
-                #[cfg(target_os = "windows")]
-                let _ = Command::new("cmd")
-                    .args(["/C", "start", "", path.to_str().unwrap_or("")])
-                    .spawn();
+                    #[cfg(target_os = "windows")]
+                    let _ = Command::new("cmd")
+                        .args(["/C", "start", "", path.to_str().unwrap_or("")])
+                        .spawn();
 
-                if verbose {
-                    println!("✓ Opened: {}", path.display());
+                    if verbose {
+                        println!("✓ Opened: {}", path.display());
+                    }
                 }
             }
-            println!("✅ Opened {} file(s)", paths.len());
+            if dry_run {
+                println!("📋 Would open {} file(s)", paths.len());
+            } else {
+                println!("✅ Opened {} file(s)", paths.len());
+            }
         }
         "cat" | "show" => {
             for path in &paths {
@@ -140,39 +166,50 @@ pub fn run_do(action: Option<&str>, verbose: bool) -> Result<()> {
 
             for path in &paths {
                 let cmd_str = cmd_template.replace("{}", &path.to_string_lossy());
-                let parts: Vec<&str> = cmd_str.split_whitespace().collect();
 
-                if parts.is_empty() {
-                    continue;
-                }
+                if dry_run {
+                    println!("  Would run: {}", cmd_str);
+                } else {
+                    let parts: Vec<&str> = cmd_str.split_whitespace().collect();
 
-                let mut cmd = Command::new(parts[0]);
-                for arg in &parts[1..] {
-                    cmd.arg(arg);
-                }
+                    if parts.is_empty() {
+                        continue;
+                    }
 
-                if verbose {
-                    println!("$ {}", cmd_str);
-                }
+                    let mut cmd = Command::new(parts[0]);
+                    for arg in &parts[1..] {
+                        cmd.arg(arg);
+                    }
 
-                match cmd.output() {
-                    Ok(output) => {
-                        if !output.status.success() {
-                            eprintln!("❌ Command failed: {}", cmd_str);
-                            if !output.stderr.is_empty() {
-                                eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
-                            }
-                        } else if verbose {
-                            println!("✅ {}", path.display());
-                            if !output.stdout.is_empty() {
-                                print!("{}", String::from_utf8_lossy(&output.stdout));
+                    if verbose {
+                        println!("$ {}", cmd_str);
+                    }
+
+                    match cmd.output() {
+                        Ok(output) => {
+                            if !output.status.success() {
+                                eprintln!("❌ Command failed: {}", cmd_str);
+                                if !output.stderr.is_empty() {
+                                    eprintln!(
+                                        "stderr: {}",
+                                        String::from_utf8_lossy(&output.stderr)
+                                    );
+                                }
+                            } else if verbose {
+                                println!("✅ {}", path.display());
+                                if !output.stdout.is_empty() {
+                                    print!("{}", String::from_utf8_lossy(&output.stdout));
+                                }
                             }
                         }
-                    }
-                    Err(e) => {
-                        eprintln!("❌ Failed to run {}: {}", cmd_str, e);
+                        Err(e) => {
+                            eprintln!("❌ Failed to run {}: {}", cmd_str, e);
+                        }
                     }
                 }
+            }
+            if dry_run {
+                println!("📋 Would run {} command(s)", paths.len());
             }
         }
     }

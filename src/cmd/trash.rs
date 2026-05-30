@@ -26,18 +26,29 @@ pub struct TrashItem {
     pub original_size: u64,
 }
 
-pub fn run_trash(paths: &[PathBuf], verbose: bool) -> Result<()> {
+pub fn run_trash(paths: &[PathBuf], verbose: bool, dry_run: bool) -> Result<()> {
     if paths.is_empty() {
         println!("❌ No files specified");
         return Ok(());
     }
 
+    if dry_run {
+        println!("🔍 Dry run — no files will be trashed");
+        println!();
+    }
+
     // Get trash directory
     let trash_base = get_trash_base()?;
-    fs::create_dir_all(&trash_base)?;
+    if !dry_run {
+        fs::create_dir_all(&trash_base)?;
+    }
 
     // Load manifest
-    let mut manifest = load_manifest(&trash_base)?;
+    let mut manifest = if dry_run {
+        TrashManifest { items: Vec::new() }
+    } else {
+        load_manifest(&trash_base)?
+    };
 
     let mut trashed = 0;
     let mut skipped = 0;
@@ -49,21 +60,33 @@ pub fn run_trash(paths: &[PathBuf], verbose: bool) -> Result<()> {
             continue;
         }
 
-        match trash_file(path, &trash_base, &mut manifest, verbose) {
-            Ok(_) => trashed += 1,
-            Err(e) => {
-                eprintln!("❌ Failed to trash {}: {}", path.display(), e);
-                skipped += 1;
+        if dry_run {
+            println!("  Would trash: {}", path.display());
+            trashed += 1;
+        } else {
+            match trash_file(path, &trash_base, &mut manifest, verbose) {
+                Ok(_) => trashed += 1,
+                Err(e) => {
+                    eprintln!("❌ Failed to trash {}: {}", path.display(), e);
+                    skipped += 1;
+                }
             }
         }
     }
 
     // Save manifest
-    save_manifest(&trash_base, &manifest)?;
+    if !dry_run {
+        save_manifest(&trash_base, &manifest)?;
+    }
 
     // Summary
     println!();
-    if trashed > 0 {
+    if dry_run {
+        println!(
+            "📋 Would trash {} file(s), {} skip(s)",
+            trashed, skipped
+        );
+    } else if trashed > 0 {
         print!("🗑️  Moved {} file(s) to trash", trashed);
         if skipped > 0 {
             print!(", {} skipped", skipped);

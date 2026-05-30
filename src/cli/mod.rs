@@ -460,36 +460,36 @@ impl Cli {
                 overwrite,
                 rename,
                 skip: _,
-                dry_run: _,
-            }) => {
-                crate::cmd::mv::run_mv(sources, dest, *overwrite, *rename, true)
-                // verbose=true
-            }
+                dry_run,
+            }) => crate::cmd::mv::run_mv(sources, dest, *overwrite, *rename, true, *dry_run),
             Some(Cp {
                 sources,
                 dest,
                 overwrite,
-                dry_run: _,
-            }) => {
-                crate::cmd::cp::run_cp(sources, dest, *overwrite, false, true, true)
-                // rename=false, verbose=true, preserve=true
-            }
+                dry_run,
+            }) => crate::cmd::cp::run_cp(sources, dest, *overwrite, false, true, true, *dry_run),
 
             // Phase 7: Safe ops
             Some(Rm {
                 paths,
                 force,
-                dry_run: _,
-            }) => crate::cmd::rm::run_rm(paths, false, *force, true), // recursive=false, verbose=true
+                dry_run,
+            }) => crate::cmd::rm::run_rm(paths, false, *force, true, *dry_run),
             Some(Trash {
                 paths,
                 force: _,
-                dry_run: _,
-            }) => crate::cmd::trash::run_trash(paths, true), // verbose=true
-            Some(Open { paths, dry_run: _ }) => crate::cmd::open::run_open(paths, true),
+                dry_run,
+            }) => crate::cmd::trash::run_trash(paths, true, *dry_run),
+            Some(Open {
+                paths,
+                dry_run,
+            }) => crate::cmd::open::run_open(paths, true, *dry_run),
 
             // Phase 8: Smart piping
-            Some(Do { action, dry_run: _ }) => crate::cmd::do_cmd::run_do(action.as_deref(), true),
+            Some(Do {
+                action,
+                dry_run,
+            }) => crate::cmd::do_cmd::run_do(action.as_deref(), true, *dry_run),
             Some(Peek { file, lines }) => crate::cmd::peek::run_peek(file, *lines),
 
             // Phase 9: Stats

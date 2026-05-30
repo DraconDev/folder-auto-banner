@@ -22,10 +22,16 @@ pub fn run_cp(
     rename_on_collision: bool,
     verbose: bool,
     preserve: bool,
+    dry_run: bool,
 ) -> Result<()> {
     if sources.is_empty() {
         println!("❌ No source files specified");
         return Ok(());
+    }
+
+    if dry_run {
+        println!("🔍 Dry run — no files will be copied");
+        println!();
     }
 
     let mut copied = 0;
@@ -54,8 +60,13 @@ pub fn run_cp(
         // Check for collision
         if dest_path.exists() {
             if overwrite {
-                // Remove destination first
-                if dest_path.is_dir() {
+                if dry_run {
+                    println!(
+                        "  Would overwrite: {} -> {}",
+                        source.display(),
+                        dest_path.display()
+                    );
+                } else if dest_path.is_dir() {
                     fs::remove_dir_all(&dest_path)?;
                 } else {
                     fs::remove_file(&dest_path)?;
@@ -64,7 +75,15 @@ pub fn run_cp(
             } else if rename_on_collision {
                 // Generate new name
                 let new_path = generate_unique_name(&dest_path);
-                perform_copy(source, &new_path, preserve, verbose)?;
+                if dry_run {
+                    println!(
+                        "  Would copy: {} -> {}",
+                        source.display(),
+                        new_path.display()
+                    );
+                } else {
+                    perform_copy(source, &new_path, preserve, verbose)?;
+                }
                 copied += 1;
                 continue;
             } else {
@@ -74,12 +93,28 @@ pub fn run_cp(
             }
         }
 
-        perform_copy(source, &dest_path, preserve, verbose)?;
+        if dry_run {
+            println!(
+                "  Would copy: {} -> {}",
+                source.display(),
+                dest_path.display()
+            );
+        } else {
+            perform_copy(source, &dest_path, preserve, verbose)?;
+        }
         copied += 1;
     }
 
     // Summary
-    print_summary("Copied", copied, skipped, overwritten);
+    if dry_run {
+        println!();
+        println!(
+            "📋 Would copy {} file(s), {} overwrite(s), {} skip(s)",
+            copied, overwritten, skipped
+        );
+    } else {
+        print_summary("Copied", copied, skipped, overwritten);
+    }
 
     Ok(())
 }

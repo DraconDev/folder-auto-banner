@@ -6,10 +6,15 @@ use anyhow::Result;
 use std::path::PathBuf;
 use std::process::Command;
 
-pub fn run_open(paths: &[PathBuf], verbose: bool) -> Result<()> {
+pub fn run_open(paths: &[PathBuf], verbose: bool, dry_run: bool) -> Result<()> {
     if paths.is_empty() {
         println!("❌ No files specified");
         return Ok(());
+    }
+
+    if dry_run {
+        println!("🔍 Dry run — no files will be opened");
+        println!();
     }
 
     let mut opened = 0;
@@ -22,25 +27,35 @@ pub fn run_open(paths: &[PathBuf], verbose: bool) -> Result<()> {
             continue;
         }
 
-        match open_path(path) {
-            Ok(_) => {
-                if verbose {
-                    println!("✓ Opened: {}", path.display());
+        if dry_run {
+            println!("  Would open: {}", path.display());
+            opened += 1;
+        } else {
+            match open_path(path) {
+                Ok(_) => {
+                    if verbose {
+                        println!("✓ Opened: {}", path.display());
+                    }
+                    opened += 1;
                 }
-                opened += 1;
-            }
-            Err(e) => {
-                eprintln!("❌ Failed to open {}: {}", path.display(), e);
-                failed += 1;
+                Err(e) => {
+                    eprintln!("❌ Failed to open {}: {}", path.display(), e);
+                    failed += 1;
+                }
             }
         }
     }
 
-    if opened > 0 {
-        println!("✅ Opened {} file(s)", opened);
-    }
-    if failed > 0 {
-        println!("⚠️  {} failed", failed);
+    if dry_run {
+        println!();
+        println!("📋 Would open {} file(s), {} fail(s)", opened, failed);
+    } else {
+        if opened > 0 {
+            println!("✅ Opened {} file(s)", opened);
+        }
+        if failed > 0 {
+            println!("⚠️  {} failed", failed);
+        }
     }
 
     Ok(())
