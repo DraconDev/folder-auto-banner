@@ -135,9 +135,9 @@
 - [ ] Make each subsystem call independent and composable
 
 ### Consolidate `Session` types
-- [ ] `state/mod.rs`, `cmd/save_session.rs`, `cmd/sessions.rs` each define a different `Session` struct
-- [ ] Create one canonical `Session` struct with all fields, use it everywhere
-- [ ] Add proper serde support for serialization/deserialization
+- [x] `state/mod.rs`, `cmd/save_session.rs`, `cmd/sessions.rs` each define a different `Session` struct
+- [x] Create one canonical `Session` struct with all fields, use it everywhere
+- [x] Add proper serde support for serialization/deserialization
 
 ### Fix `cli/mod.rs` separation of concerns
 - [ ] Extract `run_daemon()` out of `cli/mod.rs` into a daemon command module
