@@ -98,7 +98,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -129,7 +129,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
