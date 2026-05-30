@@ -41,12 +41,12 @@ pub enum FileStatus {
 impl FileStatus {
     pub fn icon(&self) -> &'static str {
         match self {
-            FileStatus::Modified => "M",
-            FileStatus::Added => "+",
-            FileStatus::Deleted => "D",
-            FileStatus::Renamed => "R",
-            FileStatus::Untracked => "?",
-            FileStatus::Conflict => "!",
+            FileStatus::Modified => "\u{25cf}",  // ●
+            FileStatus::Added => "\u{25cf}",      // ●
+            FileStatus::Deleted => "\u{25cf}",    // ●
+            FileStatus::Renamed => "\u{25cf}",    // ●
+            FileStatus::Untracked => "\u{25cf}",  // ●
+            FileStatus::Conflict => "\u{25cf}",   // ●
         }
     }
 
