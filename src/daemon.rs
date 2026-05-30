@@ -174,6 +174,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
     };
 
     let mut watched: HashMap<PathBuf, inotify::WatchDescriptor> = HashMap::new();
+    let mut failed_watches: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
 
     loop {
         // Check for new directories to watch
@@ -183,14 +184,16 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                 e.into_inner()
             });
             for path in cache.keys() {
-                if !watched.contains_key(path) {
+                if !watched.contains_key(path) && !failed_watches.contains(path) {
                     // Skip non-existent directories and dead symlinks
                     if !path.exists() {
+                        failed_watches.insert(path.clone());
                         continue;
                     }
                     // For symlinks, check if target exists
                     if let Ok(meta) = std::fs::symlink_metadata(path) {
                         if meta.is_symlink() && std::fs::metadata(path).is_err() {
+                            failed_watches.insert(path.clone());
                             continue; // Dead symlink, skip
                         }
                     }
@@ -204,6 +207,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                         }
                         Err(e) => {
                             tracing::warn!("Failed to watch {}: {}", path.display(), e);
+                            failed_watches.insert(path.clone());
                         }
                     }
                 }
@@ -261,6 +265,8 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                     tracing::info!("Stopped watching: {}", path.display());
                 }
             }
+            // Also clear failed watches for paths no longer in cache
+            failed_watches.retain(|p| cache.contains_key(p));
         }
 
         thread::sleep(Duration::from_millis(100));
