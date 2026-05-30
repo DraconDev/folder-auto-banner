@@ -547,6 +547,14 @@ fn output_rich(
                         None
                     }
                 })
+                .unwrap_or_else(|| {
+                    // Tracked but clean — show dim dot
+                    if git_info.is_repo {
+                        Some(format!("{}\u{{25cf}}{}", color(DIM), color(RESET)))
+                    } else {
+                        None
+                    }
+                })
                 .unwrap_or_default()
         };
 
