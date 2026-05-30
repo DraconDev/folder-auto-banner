@@ -767,6 +767,40 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .unwrap_or(0)
 }
 
+/// Aggregate git status for a directory — returns the most severe status
+/// from any child file (Conflict > Deleted > Modified > Added > Untracked)
+fn aggregate_dir_git_status(
+    file_statuses: &std::collections::HashMap<String, crate::git::FileStatus>,
+    dir_name: &str,
+) -> Option<String> {
+    let prefix = format!("{}/", dir_name);
+    let mut worst: Option<&crate::git::FileStatus> = None;
+
+    for (file_path, status) in file_statuses {
+        if file_path.starts_with(&prefix) {
+            let is_worse = match worst {
+                None => true,
+                Some(current) => {
+                    let severity = |s: &crate::git::FileStatus| match s {
+                        crate::git::FileStatus::Conflict => 5,
+                        crate::git::FileStatus::Deleted => 4,
+                        crate::git::FileStatus::Modified => 3,
+                        crate::git::FileStatus::Added => 2,
+                        crate::git::FileStatus::Renamed => 1,
+                        crate::git::FileStatus::Untracked => 0,
+                    };
+                    severity(status) > severity(current)
+                }
+            };
+            if is_worse {
+                worst = Some(status);
+            }
+        }
+    }
+
+    worst.map(|fs| format!("{}{}{}", color(fs.color()), fs.icon(), color(RESET)))
+}
+
 /// Get contents description for a file — line count for text, resolution for image, etc.
 /// Returns plain text (no ANSI codes) — coloring is applied by the renderer.
 fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
