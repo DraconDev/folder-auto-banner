@@ -6,8 +6,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::process::Command;
 use std::time::Duration;
+
+use crate::utils;
 
 const DOCKER_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -57,7 +58,7 @@ fn detect_containers(path: &Path) -> Result<Vec<ContainerInfo>> {
         .unwrap_or_default();
 
     // Try docker-compose project filter
-    let output = run_with_timeout(
+    let output = utils::run_with_timeout_stdout(
         "docker",
         &[
             "ps",
@@ -82,7 +83,7 @@ fn detect_containers(path: &Path) -> Result<Vec<ContainerInfo>> {
     // If no compose containers found, try volume filter
     if containers.is_empty() {
         let abs_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        let output = run_with_timeout(
+        let output = utils::run_with_timeout_stdout(
             "docker",
             &[
                 "ps",
@@ -107,27 +108,4 @@ fn detect_containers(path: &Path) -> Result<Vec<ContainerInfo>> {
     Ok(containers)
 }
 
-fn run_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -> Result<String> {
-    let mut command = Command::new(cmd);
-    command.args(args);
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::null());
 
-    let start = std::time::Instant::now();
-    let mut child = command.spawn()?;
-
-    loop {
-        if let Some(_output) = child.try_wait()? {
-            let result = child.wait_with_output()?;
-            return Ok(String::from_utf8_lossy(&result.stdout).to_string());
-        }
-
-        if start.elapsed() > timeout {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Ok(String::new());
-        }
-
-        std::thread::sleep(Duration::from_millis(10));
-    }
-}

@@ -136,27 +136,4 @@ fn try_lsof_with_dir(project_path: &Path) -> Result<Vec<u16>> {
     Ok(ports)
 }
 
-fn run_with_timeout(cmd: &str, args: &[&str], timeout: Duration) -> Result<String> {
-    let mut command = Command::new(cmd);
-    command.args(args);
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::null());
 
-    let start = std::time::Instant::now();
-    let mut child = command.spawn()?;
-
-    loop {
-        if let Some(_output) = child.try_wait()? {
-            let result = child.wait_with_output()?;
-            return Ok(String::from_utf8_lossy(&result.stdout).to_string());
-        }
-
-        if start.elapsed() > timeout {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Ok(String::new());
-        }
-
-        std::thread::sleep(Duration::from_millis(10));
-    }
-}
