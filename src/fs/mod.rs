@@ -161,16 +161,19 @@ impl DirSummary {
                 files += 1;
             }
 
-            // Try to get metadata — for symlinks, always follow the link
+            // Try to get metadata — for symlinks, use symlink_metadata to read the link itself
             let metadata = if is_symlink {
-                std::fs::metadata(entry.path()).ok()
+                std::fs::symlink_metadata(entry.path()).ok()
             } else {
                 entry.metadata().ok()
             };
 
             // For symlinks, update is_dir based on the target
             let is_dir = if is_symlink {
-                metadata.as_ref().map(|m| m.is_dir()).unwrap_or(is_dir)
+                // Try to resolve the target to determine if it points to a dir
+                std::fs::metadata(entry.path())
+                    .map(|m| m.is_dir())
+                    .unwrap_or(is_dir)
             } else {
                 is_dir
             };
