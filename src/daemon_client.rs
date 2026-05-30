@@ -95,7 +95,9 @@ pub fn send_warm(path: &Path) {
         path: path.to_path_buf(),
     };
     // Fire and forget — don't wait for response
-    let _ = serde_json::to_writer(&stream, &request);
+    if let Err(e) = serde_json::to_writer(&stream, &request) {
+        tracing::warn!("Failed to send warm request: {}", e);
+    }
 }
 
 /// Send shutdown signal to daemon
@@ -107,7 +109,9 @@ pub fn send_shutdown() {
         stream.set_read_timeout(Some(Duration::from_secs(1))).ok();
         stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
         let request = Request::Shutdown;
-        let _ = send_and_recv(&stream, &request);
+        if let Err(e) = send_and_recv(&stream, &request) {
+            tracing::warn!("Failed to send shutdown request: {}", e);
+        }
     }
 }
 
