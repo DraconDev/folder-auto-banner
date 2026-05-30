@@ -555,7 +555,11 @@ fn output_rich(
     for (idx, item) in display_items.iter().enumerate() {
         let row_tint = if idx % 2 == 0 { ROW_TINT } else { "" };
         let tint_reset = if idx % 2 == 0 { color(RESET) } else { "" };
-        let icon_str = icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink);
+        let icon_str = if icons {
+            icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink)
+        } else {
+            ""
+        };
 
         // Per-file git status — try relative path first, then filename
         // For directories, aggregate status from child files
