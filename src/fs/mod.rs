@@ -265,57 +265,37 @@ impl DirSummary {
 
         // Run optional checks with caching
         let cache = crate::cache::Cache::new().ok();
-        let cache_key = |feature: &str| crate::cache::cache_key(path, feature);
 
-        let cached_compute =
-            |cache: &Option<crate::cache::Cache>, key: &str, ttl_secs: u64, compute: impl FnOnce() -> Option<T>| {
-                if let Some(ref cache) = cache {
-                    let key = cache_key(key);
-                    if let Some(cached) = cache.get(&key, std::time::Duration::from_secs(ttl_secs)) {
-                        Some(cached)
-                    } else {
-                        let result = compute();
-                        if let Some(ref r) = result {
-                            if let Err(e) = cache.set(&key, r.clone()) {
-                                tracing::warn!("Failed to cache {}: {}", key, e);
+        macro_rules! cached_check {
+            ($enabled:expr, $cache:expr, $key:expr, $ttl:expr, $compute:expr) => {
+                if $enabled {
+                    if let Some(ref cache) = $cache {
+                        let ck = crate::cache::cache_key(path, $key);
+                        if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs($ttl)) {
+                            Some(cached)
+                        } else {
+                            let result = $compute;
+                            if let Some(ref r) = result {
+                                if let Err(e) = cache.set(&ck, r.clone()) {
+                                    tracing::warn!("Failed to cache {}: {}", $key, e);
+                                }
                             }
+                            result
                         }
-                        result
+                    } else {
+                        $compute
                     }
                 } else {
-                    compute()
+                    None
                 }
             };
+        }
 
-        let build_status = if check_build {
-            cached_compute(&cache, "build", 30, || crate::build_status::check_build(path, &project_type))
-        } else {
-            None
-        };
-
-        let todo_info = if scan_todos {
-            cached_compute(&cache, "todos", 60, || crate::todo_scanner::scan_todos(path).ok())
-        } else {
-            None
-        };
-
-        let code_metrics = if check_metrics {
-            cached_compute(&cache, "metrics", 60, || crate::code_metrics::scan_metrics(path).ok())
-        } else {
-            None
-        };
-
-        let port_info = if check_ports {
-            cached_compute(&cache, "ports", 10, || crate::port_usage::detect_ports(path).ok())
-        } else {
-            None
-        };
-
-        let docker_info = if check_docker {
-            cached_compute(&cache, "docker", 10, || crate::docker::detect_docker(path).ok())
-        } else {
-            None
-        };
+        let build_status = cached_check!(check_build, cache, "build", 30, crate::build_status::check_build(path, &project_type));
+        let todo_info = cached_check!(scan_todos, cache, "todos", 60, crate::todo_scanner::scan_todos(path).ok());
+        let code_metrics = cached_check!(check_metrics, cache, "metrics", 60, crate::code_metrics::scan_metrics(path).ok());
+        let port_info = cached_check!(check_ports, cache, "ports", 10, crate::port_usage::detect_ports(path).ok());
+        let docker_info = cached_check!(check_docker, cache, "docker", 10, crate::docker::detect_docker(path).ok());
 
         Ok(DirSummary {
             total_items: files + dirs,
