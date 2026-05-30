@@ -658,7 +658,7 @@ fn output_rich(
         let git_colored = if git_icon.is_empty() {
             format!("{:width$}", "", width = max_git)
         } else {
-            format!("{}", git_icon)
+            git_icon
         };
 
         // PERM OWNER GROUP DATE SIZE CONTENTS GIT NAME
