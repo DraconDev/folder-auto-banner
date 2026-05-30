@@ -639,11 +639,8 @@ fn output_rich(
         let size_colored = format!("{}{}{}", color(ORANGE), size_padded, color(RESET));
 
         // Contents: orange (like size)
-        let contents_colored = if item.is_dir {
-            format!("{}{}{}", color(ORANGE), contents_padded, color(RESET))
-        } else {
-            format!("{}{}{}", color(ORANGE), contents_padded, color(RESET))
-        };
+        let contents_colored =
+            format!("{}{}{}", color(ORANGE), contents_padded, color(RESET));
 
         // PERM OWNER GROUP DATE SIZE CONTENTS NAME
         println!(
