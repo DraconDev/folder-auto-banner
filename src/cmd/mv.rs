@@ -7,6 +7,8 @@ use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::utils;
+
 #[derive(Debug, Clone)]
 pub enum CollisionAction {
     Skip,
@@ -73,7 +75,7 @@ pub fn run_mv(
                 overwritten += 1;
             } else if rename_on_collision {
                 // Generate new name
-                let new_path = generate_unique_name(&dest_path);
+                let new_path = utils::generate_unique_name(&dest_path);
                 if dry_run {
                     println!(
                         "  Would move: {} -> {}",
@@ -112,7 +114,7 @@ pub fn run_mv(
             moved, overwritten, skipped
         );
     } else {
-        print_summary("Moved", moved, skipped, overwritten);
+        utils::print_summary("Moved", moved, skipped, overwritten);
     }
 
     Ok(())
@@ -134,7 +136,7 @@ fn perform_move(source: &Path, dest: &Path, verbose: bool) -> Result<()> {
         Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
             // Cross-device move: copy then delete with verification
             if source.is_dir() {
-                copy_dir_recursive(source, dest)?;
+                utils::copy_dir_recursive(source, dest)?;
                 // Verify copy succeeded before deleting source
                 verify_dir_copy(source, dest)?;
             } else {
@@ -151,7 +153,7 @@ fn perform_move(source: &Path, dest: &Path, verbose: bool) -> Result<()> {
                     ));
                 }
             }
-            delete_recursive(source)?;
+            utils::delete_recursive(source)?;
             if verbose {
                 println!(
                     "✓ {} -> {} (cross-device)",
@@ -191,78 +193,4 @@ fn count_items(path: &Path) -> Result<usize> {
     Ok(count)
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
-    fs::create_dir_all(dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        let src_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
 
-        if ty.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
-        } else {
-            fs::copy(&src_path, &dst_path)?;
-        }
-    }
-    Ok(())
-}
-
-fn delete_recursive(path: &Path) -> Result<()> {
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            delete_recursive(&entry.path())?;
-        }
-        fs::remove_dir(path)?;
-    } else {
-        fs::remove_file(path)?;
-    }
-    Ok(())
-}
-
-fn generate_unique_name(path: &Path) -> PathBuf {
-    if !path.exists() {
-        return path.to_path_buf();
-    }
-
-    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-    let ext = path.extension().map(|e| e.to_string_lossy().to_string());
-    let parent = path.parent().unwrap_or(Path::new("."));
-
-    let mut counter = 1;
-    loop {
-        let new_name = match ext.as_ref() {
-            Some(ext) => format!(
-                "{stem} ({counter}).{ext}",
-                stem = stem,
-                counter = counter,
-                ext = ext
-            ),
-            None => format!("{} ({})", stem, counter),
-        };
-        let new_path = parent.join(&new_name);
-        if !new_path.exists() {
-            return new_path;
-        }
-        counter += 1;
-    }
-}
-
-fn print_summary(action: &str, moved: usize, skipped: usize, overwritten: usize) {
-    println!();
-    if moved > 0 {
-        print!("✅ {} {} file(s)", action, moved);
-        if overwritten > 0 {
-            print!(", {} overwritten", overwritten);
-        }
-        if skipped > 0 {
-            print!(", {} skipped", skipped);
-        }
-        println!();
-    } else if skipped > 0 {
-        println!("⚠️  {} skipped", skipped);
-    } else {
-        println!("📋 Nothing to do");
-    }
-}

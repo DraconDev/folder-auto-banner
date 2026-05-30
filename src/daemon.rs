@@ -20,6 +20,7 @@ mod icon;
 mod port_usage;
 mod state;
 mod todo_scanner;
+mod utils;
 
 use daemon_types::{BannerData, Request, Response};
 use fs::DirSummary;

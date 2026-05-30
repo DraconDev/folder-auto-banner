@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::utils;
+
 const TRASH_DIR: &str = ".local/share/cfm/trash";
 const TRASH_MANIFEST: &str = ".local/share/cfm/trash/manifest.json";
 

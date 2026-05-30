@@ -7,6 +7,8 @@ use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::utils;
+
 #[derive(Debug, Clone)]
 pub enum CollisionAction {
     Skip,
@@ -74,7 +76,7 @@ pub fn run_cp(
                 overwritten += 1;
             } else if rename_on_collision {
                 // Generate new name
-                let new_path = generate_unique_name(&dest_path);
+                let new_path = utils::generate_unique_name(&dest_path);
                 if dry_run {
                     println!(
                         "  Would copy: {} -> {}",
@@ -113,7 +115,7 @@ pub fn run_cp(
             copied, overwritten, skipped
         );
     } else {
-        print_summary("Copied", copied, skipped, overwritten);
+        utils::print_summary("Copied", copied, skipped, overwritten);
     }
 
     Ok(())
@@ -121,7 +123,7 @@ pub fn run_cp(
 
 fn perform_copy(source: &Path, dest: &Path, preserve: bool, verbose: bool) -> Result<()> {
     if source.is_dir() {
-        copy_dir_recursive(source, dest, preserve)?;
+        utils::copy_dir_recursive(source, dest)?;
     } else {
         if preserve {
             // Preserve metadata
@@ -144,66 +146,4 @@ fn perform_copy(source: &Path, dest: &Path, preserve: bool, verbose: bool) -> Re
     Ok(())
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path, _preserve: bool) -> Result<()> {
-    fs::create_dir_all(dst)?;
 
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        let src_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
-
-        if ty.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path, _preserve)?;
-        } else {
-            fs::copy(&src_path, &dst_path)?;
-        }
-    }
-    Ok(())
-}
-
-fn generate_unique_name(path: &Path) -> PathBuf {
-    if !path.exists() {
-        return path.to_path_buf();
-    }
-
-    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-    let ext = path.extension().map(|e| e.to_string_lossy().to_string());
-    let parent = path.parent().unwrap_or(Path::new("."));
-
-    let mut counter = 1;
-    loop {
-        let new_name = match ext.as_ref() {
-            Some(ext) => format!(
-                "{stem} ({counter}).{ext}",
-                stem = stem,
-                counter = counter,
-                ext = ext
-            ),
-            None => format!("{} ({})", stem, counter),
-        };
-        let new_path = parent.join(&new_name);
-        if !new_path.exists() {
-            return new_path;
-        }
-        counter += 1;
-    }
-}
-
-fn print_summary(action: &str, copied: usize, skipped: usize, overwritten: usize) {
-    println!();
-    if copied > 0 {
-        print!("✅ {} {} file(s)", action, copied);
-        if overwritten > 0 {
-            print!(", {} overwritten", overwritten);
-        }
-        if skipped > 0 {
-            print!(", {} skipped", skipped);
-        }
-        println!();
-    } else if skipped > 0 {
-        println!("⚠️  {} skipped", skipped);
-    } else {
-        println!("📋 Nothing to do");
-    }
-}
