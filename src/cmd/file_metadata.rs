@@ -274,7 +274,6 @@ mod tests {
         assert_eq!(contents, "");
     }
 }
-}
 
 /// Count SQLite tables by reading schema
 fn count_sqlite_tables(path: &Path) -> Option<usize> {
