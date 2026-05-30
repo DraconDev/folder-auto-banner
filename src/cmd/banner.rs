@@ -503,14 +503,9 @@ fn output_rich(
                 if !metrics.by_extension.is_empty() {
                     let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
                         let loc_str = format_loc(*loc);
-                        format!("{}{}{}", ext, color(DIM), loc_str)
+                        format!("{}{}{}{}", color(DIM), ext, loc_str, color(RESET))
                     }).collect();
-                    parts.push(format!(
-                        "│ {}{}{}",
-                        color(DIM),
-                        lang_parts.join(&format!("{} {}", color(RESET), color(DIM))),
-                        color(RESET)
-                    ));
+                    parts.push(format!("│ {}", lang_parts.join(" ")));
                 }
             }
         }
