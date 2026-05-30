@@ -3,28 +3,13 @@
 //! Prints cd commands to restore saved workspace state
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
 
-use crate::utils;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Session {
-    pub name: String,
-    pub cwd: PathBuf,
-    pub timestamp: String,
-    pub git_branch: Option<String>,
-    pub description: Option<String>,
-}
+use crate::state::Session;
 
 pub fn run_load_session(name: &str) -> Result<()> {
-    // Get sessions directory
-    let proj_dirs = directories::ProjectDirs::from("com", "cfm", "cfm")
-        .ok_or_else(|| anyhow::anyhow!("Cannot determine config directory"))?;
-    let sessions_dir = proj_dirs.data_dir().join("sessions");
-
-    let session_file = sessions_dir.join(format!("{}.json", utils::sanitize_filename(name)));
+    let sessions_dir = Session::sessions_dir()?;
+    let session_file = sessions_dir.join(format!("{}.json", crate::utils::sanitize_filename(name)));
 
     if !session_file.exists() {
         println!("❌ Session '{}' not found", name);

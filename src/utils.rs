@@ -18,18 +18,26 @@ fn copy_dir_recursive_inner(
     dst: &Path,
     visited: &mut std::collections::HashSet<std::path::PathBuf>,
 ) -> Result<()> {
-    let canonical = src.canonicalize().unwrap_or_else(|_| src.to_path_buf());
-    if !visited.insert(canonical) {
+    if !visited.insert(src.to_path_buf()) {
         return Err(anyhow::anyhow!("Symlink loop detected at {}", src.display()));
     }
 
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
-        let ty = entry.file_type()?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
 
-        if ty.is_dir() {
+        // Use symlink_metadata to detect symlinks without following them
+        let meta = match std::fs::symlink_metadata(&src_path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        if meta.is_symlink() {
+            // Skip symlinks to prevent loops
+            continue;
+        } else if meta.is_dir() {
+            std::fs::create_dir_all(&dst_path)?;
             copy_dir_recursive_inner(&src_path, &dst_path, visited)?;
         } else {
             std::fs::copy(&src_path, &dst_path)?;
@@ -320,11 +328,16 @@ mod tests {
         let dst = tmp.path().join("dst");
 
         fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("real.txt"), "content").unwrap();
         #[cfg(unix)]
         {
+            // Create symlink loop - should be skipped, not cause infinite recursion
             std::os::unix::fs::symlink(&src, src.join("loop")).unwrap();
             let result = copy_dir_recursive(&src, &dst);
-            assert!(result.is_err(), "Should detect symlink loop");
+            assert!(result.is_ok(), "Should handle symlinks gracefully");
+            // The symlink should be skipped, but real files should be copied
+            assert!(dst.join("real.txt").exists());
+            assert!(!dst.join("loop").exists(), "Symlink should be skipped");
         }
     }
 

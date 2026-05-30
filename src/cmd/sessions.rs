@@ -3,20 +3,10 @@
 use anyhow::Result;
 use std::fs;
 
-#[derive(Debug, serde::Deserialize)]
-struct Session {
-    name: String,
-    cwd: std::path::PathBuf,
-    timestamp: String,
-    git_branch: Option<String>,
-    description: Option<String>,
-}
+use crate::state::Session;
 
 pub fn run_sessions() -> Result<()> {
-    // Get sessions directory
-    let proj_dirs = directories::ProjectDirs::from("com", "cfm", "cfm")
-        .ok_or_else(|| anyhow::anyhow!("Cannot determine config directory"))?;
-    let sessions_dir = proj_dirs.data_dir().join("sessions");
+    let sessions_dir = Session::sessions_dir()?;
 
     if !sessions_dir.exists() {
         println!("📋 No sessions saved");
@@ -49,8 +39,12 @@ pub fn run_sessions() -> Result<()> {
     println!("📋 Sessions ({} total):", sessions.len());
     println!();
 
-    // Sort by timestamp (newest first)
-    sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    // Sort by created_at (newest first)
+    sessions.sort_by(|a, b| {
+        b.created_at
+            .partial_cmp(&a.created_at)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     for session in &sessions {
         let exists = if session.cwd.exists() { "✓" } else { "✗" };
@@ -62,7 +56,9 @@ pub fn run_sessions() -> Result<()> {
 
         println!("  📁 {} {}{}", exists, session.name, branch);
         println!("     Path: {}", session.cwd.display());
-        println!("     Saved: {}", session.timestamp);
+        if let Some(created) = &session.created_at {
+            println!("     Saved: {}", created.format("%Y-%m-%d %H:%M:%S"));
+        }
 
         if let Some(ref desc) = session.description {
             println!("     Note: {}", desc);
