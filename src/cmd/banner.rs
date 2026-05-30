@@ -98,8 +98,6 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
 
     // Daemon not available or cache miss — try direct scan
     eprintln!("cfmd: daemon not available, falling back to direct scan");
-    let no_build_check =
-        opts.no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";
     let no_todos = opts.no_todos || std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
     let no_ports = opts.no_ports || std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
     let no_docker = opts.no_docker || std::env::var("CFM_NO_DOCKER").unwrap_or_default() == "1";
