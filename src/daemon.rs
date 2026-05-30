@@ -184,6 +184,10 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
             });
             for path in cache.keys() {
                 if !watched.contains_key(path) {
+                    // Skip non-existent directories
+                    if !path.exists() {
+                        continue;
+                    }
                     match inotify.watches().add(
                         path,
                         WatchMask::CREATE | WatchMask::DELETE | WatchMask::MODIFY | WatchMask::MOVE,
@@ -234,7 +238,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
             }
         }
 
-        // Remove stale watchers for directories no longer in cache
+        // Remove stale watchers for directories no longer in cache or no longer exist
         {
             let cache = cache.lock().unwrap_or_else(|e| {
                 tracing::warn!("Mutex poisoned, recovering");
@@ -242,7 +246,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
             });
             let to_remove: Vec<PathBuf> = watched
                 .keys()
-                .filter(|p| !cache.contains_key(*p))
+                .filter(|p| !cache.contains_key(*p) || !p.exists())
                 .cloned()
                 .collect();
             for path in to_remove {
