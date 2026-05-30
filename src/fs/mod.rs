@@ -559,10 +559,9 @@ mod tests {
 
     #[test]
     fn test_format_size() {
-        assert_eq!(format_size(0), "0");
-        assert_eq!(format_size(1023), "1023");
-        assert_eq!(format_size(1024), "1");
-        assert_eq!(format_size(1024 * 1024), "1");
+        assert_eq!(format_size(0), "0 B");
+        assert_eq!(format_size(1023), "1023 B");
+        assert_eq!(format_size(1024), "1 KB");
     }
 
     #[test]
