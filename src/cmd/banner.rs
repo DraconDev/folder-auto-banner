@@ -94,6 +94,13 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     let max_items = config.max_display_items;
     set_colors_enabled(colors);
 
+    // Tree view mode
+    if let Some(depth) = opts.tree {
+        let max_depth = depth.unwrap_or(0); // 0 = unlimited
+        output_tree(&path, max_depth, opts.hidden, opts.filter, icons, colors);
+        return Ok(());
+    }
+
     // Try daemon cache — if daemon isn't running, start it and retry
     if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
         let summary = cached.summary;
@@ -142,6 +149,76 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     warm_nearby_dirs(&path);
 
     Ok(())
+}
+
+/// Output tree view of directory
+fn output_tree(path: &Path, max_depth: usize, show_hidden: bool, filter: Option<&str>, icons: bool, _colors: bool) {
+    println!("{}", path.display());
+    print_tree_recursive(path, "", max_depth, 0, show_hidden, filter, icons);
+}
+
+fn print_tree_recursive(path: &Path, prefix: &str, max_depth: usize, current_depth: usize, show_hidden: bool, filter: Option<&str>, icons: bool) {
+    if max_depth > 0 && current_depth >= max_depth {
+        return;
+    }
+
+    let entries = match std::fs::read_dir(path) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    let mut items: Vec<_> = entries
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if !show_hidden && name.starts_with('.') {
+                return false;
+            }
+            if let Some(pat) = filter {
+                let lower = name.to_lowercase();
+                let lower_pat = pat.to_lowercase();
+                if !lower.contains(&lower_pat) {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+
+    // Sort: dirs first, then by name
+    items.sort_by(|a, b| {
+        let a_is_dir = a.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let b_is_dir = b.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        match (a_is_dir, b_is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.file_name().to_lowercase().cmp(&b.file_name().to_lowercase()),
+        }
+    });
+
+    let len = items.len();
+    for (idx, entry) in items.iter().enumerate() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let is_last = idx == len - 1;
+
+        let connector = if is_last { "└── " } else { "├── " };
+        let child_prefix = if is_last { "    " } else { "│   " };
+
+        let icon_str = if icons {
+            if is_dir { "📁 " } else { "📄 " }
+        } else {
+            ""
+        };
+
+        if is_dir {
+            println!("{}{}{}{}/", prefix, connector, icon_str, name);
+            let new_prefix = format!("{}{}", prefix, child_prefix);
+            print_tree_recursive(&entry.path(), &new_prefix, max_depth, current_depth + 1, show_hidden, filter, icons);
+        } else {
+            println!("{}{}{}{}", prefix, connector, icon_str, name);
+        }
+    }
 }
 
 /// Pre-compute banners for parent and sibling directories
