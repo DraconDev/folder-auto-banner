@@ -34,6 +34,7 @@ const ORANGE: &str = "\x1b[38;5;214m";
 const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating rows
 
 /// Options for the banner command
+#[derive(Default)]
 pub struct BannerOptions<'a> {
     pub path: Option<&'a Path>,
     pub raw: bool,
@@ -46,24 +47,6 @@ pub struct BannerOptions<'a> {
     pub no_metrics: bool,
     pub sort: Option<&'a str>,
     pub reverse: bool,
-}
-
-impl<'a> Default for BannerOptions<'a> {
-    fn default() -> Self {
-        Self {
-            path: None,
-            raw: false,
-            json: false,
-            compact: false,
-            no_build_check: false,
-            no_todos: false,
-            no_ports: false,
-            no_docker: false,
-            no_metrics: false,
-            sort: None,
-            reverse: false,
-        }
-    }
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {

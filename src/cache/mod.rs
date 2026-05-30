@@ -127,7 +127,7 @@ mod tests {
         let cache = Cache::new().unwrap();
         let key = format!("test-expired-{}", std::process::id());
 
-        cache.set(&key, &"value".to_string()).unwrap();
+        cache.set(&key, "value".to_string()).unwrap();
         // Get with 0 TTL should always expire
         let result: Option<String> = cache.get(&key, Duration::from_secs(0));
         assert_eq!(result, None);
@@ -148,7 +148,7 @@ mod tests {
         let cache = Cache::new().unwrap();
         let key = format!("test-cleanup-{}", std::process::id());
 
-        cache.set(&key, &"value".to_string()).unwrap();
+        cache.set(&key, "value".to_string()).unwrap();
         // Cleanup with 0 max_age should remove everything
         cache.cleanup(Duration::from_secs(0));
 
