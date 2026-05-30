@@ -184,9 +184,15 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
             });
             for path in cache.keys() {
                 if !watched.contains_key(path) {
-                    // Skip non-existent directories
+                    // Skip non-existent directories and dead symlinks
                     if !path.exists() {
                         continue;
+                    }
+                    // For symlinks, check if target exists
+                    if let Ok(meta) = std::fs::symlink_metadata(path) {
+                        if meta.is_symlink() && std::fs::metadata(path).is_err() {
+                            continue; // Dead symlink, skip
+                        }
                     }
                     match inotify.watches().add(
                         path,
@@ -518,10 +524,22 @@ fn proactive_scan(
     // Level 1: direct children of home
     if let Ok(entries) = std::fs::read_dir(&home) {
         for entry in entries.flatten() {
-            if let Ok(metadata) = entry.metadata() {
-                if metadata.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
-                    dirs_to_scan.push(entry.path());
+            // Use symlink_metadata to detect symlinks without following them
+            let meta = match std::fs::symlink_metadata(entry.path()) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            
+            if meta.is_symlink() {
+                // For symlinks, try to resolve the target
+                if let Ok(target_meta) = std::fs::metadata(entry.path()) {
+                    if target_meta.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
+                        dirs_to_scan.push(entry.path());
+                    }
                 }
+                // Skip dead symlinks (target doesn't exist)
+            } else if meta.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
+                dirs_to_scan.push(entry.path());
             }
         }
     }
@@ -531,10 +549,19 @@ fn proactive_scan(
     for dir in &level1 {
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten().take(50) {
-                if let Ok(metadata) = entry.metadata() {
-                    if metadata.is_dir() {
-                        dirs_to_scan.push(entry.path());
+                let meta = match std::fs::symlink_metadata(entry.path()) {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+                
+                if meta.is_symlink() {
+                    if let Ok(target_meta) = std::fs::metadata(entry.path()) {
+                        if target_meta.is_dir() {
+                            dirs_to_scan.push(entry.path());
+                        }
                     }
+                } else if meta.is_dir() {
+                    dirs_to_scan.push(entry.path());
                 }
             }
         }
@@ -548,10 +575,19 @@ fn proactive_scan(
     for dir in &level2 {
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten().take(20) {
-                if let Ok(metadata) = entry.metadata() {
-                    if metadata.is_dir() {
-                        dirs_to_scan.push(entry.path());
+                let meta = match std::fs::symlink_metadata(entry.path()) {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+                
+                if meta.is_symlink() {
+                    if let Ok(target_meta) = std::fs::metadata(entry.path()) {
+                        if target_meta.is_dir() {
+                            dirs_to_scan.push(entry.path());
+                        }
                     }
+                } else if meta.is_dir() {
+                    dirs_to_scan.push(entry.path());
                 }
             }
         }
@@ -561,8 +597,21 @@ fn proactive_scan(
     if let Ok(entries) = std::fs::read_dir(&home) {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with('.') && entry.metadata().map(|m| m.is_dir()).unwrap_or(false) {
-                dirs_to_scan.push(entry.path());
+            if name.starts_with('.') {
+                let meta = match std::fs::symlink_metadata(entry.path()) {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+                
+                let is_dir = if meta.is_symlink() {
+                    std::fs::metadata(entry.path()).map(|m| m.is_dir()).unwrap_or(false)
+                } else {
+                    meta.is_dir()
+                };
+                
+                if is_dir {
+                    dirs_to_scan.push(entry.path());
+                }
             }
         }
     }
