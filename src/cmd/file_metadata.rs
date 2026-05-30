@@ -121,6 +121,153 @@ fn count_zip_entries(bytes: &[u8]) -> Option<usize> {
     }
 }
 
+
+
+/// Count SQLite tables by reading schema
+fn count_sqlite_tables(path: &Path) -> Option<usize> {
+    let bytes = std::fs::read(path).ok()?;
+    if bytes.len() < 16 {
+        return None;
+    }
+    let header = std::str::from_utf8(&bytes[..16]).ok()?;
+    if !header.starts_with("SQLite format 3") {
+        return None;
+    }
+
+    use std::process::Command;
+    let output = Command::new("sqlite3")
+        .arg(path)
+        .arg("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
+        .output()
+        .ok()?;
+
+    let count = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse()
+        .ok()?;
+    Some(count)
+}
+
+/// Extract video duration from MP4/MOV container headers
+fn extract_video_duration(path: &Path) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    let mut file = std::fs::File::open(path).ok()?;
+    let file_len = file.metadata().ok()?.len();
+
+    // For files under 100MB, just read the whole thing - fast and reliable
+    if file_len <= 100 * 1024 * 1024 {
+        let mut buf = Vec::with_capacity(file_len as usize);
+        file.read_to_end(&mut buf).ok()?;
+        return parse_mp4_duration(&buf);
+    }
+
+    // For very large files, read 50MB from start and 50MB from end
+    let chunk_size = 50 * 1024 * 1024;
+
+    let mut buf = vec![0u8; chunk_size];
+    let bytes_read = file.read(&mut buf).ok()?;
+    buf.truncate(bytes_read);
+
+    if let Some(dur) = parse_mp4_duration(&buf) {
+        return Some(dur);
+    }
+
+    file.seek(SeekFrom::Start(file_len - chunk_size as u64))
+        .ok()?;
+    let mut buf = vec![0u8; chunk_size];
+    let bytes_read = file.read(&mut buf).ok()?;
+    buf.truncate(bytes_read);
+
+    parse_mp4_duration(&buf)
+}
+
+/// Parse MP4 buffer for moov > mvhd and extract duration
+fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
+    let mut i = 0;
+    while i < buf.len().saturating_sub(8) {
+        let size = u32::from_be_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]) as usize;
+        if size < 8 {
+            break;
+        }
+
+        // Check for "moov" atom
+        if buf[i + 4] == 0x6D && buf[i + 5] == 0x6F && buf[i + 6] == 0x6F && buf[i + 7] == 0x76 {
+            // Found moov, scan inside for mvhd
+            let mut j = i + 8;
+            let moov_end = i + size;
+
+            while j < moov_end.saturating_sub(8) && j < buf.len().saturating_sub(8) {
+                let atom_size =
+                    u32::from_be_bytes([buf[j], buf[j + 1], buf[j + 2], buf[j + 3]]) as usize;
+                if atom_size < 8 || atom_size > size {
+                    break;
+                }
+
+                // Check for "mvhd" atom
+                if buf[j + 4] == 0x6D
+                    && buf[j + 5] == 0x76
+                    && buf[j + 6] == 0x68
+                    && buf[j + 7] == 0x64
+                {
+                    let version = buf[j + 8];
+
+                    let (timescale, duration) = if version == 0 {
+                        let ts = u32::from_be_bytes([
+                            buf[j + 20],
+                            buf[j + 21],
+                            buf[j + 22],
+                            buf[j + 23],
+                        ]);
+                        let dur = u32::from_be_bytes([
+                            buf[j + 24],
+                            buf[j + 25],
+                            buf[j + 26],
+                            buf[j + 27],
+                        ]);
+                        (ts as u64, dur as u64)
+                    } else {
+                        let ts = u32::from_be_bytes([
+                            buf[j + 28],
+                            buf[j + 29],
+                            buf[j + 30],
+                            buf[j + 31],
+                        ]);
+                        let dur = u64::from_be_bytes([
+                            buf[j + 32],
+                            buf[j + 33],
+                            buf[j + 34],
+                            buf[j + 35],
+                            buf[j + 36],
+                            buf[j + 37],
+                            buf[j + 38],
+                            buf[j + 39],
+                        ]);
+                        (ts as u64, dur)
+                    };
+
+                    if timescale > 0 && duration > 0 {
+                        let seconds = duration / timescale;
+                        let mins = seconds / 60;
+                        let secs = seconds % 60;
+                        if mins >= 60 {
+                            let hours = mins / 60;
+                            let mins = mins % 60;
+                            return Some(format!("{}:{:02}:{:02}", hours, mins, secs));
+                        } else if mins > 0 {
+                            return Some(format!("{}:{:02}", mins, secs));
+                        }
+                        return Some(format!("{}s", seconds));
+                    }
+                }
+                j += atom_size;
+            }
+        }
+        i += size;
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,149 +420,4 @@ mod tests {
         let contents = get_file_contents(&entry);
         assert_eq!(contents, "");
     }
-}
-
-/// Count SQLite tables by reading schema
-fn count_sqlite_tables(path: &Path) -> Option<usize> {
-    let bytes = std::fs::read(path).ok()?;
-    if bytes.len() < 16 {
-        return None;
-    }
-    let header = std::str::from_utf8(&bytes[..16]).ok()?;
-    if !header.starts_with("SQLite format 3") {
-        return None;
-    }
-
-    use std::process::Command;
-    let output = Command::new("sqlite3")
-        .arg(path)
-        .arg("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
-        .output()
-        .ok()?;
-
-    let count = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .parse()
-        .ok()?;
-    Some(count)
-}
-
-/// Extract video duration from MP4/MOV container headers
-fn extract_video_duration(path: &Path) -> Option<String> {
-    use std::io::{Read, Seek, SeekFrom};
-
-    let mut file = std::fs::File::open(path).ok()?;
-    let file_len = file.metadata().ok()?.len();
-
-    // For files under 100MB, just read the whole thing - fast and reliable
-    if file_len <= 100 * 1024 * 1024 {
-        let mut buf = Vec::with_capacity(file_len as usize);
-        file.read_to_end(&mut buf).ok()?;
-        return parse_mp4_duration(&buf);
-    }
-
-    // For very large files, read 50MB from start and 50MB from end
-    let chunk_size = 50 * 1024 * 1024;
-
-    let mut buf = vec![0u8; chunk_size];
-    let bytes_read = file.read(&mut buf).ok()?;
-    buf.truncate(bytes_read);
-
-    if let Some(dur) = parse_mp4_duration(&buf) {
-        return Some(dur);
-    }
-
-    file.seek(SeekFrom::Start(file_len - chunk_size as u64))
-        .ok()?;
-    let mut buf = vec![0u8; chunk_size];
-    let bytes_read = file.read(&mut buf).ok()?;
-    buf.truncate(bytes_read);
-
-    parse_mp4_duration(&buf)
-}
-
-/// Parse MP4 buffer for moov > mvhd and extract duration
-fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
-    let mut i = 0;
-    while i < buf.len().saturating_sub(8) {
-        let size = u32::from_be_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]) as usize;
-        if size < 8 {
-            break;
-        }
-
-        // Check for "moov" atom
-        if buf[i + 4] == 0x6D && buf[i + 5] == 0x6F && buf[i + 6] == 0x6F && buf[i + 7] == 0x76 {
-            // Found moov, scan inside for mvhd
-            let mut j = i + 8;
-            let moov_end = i + size;
-
-            while j < moov_end.saturating_sub(8) && j < buf.len().saturating_sub(8) {
-                let atom_size =
-                    u32::from_be_bytes([buf[j], buf[j + 1], buf[j + 2], buf[j + 3]]) as usize;
-                if atom_size < 8 || atom_size > size {
-                    break;
-                }
-
-                // Check for "mvhd" atom
-                if buf[j + 4] == 0x6D
-                    && buf[j + 5] == 0x76
-                    && buf[j + 6] == 0x68
-                    && buf[j + 7] == 0x64
-                {
-                    let version = buf[j + 8];
-
-                    let (timescale, duration) = if version == 0 {
-                        let ts = u32::from_be_bytes([
-                            buf[j + 20],
-                            buf[j + 21],
-                            buf[j + 22],
-                            buf[j + 23],
-                        ]);
-                        let dur = u32::from_be_bytes([
-                            buf[j + 24],
-                            buf[j + 25],
-                            buf[j + 26],
-                            buf[j + 27],
-                        ]);
-                        (ts as u64, dur as u64)
-                    } else {
-                        let ts = u32::from_be_bytes([
-                            buf[j + 28],
-                            buf[j + 29],
-                            buf[j + 30],
-                            buf[j + 31],
-                        ]);
-                        let dur = u64::from_be_bytes([
-                            buf[j + 32],
-                            buf[j + 33],
-                            buf[j + 34],
-                            buf[j + 35],
-                            buf[j + 36],
-                            buf[j + 37],
-                            buf[j + 38],
-                            buf[j + 39],
-                        ]);
-                        (ts as u64, dur)
-                    };
-
-                    if timescale > 0 && duration > 0 {
-                        let seconds = duration / timescale;
-                        let mins = seconds / 60;
-                        let secs = seconds % 60;
-                        if mins >= 60 {
-                            let hours = mins / 60;
-                            let mins = mins % 60;
-                            return Some(format!("{}:{:02}:{:02}", hours, mins, secs));
-                        } else if mins > 0 {
-                            return Some(format!("{}:{:02}", mins, secs));
-                        }
-                        return Some(format!("{}s", seconds));
-                    }
-                }
-                j += atom_size;
-            }
-        }
-        i += size;
-    }
-    None
 }
