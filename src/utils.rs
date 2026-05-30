@@ -217,3 +217,155 @@ pub const BINARY_EXTS: &[&str] = &[
     "ttf", "eot", "pdf", "doc", "docx", "xls", "xlsx", "sqlite", "sqlite3", "db",
     "lock", // Cargo.lock, package-lock.json etc.
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_sanitize_filename() {
+        assert_eq!(sanitize_filename("hello"), "hello");
+        assert_eq!(sanitize_filename("hello world"), "hello_world");
+        assert_eq!(sanitize_filename("file/name"), "file_name");
+        assert_eq!(sanitize_filename("file\\name"), "file_name");
+        assert_eq!(sanitize_filename("file:name"), "file_name");
+        assert_eq!(sanitize_filename("file\"name"), "file_name");
+        assert_eq!(sanitize_filename("hello-world"), "hello-world");
+        assert_eq!(sanitize_filename("file_123"), "file_123");
+        assert_eq!(sanitize_filename(""), "");
+    }
+
+    #[test]
+    fn test_generate_unique_name_new_file() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("nonexistent.txt");
+        let result = generate_unique_name(&path);
+        assert_eq!(result, path);
+    }
+
+    #[test]
+    fn test_generate_unique_name_existing_file() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("existing.txt");
+        fs::write(&path, "content").unwrap();
+        let result = generate_unique_name(&path);
+        assert_eq!(result, tmp.path().join("existing (1).txt"));
+    }
+
+    #[test]
+    fn test_generate_unique_name_multiple() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("file.txt");
+        fs::write(&path, "content").unwrap();
+        fs::write(tmp.path().join("file (1).txt"), "content").unwrap();
+        let result = generate_unique_name(&path);
+        assert_eq!(result, tmp.path().join("file (2).txt"));
+    }
+
+    #[test]
+    fn test_generate_unique_name_no_extension() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("Makefile");
+        fs::write(&path, "content").unwrap();
+        let result = generate_unique_name(&path);
+        assert_eq!(result, tmp.path().join("Makefile (1)"));
+    }
+
+    #[test]
+    fn test_copy_dir_recursive() {
+        let tmp = TempDir::new().unwrap();
+        let src = tmp.path().join("src");
+        let dst = tmp.path().join("dst");
+
+        fs::create_dir_all(src.join("sub")).unwrap();
+        fs::write(src.join("file1.txt"), "hello").unwrap();
+        fs::write(src.join("sub/file2.txt"), "world").unwrap();
+
+        copy_dir_recursive(&src, &dst).unwrap();
+
+        assert!(dst.join("file1.txt").exists());
+        assert!(dst.join("sub/file2.txt").exists());
+        assert_eq!(fs::read_to_string(dst.join("file1.txt")).unwrap(), "hello");
+        assert_eq!(fs::read_to_string(dst.join("sub/file2.txt")).unwrap(), "world");
+    }
+
+    #[test]
+    fn test_delete_recursive_file() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("file.txt");
+        fs::write(&path, "content").unwrap();
+        assert!(path.exists());
+        delete_recursive(&path).unwrap();
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn test_delete_recursive_dir() {
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path().join("dir");
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        fs::write(dir.join("file.txt"), "content").unwrap();
+        fs::write(dir.join("sub/file2.txt"), "content").unwrap();
+        assert!(dir.exists());
+        delete_recursive(&dir).unwrap();
+        assert!(!dir.exists());
+    }
+
+    #[test]
+    fn test_copy_dir_recursive_symlink_loop() {
+        let tmp = TempDir::new().unwrap();
+        let src = tmp.path().join("src");
+        let dst = tmp.path().join("dst");
+
+        fs::create_dir_all(&src).unwrap();
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&src, src.join("loop")).unwrap();
+            let result = copy_dir_recursive(&src, &dst);
+            assert!(result.is_err(), "Should detect symlink loop");
+        }
+    }
+
+    #[test]
+    fn test_run_with_timeout_success() {
+        let tmp = TempDir::new().unwrap();
+        let result = run_with_timeout("echo", &["hello"], tmp.path(), Duration::from_secs(5));
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        assert!(output.stdout.contains("hello"));
+    }
+
+    #[test]
+    fn test_run_with_timeout_timeout() {
+        let tmp = TempDir::new().unwrap();
+        let result = run_with_timeout("sleep", &["10"], tmp.path(), Duration::from_millis(50));
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        assert_eq!(output.stderr, "timeout");
+    }
+
+    #[test]
+    fn test_run_with_timeout_stdout() {
+        let result = run_with_timeout_stdout("echo", &["test"], Duration::from_secs(5));
+        assert!(result.is_ok());
+        assert!(result.unwrap().contains("test"));
+    }
+
+    #[test]
+    fn test_skip_dirs_constant() {
+        assert!(SKIP_DIRS.contains(&"node_modules"));
+        assert!(SKIP_DIRS.contains(&"target"));
+        assert!(SKIP_DIRS.contains(&".git"));
+        assert!(SKIP_DIRS.contains(&"__pycache__"));
+    }
+
+    #[test]
+    fn test_binary_exts_constant() {
+        assert!(BINARY_EXTS.contains(&"png"));
+        assert!(BINARY_EXTS.contains(&"jpg"));
+        assert!(BINARY_EXTS.contains(&"mp4"));
+        assert!(BINARY_EXTS.contains(&"lock"));
+    }
+}
