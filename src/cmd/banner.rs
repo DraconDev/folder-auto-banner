@@ -550,12 +550,11 @@ fn output_rich(
                 .unwrap_or_else(|| {
                     // Tracked but clean — show dim dot
                     if git_info.is_repo {
-                        Some(format!("{}\u{{25cf}}{}", color(DIM), color(RESET)))
+                        format!("{}●{}", color(DIM), color(RESET))
                     } else {
-                        None
+                        String::new()
                     }
                 })
-                .unwrap_or_default()
         };
 
         // Color the name based on type (like lsd/exa)
