@@ -7,6 +7,7 @@ use std::time::Duration;
 // === File Operations ===
 
 /// Recursively copy a directory (follows symlink guards to prevent loops)
+#[allow(dead_code)]
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
     std::fs::create_dir_all(dst)?;
     let mut visited: std::collections::HashSet<std::path::PathBuf> = std::collections::HashSet::new();
@@ -47,6 +48,7 @@ fn copy_dir_recursive_inner(
 }
 
 /// Recursively delete a directory or file
+#[allow(dead_code)]
 pub fn delete_recursive(path: &Path) -> Result<()> {
     if path.is_dir() {
         for entry in std::fs::read_dir(path)? {
@@ -60,6 +62,7 @@ pub fn delete_recursive(path: &Path) -> Result<()> {
 }
 
 /// Generate a unique filename by appending a counter
+#[allow(dead_code)]
 pub fn generate_unique_name(path: &Path) -> PathBuf {
     if !path.exists() {
         return path.to_path_buf();
@@ -89,6 +92,7 @@ pub fn generate_unique_name(path: &Path) -> PathBuf {
 }
 
 /// Sanitize a string for use as a filename
+#[allow(dead_code)]
 pub fn sanitize_filename(name: &str) -> String {
     name.chars()
         .map(|c| {
@@ -104,6 +108,7 @@ pub fn sanitize_filename(name: &str) -> String {
 // === Output ===
 
 /// Print a summary of file operation results
+#[allow(dead_code)]
 pub fn print_summary(action: &str, moved: usize, skipped: usize, overwritten: usize) {
     println!();
     if moved > 0 {
@@ -227,6 +232,7 @@ pub const BINARY_EXTS: &[&str] = &[
 ];
 
 /// Check if path is protected (home, root, etc.)
+#[allow(dead_code)]
 pub fn is_protected_path(path: &Path) -> bool {
     let path_str = path.to_string_lossy().to_lowercase();
 

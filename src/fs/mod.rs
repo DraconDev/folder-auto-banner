@@ -368,6 +368,7 @@ impl DirSummary {
 }
 
 /// Human-readable size — compact
+#[allow(dead_code)]
 pub fn format_size(bytes: u64) -> String {
     use byte_unit::{Byte, UnitType};
     let byte = Byte::from_u64(bytes);

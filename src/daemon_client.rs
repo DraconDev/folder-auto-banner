@@ -101,6 +101,7 @@ pub fn send_warm(path: &Path) {
 }
 
 /// Send shutdown signal to daemon
+#[allow(dead_code)]
 pub fn send_shutdown() {
     let Ok(socket) = socket_path() else {
         return;
