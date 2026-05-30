@@ -250,6 +250,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "byte-unit",
+ "cfm-lib",
  "chrono",
  "clap",
  "clap_complete",
@@ -270,6 +271,27 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "unicode-width 0.2.2",
+]
+
+[[package]]
+name = "cfm-lib"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "byte-unit",
+ "chrono",
+ "clap",
+ "directories",
+ "git2",
+ "glob",
+ "ignore",
+ "inotify",
+ "libc",
+ "path-absolutize",
+ "serde",
+ "serde_json",
+ "toml",
+ "tracing",
 ]
 
 [[package]]
