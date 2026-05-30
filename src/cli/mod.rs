@@ -86,6 +86,10 @@ pub enum Commands {
         /// Filter items by pattern (glob or extension)
         #[arg(short, long)]
         filter: Option<String>,
+
+        /// Maximum number of items to display
+        #[arg(short, long)]
+        max: Option<usize>,
     },
 
     // === Phase 4: Context-Aware Environment ===
@@ -424,6 +428,7 @@ impl Cli {
                 reverse,
                 hidden,
                 filter,
+                max,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
                 crate::cmd::banner::run_banner(&crate::cmd::banner::BannerOptions {
@@ -440,6 +445,7 @@ impl Cli {
                     reverse: *reverse,
                     hidden: *hidden,
                     filter: filter.as_deref(),
+                    max: *max,
                 })
             }
             None => {

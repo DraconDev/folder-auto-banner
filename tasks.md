@@ -182,7 +182,7 @@
 ### Sorting & Filtering
 - [x] `--sort name|size|modified|type` flag
 - [x] `--filter` flag (type, size range, name pattern)
-- [ ] `--max N` flag (limit items shown)
+- [x] `--max N` flag (limit items shown)
 - [x] `--hidden` flag to always show dotfiles
 - [ ] `--group` flag to group by type (dirs, files, symlinks)
 

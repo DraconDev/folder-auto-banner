@@ -64,6 +64,7 @@ pub struct BannerOptions<'a> {
     pub reverse: bool,
     pub hidden: bool,
     pub filter: Option<&'a str>,
+    pub max: Option<usize>,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -96,7 +97,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -127,7 +128,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -168,6 +169,7 @@ fn output_rich(
     _max_items: usize,
     show_hidden: bool,
     filter: Option<&str>,
+    max: Option<usize>,
 ) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
@@ -505,6 +507,11 @@ fn output_rich(
                     .map(|ext| ext.to_lowercase().contains(&lower_pattern))
                     .unwrap_or(false)
         });
+    }
+
+    // Apply max limit if specified
+    if let Some(max_items) = max {
+        display_items.truncate(max_items);
     }
 
     // Sort based on --sort flag
