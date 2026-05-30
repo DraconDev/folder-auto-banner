@@ -6,12 +6,13 @@ A directory listing with instant context.
 
 When you run `f`, you see:
 - File listing (like `ls`/`exa`/`lsd`)
-- Git status
-- Build status
+- Git status, last commit, commits today, branches
+- Build status with duration
 - TODO count
-- Project type
+- Languages breakdown
 - Ports in use
 - Docker status
+- Cached test results
 
 **All instantly, no extra commands needed.**
 

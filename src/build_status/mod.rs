@@ -20,10 +20,12 @@ pub struct BuildStatus {
     pub errors: usize,
     pub warnings: usize,
     pub output: String,
+    pub duration_ms: u64,
 }
 
 /// Check build status for a project
 pub fn check_build(path: &Path, project_type: &ProjectType) -> Option<BuildStatus> {
+    let start = std::time::Instant::now();
     let result = match project_type {
         ProjectType::Rust => check_rust_build(path),
         ProjectType::Node => check_node_build(path),
@@ -31,8 +33,12 @@ pub fn check_build(path: &Path, project_type: &ProjectType) -> Option<BuildStatu
         ProjectType::Python => check_python_build(path),
         _ => return None,
     };
-
-    result.ok()
+    let duration_ms = start.elapsed().as_millis() as u64;
+    
+    result.ok().map(|mut bs| {
+        bs.duration_ms = duration_ms;
+        bs
+    })
 }
 
 fn check_rust_build(path: &Path) -> Result<BuildStatus> {
@@ -48,6 +54,7 @@ fn check_rust_build(path: &Path) -> Result<BuildStatus> {
     let ok = errors == 0 && output.status.success();
 
     Ok(BuildStatus {
+                duration_ms: 0,
         ok,
         errors,
         warnings,
@@ -64,6 +71,7 @@ fn check_node_build(path: &Path) -> Result<BuildStatus> {
         let ok = errors == 0 && output.status.success();
 
         return Ok(BuildStatus {
+                duration_ms: 0,
             ok,
             errors,
             warnings,
@@ -82,6 +90,7 @@ fn check_node_build(path: &Path) -> Result<BuildStatus> {
             )?;
             let ok = output.status.success();
             return Ok(BuildStatus {
+                duration_ms: 0,
                 ok,
                 errors: if ok { 0 } else { 1 },
                 warnings: 0,
@@ -91,6 +100,7 @@ fn check_node_build(path: &Path) -> Result<BuildStatus> {
     }
 
     Ok(BuildStatus {
+                duration_ms: 0,
         ok: true,
         errors: 0,
         warnings: 0,
@@ -105,6 +115,7 @@ fn check_go_build(path: &Path) -> Result<BuildStatus> {
     let ok = errors == 0 && output.status.success();
 
     Ok(BuildStatus {
+                duration_ms: 0,
         ok,
         errors,
         warnings,
@@ -123,6 +134,7 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
 
     if py_files.is_empty() {
         return Ok(BuildStatus {
+                duration_ms: 0,
             ok: true,
             errors: 0,
             warnings: 0,
@@ -135,6 +147,7 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
     let errors = if output.status.success() { 0 } else { 1 };
 
     Ok(BuildStatus {
+                duration_ms: 0,
         ok: output.status.success(),
         errors,
         warnings: 0,

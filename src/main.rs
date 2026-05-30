@@ -11,6 +11,7 @@ mod git;
 mod icon;
 mod port_usage;
 mod state;
+mod test_cache;
 mod todo_scanner;
 mod utils;
 

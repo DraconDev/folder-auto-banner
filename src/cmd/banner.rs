@@ -381,10 +381,57 @@ fn output_rich(
         if !git_status_str.is_empty() {
             parts.push(format!("│ {}", git_status_str));
         }
+        // Git enhancements: last commit, commits today, branches
+        if git_info.is_repo {
+            if let Some(time) = git_info.last_commit_time {
+                let now = chrono::Utc::now().timestamp();
+                let diff = now - time;
+                let time_str = if diff < 60 {
+                    "just now".to_string()
+                } else if diff < 3600 {
+                    format!("{}m ago", diff / 60)
+                } else if diff < 86400 {
+                    format!("{}h ago", diff / 3600)
+                } else {
+                    format!("{}d ago", diff / 86400)
+                };
+                parts.push(format!("│ {}📅 {}{}", color(DIM), time_str, color(RESET)));
+            }
+            if git_info.commits_today > 0 {
+                parts.push(format!(
+                    "│ {}📝 {} today{}",
+                    color(GREEN),
+                    git_info.commits_today,
+                    color(RESET)
+                ));
+            }
+            if git_info.branch_count > 1 {
+                parts.push(format!(
+                    "│ {}🔀 {} branches{}",
+                    color(CYAN),
+                    git_info.branch_count,
+                    color(RESET)
+                ));
+            }
+        }
         // Build status
         if let Some(ref build) = summary.build_status {
             if build.ok {
-                parts.push(format!("│ {}✓ builds{}", color(GREEN), color(RESET)));
+                let duration_str = if build.duration_ms > 0 {
+                    if build.duration_ms < 1000 {
+                        format!(" ({}ms)", build.duration_ms)
+                    } else {
+                        format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
+                    }
+                } else {
+                    String::new()
+                };
+                parts.push(format!(
+                    "│ {}✓ builds{}{}",
+                    color(GREEN),
+                    duration_str,
+                    color(RESET)
+                ));
             } else {
                 let err_str = if build.errors > 0 {
                     format!(" ({} err)", build.errors)
@@ -442,7 +489,7 @@ fn output_rich(
                 parts.push(format!("│ {}🐳 docker{}", color(DIM), color(RESET)));
             }
         }
-        // Code metrics — just total lines, no breakdown
+        // Code metrics — show languages breakdown
         if let Some(ref metrics) = summary.code_metrics {
             if metrics.total_loc > 0 {
                 let loc_str = format_loc(metrics.total_loc);
@@ -452,6 +499,19 @@ fn output_rich(
                     loc_str,
                     color(RESET)
                 ));
+                // Show top 3 languages
+                if !metrics.by_extension.is_empty() {
+                    let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
+                        let loc_str = format_loc(*loc);
+                        format!("{}{}", ext, loc_str)
+                    }).collect();
+                    parts.push(format!(
+                        "│ {}{}{}",
+                        color(DIM),
+                        lang_parts.join(" "),
+                        color(RESET)
+                    ));
+                }
             }
         }
         // Diff stats
@@ -473,6 +533,25 @@ fn output_rich(
             && git_info.untracked == 0
         {
             parts.push(format!("│ {}✓ clean{}", color(GREEN), color(RESET)));
+        }
+        // Cached test results
+        if let Some(test_results) = crate::test_cache::TestResults::load() {
+            if test_results.failed > 0 {
+                parts.push(format!(
+                    "│ {}✗ {} failed{}",
+                    color(RED),
+                    test_results.failed,
+                    color(RESET)
+                ));
+            } else if test_results.passed > 0 {
+                parts.push(format!(
+                    "│ {}✓ {} tests{} ({})",
+                    color(GREEN),
+                    test_results.passed,
+                    color(RESET),
+                    test_results.format_time_ago()
+                ));
+            }
         }
         parts.join(" ")
     } else {
