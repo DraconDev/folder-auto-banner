@@ -97,6 +97,12 @@ pub struct DirEntry {
     pub owner: String,
     pub group: String,
     pub symlink_target: Option<String>,
+    #[serde(default = "default_true")]
+    pub symlink_valid: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Directory summary
@@ -248,13 +254,15 @@ impl DirSummary {
                 )
             };
 
-            // Symlink target
-            let symlink_target = if is_symlink {
-                std::fs::read_link(entry.path())
+            // Symlink target and validity
+            let (symlink_target, symlink_valid) = if is_symlink {
+                let target = std::fs::read_link(entry.path())
                     .ok()
-                    .map(|p| p.to_string_lossy().to_string())
+                    .map(|p| p.to_string_lossy().to_string());
+                let valid = target.is_some() && std::fs::metadata(entry.path()).is_ok();
+                (target, valid)
             } else {
-                None
+                (None, true)
             };
 
             top_items.push(DirEntry {
@@ -270,6 +278,7 @@ impl DirSummary {
                 owner,
                 group,
                 symlink_target,
+                symlink_valid,
             });
         }
 
