@@ -258,7 +258,22 @@ impl DirSummary {
             let (symlink_target, symlink_valid) = if is_symlink {
                 let target = std::fs::read_link(entry.path())
                     .ok()
-                    .map(|p| p.to_string_lossy().to_string());
+                    .map(|p| {
+                        // Try to resolve to absolute path for display
+                        if p.is_absolute() {
+                            p.to_string_lossy().to_string()
+                        } else {
+                            // Resolve relative path from parent directory
+                            let parent = entry.path().parent().unwrap_or_else(|| Path::new("."));
+                            let absolute = parent.join(&p);
+                            if let Ok(canonical) = absolute.canonicalize() {
+                                canonical.to_string_lossy().to_string()
+                            } else {
+                                // Can't resolve (dead symlink), show relative path
+                                p.to_string_lossy().to_string()
+                            }
+                        }
+                    });
                 let valid = target.is_some() && std::fs::metadata(entry.path()).is_ok();
                 (target, valid)
             } else {
