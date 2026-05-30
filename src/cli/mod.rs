@@ -438,6 +438,7 @@ impl Cli {
                 filter,
                 max,
                 group,
+                tree,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
                 crate::cmd::banner::run_banner(&crate::cmd::banner::BannerOptions {
@@ -456,6 +457,7 @@ impl Cli {
                     filter: filter.as_deref(),
                     max: *max,
                     group: *group,
+                    tree: tree.clone(),
                 })
             }
             None => {
