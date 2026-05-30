@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::utils;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Session {
     pub name: String,
@@ -22,7 +24,7 @@ pub fn run_load_session(name: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Cannot determine config directory"))?;
     let sessions_dir = proj_dirs.data_dir().join("sessions");
 
-    let session_file = sessions_dir.join(format!("{}.json", sanitize_filename(name)));
+    let session_file = sessions_dir.join(format!("{}.json", utils::sanitize_filename(name)));
 
     if !session_file.exists() {
         println!("❌ Session '{}' not found", name);
@@ -50,16 +52,4 @@ pub fn run_load_session(name: &str) -> Result<()> {
     println!("# cds() {{ cd '{}'; }}", session.cwd.display());
 
     Ok(())
-}
-
-fn sanitize_filename(name: &str) -> String {
-    name.chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
 }

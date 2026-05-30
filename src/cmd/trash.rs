@@ -202,35 +202,6 @@ fn calculate_dir_size(path: &Path) -> u64 {
         .unwrap_or(0)
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
-    fs::create_dir_all(dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        let src_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
-
-        if ty.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
-        } else {
-            fs::copy(&src_path, &dst_path)?;
-        }
-    }
-    Ok(())
-}
-
-fn delete_recursive(path: &Path) -> Result<()> {
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            delete_recursive(&entry?.path())?;
-        }
-        fs::remove_dir(path)?;
-    } else {
-        fs::remove_file(path)?;
-    }
-    Ok(())
-}
-
 fn generate_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let timestamp = SystemTime::now()

@@ -7,8 +7,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::process::Command;
 use std::time::Duration;
+
+use crate::utils;
 
 const PORT_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -37,7 +38,7 @@ pub fn detect_ports(path: &Path) -> Result<PortInfo> {
 
 /// Use `ss -tlnp` to get listening ports, then check if PID's cwd matches project dir
 fn try_ss_with_cwd_check(project_path: &Path) -> Result<Vec<u16>> {
-    let output = run_with_timeout("ss", &["-tlnp"], PORT_TIMEOUT)?;
+    let output = utils::run_with_timeout_stdout("ss", &["-tlnp"], PORT_TIMEOUT)?;
 
     let mut ports = Vec::new();
 

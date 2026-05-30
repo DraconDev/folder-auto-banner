@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::utils;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Session {
     pub name: String,
@@ -38,7 +40,7 @@ pub fn run_save_session(name: &str, description: Option<&str>) -> Result<()> {
     fs::create_dir_all(&sessions_dir)?;
 
     // Save session
-    let session_file = sessions_dir.join(format!("{}.json", sanitize_filename(name)));
+    let session_file = sessions_dir.join(format!("{}.json", utils::sanitize_filename(name)));
     let content = serde_json::to_string_pretty(&session)?;
     fs::write(&session_file, content)?;
 
@@ -52,16 +54,4 @@ pub fn run_save_session(name: &str, description: Option<&str>) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn sanitize_filename(name: &str) -> String {
-    name.chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
 }

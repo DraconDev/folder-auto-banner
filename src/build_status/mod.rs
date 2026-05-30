@@ -6,10 +6,10 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::process::Command;
 use std::time::Duration;
 
 use super::fs::ProjectType;
+use crate::utils;
 
 const BUILD_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -36,7 +36,7 @@ pub fn check_build(path: &Path, project_type: &ProjectType) -> Option<BuildStatu
 }
 
 fn check_rust_build(path: &Path) -> Result<BuildStatus> {
-    let output = run_with_timeout(
+    let output = utils::run_with_timeout(
         "cargo",
         &["check", "--message-format=short"],
         path,
@@ -58,7 +58,7 @@ fn check_rust_build(path: &Path) -> Result<BuildStatus> {
 fn check_node_build(path: &Path) -> Result<BuildStatus> {
     // Try tsc --noEmit first (TypeScript)
     if path.join("tsconfig.json").exists() {
-        let output = run_with_timeout("npx", &["tsc", "--noEmit"], path, BUILD_TIMEOUT)?;
+        let output = utils::run_with_timeout("npx", &["tsc", "--noEmit"], path, BUILD_TIMEOUT)?;
         let errors = count_matches(&output, "error");
         let warnings = count_matches(&output, "warning");
         let ok = errors == 0 && output.status.success();
@@ -74,8 +74,12 @@ fn check_node_build(path: &Path) -> Result<BuildStatus> {
     // Fall back to checking if package.json has a build script
     if let Ok(pkg) = std::fs::read_to_string(path.join("package.json")) {
         if pkg.contains("\"build\"") {
-            let output =
-                run_with_timeout("npm", &["run", "build", "--dry-run"], path, BUILD_TIMEOUT)?;
+            let output = utils::run_with_timeout(
+                "npm",
+                &["run", "build", "--dry-run"],
+                path,
+                BUILD_TIMEOUT,
+            )?;
             let ok = output.status.success();
             return Ok(BuildStatus {
                 ok,
@@ -95,7 +99,7 @@ fn check_node_build(path: &Path) -> Result<BuildStatus> {
 }
 
 fn check_go_build(path: &Path) -> Result<BuildStatus> {
-    let output = run_with_timeout("go", &["build", "./..."], path, BUILD_TIMEOUT)?;
+    let output = utils::run_with_timeout("go", &["build", "./..."], path, BUILD_TIMEOUT)?;
     let errors = count_matches(&output, "error");
     let warnings = count_matches(&output, "warning");
     let ok = errors == 0 && output.status.success();
@@ -126,7 +130,8 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
         });
     }
 
-    let output = run_with_timeout("python3", &["-m", "py_compile"], path, BUILD_TIMEOUT)?;
+    let output =
+        utils::run_with_timeout("python3", &["-m", "py_compile"], path, BUILD_TIMEOUT)?;
     let errors = if output.status.success() { 0 } else { 1 };
 
     Ok(BuildStatus {
@@ -137,55 +142,7 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
     })
 }
 
-/// Run a command with a timeout (uses std::process with no real timeout on non-unix,
-/// but we use a simple approach: just spawn and wait briefly)
-fn run_with_timeout(
-    cmd: &str,
-    args: &[&str],
-    cwd: &Path,
-    timeout: Duration,
-) -> Result<CommandOutput> {
-    let mut command = Command::new(cmd);
-    command.args(args);
-    command.current_dir(cwd);
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::piped());
-
-    let start = std::time::Instant::now();
-    let mut child = command.spawn()?;
-
-    // Poll with short intervals up to timeout
-    loop {
-        if let Some(_status) = child.try_wait()? {
-            let output = child.wait_with_output()?;
-            return Ok(CommandOutput {
-                status: output.status,
-                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            });
-        }
-
-        if start.elapsed() > timeout {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Ok(CommandOutput {
-                status: std::process::ExitStatus::default(),
-                stdout: String::new(),
-                stderr: "timeout".to_string(),
-            });
-        }
-
-        std::thread::sleep(Duration::from_millis(10));
-    }
-}
-
-struct CommandOutput {
-    status: std::process::ExitStatus,
-    stdout: String,
-    stderr: String,
-}
-
-fn count_matches(output: &CommandOutput, pattern: &str) -> usize {
+fn count_matches(output: &utils::CommandOutput, pattern: &str) -> usize {
     output
         .stdout
         .lines()

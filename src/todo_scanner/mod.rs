@@ -12,29 +12,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::time::Duration;
 
+use crate::utils;
+
 const TODO_TIMEOUT: Duration = Duration::from_secs(1);
 const MAX_FILES: usize = 1000;
-
-const SKIP_DIRS: &[&str] = &[
-    "node_modules",
-    "target",
-    ".git",
-    "dist",
-    "build",
-    "vendor",
-    ".next",
-    "__pycache__",
-    ".venv",
-    "venv",
-];
-
-const BINARY_EXTS: &[&str] = &[
-    "exe", "bin", "o", "so", "dll", "dylib", "a", "lib", "obj", "pdb", "png", "jpg", "jpeg", "gif",
-    "webp", "ico", "svg", "bmp", "tiff", "mp3", "mp4", "avi", "mkv", "mov", "webm", "flac", "wav",
-    "ogg", "zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz", "woff", "woff2", "ttf", "eot",
-    "pdf", "doc", "docx", "xls", "xlsx", "sqlite", "sqlite3", "db",
-    "lock", // Cargo.lock, package-lock.json etc.
-];
 
 const TODO_PATTERNS: &[&str] = &[
     "- [ ]", "TODO:", "TODO ", "FIXME:", "FIXME ", "HACK:", "HACK ", "XXX:", "XXX ",
@@ -84,7 +65,7 @@ pub fn scan_todos(path: &Path) -> Result<TodoInfo> {
         let components: Vec<_> = rel_path.components().collect();
         let skip = components.iter().any(|c| {
             let s = c.as_os_str().to_string_lossy();
-            SKIP_DIRS.contains(&s.as_ref())
+            utils::SKIP_DIRS.contains(&s.as_ref())
         });
         if skip {
             continue;
@@ -93,7 +74,7 @@ pub fn scan_todos(path: &Path) -> Result<TodoInfo> {
         // Skip binary files by extension
         if let Some(ext) = entry.path().extension() {
             let ext_str = ext.to_string_lossy().to_lowercase();
-            if BINARY_EXTS.contains(&ext_str.as_ref()) {
+            if utils::BINARY_EXTS.contains(&ext_str.as_ref()) {
                 continue;
             }
         }

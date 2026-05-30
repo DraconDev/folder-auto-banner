@@ -12,29 +12,10 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 
+use crate::utils;
+
 const METRICS_TIMEOUT: Duration = Duration::from_secs(1);
 const MAX_FILES: usize = 1000;
-
-const SKIP_DIRS: &[&str] = &[
-    "node_modules",
-    "target",
-    ".git",
-    "dist",
-    "build",
-    "vendor",
-    ".next",
-    "__pycache__",
-    ".venv",
-    "venv",
-];
-
-const BINARY_EXTS: &[&str] = &[
-    "exe", "bin", "o", "so", "dll", "dylib", "a", "lib", "obj", "pdb", "png", "jpg", "jpeg", "gif",
-    "webp", "ico", "svg", "bmp", "tiff", "mp3", "mp4", "avi", "mkv", "mov", "webm", "flac", "wav",
-    "ogg", "zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz", "woff", "woff2", "ttf", "eot",
-    "pdf", "doc", "docx", "xls", "xlsx", "sqlite", "sqlite3", "db",
-    "lock", // Cargo.lock, package-lock.json etc.
-];
 
 /// Code metrics result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,7 +63,7 @@ pub fn scan_metrics(path: &Path) -> Result<CodeMetrics> {
         let components: Vec<_> = rel_path.components().collect();
         let skip = components.iter().any(|c| {
             let s = c.as_os_str().to_string_lossy();
-            SKIP_DIRS.contains(&s.as_ref())
+            utils::SKIP_DIRS.contains(&s.as_ref())
         });
         if skip {
             continue;
@@ -95,7 +76,7 @@ pub fn scan_metrics(path: &Path) -> Result<CodeMetrics> {
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
 
-        if BINARY_EXTS.contains(&ext.as_ref()) {
+        if utils::BINARY_EXTS.contains(&ext.as_ref()) {
             continue;
         }
 

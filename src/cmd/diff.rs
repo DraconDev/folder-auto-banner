@@ -146,7 +146,7 @@ fn output_rich(
         for file in unique_to_1.iter().take(20) {
             let size = files1
                 .get(file)
-                .map(|f| format_size(f.size))
+                .map(|f| crate::fs::format_size(f.size))
                 .unwrap_or_default();
             println!("  + {} ({})", file, size);
         }
@@ -165,7 +165,7 @@ fn output_rich(
         for file in unique_to_2.iter().take(20) {
             let size = files2
                 .get(file)
-                .map(|f| format_size(f.size))
+                .map(|f| crate::fs::format_size(f.size))
                 .unwrap_or_default();
             println!("  + {} ({})", file, size);
         }
@@ -195,31 +195,15 @@ fn output_rich(
             println!(
                 "  {} {} → {} ({}{})",
                 file,
-                format_size(s1),
-                format_size(s2),
+                crate::fs::format_size(s1),
+                crate::fs::format_size(s2),
                 sign,
-                format_size(diff.unsigned_abs())
+                crate::fs::format_size(diff.unsigned_abs())
             );
         }
     }
 
     println!();
-}
-
-fn format_size(bytes: u64) -> String {
-    const KB: u64 = 1024;
-    const MB: u64 = KB * 1024;
-    const GB: u64 = MB * 1024;
-
-    if bytes >= GB {
-        format!("{:.1} GB", bytes as f64 / GB as f64)
-    } else if bytes >= MB {
-        format!("{:.1} MB", bytes as f64 / MB as f64)
-    } else if bytes >= KB {
-        format!("{:.1} KB", bytes as f64 / KB as f64)
-    } else {
-        format!("{} B", bytes)
-    }
 }
 
 fn output_json(
