@@ -267,7 +267,7 @@ fn handle_client(
         Request::Banner { path } => {
             let path = path.canonicalize().unwrap_or(path);
 
-            // Check cache — if hit, inject sizes and return immediately
+            // Check cache — if hit, inject sizes and refresh git status
             {
                 let cache = cache.lock().unwrap();
                 if let Some(entry) = cache.get(&path) {
@@ -283,6 +283,9 @@ fn handle_client(
                                 }
                             }
                         }
+                        drop(global_sizes);
+                        // Refresh git status (cheap — just libgit2 status check)
+                        data.git_info = git::get_git_info(&path).ok();
                         return send_response(&mut writer, &Response::Banner(Box::new(data)));
                     }
                 }
