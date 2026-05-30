@@ -221,7 +221,7 @@
 - [x] Extend `is_protected_path()` in `rm.rs` to cover `~/.ssh`, `~/.gnupg`, `~/.config`
 - [x] Apply protection checks to `trash`, `mv`, `cp`, and `paste` (currently only `rm` has them)
 - [x] Verify copy success before deleting source in cross-device moves
-- [ ] Handle broken symlinks gracefully in listing
+- [x] Handle broken symlinks gracefully in listing
 
 ### Install script robustness
 - [ ] Deduplicate `autoload -U add-zsh-hook` in install.sh

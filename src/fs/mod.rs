@@ -164,7 +164,14 @@ impl DirSummary {
 
             // Try to get metadata — for symlinks, use symlink_metadata to read the link itself
             let metadata = if is_symlink {
-                std::fs::symlink_metadata(entry.path()).ok()
+                // For symlinks, try symlink_metadata first (reads the link itself)
+                // If that fails, the symlink might be broken but we can still read permissions
+                std::fs::symlink_metadata(entry.path())
+                    .ok()
+                    .or_else(|| {
+                        // Fallback: try to read metadata from the parent directory
+                        entry.metadata().ok()
+                    })
             } else {
                 entry.metadata().ok()
             };
@@ -221,6 +228,16 @@ impl DirSummary {
                         "rw-rw-rw-".to_string()
                     };
                     (perms_str, false, "?".to_string(), "?".to_string())
+                }
+            } else if is_symlink {
+                // For broken symlinks, show symlink permissions (usually lrwxrwxrwx)
+                #[cfg(unix)]
+                {
+                    ("lrwxrwxrwx".to_string(), false, "?".to_string(), "?".to_string())
+                }
+                #[cfg(not(unix))]
+                {
+                    ("----------".to_string(), false, "?".to_string(), "?".to_string())
                 }
             } else {
                 (

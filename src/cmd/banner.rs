@@ -66,6 +66,7 @@ pub struct BannerOptions<'a> {
     pub filter: Option<&'a str>,
     pub max: Option<usize>,
     pub group: bool,
+    pub tree: Option<Option<usize>>,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {

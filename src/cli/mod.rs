@@ -94,6 +94,10 @@ pub enum Commands {
         /// Group items by type (dirs, files, symlinks)
         #[arg(long)]
         group: bool,
+
+        /// Tree view with specified depth (0 = unlimited)
+        #[arg(long)]
+        tree: Option<Option<usize>>,
     },
 
     // === Phase 4: Context-Aware Environment ===
