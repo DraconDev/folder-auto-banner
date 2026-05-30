@@ -418,26 +418,27 @@ impl Cli {
                 reverse,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
-                crate::cmd::banner::run_banner(
-                    p,
-                    *raw,
-                    *json,
-                    *compact,
-                    *no_build_check,
-                    *no_todos,
-                    *no_ports,
-                    *no_docker,
-                    *no_metrics,
-                    sort.as_deref(),
-                    *reverse,
-                )
+                crate::cmd::banner::run_banner(&crate::cmd::banner::BannerOptions {
+                    path: p,
+                    raw: *raw,
+                    json: *json,
+                    compact: *compact,
+                    no_build_check: *no_build_check,
+                    no_todos: *no_todos,
+                    no_ports: *no_ports,
+                    no_docker: *no_docker,
+                    no_metrics: *no_metrics,
+                    sort: sort.as_deref(),
+                    reverse: *reverse,
+                })
             }
             None => {
                 // `fm` with no args = `fm banner`
                 let p: Option<&Path> = self.path.as_deref();
-                crate::cmd::banner::run_banner(
-                    p, false, false, false, false, false, false, false, false, None, false,
-                )
+                crate::cmd::banner::run_banner(&crate::cmd::banner::BannerOptions {
+                    path: p,
+                    ..Default::default()
+                })
             }
 
             // Phase 4: Env

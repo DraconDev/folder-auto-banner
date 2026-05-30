@@ -33,41 +33,62 @@ const WHITE: &str = "\x1b[97m";
 const ORANGE: &str = "\x1b[38;5;214m";
 const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating rows
 
+/// Options for the banner command
+pub struct BannerOptions<'a> {
+    pub path: Option<&'a Path>,
+    pub raw: bool,
+    pub json: bool,
+    pub compact: bool,
+    pub no_build_check: bool,
+    pub no_todos: bool,
+    pub no_ports: bool,
+    pub no_docker: bool,
+    pub no_metrics: bool,
+    pub sort: Option<&'a str>,
+    pub reverse: bool,
+}
+
+impl<'a> Default for BannerOptions<'a> {
+    fn default() -> Self {
+        Self {
+            path: None,
+            raw: false,
+            json: false,
+            compact: false,
+            no_build_check: false,
+            no_todos: false,
+            no_ports: false,
+            no_docker: false,
+            no_metrics: false,
+            sort: None,
+            reverse: false,
+        }
+    }
+}
+
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn run_banner(
-    path: Option<&Path>,
-    raw: bool,
-    json: bool,
-    compact: bool,
-    no_build_check: bool,
-    no_todos: bool,
-    no_ports: bool,
-    no_docker: bool,
-    no_metrics: bool,
-    sort: Option<&str>,
-    reverse: bool,
-) -> Result<()> {
+pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    let path = path
+    let path = opts
+        .path
         .unwrap_or(cwd.as_path())
         .canonicalize()
-        .unwrap_or_else(|_| path.unwrap_or(cwd.as_path()).to_path_buf());
+        .unwrap_or_else(|_| opts.path.unwrap_or(cwd.as_path()).to_path_buf());
 
     // Try daemon cache — if daemon isn't running, start it and retry
     if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
         let summary = cached.summary;
         let git_info = cached.git_info.unwrap_or_default();
 
-        if json {
+        if opts.json {
             output_json(&path, &summary, &git_info);
-        } else if raw {
+        } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, compact, sort, reverse);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -77,12 +98,12 @@ pub fn run_banner(
 
     // Daemon not available or cache miss — try direct scan
     eprintln!("cfmd: daemon not available, falling back to direct scan");
-    let _no_build_check =
-        no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";
-    let no_todos = no_todos || std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
-    let no_ports = no_ports || std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
-    let no_docker = no_docker || std::env::var("CFM_NO_DOCKER").unwrap_or_default() == "1";
-    let no_metrics = no_metrics || std::env::var("CFM_NO_METRICS").unwrap_or_default() == "1";
+    let no_build_check =
+        opts.no_build_check || std::env::var("CFM_NO_BUILD_CHECK").unwrap_or_default() == "1";
+    let no_todos = opts.no_todos || std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
+    let no_ports = opts.no_ports || std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
+    let no_docker = opts.no_docker || std::env::var("CFM_NO_DOCKER").unwrap_or_default() == "1";
+    let no_metrics = opts.no_metrics || std::env::var("CFM_NO_METRICS").unwrap_or_default() == "1";
 
     let summary = DirSummary::scan_with_options(
         &path,
@@ -95,12 +116,12 @@ pub fn run_banner(
     let git_info = crate::git::get_git_info(&path)?;
 
     // Display the banner
-    if json {
+    if opts.json {
         output_json(&path, &summary, &git_info);
-    } else if raw {
+    } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, compact, sort, reverse);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.reverse);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
