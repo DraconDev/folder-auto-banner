@@ -14,6 +14,7 @@ mod icon;
 mod port_usage;
 mod state;
 mod todo_scanner;
+mod utils;
 
 use anyhow::Result;
 use clap::Parser;
