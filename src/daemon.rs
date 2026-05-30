@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use anyhow::Result;
 use inotify::{Inotify, WatchMask};
 use std::collections::HashMap;
@@ -9,21 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-mod build_status;
-mod cache;
-mod code_metrics;
-mod daemon_types;
-mod docker;
-mod fs;
-mod git;
-mod icon;
-mod port_usage;
-mod state;
-mod todo_scanner;
-mod utils;
-
-use daemon_types::{BannerData, Request, Response};
-use fs::DirSummary;
+use cfm_lib::daemon_types::{BannerData, Request, Response};
+use cfm_lib::fs::DirSummary;
 
 // Cache entry with TTL
 struct CacheEntry {
@@ -313,7 +298,7 @@ fn handle_client(
                         }
                         drop(global_sizes);
                         // Refresh git status (cheap — just libgit2 status check)
-                        data.git_info = git::get_git_info(&path).ok();
+                        data.git_info = cfm_lib::git::get_git_info(&path).ok();
                         return send_response(&mut writer, &Response::Banner(Box::new(data)));
                     }
                 }
@@ -413,7 +398,7 @@ fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
-    let git_info = git::get_git_info(path).ok();
+    let git_info = cfm_lib::git::get_git_info(path).ok();
 
     // Return immediately — sizes come from global cache
     Ok(BannerData {
