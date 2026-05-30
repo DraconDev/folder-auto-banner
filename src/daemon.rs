@@ -464,8 +464,11 @@ fn save_banner_cache(socket_dir: &Path, cache: &HashMap<PathBuf, CacheEntry>) {
     }
 }
 
-/// Proactively scan home directory and populate global size cache
-fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
+/// Proactively scan home directory and populate global size cache + banner cache
+fn proactive_scan(
+    dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
+    banner_cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+) {
     let home = match std::env::var("HOME") {
         Ok(h) => PathBuf::from(h),
         Err(_) => return,
@@ -563,12 +566,47 @@ fn proactive_scan(dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>) {
 
     tracing::info!("Proactive scan complete: {} directory sizes cached", count);
 
-    // Save to disk
+    // Save sizes to disk
     let socket_dir =
         directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
     if let Some(dir) = socket_dir {
         let sizes = dir_sizes.lock().unwrap();
         save_size_cache(&dir, &sizes);
+    }
+
+    // Pre-compute banner data for level 1 + level 2 dirs (most likely navigation targets)
+    let banner_targets: Vec<PathBuf> = dirs_to_scan[..level2_end.min(dirs_to_scan.len())].to_vec();
+    tracing::info!("Pre-computing banners for {} directories", banner_targets.len());
+
+    let mut banner_count = 0;
+    for path in &banner_targets {
+        // Skip if already cached
+        {
+            let cache = banner_cache.lock().unwrap();
+            if cache.get(path).map(|e| e.computed_at.elapsed() < CACHE_TTL).unwrap_or(false) {
+                continue;
+            }
+        }
+
+        if let Ok(data) = compute_banner_data(path) {
+            let mut cache = banner_cache.lock().unwrap();
+            cache.insert(
+                path.clone(),
+                CacheEntry {
+                    data,
+                    computed_at: Instant::now(),
+                },
+            );
+            banner_count += 1;
+        }
+    }
+
+    tracing::info!("Pre-computed {} banner caches", banner_count);
+
+    // Save banner cache to disk
+    if let Some(dir) = socket_dir {
+        let cache = banner_cache.lock().unwrap();
+        save_banner_cache(&dir, &cache);
     }
 }
 
