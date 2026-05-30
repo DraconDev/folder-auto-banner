@@ -11,6 +11,8 @@ use crate::git::GitInfo;
 pub enum Request {
     /// Get cached banner data for a directory
     Banner { path: PathBuf },
+    /// Pre-compute banner data for a directory (fire-and-forget)
+    Warm { path: PathBuf },
     /// Get directory size (recursive)
     DirSize { path: PathBuf },
     /// Ping (health check)

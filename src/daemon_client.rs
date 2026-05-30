@@ -72,6 +72,22 @@ pub fn is_daemon_running() -> bool {
     }
 }
 
+/// Fire-and-forget: ask daemon to pre-compute banner for a path
+pub fn send_warm(path: &Path) {
+    let Ok(socket) = socket_path() else {
+        return;
+    };
+    let Ok(stream) = UnixStream::connect(&socket) else {
+        return;
+    };
+    stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
+    let request = Request::Warm {
+        path: path.to_path_buf(),
+    };
+    // Fire and forget — don't wait for response
+    let _ = serde_json::to_writer(&stream, &request);
+}
+
 /// Send shutdown signal to daemon
 pub fn send_shutdown() {
     let Ok(socket) = socket_path() else {
