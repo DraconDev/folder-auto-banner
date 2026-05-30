@@ -90,6 +90,10 @@ pub enum Commands {
         /// Maximum number of items to display
         #[arg(short, long)]
         max: Option<usize>,
+
+        /// Group items by type (dirs, files, symlinks)
+        #[arg(long)]
+        group: bool,
     },
 
     // === Phase 4: Context-Aware Environment ===
@@ -429,6 +433,7 @@ impl Cli {
                 hidden,
                 filter,
                 max,
+                group,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
                 crate::cmd::banner::run_banner(&crate::cmd::banner::BannerOptions {
@@ -446,6 +451,7 @@ impl Cli {
                     hidden: *hidden,
                     filter: filter.as_deref(),
                     max: *max,
+                    group: *group,
                 })
             }
             None => {

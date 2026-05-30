@@ -65,6 +65,7 @@ pub struct BannerOptions<'a> {
     pub hidden: bool,
     pub filter: Option<&'a str>,
     pub max: Option<usize>,
+    pub group: bool,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -170,6 +171,7 @@ fn output_rich(
     show_hidden: bool,
     filter: Option<&str>,
     max: Option<usize>,
+    group: bool,
 ) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
@@ -512,6 +514,17 @@ fn output_rich(
     // Apply max limit if specified
     if let Some(max_items) = max {
         display_items.truncate(max_items);
+    }
+
+    // Group by type if requested
+    if group {
+        let mut dirs: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_dir).copied().collect();
+        let mut files: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_file && !i.is_symlink).copied().collect();
+        let mut symlinks: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_symlink).copied().collect();
+        dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        symlinks.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        display_items = dirs.into_iter().chain(files).chain(symlinks).collect();
     }
 
     // Sort based on --sort flag
