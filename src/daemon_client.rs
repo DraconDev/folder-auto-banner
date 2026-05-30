@@ -142,8 +142,15 @@ pub fn ensure_daemon_running() {
     {
         Ok(_) => {
             tracing::info!("Started cfmd daemon");
-            // Give daemon time to bind socket
-            std::thread::sleep(Duration::from_millis(1000));
+            // Poll for socket to appear (up to 2s, checking every 50ms)
+            for _ in 0..40 {
+                if let Ok(socket) = socket_path() {
+                    if socket.exists() && UnixStream::connect(&socket).is_ok() {
+                        return;
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
         }
         Err(e) => {
             tracing::warn!("Failed to start cfmd: {}", e);
