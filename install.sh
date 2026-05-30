@@ -14,10 +14,29 @@ mkdir -p "$BIN_DIR"
 # --- Kill running daemon and clean up socket ---
 if [ -f "$DAEMON_BIN" ] && pgrep -x cfmd > /dev/null 2>&1; then
     echo "   Stopping running daemon..."
-    "$DAEMON_BIN" --help > /dev/null 2>&1 || true  # ensure binary is accessible
-    # Send SIGTERM via socket if possible, otherwise kill
-    pkill -x cfmd 2>/dev/null || true
+    
+    # First try to stop via systemd if running as a service
+    if systemctl --user is-active cfmd.service > /dev/null 2>&1; then
+        echo "   Stopping systemd service..."
+        systemctl --user stop cfmd.service 2>/dev/null || true
+        sleep 1
+    fi
+    
+    # Send shutdown signal via socket if possible
+    "$BIN_DIR/fm" daemon stop 2>/dev/null || true
     sleep 1
+    
+    # Force kill any remaining processes
+    pkill -9 -x cfmd 2>/dev/null || true
+    sleep 1
+    
+    # Verify daemon is dead
+    if pgrep -x cfmd > /dev/null 2>&1; then
+        echo "   ⚠️  Warning: daemon still running, waiting..."
+        sleep 2
+        pkill -9 -x cfmd 2>/dev/null || true
+        sleep 1
+    fi
 fi
 # Always clean up stale socket
 if [ -S "$SOCKET_PATH" ]; then
