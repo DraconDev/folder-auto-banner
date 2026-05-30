@@ -150,8 +150,8 @@
 - [ ] Keep `daemon.rs` as a thin entry point that calls into the library
 
 ### DirSummary god function
-- [ ] Extract `scan_with_options` subsystem calls into a `ProjectScanner` coordinator
-- [ ] Make each subsystem call independent and composable
+- [x] Extract `scan_with_options` subsystem calls into a `cached_check!` macro
+- [x] Make each subsystem call independent and composable
 
 ---
 
