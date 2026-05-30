@@ -552,3 +552,158 @@ fn resolve_gid(gid: u32) -> Option<String> {
     }
     Some(gid.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_size() {
+        assert_eq!(format_size(0), "0");
+        assert_eq!(format_size(1023), "1023");
+        assert_eq!(format_size(1024), "1");
+        assert_eq!(format_size(1024 * 1024), "1");
+    }
+
+    #[test]
+    fn test_format_size_compact() {
+        assert_eq!(format_size_compact(0), "0");
+        assert_eq!(format_size_compact(500), "500");
+        assert_eq!(format_size_compact(1024), "1.0k");
+        assert_eq!(format_size_compact(10 * 1024), "10k");
+        assert_eq!(format_size_compact(1024 * 1024), "1.0M");
+        assert_eq!(format_size_compact(1024 * 1024 * 1024), "1.0G");
+    }
+
+    #[test]
+    fn test_project_type_detect_rust() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("Cargo.toml"), "").unwrap();
+        assert_eq!(ProjectType::detect(tmp.path()), ProjectType::Rust);
+    }
+
+    #[test]
+    fn test_project_type_detect_node() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("package.json"), "").unwrap();
+        assert_eq!(ProjectType::detect(tmp.path()), ProjectType::Node);
+    }
+
+    #[test]
+    fn test_project_type_detect_python() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("pyproject.toml"), "").unwrap();
+        assert_eq!(ProjectType::detect(tmp.path()), ProjectType::Python);
+    }
+
+    #[test]
+    fn test_project_type_detect_go() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("go.mod"), "").unwrap();
+        assert_eq!(ProjectType::detect(tmp.path()), ProjectType::Go);
+    }
+
+    #[test]
+    fn test_project_type_generic() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert_eq!(ProjectType::detect(tmp.path()), ProjectType::Generic);
+    }
+
+    #[test]
+    fn test_project_type_icons() {
+        assert_eq!(ProjectType::Rust.icon(), "🦀");
+        assert_eq!(ProjectType::Node.icon(), "📦");
+        assert_eq!(ProjectType::Python.icon(), "🐍");
+        assert_eq!(ProjectType::Go.icon(), "🐹");
+        assert_eq!(ProjectType::Generic.icon(), "📂");
+    }
+
+    #[test]
+    fn test_project_type_labels() {
+        assert_eq!(ProjectType::Rust.label(), "Rust");
+        assert_eq!(ProjectType::Node.label(), "Node.js");
+        assert_eq!(ProjectType::Python.label(), "Python");
+    }
+
+    #[test]
+    fn test_format_exact_time() {
+        let dt = chrono::DateTime::parse_from_str("2024-01-15 10:30:00", "%Y-%m-%d %H:%M:%S")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let formatted = format_exact_time(&dt);
+        assert_eq!(formatted, "2024-01-15 10:30:00");
+    }
+
+    #[test]
+    fn test_format_relative_time() {
+        let now = chrono::Utc::now();
+        let five_min_ago = now - chrono::Duration::minutes(5);
+        let result = format_relative_time(&five_min_ago);
+        assert!(result.contains("5"));
+        assert!(result.contains("minute"));
+    }
+
+    #[test]
+    fn test_dir_summary_by_type() {
+        let summary = DirSummary {
+            total_items: 3,
+            total_size: 100,
+            files: 3,
+            dirs: 0,
+            top_items: vec![
+                DirEntry {
+                    name: "test.rs".into(),
+                    path: "".into(),
+                    is_dir: false,
+                    is_file: true,
+                    is_symlink: false,
+                    is_exec: false,
+                    size: 50,
+                    modified: None,
+                    perms: String::new(),
+                    owner: String::new(),
+                    group: String::new(),
+                    symlink_target: None,
+                },
+                DirEntry {
+                    name: "main.rs".into(),
+                    path: "".into(),
+                    is_dir: false,
+                    is_file: true,
+                    is_symlink: false,
+                    is_exec: false,
+                    size: 30,
+                    modified: None,
+                    perms: String::new(),
+                    owner: String::new(),
+                    group: String::new(),
+                    symlink_target: None,
+                },
+                DirEntry {
+                    name: "readme.md".into(),
+                    path: "".into(),
+                    is_dir: false,
+                    is_file: true,
+                    is_symlink: false,
+                    is_exec: false,
+                    size: 20,
+                    modified: None,
+                    perms: String::new(),
+                    owner: String::new(),
+                    group: String::new(),
+                    symlink_target: None,
+                },
+            ],
+            project_type: ProjectType::Rust,
+            last_modified: None,
+            build_status: None,
+            todo_info: None,
+            code_metrics: None,
+            port_info: None,
+            docker_info: None,
+        };
+
+        let by_type = summary.by_type();
+        assert_eq!(by_type.len(), 2); // rs and md
+    }
+}
