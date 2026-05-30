@@ -163,6 +163,7 @@ fn output_rich(
     icons: bool,
     _colors: bool,
     _max_items: usize,
+    show_hidden: bool,
 ) {
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
