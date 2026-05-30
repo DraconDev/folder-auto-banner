@@ -152,8 +152,8 @@ fn trash_file(
             Ok(_) => Ok(()),
             Err(_) => {
                 // If rename fails (cross-device), copy and delete
-                copy_dir_recursive(path, &trash_path)?;
-                delete_recursive(path)?;
+                utils::copy_dir_recursive(path, &trash_path)?;
+                utils::delete_recursive(path)?;
                 Ok(())
             }
         }
