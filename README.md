@@ -1,15 +1,19 @@
 # cfm — Contextual File Manager
 
-An ephemeral, zero-hostage intelligence layer for the shell.
+A directory listing with instant context.
 
-## Features
+## What It Does
 
-- **Auto banner** on every `cd` (zsh / bash)
-- **Rich output** with Unicode icons, Git status, build status, TODO counts
-- **30 commands** for file operations, sessions, pins, and more
-- **Daemon** (`cfmd`) for fast cached banner data
-- **Configurable** via `~/.config/cfm/config.toml`
-- **Safe** with symlink guards, path protection, and dry-run support
+When you run `f`, you see:
+- File listing (like `ls`/`exa`/`lsd`)
+- Git status
+- Build status
+- TODO count
+- Project type
+- Ports in use
+- Docker status
+
+**All instantly, no extra commands needed.**
 
 ## Quick Start
 
@@ -18,34 +22,50 @@ An ephemeral, zero-hostage intelligence layer for the shell.
 exec zsh   # or: source ~/.bashrc
 ```
 
-## Commands
+## Usage
 
-| Category | Commands |
-|----------|----------|
-| Banner | `f`, `f banner` |
-| File Ops | `f mv`, `f cp`, `f rm`, `f trash`, `f open` |
-| Clipboard | `f yank`, `f paste`, `f clipboard` |
-| Piping | `f do`, `f peek` |
-| Stats | `f stats` |
-| Spatial | `f pin`, `f jump`, `f root`, `f pins`, `f unpin` |
-| Sessions | `f save-session`, `f load-session`, `f sessions`, `f delete-session` |
-| Diff | `f diff` |
-| Shell | `f install-hook`, `f uninstall-hook`, `f completion` |
-| Config | `f config`, `f config --edit`, `f config --get`, `f config --set` |
-| Daemon | `f daemon start/stop/status/restart/clear-cache` |
+```bash
+f                    # Directory listing + context
+f <dir>              # Listing for specific dir
+f --sort size        # Sort by size
+f --hidden           # Show dotfiles
+f --tree             # Tree view
+f --json             # JSON output
+f --filter rs        # Filter by pattern
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--sort name\|size\|date\|type` | Sort order |
+| `--reverse` | Reverse sort |
+| `--hidden` | Show dotfiles |
+| `--tree [depth]` | Tree view (0 = unlimited) |
+| `--json` | JSON output |
+| `--raw` | Plain text output |
+| `--compact` | Less info |
+| `--verbose` | More info |
+| `--filter <pattern>` | Filter by name |
+| `--max <N>` | Limit items |
+| `--group` | Group by type |
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `CFM_NO_TODOS` | Set to `1` to disable TODO scanning |
+| `CFM_NO_PORTS` | Set to `1` to disable port detection |
+| `CFM_NO_DOCKER` | Set to `1` to disable Docker detection |
+| `CFM_NO_METRICS` | Set to `1` to disable code metrics |
+| `NO_COLOR` | Disable colors (per spec) |
 
 ## Testing
 
 ```bash
-cargo test    # 76 tests pass
+cargo test    # 77 tests pass
 cargo clippy  # 0 warnings
 ```
-
-## Architecture
-
-- **`f`** — CLI binary (ephemeral: wake up, read state, print output, exit)
-- **`cfmd`** — Background daemon (Unix socket IPC, inotify watching, proactive scanning)
-- **`cfm-lib`** — Shared library (modules used by both binaries)
 
 ## License
 
