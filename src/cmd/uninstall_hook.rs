@@ -68,7 +68,7 @@ fn detect_shell() -> String {
     std::env::var("SHELL")
         .unwrap_or_else(|_| "/bin/sh".to_string())
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or("sh")
         .to_string()
 }

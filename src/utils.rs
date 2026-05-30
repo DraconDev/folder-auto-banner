@@ -6,9 +6,23 @@ use std::time::Duration;
 
 // === File Operations ===
 
-/// Recursively copy a directory
+/// Recursively copy a directory (follows symlink guards to prevent loops)
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
     std::fs::create_dir_all(dst)?;
+    let mut visited: std::collections::HashSet<std::path::PathBuf> = std::collections::HashSet::new();
+    copy_dir_recursive_inner(src, dst, &mut visited)
+}
+
+fn copy_dir_recursive_inner(
+    src: &Path,
+    dst: &Path,
+    visited: &mut std::collections::HashSet<std::path::PathBuf>,
+) -> Result<()> {
+    let canonical = src.canonicalize().unwrap_or_else(|_| src.to_path_buf());
+    if !visited.insert(canonical) {
+        return Err(anyhow::anyhow!("Symlink loop detected at {}", src.display()));
+    }
+
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
         let ty = entry.file_type()?;
@@ -16,7 +30,7 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
         let dst_path = dst.join(entry.file_name());
 
         if ty.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
+            copy_dir_recursive_inner(&src_path, &dst_path, visited)?;
         } else {
             std::fs::copy(&src_path, &dst_path)?;
         }

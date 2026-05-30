@@ -89,23 +89,23 @@
 ## 🔴 Critical Fixes
 
 ### Dry-run flag silently discarded
-- [ ] In `cli/mod.rs:462-492`, the `--dry_run` field is bound as `_` and never passed to command functions
-- [ ] Wire `dry_run` through to `run_mv`, `run_cp`, `run_rm`, `run_trash`, `run_open`, `run_do_cmd`
-- [ ] Verify dry-run actually prevents file mutations in each command
+- [x] In `cli/mod.rs:462-492`, the `--dry_run` field is bound as `_` and never passed to command functions
+- [x] Wire `dry_run` through to `run_mv`, `run_cp`, `run_rm`, `run_trash`, `run_open`, `run_do_cmd`
+- [x] Verify dry-run actually prevents file mutations in each command
 
 ### Daemon mutex poisoning
-- [ ] Replace all 18 `.unwrap()` on `Mutex::lock()` in `daemon.rs` with `unwrap_or_else(|e| e.into_inner())` or proper error propagation
+- [x] Replace all 18 `.unwrap()` on `Mutex::lock()` in `daemon.rs` with `unwrap_or_else(|e| e.into_inner())` or proper error propagation
 - [ ] Audit `Mutex` usage for potential deadlocks (nested locks, lock ordering)
 - [ ] Add logging when mutex poisoning occurs so failures are visible
 
 ### Shell injection vectors
-- [ ] `do_cmd.rs`: sanitize `{}` replacement — reject or escape filenames containing shell metacharacters
+- [x] `do_cmd.rs`: sanitize `{}` replacement — reject or escape filenames containing shell metacharacters
 - [ ] `banner.rs:count_sqlite_tables`: quote or escape paths passed to `sqlite3` command
 - [ ] Review all `Command::new()` call sites for user-controlled argument injection
 
 ### Data loss risk in mv/trash
-- [ ] `mv.rs` and `trash.rs`: verify `copy_dir_recursive` succeeds fully before calling `delete_recursive`
-- [ ] Add rollback or partial-failure handling for cross-device moves
+- [x] `mv.rs` and `trash.rs`: verify `copy_dir_recursive` succeeds fully before calling `delete_recursive`
+- [x] Add rollback or partial-failure handling for cross-device moves
 
 ---
 
@@ -149,39 +149,39 @@
 ## 🟡 Code Quality
 
 ### Extract duplicated functions (~500 lines)
-- [ ] `copy_dir_recursive`: exists in `cp.rs`, `mv.rs`, `trash.rs` → move to `fs/mod.rs`
-- [ ] `delete_recursive`: exists in `mv.rs`, `trash.rs` → move to `fs/mod.rs`
-- [ ] `sanitize_filename`: exists in `save_session.rs`, `load_session.rs`, `delete_session.rs` → move to `state/mod.rs` or new `utils.rs`
-- [ ] `generate_unique_name`: exists in `cp.rs`, `mv.rs` → move to `fs/mod.rs`
-- [ ] `format_size`: exists in `fs/mod.rs`, `diff.rs` → use the canonical version in `fs/mod.rs`, remove duplicate from `diff.rs`
-- [ ] `BINARY_EXTS` constant: exists in `todo_scanner/mod.rs` and `code_metrics/mod.rs` → single shared constant
-- [ ] `SKIP_DIRS` constant: exists in `todo_scanner/mod.rs` and `code_metrics/mod.rs` → single shared constant
-- [ ] `run_with_timeout`: exists in `build_status/mod.rs`, `port_usage/mod.rs`, `docker/mod.rs` → single shared utility
-- [ ] `print_summary`: exists in `mv.rs`, `cp.rs` → single shared utility
+- [x] `copy_dir_recursive`: exists in `cp.rs`, `mv.rs`, `trash.rs` → move to `fs/mod.rs`
+- [x] `delete_recursive`: exists in `mv.rs`, `trash.rs` → move to `fs/mod.rs`
+- [x] `sanitize_filename`: exists in `save_session.rs`, `load_session.rs`, `delete_session.rs` → move to `state/mod.rs` or new `utils.rs`
+- [x] `generate_unique_name`: exists in `cp.rs`, `mv.rs` → move to `fs/mod.rs`
+- [x] `format_size`: exists in `fs/mod.rs`, `diff.rs` → use the canonical version in `fs/mod.rs`, remove duplicate from `diff.rs`
+- [x] `BINARY_EXTS` constant: exists in `todo_scanner/mod.rs` and `code_metrics/mod.rs` → single shared constant
+- [x] `SKIP_DIRS` constant: exists in `todo_scanner/mod.rs` and `code_metrics/mod.rs` → single shared constant
+- [x] `run_with_timeout`: exists in `build_status/mod.rs`, `port_usage/mod.rs`, `docker/mod.rs` → single shared utility
+- [x] `print_summary`: exists in `mv.rs`, `cp.rs` → single shared utility
 
 ### Fix error handling
-- [ ] Audit all 57 `.ok()` calls — categorize as intentional (cache writes) vs accidental (masking real errors)
-- [ ] Replace accidental `.ok()` discards with `?` propagation or `eprintln!` logging
-- [ ] `daemon_client.rs:98,110`: replace `let _ = serde_json::to_writer(...)` and `let _ = send_and_recv(...)` with error logging
-- [ ] `fs/mod.rs`: audit 15 `.ok()` calls, add logging for non-cache failures
+- [x] Audit all 57 `.ok()` calls — categorize as intentional (cache writes) vs accidental (masking real errors)
+- [x] Replace accidental `.ok()` discards with `?` propagation or `eprintln!` logging
+- [x] `daemon_client.rs:98,110`: replace `let _ = serde_json::to_writer(...)` and `let _ = send_and_recv(...)` with error logging
+- [x] `fs/mod.rs`: audit 15 `.ok()` calls, add logging for non-cache failures
 - [ ] `cmd/banner.rs`: audit 10 `.ok()` calls, surface filesystem permission errors
-- [ ] Remove unused `thiserror` dependency from `Cargo.toml` (or start using it for custom error types)
+- [x] Remove unused `thiserror` dependency from `Cargo.toml` (or start using it for custom error types)
 
 ### Remove dead code
 - [ ] Remove `#![allow(dead_code)]` from `main.rs` and `daemon.rs`
 - [ ] Fix all resulting warnings — delete unused functions/structs or add `#[allow(dead_code)]` to specific items
 - [ ] Audit `cmd/` modules for unused helper functions
-- [ ] Remove `cmd/uninstall_hook.rs` stub (or implement it)
-- [ ] Remove `cmd/root.rs` stub (or implement the non-print-cd path)
+- [x] Remove `cmd/uninstall_hook.rs` stub (or implement it)
+- [x] Remove `cmd/root.rs` stub (or implement the non-print-cd path)
 
 ### Wire up Config
-- [ ] `cmd/config.rs` is entirely a stub — implement actual config reading/writing
-- [ ] `--edit` should open `$EDITOR` with the config TOML file
-- [ ] `--get <key>` should read from the config file
-- [ ] `--set <key> <value>` should write to the config file
+- [x] `cmd/config.rs` is entirely a stub — implement actual config reading/writing
+- [x] `--edit` should open `$EDITOR` with the config TOML file
+- [x] `--get <key>` should read from the config file
+- [x] `--set <key> <value>` should write to the config file
 - [ ] Consume config values (`icons`, `colors`, `compact`, `max_display_items`) in banner rendering
 - [ ] Centralize ad-hoc env var overrides (`CFM_NO_BUILD_CHECK`, `CFM_NO_TODOS`, etc.) into config loading
-- [ ] Remove `thiserror` from Cargo.toml if unused, or adopt it for `ConfigError`
+- [x] Remove `thiserror` from Cargo.toml if unused, or adopt it for `ConfigError`
 
 ### Fix completion drift
 - [ ] `completion.rs` manually rebuilds the clap command tree instead of reusing the `Cli` struct
@@ -225,18 +225,18 @@
 - [ ] Color the whole row like exa/lsd (permissions colored by type, size bold if >1MB, date bright if recent)
 
 ### Implement stub commands
-- [ ] `cmd/root.rs`: implement the non-print-cd path
-- [ ] `cmd/uninstall_hook.rs`: implement hook removal
+- [x] `cmd/root.rs`: implement the non-print-cd path
+- [x] `cmd/uninstall_hook.rs`: implement hook removal
 
 ---
 
 ## 🟣 Safety
 
 ### Filesystem operation hardening
-- [ ] Add symlink-following guards in recursive operations (prevent symlink loops)
-- [ ] Extend `is_protected_path()` in `rm.rs` to cover `~/.ssh`, `~/.gnupg`, `~/.config`
+- [x] Add symlink-following guards in recursive operations (prevent symlink loops)
+- [x] Extend `is_protected_path()` in `rm.rs` to cover `~/.ssh`, `~/.gnupg`, `~/.config`
 - [ ] Apply protection checks to `trash`, `mv`, `cp`, and `paste` (currently only `rm` has them)
-- [ ] Verify copy success before deleting source in cross-device moves
+- [x] Verify copy success before deleting source in cross-device moves
 - [ ] Handle broken symlinks gracefully in listing
 
 ### Install script robustness
