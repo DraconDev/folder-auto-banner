@@ -38,6 +38,8 @@
 - [x] `--filter <pattern>` — filter by name
 - [x] `--max <N>` — limit items displayed
 - [x] `--group` — group by type
+- [x] `--compact` — less info
+- [x] `--verbose` — more info
 
 ### Shell Integration
 - [x] Zsh hook (chpwd)
@@ -50,59 +52,32 @@
 - [x] Full resolved symlink paths
 - [x] Path protection for sensitive directories
 
----
-
-## 🔴 Remove (Commands That Duplicate Existing Tools)
-
-### File Operations
-- [ ] Remove `cp` command — people use their own cp
-- [ ] Remove `mv` command — people use their own mv
-- [ ] Remove `rm` command — people use their own rm
-- [ ] Remove `trash` command — people use trash-cli
-- [ ] Remove `open` command — people use xdg-open
-
-### Clipboard
-- [ ] Remove `yank` command — niche use case
-- [ ] Remove `paste` command — niche use case
-- [ ] Remove `clipboard` command — niche use case
-
-### Navigation
-- [ ] Remove `pin` command — redundant with frecency
-- [ ] Remove `unpin` command — redundant with frecency
-- [ ] Remove `pins` command — redundant with frecency
-- [ ] Remove `jump` command — z/zoxide is better
-- [ ] Remove `root` command — git root is trivial
-
-### Sessions
-- [ ] Remove `save-session` command — over-engineering
-- [ ] Remove `load-session` command — over-engineering
-- [ ] Remove `sessions` command — over-engineering
-- [ ] Remove `delete-session` command — over-engineering
-
-### Other
-- [ ] Remove `diff` command — people use diff/meld
-- [ ] Remove `do` command — niche
-- [ ] Remove `peek` command — people use bat/cat
-- [ ] Remove `stats` command — covered by banner
-- [ ] Remove `config` command — use env vars instead
-
-### Flags to Remove
-- [ ] Remove `--no-build-check` flag — use env var
-- [ ] Remove `--no-todos` flag — use env var
-- [ ] Remove `--no-ports` flag — use env var
-- [ ] Remove `--no-docker` flag — use env var
-- [ ] Remove `--no-metrics` flag — use env var
+### Simplification (v0.3.0)
+- [x] Removed file ops commands (cp, mv, rm, trash, open)
+- [x] Removed clipboard commands (yank, paste, clipboard)
+- [x] Removed navigation commands (pin, unpin, pins, jump, root)
+- [x] Removed session commands (save, load, list, delete)
+- [x] Removed other commands (diff, do, peek, stats, config)
+- [x] Removed flags that can be env vars
+- [x] Renamed binary from fm to f
 
 ---
 
-## 🟡 Add (Useful Features)
+## 🔴 Current Issues
 
-### Output Modes
-- [ ] Add `--compact` flag — less info, just essentials
-- [ ] Add `--verbose` flag — more info, deep dive
-- [ ] Add `--format <template>` flag — custom output format
+### Daemon
+- [ ] Fix daemon log spam for non-existent directories (partially fixed)
+- [ ] Fix daemon to handle dead symlinks gracefully (partially fixed)
 
-### Context Improvements
+### Display
+- [ ] Fix broken symlink display (show ✗→ indicator) — DONE
+- [ ] Fix symlink target to show full resolved path — DONE
+
+---
+
+## 🟡 Future Improvements
+
+### Banner Enhancements
 - [ ] Show last commit date per file
 - [ ] Show file count in directory header
 - [ ] Show total size in directory header
@@ -114,20 +89,6 @@
 - [ ] Sort by file type (dirs, then files)
 - [ ] Sort by extension
 
----
-
-## 🔵 Fix (Issues to Address)
-
-### Daemon
-- [ ] Fix daemon log spam for non-existent directories
-- [ ] Fix daemon to handle dead symlinks gracefully
-- [ ] Fix install script to properly stop daemon before reinstall
-
-### Display
-- [ ] Fix broken symlink display (show ✗→ indicator)
-- [ ] Fix symlink target to show full resolved path
-- [ ] Fix permissions display for symlinks
-
 ### Performance
 - [ ] Optimize banner for large directories (1000+ files)
 - [ ] Cache directory scan results more aggressively
@@ -137,8 +98,9 @@
 ## ⚪ Polish
 
 ### Documentation
-- [ ] Update README with vision and scope
-- [ ] Document all flags with examples
+- [x] Update README with vision and scope
+- [x] Update CHANGELOG with v0.3.0 changes
+- [x] Create VISION.md with project direction
 - [ ] Add man page
 
 ### CI/CD
@@ -149,22 +111,9 @@
 
 ## 📊 Summary
 
-**Current state:** 30+ commands, complex
-**Target state:** 1 command (`f`), simple, focused
+**Current state:** Simple, focused tool
+**Core feature:** Directory listing with instant context
+**Commands:** Just `f` (banner) and `f env` (shell aliases)
+**Flags:** Sorting, filtering, tree view, compact/verbose modes
 
-**Keep:**
-- Banner (directory listing + context)
-- Shell hook (auto-banner)
-- Sorting, filtering, tree view
-- JSON/raw output
-
-**Remove:**
-- 15+ commands that duplicate existing tools
-- 5+ flags that can be env vars
-
-**Add:**
-- Compact/verbose modes
-- Better context per project type
-- Custom format template
-
-**Result:** Simple, fast, useful directory listing with instant context.
+**Result:** A better `ls`/`exa`/`lsd` that shows what matters instantly.
