@@ -1075,8 +1075,18 @@ fn output_rich(
         };
         let contents_padded = format!("{:>width$}", contents_raw, width = max_contents);
 
-        // Colorize permissions
-        let perm_colored = colorize_perms(&item.perms);
+        // Colorize permissions based on config
+        let perm_colored = match config.permission.as_str() {
+            "octal" => {
+                // Convert to octal format
+                let mode = item.perms.chars().enumerate().fold(0u32, |acc, (i, c)| {
+                    if c == '-' { 0 } else { 1 << (9 - i) }
+                });
+                format!("{}{:04o}{}", color(DIM), mode & 0o777, color(RESET))
+            }
+            "disable" => String::new(),
+            _ => colorize_perms(&item.perms), // default: rwx
+        };
 
         // Owner/group: blue
         let owner_colored = format!("{}{}{}", color(BLUE), owner_padded, color(RESET));
@@ -1096,21 +1106,33 @@ fn output_rich(
             git_icon
         };
 
-        // PERM OWNER GROUP DATE SIZE CONTENTS GIT NAME
-        println!(
-            "{}{} {} {} {} {} {} {} {}{}{}",
-            row_tint,
-            perm_colored,
-            owner_colored,
-            group_colored,
-            modified,
-            size_colored,
-            contents_colored,
-            git_colored,
-            icon_str,
-            name_display,
-            tint_reset
-        );
+        // Build row based on config columns
+        let mut row_parts = Vec::new();
+        if config.columns.contains(&"permission".to_string()) && !perm_colored.is_empty() {
+            row_parts.push(perm_colored);
+        }
+        if config.columns.contains(&"owner".to_string()) {
+            row_parts.push(owner_colored);
+        }
+        if config.columns.contains(&"group".to_string()) {
+            row_parts.push(group_colored);
+        }
+        if config.columns.contains(&"date".to_string()) {
+            row_parts.push(modified);
+        }
+        if config.columns.contains(&"size".to_string()) {
+            row_parts.push(size_colored);
+        }
+        if config.columns.contains(&"contents".to_string()) {
+            row_parts.push(contents_colored);
+        }
+        if config.git_status {
+            row_parts.push(git_colored);
+        }
+        row_parts.push(icon_str);
+        row_parts.push(name_display);
+
+        println!("{}{}{}", row_tint, row_parts.join(" "), tint_reset);
     }
 
     if !show_hidden_flag && !hidden_items.is_empty() {
