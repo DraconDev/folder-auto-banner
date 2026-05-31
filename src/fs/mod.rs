@@ -421,7 +421,6 @@ pub fn format_exact_time(dt: &DateTime<Utc>) -> String {
 }
 
 /// Format relative time
-#[allow(dead_code)]
 pub fn format_relative_time(dt: &DateTime<Utc>) -> String {
     let now = Utc::now();
     let duration = now.signed_duration_since(*dt);

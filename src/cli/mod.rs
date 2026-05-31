@@ -202,6 +202,7 @@ impl Cli {
                     group_dirs: group_dirs.as_deref(),
                     reverse: *reverse,
                     hidden: *hidden,
+                    relative_date: *relative_date,
                     filter: filter.as_deref(),
                     max: *max,
                     group: *group,

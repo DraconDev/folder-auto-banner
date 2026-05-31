@@ -116,7 +116,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify, opts.relative_date);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -147,7 +147,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify, opts.relative_date);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -308,6 +308,7 @@ fn output_rich(
     max: Option<usize>,
     group: bool,
     classify: bool,
+    relative_date: bool,
 ) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
@@ -1079,7 +1080,11 @@ fn output_rich(
             .modified
             .as_ref()
             .map(|dt| {
-                let formatted = format_exact_time(dt);
+                let formatted = if relative_date {
+                    crate::fs::format_relative_time(dt)
+                } else {
+                    format_exact_time(dt)
+                };
                 colorize_date(dt, &formatted)
             })
             .unwrap_or_default();

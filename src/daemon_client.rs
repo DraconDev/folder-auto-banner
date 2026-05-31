@@ -51,17 +51,50 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     match response {
         Response::Banner(data) => Some(*data),
         _ => None,
+        }
     }
 }
 
-/// Check if daemon is running. Cleans up stale sockets automatically.
-pub fn is_daemon_running() -> bool {
-    let Ok(socket) = socket_path() else {
-        return false;
-    };
-    if !socket.exists() {
-        return false;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_socket_path() {
+        let path = socket_path();
+        assert!(path.is_ok());
+        let path = path.unwrap();
+        assert!(path.to_string_lossy().contains("cfmd.sock"));
     }
+
+    #[test]
+    fn test_send_and_recv_with_mock() {
+        // This test verifies the function signature and basic flow
+        // In a real test, we'd mock the UnixStream, but for now we just test the types
+        let request = Request::Ping;
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("Ping"));
+    }
+
+    #[test]
+    fn test_is_daemon_running_when_not_running() {
+        // This test checks the function doesn't panic when daemon is not running
+        // It may return false, which is expected
+        let _result = is_daemon_running();
+    }
+
+    #[test]
+    fn test_send_warm_does_not_panic() {
+        // send_warm is fire-and-forget, just verify it doesn't panic
+        send_warm(Path::new("/tmp"));
+    }
+
+    #[test]
+    fn test_send_shutdown_does_not_panic() {
+        // send_shutdown may fail if daemon is not running, but shouldn't panic
+        send_shutdown();
+    }
+}
     let stream = match UnixStream::connect(&socket) {
         Ok(s) => s,
         Err(_) => {
