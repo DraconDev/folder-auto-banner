@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::os::unix::net::UnixStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crate::daemon_types::{BannerData, Request, Response};
@@ -99,6 +99,28 @@ pub fn send_warm(path: &Path) {
     // Fire and forget — don't wait for response
     if let Err(e) = serde_json::to_writer(&stream, &request) {
         tracing::warn!("Failed to send warm request: {}", e);
+    }
+}
+
+/// Fire-and-forget: warm multiple paths using a single connection (faster)
+pub fn warm_paths(paths: &[PathBuf]) {
+    let Ok(socket) = socket_path() else {
+        return;
+    };
+    let Ok(stream) = UnixStream::connect(&socket) else {
+        return;
+    };
+    stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
+    
+    // Send all warm requests over the same connection
+    for path in paths {
+        let request = Request::Warm {
+            path: path.clone(),
+        };
+        if let Err(e) = serde_json::to_writer(&stream, &request) {
+            tracing::warn!("Failed to send warm request: {}", e);
+            break; // Connection broken, stop sending
+        }
     }
 }
 

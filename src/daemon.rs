@@ -458,8 +458,6 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
             });
         }
     }
-        }
-    }
 
     // Return immediately — sizes come from global cache
     Ok(BannerData {

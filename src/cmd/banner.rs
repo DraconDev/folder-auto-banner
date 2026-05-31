@@ -236,7 +236,7 @@ fn warm_nearby_dirs(path: &Path) {
     let mut paths_to_warm = vec![parent.to_path_buf()];
 
     if let Ok(entries) = std::fs::read_dir(parent) {
-        for entry in entries.flatten().take(20) {
+        for entry in entries.flatten().take(10) { // Reduced from 20 to 10
             if entry.path().is_dir() && entry.path() != path {
                 paths_to_warm.push(entry.path());
             }
@@ -245,9 +245,8 @@ fn warm_nearby_dirs(path: &Path) {
 
     // Fire-and-forget in background thread — don't block the banner
     std::thread::spawn(move || {
-        for p in &paths_to_warm {
-            crate::daemon_client::send_warm(p);
-        }
+        // Use a single connection for all warm requests (faster)
+        crate::daemon_client::warm_paths(&paths_to_warm);
     });
 }
 

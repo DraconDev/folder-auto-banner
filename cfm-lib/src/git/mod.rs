@@ -66,7 +66,27 @@ impl FileStatus {
 }
 
 /// Get Git info for a directory
+/// 
+/// If `collect_file_statuses` is false, skips building the per-file status map
+/// (which can be 39K+ entries for large repos). Use false when you only need
+/// aggregate counts (staged/modified/untracked) for the banner header.
 pub fn get_git_info(path: &Path) -> Result<GitInfo> {
+    get_git_info_inner(path, true, &[])
+}
+
+/// Get Git info without per-file status map (faster, for banner header only)
+pub fn get_git_info_summary(path: &Path) -> Result<GitInfo> {
+    get_git_info_inner(path, false, &[])
+}
+
+/// Get Git info with filtered file statuses (only paths matching the filter)
+/// This is much faster for large repos — only collects statuses for files
+/// that will actually be displayed in the banner.
+pub fn get_git_info_filtered(path: &Path, filter_paths: &[String]) -> Result<GitInfo> {
+    get_git_info_inner(path, true, filter_paths)
+}
+
+fn get_git_info_inner(path: &Path, collect_file_statuses: bool, filter_paths: &[String]) -> Result<GitInfo> {
     let mut repo = match Repository::discover(path) {
         Ok(r) => r,
         Err(_) => return Ok(GitInfo::default()),
@@ -94,7 +114,20 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
     let mut untracked = 0;
     let mut file_statuses = std::collections::HashMap::new();
 
-    let statuses = repo.statuses(None).ok();
+    let statuses = if !filter_paths.is_empty() {
+        // Use pathspec filtering to only collect statuses for specific paths
+        let mut opts = git2::StatusOptions::new();
+        opts.include_untracked(true)
+            .recurse_untracked_dirs(false)
+            .disable_pathspec_match(true); // Use literal paths, not patterns
+        for path in filter_paths {
+            opts.pathspec(path);
+        }
+        repo.statuses(Some(&mut opts)).ok()
+    } else {
+        repo.statuses(None).ok()
+    };
+    
     if let Some(statuses) = statuses {
         for entry in statuses.iter() {
             let status = entry.status();
@@ -106,32 +139,38 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
                 || status.contains(git2::Status::INDEX_RENAMED)
             {
                 staged += 1;
-                let fs = if status.contains(git2::Status::INDEX_NEW) {
-                    FileStatus::Added
-                } else if status.contains(git2::Status::INDEX_DELETED) {
-                    FileStatus::Deleted
-                } else if status.contains(git2::Status::INDEX_RENAMED) {
-                    FileStatus::Renamed
-                } else {
-                    FileStatus::Added
-                };
-                file_statuses.insert(file_path, fs);
+                if collect_file_statuses {
+                    let fs = if status.contains(git2::Status::INDEX_NEW) {
+                        FileStatus::Added
+                    } else if status.contains(git2::Status::INDEX_DELETED) {
+                        FileStatus::Deleted
+                    } else if status.contains(git2::Status::INDEX_RENAMED) {
+                        FileStatus::Renamed
+                    } else {
+                        FileStatus::Added
+                    };
+                    file_statuses.insert(file_path, fs);
+                }
             } else if status.contains(git2::Status::WT_MODIFIED)
                 || status.contains(git2::Status::WT_DELETED)
                 || status.contains(git2::Status::WT_RENAMED)
             {
                 modified += 1;
-                let fs = if status.contains(git2::Status::WT_DELETED) {
-                    FileStatus::Deleted
-                } else if status.contains(git2::Status::WT_RENAMED) {
-                    FileStatus::Renamed
-                } else {
-                    FileStatus::Modified
-                };
-                file_statuses.insert(file_path, fs);
+                if collect_file_statuses {
+                    let fs = if status.contains(git2::Status::WT_DELETED) {
+                        FileStatus::Deleted
+                    } else if status.contains(git2::Status::WT_RENAMED) {
+                        FileStatus::Renamed
+                    } else {
+                        FileStatus::Modified
+                    };
+                    file_statuses.insert(file_path, fs);
+                }
             } else if status.contains(git2::Status::WT_NEW) {
                 untracked += 1;
-                file_statuses.insert(file_path, FileStatus::Untracked);
+                if collect_file_statuses {
+                    file_statuses.insert(file_path, FileStatus::Untracked);
+                }
             }
         }
     }
