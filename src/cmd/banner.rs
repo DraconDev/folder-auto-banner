@@ -1079,7 +1079,7 @@ fn output_rich(
         let perm_colored = match config.permission.as_str() {
             "octal" => {
                 // Convert to octal format
-                let mode = item.perms.chars().enumerate().fold(0u32, |acc, (i, c)| {
+                let mode = item.perms.chars().enumerate().fold(0u32, |_acc, (i, c)| {
                     if c == '-' { 0 } else { 1 << (9 - i) }
                 });
                 format!("{}{:04o}{}", color(DIM), mode & 0o777, color(RESET))
