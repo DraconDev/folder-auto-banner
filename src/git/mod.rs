@@ -273,15 +273,19 @@ fn get_git_info_inner(path: &Path, collect_file_statuses: bool) -> Result<GitInf
         None
     });
 
-    // Get diff stats (lines added/deleted)
-    let (lines_added, lines_deleted) = if let Ok(head) = repo.head() {
-        if let Ok(commit) = head.peel_to_commit() {
-            if let Ok(tree) = commit.tree() {
-                if let Ok(diff) = repo.diff_tree_to_workdir(Some(&tree), None) {
-                    let stats = diff.stats().ok();
-                    let added = stats.as_ref().map(|s| s.insertions()).unwrap_or(0);
-                    let deleted = stats.as_ref().map(|s| s.deletions()).unwrap_or(0);
-                    (added, deleted)
+    // Get diff stats (lines added/deleted) - skip for summary-only calls
+    let (lines_added, lines_deleted) = if collect_file_statuses {
+        if let Ok(head) = repo.head() {
+            if let Ok(commit) = head.peel_to_commit() {
+                if let Ok(tree) = commit.tree() {
+                    if let Ok(diff) = repo.diff_tree_to_workdir(Some(&tree), None) {
+                        let stats = diff.stats().ok();
+                        let added = stats.as_ref().map(|s| s.insertions()).unwrap_or(0);
+                        let deleted = stats.as_ref().map(|s| s.deletions()).unwrap_or(0);
+                        (added, deleted)
+                    } else {
+                        (0, 0)
+                    }
                 } else {
                     (0, 0)
                 }
