@@ -197,6 +197,44 @@ impl Cli {
             Some(Env { path, format }) => {
                 crate::cmd::env::run_env(path.as_ref().map(|p| p.as_path()), format.as_deref())
             }
+            
+            // Config
+            Some(Config) => {
+                let config_path = crate::state::Config::config_path()
+                    .map_err(|e| anyhow::anyhow!("Failed to get config path: {}", e))?;
+                
+                // Ensure config file exists
+                if !config_path.exists() {
+                    if let Some(parent) = config_path.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
+                    let default_config = crate::state::Config::default();
+                    default_config.save()?;
+                    println!("📝 Created config file: {}", config_path.display());
+                }
+                
+                // Open in editor
+                let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+                let status = std::process::Command::new(&editor)
+                    .arg(&config_path)
+                    .status();
+                
+                match status {
+                    Ok(s) => {
+                        if s.success() {
+                            println!("✅ Config updated: {}", config_path.display());
+                        } else {
+                            eprintln!("⚠️  Editor exited with status: {}", s);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to open editor: {}", e);
+                        println!("💡 Config file: {}", config_path.display());
+                    }
+                }
+                
+                Ok(())
+            }
         }
     }
 }
