@@ -357,6 +357,7 @@ fn output_rich(
     let git_status_str = git_status.join(" ");
 
     let header = if git_info.is_repo {
+        // Row 1: Core info
         let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
         if !branch_display.is_empty() {
             parts.push(format!("{} │", branch_display));
@@ -381,7 +382,12 @@ fn output_rich(
         if !git_status_str.is_empty() {
             parts.push(format!("│ {}", git_status_str));
         }
-        // Git enhancements: last commit, commits today, branches
+        let row1 = parts.join(" ");
+
+        // Row 2: Details
+        let mut details = Vec::new();
+        
+        // Git enhancements
         if git_info.is_repo {
             if let Some(time) = git_info.last_commit_time {
                 let now = chrono::Utc::now().timestamp();
@@ -395,25 +401,59 @@ fn output_rich(
                 } else {
                     format!("{}d ago", diff / 86400)
                 };
-                parts.push(format!("│ {}📅 {}{}", color(DIM), time_str, color(RESET)));
+                details.push(format!("{}📅 {}{}", color(DIM), time_str, color(RESET)));
             }
             if git_info.commits_today > 0 {
-                parts.push(format!(
-                    "│ {}📝 {} today{}",
+                details.push(format!(
+                    "{}📝 {} today{}",
                     color(GREEN),
                     git_info.commits_today,
                     color(RESET)
                 ));
             }
             if git_info.branch_count > 1 {
-                parts.push(format!(
-                    "│ {}🔀 {} branches{}",
+                details.push(format!(
+                    "{}🔀 {} branches{}",
                     color(CYAN),
                     git_info.branch_count,
                     color(RESET)
                 ));
             }
         }
+        
+        // TODO count
+        if let Some(ref todos) = summary.todo_info {
+            if todos.count > 0 {
+                details.push(format!(
+                    "{}📝 {} TODOs{}",
+                    color(YELLOW),
+                    todos.count,
+                    color(RESET)
+                ));
+            }
+        }
+        
+        // Code metrics — show languages breakdown
+        if let Some(ref metrics) = summary.code_metrics {
+            if metrics.total_loc > 0 {
+                let loc_str = format_loc(metrics.total_loc);
+                details.push(format!(
+                    "{}📊 {} lines{}",
+                    color(GREEN),
+                    loc_str,
+                    color(RESET)
+                ));
+                // Show top 3 languages with percentages
+                if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
+                    let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
+                        let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
+                        format!("{}{} {}%{}", color(DIM), ext, pct, color(RESET))
+                    }).collect();
+                    details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
+                }
+            }
+        }
+        
         // Build status
         if let Some(ref build) = summary.build_status {
             if build.ok {
@@ -426,8 +466,8 @@ fn output_rich(
                 } else {
                     String::new()
                 };
-                parts.push(format!(
-                    "│ {}✓ builds{}{}",
+                details.push(format!(
+                    "{}✓ builds{}{}",
                     color(GREEN),
                     duration_str,
                     color(RESET)
@@ -438,37 +478,28 @@ fn output_rich(
                 } else {
                     String::new()
                 };
-                parts.push(format!(
-                    "│ {}✗ build errors{}{}",
+                details.push(format!(
+                    "{}✗ build errors{}{}",
                     color(RED),
                     err_str,
                     color(RESET)
                 ));
             }
         }
-        // TODO count
-        if let Some(ref todos) = summary.todo_info {
-            if todos.count > 0 {
-                parts.push(format!(
-                    "│ {}📝 {} TODOs{}",
-                    color(YELLOW),
-                    todos.count,
-                    color(RESET)
-                ));
-            }
-        }
+        
         // Port usage
         if let Some(ref ports) = summary.port_info {
             if !ports.ports.is_empty() {
                 let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                parts.push(format!(
-                    "│ {}🔌 {}{}",
+                details.push(format!(
+                    "{}🔌 {}{}",
                     color(CYAN),
                     port_str.join(", "),
                     color(RESET)
                 ));
             }
         }
+        
         // Docker info
         if let Some(ref docker) = summary.docker_info {
             let running = docker
@@ -478,41 +509,19 @@ fn output_rich(
                 .count();
             let total = docker.containers.len();
             if total > 0 {
-                parts.push(format!(
-                    "│ {}🐳 {} containers ({} running){}",
-                    color(BLUE),
-                    total,
-                    running,
+                details.push(format!(
+                    "{}🐳 {} container(s){}",
+                    color(CYAN),
+                    if running > 0 { format!("{} up", running) } else { total.to_string() },
                     color(RESET)
                 ));
-            } else if docker.has_compose || docker.has_dockerfile {
-                parts.push(format!("│ {}🐳 docker{}", color(DIM), color(RESET)));
             }
         }
-        // Code metrics — show languages breakdown
-        if let Some(ref metrics) = summary.code_metrics {
-            if metrics.total_loc > 0 {
-                let loc_str = format_loc(metrics.total_loc);
-                parts.push(format!(
-                    "│ {}📊 {} lines{}",
-                    color(GREEN),
-                    loc_str,
-                    color(RESET)
-                ));
-                // Show top 3 languages with percentages
-                if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                    let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
-                        let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                        format!("{}{} {}%{}", color(DIM), ext, pct, color(RESET))
-                    }).collect();
-                    parts.push(format!("│ {}{}", color(DIM), lang_parts.join(" ")));
-                }
-            }
-        }
+        
         // Diff stats
         if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
-            parts.push(format!(
-                "│ {}+{}{} {}-{}{}",
+            details.push(format!(
+                "{}+{}{} {}-{}{}",
                 color(GREEN),
                 git_info.lines_added,
                 color(RESET),
@@ -521,26 +530,28 @@ fn output_rich(
                 color(RESET)
             ));
         }
+        
         // Clean indicator
         if !git_info.is_dirty
             && git_info.modified == 0
             && git_info.staged == 0
             && git_info.untracked == 0
         {
-            parts.push(format!("│ {}✓ clean{}", color(GREEN), color(RESET)));
+            details.push(format!("{}✓ clean{}", color(GREEN), color(RESET)));
         }
+        
         // Cached test results
         if let Some(test_results) = crate::test_cache::TestResults::load() {
             if test_results.failed > 0 {
-                parts.push(format!(
-                    "│ {}✗ {} failed{}",
+                details.push(format!(
+                    "{}✗ {} failed{}",
                     color(RED),
                     test_results.failed,
                     color(RESET)
                 ));
             } else if test_results.passed > 0 {
-                parts.push(format!(
-                    "│ {}✓ {} tests{} ({})",
+                details.push(format!(
+                    "{}✓ {} tests{} ({})",
                     color(GREEN),
                     test_results.passed,
                     color(RESET),
@@ -548,7 +559,13 @@ fn output_rich(
                 ));
             }
         }
-        parts.join(" ")
+        
+        // Combine rows
+        if details.is_empty() {
+            row1
+        } else {
+            format!("{}\n{}", row1, details.join(" │ "))
+        }
     } else {
         let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
         parts.push(format!("{} │", project_label));
