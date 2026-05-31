@@ -1022,6 +1022,21 @@ fn output_rich(
         };
 
         // Build name with optional symlink target
+        // Add classify indicator if enabled
+        let classify_suffix = if config.classify {
+            if item.is_dir {
+                "/".to_string()
+            } else if item.is_symlink {
+                "@".to_string()
+            } else if item.is_exec {
+                "*".to_string()
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
         let name_display = if item.is_symlink {
             if let Some(target) = &item.symlink_target {
                 let indicator = if item.symlink_valid {
@@ -1030,9 +1045,10 @@ fn output_rich(
                     "✗→"
                 };
                 format!(
-                    "{}{}{} {}{}{} {}",
+                    "{}{}{}{} {}{}{} {}",
                     name_prefix,
                     item.name,
+                    classify_suffix,
                     name_suffix,
                     color(DIM),
                     indicator,
@@ -1040,10 +1056,10 @@ fn output_rich(
                     target
                 )
             } else {
-                format!("{}{}{}", name_prefix, item.name, name_suffix)
+                format!("{}{}{}{}", name_prefix, item.name, classify_suffix, name_suffix)
             }
         } else {
-            format!("{}{}{}", name_prefix, item.name, name_suffix)
+            format!("{}{}{}{}", name_prefix, item.name, classify_suffix, name_suffix)
         };
 
         let modified = item
