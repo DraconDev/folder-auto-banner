@@ -313,8 +313,7 @@ fn handle_client(
                             }
                         }
                         drop(global_sizes);
-                        // Refresh git status (cheap — just libgit2 status check)
-                        data.git_info = cfm_lib::git::get_git_info(&path).ok();
+                        // Don't refresh git on cache hit — it's cached with TTL
                         return send_response(&mut writer, &Response::Banner(Box::new(data)));
                     }
                 }
@@ -414,7 +413,29 @@ fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
-    let git_info = cfm_lib::git::get_git_info(path).ok();
+    let mut git_info = cfm_lib::git::get_git_info(path).ok();
+
+    // Filter file_statuses to only include files in this directory.
+    // get_git_info returns statuses for the entire repo (which can be 36K+
+    // entries from target/). We only need entries for the ~20 files we display.
+    if let Some(ref mut gi) = git_info {
+        if !gi.file_statuses.is_empty() {
+            let keep: std::collections::HashSet<_> = summary
+                .top_items
+                .iter()
+                .map(|item| item.name.clone())
+                .collect();
+            gi.file_statuses
+                .retain(|path_str, _| {
+                    // Match by filename (for files in this dir) or by relative path
+                    let name = std::path::Path::new(path_str)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    keep.contains(path_str) || keep.contains(&name)
+                });
+        }
+    }
 
     // Return immediately — sizes come from global cache
     Ok(BannerData {
