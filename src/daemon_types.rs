@@ -41,6 +41,7 @@ pub struct BannerData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn test_request_banner_serialization() {

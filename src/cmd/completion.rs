@@ -81,3 +81,51 @@ pub fn run_completion(shell: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_run_completion_bash() {
+        let result = run_completion("bash");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_completion_zsh() {
+        let result = run_completion("zsh");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_completion_fish() {
+        let result = run_completion("fish");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_completion_powershell() {
+        let result = run_completion("powershell");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_completion_ps() {
+        let result = run_completion("ps");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_completion_elvish() {
+        let result = run_completion("elvish");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_completion_unknown_shell() {
+        // Unknown shell should still return Ok, just print error
+        let result = run_completion("unknown");
+        assert!(result.is_ok());
+    }
+}
