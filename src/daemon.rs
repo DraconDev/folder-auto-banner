@@ -424,12 +424,40 @@ fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
     
-    // Build filter list: use relative paths from banner directory for git status filtering
-    // e.g., for banner ~/Dev/cli-file-manager, filter on "src", "Cargo.toml", etc.
+    // Build filter list for git status collection:
+    // - For files at root: just the filename (e.g., "Cargo.toml")
+    // - For directories: the directory name (e.g., "src") to match all children
+    // This tells git2 to only collect statuses for files we'll actually display
     let filter_paths: Vec<String> = summary.top_items.iter().map(|item| item.name.clone()).collect();
     
     // Use filtered git info — only collects statuses for top_items (much faster for large repos)
-    let git_info = cfm_lib::git::get_git_info_filtered(path, &filter_paths).ok();
+    let mut git_info = cfm_lib::git::get_git_info_filtered(path, &filter_paths).ok();
+    
+    // For directories, we need to also collect statuses for their immediate children
+    // because git pathspec "src" matches src/*, but we display src/daemon.rs etc.
+    // The filter already handles this via pathspec matching.
+    // Additionally, filter file_statuses to only keep depth 0 or 1 entries.
+    if let Some(ref mut gi) = git_info {
+        if !gi.file_statuses.is_empty() {
+            let keep: std::collections::HashSet<_> = summary
+                .top_items
+                .iter()
+                .map(|item| item.name.clone())
+                .collect();
+            gi.file_statuses.retain(|path_str, _| {
+                let components: Vec<_> = std::path::Path::new(path_str)
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy().to_string())
+                    .collect();
+                match components.len() {
+                    0 => false,
+                    1 => keep.contains(&components[0]),
+                    2 => keep.contains(&components[0]),  // "src/daemon.rs"
+                    _ => false,  // "target/debug/build/..." — exclude
+                }
+            });
+        }
+    }
         }
     }
 
