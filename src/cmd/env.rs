@@ -60,3 +60,51 @@ fn generate_aliases(project_type: &ProjectType) -> Vec<String> {
 
     aliases
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_aliases_rust() {
+        let aliases = generate_aliases(&ProjectType::Rust);
+        assert!(aliases.iter().any(|a| a.contains("cargo run")));
+        assert!(aliases.iter().any(|a| a.contains("cargo test")));
+        assert!(aliases.iter().any(|a| a.contains("cargo build")));
+    }
+
+    #[test]
+    fn test_generate_aliases_node() {
+        let aliases = generate_aliases(&ProjectType::Node);
+        assert!(aliases.iter().any(|a| a.contains("npm run dev")));
+        assert!(aliases.iter().any(|a| a.contains("npm test")));
+    }
+
+    #[test]
+    fn test_generate_aliases_python() {
+        let aliases = generate_aliases(&ProjectType::Python);
+        assert!(aliases.iter().any(|a| a.contains("pytest")));
+        assert!(aliases.iter().any(|a| a.contains("python -m")));
+    }
+
+    #[test]
+    fn test_generate_aliases_go() {
+        let aliases = generate_aliases(&ProjectType::Go);
+        assert!(aliases.iter().any(|a| a.contains("go run")));
+        assert!(aliases.iter().any(|a| a.contains("go test")));
+    }
+
+    #[test]
+    fn test_generate_aliases_generic() {
+        let aliases = generate_aliases(&ProjectType::Generic);
+        assert!(aliases.iter().any(|a| a.contains("make run")));
+        assert!(aliases.iter().any(|a| a.contains("make")));
+    }
+
+    #[test]
+    fn test_run_env_returns_ok() {
+        // run_env should not panic even if current dir detection fails
+        let result = run_env(None, None);
+        assert!(result.is_ok());
+    }
+}
