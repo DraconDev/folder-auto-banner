@@ -59,11 +59,9 @@ for loc in "$BIN_DIR/cfmd" "$HOME/.cargo/bin/cfmd" "$HOME/bin/cfmd" "/usr/local/
     fi
 done
 
-# --- Build release if binaries don't exist ---
-if [ ! -f "target/release/f" ] || [ ! -f "target/release/cfmd" ]; then
-    echo "   Building release binaries..."
-    cargo build --release
-fi
+# --- Always build release to ensure latest version ---
+echo "   Building release binaries..."
+cargo build --release
 
 # --- Copy new binaries ---
 cp target/release/f "$BIN_PATH"
