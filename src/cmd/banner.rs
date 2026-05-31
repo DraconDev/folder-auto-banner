@@ -447,7 +447,29 @@ fn output_rich(
                 if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
                     let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
                         let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                        format!("{}{} {}%{}", color(DIM), ext, pct, color(RESET))
+                        let name = match ext.as_str() {
+                            "rs" => "Rust",
+                            "md" | "mdx" => "Markdown",
+                            "sh" | "bash" => "Shell",
+                            "py" => "Python",
+                            "js" | "mjs" => "JavaScript",
+                            "ts" | "tsx" => "TypeScript",
+                            "go" => "Go",
+                            "c" | "h" => "C",
+                            "cpp" | "cc" | "cxx" | "hpp" => "C++",
+                            "java" => "Java",
+                            "rb" => "Ruby",
+                            "toml" => "TOML",
+                            "yaml" | "yml" => "YAML",
+                            "json" => "JSON",
+                            "html" | "htm" => "HTML",
+                            "css" => "CSS",
+                            "sql" => "SQL",
+                            "vim" => "VimL",
+                            "el" => "Emacs Lisp",
+                            _ => ext,
+                        };
+                        format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
                     }).collect();
                     details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
                 }
@@ -640,7 +662,29 @@ fn output_rich(
                 if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
                     let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
                         let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                        format!("{}{} {}%{}", color(DIM), ext, pct, color(RESET))
+                        let name = match ext.as_str() {
+                            "rs" => "Rust",
+                            "md" | "mdx" => "Markdown",
+                            "sh" | "bash" => "Shell",
+                            "py" => "Python",
+                            "js" | "mjs" => "JavaScript",
+                            "ts" | "tsx" => "TypeScript",
+                            "go" => "Go",
+                            "c" | "h" => "C",
+                            "cpp" | "cc" | "cxx" | "hpp" => "C++",
+                            "java" => "Java",
+                            "rb" => "Ruby",
+                            "toml" => "TOML",
+                            "yaml" | "yml" => "YAML",
+                            "json" => "JSON",
+                            "html" | "htm" => "HTML",
+                            "css" => "CSS",
+                            "sql" => "SQL",
+                            "vim" => "VimL",
+                            "el" => "Emacs Lisp",
+                            _ => ext,
+                        };
+                        format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
                     }).collect();
                     details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
                 }
