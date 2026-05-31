@@ -712,18 +712,22 @@ fn proactive_scan(
 
     let mut banner_count = 0;
     for path in &banner_targets {
-        // Skip if already cached
-        {
+        // Check cache with brief lock, compute outside lock
+        let should_compute = {
             let cache = banner_cache.lock().unwrap_or_else(|e| {
                 tracing::warn!("Mutex poisoned, recovering");
                 e.into_inner()
             });
-            if cache.get(path).map(|e| e.computed_at.elapsed() < CACHE_TTL).unwrap_or(false) {
-                continue;
-            }
+            !cache.get(path).map(|e| e.computed_at.elapsed() < CACHE_TTL).unwrap_or(false)
+        };
+        
+        if !should_compute {
+            continue;
         }
-
+        
+        // Compute banner data outside the lock (expensive operation)
         if let Ok(data) = compute_banner_data(path) {
+            // Brief lock to insert
             let mut cache = banner_cache.lock().unwrap_or_else(|e| {
                 tracing::warn!("Mutex poisoned, recovering");
                 e.into_inner()

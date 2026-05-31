@@ -34,6 +34,19 @@ pub enum ProjectType {
 impl ProjectType {
     /// Detect project type from directory contents, walking up to ancestors
     pub fn detect(path: &Path) -> Self {
+        // Check cache first
+        let cached = PROJECT_TYPE_CACHE.with(|cache| cache.borrow().get(path).cloned());
+        if let Some(pt) = cached {
+            return pt;
+        }
+        
+        // Detect and cache the result
+        let result = Self::detect_inner(path);
+        PROJECT_TYPE_CACHE.with(|cache| cache.borrow_mut().insert(path.to_path_buf(), result.clone()));
+        result
+    }
+    
+    fn detect_inner(path: &Path) -> Self {
         let mut current = Some(path);
         while let Some(dir) = current {
             if let Ok(d) = std::fs::read_dir(dir) {
