@@ -229,17 +229,23 @@ fn warm_nearby_dirs(path: &Path) {
     let Some(parent) = path.parent() else { return };
     if !parent.is_dir() { return; }
 
-    // Warm parent
-    crate::daemon_client::send_warm(parent);
+    // Collect paths to warm, then spawn background thread to avoid blocking
+    let mut paths_to_warm = vec![parent.to_path_buf()];
 
-    // Warm siblings (up to 20, to avoid overwhelming the daemon)
     if let Ok(entries) = std::fs::read_dir(parent) {
         for entry in entries.flatten().take(20) {
             if entry.path().is_dir() && entry.path() != path {
-                crate::daemon_client::send_warm(&entry.path());
+                paths_to_warm.push(entry.path());
             }
         }
     }
+
+    // Fire-and-forget in background thread — don't block the banner
+    std::thread::spawn(move || {
+        for p in &paths_to_warm {
+            crate::daemon_client::send_warm(p);
+        }
+    });
 }
 
 /// Output rich formatted banner — compact lsd-style layout
