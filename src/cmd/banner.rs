@@ -1463,3 +1463,71 @@ fn truncate_details(details: &[String], available: usize) -> String {
     
     kept.join(" │ ")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_loc() {
+        assert_eq!(format_loc(0), "0");
+        assert_eq!(format_loc(500), "500");
+        assert_eq!(format_loc(1000), "1.0k");
+        assert_eq!(format_loc(1500), "1.5k");
+        assert_eq!(format_loc(10000), "10k");
+        assert_eq!(format_loc(123456), "123k");
+    }
+
+    #[test]
+    fn test_strip_ansi() {
+        assert_eq!(strip_ansi("hello"), "hello");
+        assert_eq!(strip_ansi("\x1b[31mred\x1b[0m"), "red");
+        assert_eq!(strip_ansi("a\x1b[1mb\x1b[0mc"), "abc");
+    }
+
+    #[test]
+    fn test_natural_cmp() {
+        assert_eq!(natural_cmp("file1", "file2"), std::cmp::Ordering::Less);
+        assert_eq!(natural_cmp("file2", "file10"), std::cmp::Ordering::Less);
+        assert_eq!(natural_cmp("file10", "file2"), std::cmp::Ordering::Greater);
+        assert_eq!(natural_cmp("file1", "file1"), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn test_colorize_perms() {
+        let result = colorize_perms("drwxr-xr-x");
+        // Should contain ANSI codes
+        assert!(result.contains("\x1b["));
+        // Should contain the original characters
+        assert!(result.contains("d"));
+        assert!(result.contains("r"));
+        assert!(result.contains("w"));
+        assert!(result.contains("x"));
+        assert!(result.contains("-"));
+    }
+
+    #[test]
+    fn test_truncate_details() {
+        let details = vec![
+            "short".to_string(),
+            "medium length".to_string(),
+            "this is a very long detail that should be truncated".to_string(),
+        ];
+        
+        // Test with enough space
+        let result = truncate_details(&details, 100);
+        assert!(result.contains("short"));
+        assert!(result.contains("medium length"));
+        
+        // Test with limited space
+        let result = truncate_details(&details, 20);
+        assert!(result.contains("short"));
+    }
+
+    #[test]
+    fn test_get_terminal_width() {
+        // Should return 0 or a positive number
+        let width = get_terminal_width();
+        assert!(width <= 1000); // Reasonable upper bound
+    }
+}
