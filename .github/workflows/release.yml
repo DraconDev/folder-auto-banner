@@ -35,7 +35,8 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           files: |
-            target/release/fm
+            target/release/f
+            target/release/cfmd
           body: |
             Release ${{ github.ref_name }}
           draft: false
