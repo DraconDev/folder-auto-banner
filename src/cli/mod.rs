@@ -93,6 +93,10 @@ pub enum Commands {
         #[arg(long)]
         hidden: bool,
 
+        /// Show relative dates (e.g., "2h ago", "just now")
+        #[arg(long)]
+        relative_date: bool,
+
         /// Filter items by pattern (glob or extension)
         #[arg(short, long)]
         filter: Option<String>,
@@ -174,6 +178,7 @@ impl Cli {
                 group_dirs,
                 reverse,
                 hidden,
+                relative_date,
                 filter,
                 max,
                 group,

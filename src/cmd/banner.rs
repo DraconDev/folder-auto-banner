@@ -66,6 +66,7 @@ pub struct BannerOptions<'a> {
     pub group_dirs: Option<&'a str>,
     pub reverse: bool,
     pub hidden: bool,
+    pub relative_date: bool,
     pub filter: Option<&'a str>,
     pub max: Option<usize>,
     pub group: bool,
