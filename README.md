@@ -37,9 +37,12 @@ f -a                 # Show dotfiles
 f --tree             # Tree view
 f --json             # JSON output
 f --filter rs        # Filter by pattern
+f config             # Open config file
+f daemon stop        # Stop daemon
+f daemon status      # Check daemon status
 ```
 
-## Flags
+## CLI Flags (Actions)
 
 ### Sorting
 | Flag | Description |
@@ -71,6 +74,49 @@ f --filter rs        # Filter by pattern
 | `--json` | JSON output |
 | `--raw` | Plain text output |
 
+## Config File
+
+Location: `~/.config/cfm/config.toml`
+
+Open with: `f config`
+
+### Display Settings
+```toml
+[display]
+permission = "rwx"        # rwx, octal, disable
+size = "default"          # default, short, bytes
+date = "date"             # date, relative
+classify = true           # append */=>@|
+no_symlink = false
+total_size = true
+```
+
+### Column Selection
+```toml
+[columns]
+show = ["permission", "owner", "group", "size", "date", "name"]
+hide = ["inode", "links"]
+```
+
+### Feature Toggles
+```toml
+[features]
+git_status = true
+build_status = true
+todo_count = true
+languages = true
+ports = true
+docker = true
+```
+
+### Sorting
+```toml
+[sort]
+default = "name"
+reverse = false
+group_dirs = "first"
+```
+
 ## Environment Variables
 
 | Variable | Description |
@@ -80,6 +126,7 @@ f --filter rs        # Filter by pattern
 | `CFM_NO_DOCKER` | Set to `1` to disable Docker detection |
 | `CFM_NO_METRICS` | Set to `1` to disable code metrics |
 | `NO_COLOR` | Disable colors (per spec) |
+| `EDITOR` | Editor for `f config` (default: vi) |
 
 ## Testing
 

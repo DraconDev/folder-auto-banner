@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2024-05-31
+
+### Added
+- **Config file** (`~/.config/cfm/config.toml`) with all display preferences
+- `f config` command — opens config in $EDITOR
+- `f daemon stop/status` commands — daemon management
+- Two-row banner layout for better readability
+- Dynamic truncation for narrow terminals
+- Git enhancements: last commit time, commits today, branch count
+- Languages breakdown with percentages
+- Build timing display
+- Cached test results display
+- Permission modes: rwx, octal, disable
+- Column selection (show/hide columns)
+- Feature toggles (git, build, todos, languages, ports, docker)
+
+### Changed
+- **Design principle**: CLI flags = actions, Config file = preferences
+- Simplified CLI to focus on core features
+- Improved banner layout with two rows
+
+### Fixed
+- Daemon log spam for non-existent directories
+- Dead symlink handling in daemon watcher
+- Install script properly stops daemon before reinstall
+- Broken symlink display (✗→ indicator)
+- Full resolved symlink paths
+
 ## [0.3.0] - 2024-05-30
 
 ### Changed
@@ -22,11 +50,6 @@ All notable changes to this project will be documented in this file.
 - `--verbose` flag for more info
 - Broken symlink indicator (✗→)
 - Full resolved symlink paths
-
-### Fixed
-- Daemon log spam for non-existent directories
-- Dead symlink handling in daemon watcher
-- Install script properly stops daemon before reinstall
 
 ## [0.2.0] - 2024-05-30
 
