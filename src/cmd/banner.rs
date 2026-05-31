@@ -1435,10 +1435,6 @@ fn truncate_details(details: &[String], available: usize) -> String {
         return String::new();
     }
     
-    // Priority order: keep most important, remove least important
-    // Most important: commit time, languages, clean status
-    // Less important: branch count, ports, docker, test results
-    
     let mut kept = Vec::new();
     let mut current_len = 0;
     
@@ -1453,9 +1449,10 @@ fn truncate_details(details: &[String], available: usize) -> String {
             // Try to fit a truncated version
             let remaining = available.saturating_sub(current_len);
             if remaining > 10 {
-                // Truncate this item
-                let truncated = format!("{}…", &plain[..remaining - 1]);
-                kept.push(truncated);
+                // Truncate this item safely
+                let truncated_len = remaining.saturating_sub(1); // Leave room for "…"
+                let truncated: String = plain.chars().take(truncated_len).collect();
+                kept.push(format!("{}…", truncated));
             }
             break;
         }
