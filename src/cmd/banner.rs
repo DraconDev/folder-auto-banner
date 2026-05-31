@@ -499,13 +499,13 @@ fn output_rich(
                     loc_str,
                     color(RESET)
                 ));
-                // Show top 3 languages with proper formatting
-                if !metrics.by_extension.is_empty() {
+                // Show top 3 languages with percentages
+                if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
                     let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
-                        let loc_str = format_loc(*loc);
-                        format!("{}{}{}{}", color(DIM), ext, loc_str, color(RESET))
+                        let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
+                        format!("{}{} {}%{}", color(DIM), ext, pct, color(RESET))
                     }).collect();
-                    parts.push(format!("│ {}", lang_parts.join(" ")));
+                    parts.push(format!("│ {}{}", color(DIM), lang_parts.join(" ")));
                 }
             }
         }
