@@ -120,6 +120,9 @@ pub enum Commands {
         #[arg(long, default_value = "shell")]
         format: Option<String>,
     },
+
+    /// Open configuration file in editor
+    Config,
 }
 
 impl Cli {
