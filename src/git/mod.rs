@@ -66,7 +66,20 @@ impl FileStatus {
 }
 
 /// Get Git info for a directory
+/// 
+/// If `collect_file_statuses` is false, skips building the per-file status map
+/// (which can be 39K+ entries for large repos). Use false when you only need
+/// aggregate counts (staged/modified/untracked) for the banner header.
 pub fn get_git_info(path: &Path) -> Result<GitInfo> {
+    get_git_info_inner(path, true)
+}
+
+/// Get Git info without per-file status map (faster, for banner header only)
+pub fn get_git_info_summary(path: &Path) -> Result<GitInfo> {
+    get_git_info_inner(path, false)
+}
+
+fn get_git_info_inner(path: &Path, collect_file_statuses: bool) -> Result<GitInfo> {
     let mut repo = match Repository::discover(path) {
         Ok(r) => r,
         Err(_) => return Ok(GitInfo::default()),
@@ -106,32 +119,38 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
                 || status.contains(git2::Status::INDEX_RENAMED)
             {
                 staged += 1;
-                let fs = if status.contains(git2::Status::INDEX_NEW) {
-                    FileStatus::Added
-                } else if status.contains(git2::Status::INDEX_DELETED) {
-                    FileStatus::Deleted
-                } else if status.contains(git2::Status::INDEX_RENAMED) {
-                    FileStatus::Renamed
-                } else {
-                    FileStatus::Added
-                };
-                file_statuses.insert(file_path, fs);
+                if collect_file_statuses {
+                    let fs = if status.contains(git2::Status::INDEX_NEW) {
+                        FileStatus::Added
+                    } else if status.contains(git2::Status::INDEX_DELETED) {
+                        FileStatus::Deleted
+                    } else if status.contains(git2::Status::INDEX_RENAMED) {
+                        FileStatus::Renamed
+                    } else {
+                        FileStatus::Added
+                    };
+                    file_statuses.insert(file_path, fs);
+                }
             } else if status.contains(git2::Status::WT_MODIFIED)
                 || status.contains(git2::Status::WT_DELETED)
                 || status.contains(git2::Status::WT_RENAMED)
             {
                 modified += 1;
-                let fs = if status.contains(git2::Status::WT_DELETED) {
-                    FileStatus::Deleted
-                } else if status.contains(git2::Status::WT_RENAMED) {
-                    FileStatus::Renamed
-                } else {
-                    FileStatus::Modified
-                };
-                file_statuses.insert(file_path, fs);
+                if collect_file_statuses {
+                    let fs = if status.contains(git2::Status::WT_DELETED) {
+                        FileStatus::Deleted
+                    } else if status.contains(git2::Status::WT_RENAMED) {
+                        FileStatus::Renamed
+                    } else {
+                        FileStatus::Modified
+                    };
+                    file_statuses.insert(file_path, fs);
+                }
             } else if status.contains(git2::Status::WT_NEW) {
                 untracked += 1;
-                file_statuses.insert(file_path, FileStatus::Untracked);
+                if collect_file_statuses {
+                    file_statuses.insert(file_path, FileStatus::Untracked);
+                }
             }
         }
     }
@@ -179,8 +198,8 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         })
         .unwrap_or((None, None, None));
 
-    // Count commits today
-    let commits_today = {
+    // Count commits today (skip for summary-only calls)
+    let commits_today = if collect_file_statuses {
         let mut count = 0;
         let today_start = {
             let now = chrono::Utc::now();
@@ -208,6 +227,8 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
             }
         }
         count
+    } else {
+        0
     };
 
     // Count branches

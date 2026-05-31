@@ -399,6 +399,16 @@ fn handle_client(
         Request::Ping => Response::Pong,
         Request::Shutdown => {
             tracing::info!("Shutdown requested");
+            // Save banner cache before exiting
+            let socket_dir =
+                directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
+            if let Some(dir) = socket_dir {
+                let c = cache.lock().unwrap_or_else(|e| {
+                    tracing::warn!("Mutex poisoned, recovering");
+                    e.into_inner()
+                });
+                save_banner_cache(&dir, &c);
+            }
             std::process::exit(0);
         }
     };
