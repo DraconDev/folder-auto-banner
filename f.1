@@ -1,166 +1,221 @@
-.TH FM 1 "2024-05-31" "cfm 0.4.0" "User Commands"
+.\" Man page for f (cfm)
+.\" Contextual File Manager
+.\"
+.TH F 1 "2026-05-31" "cfm 0.4.0" "User Commands"
+.\"
 .SH NAME
-f \- contextual file manager
+f \- contextual file manager with instant context
+.\"
 .SH SYNOPSIS
 .B f
-.RB [ OPTIONS ]
-.RB [ PATH ]
+.RI [ OPTIONS ]
+.RI [ PATH ]
 .br
-.B f
-.RB [ COMMAND ]
+.B f banner
+.RI [ OPTIONS ]
+.RI [ PATH ]
+.br
+.B f env
+.RI [ PATH ]
+.br
+.B f config
+.br
+.B f daemon
+.RI { start | stop | status }
+.\"
 .SH DESCRIPTION
 .B cfm
-is a directory listing with instant context. It shows file listing (like ls/exa/lsd) along with git status, build status, TODO count, languages breakdown, and more.
+is a directory listing tool that shows instant context about your project.
+When you run
+.BR f ,
+you see:
+.IP \(bu 2
+File listing with permissions, owner, group, size, date, name
+.IP \(bu 2
+Git status, last commit, commits today, branches
+.IP \(bu 2
+Build status with duration
+.IP \(bu 2
+TODO count
+.IP \(bu 2
+Languages breakdown
+.IP \(bu 2
+Ports in use
+.IP \(bu 2
+Docker status
+.IP \(bu 2
+Cached test results
+.PP
+All instantly, no extra commands needed.
+.\"
 .SH OPTIONS
-.SS Sorting
+.SS General Options
 .TP
-.BI \-\-sort " FIELD"
-Sort by field: name, size, date, type, git, extension, version
+.BR \-\-help
+Display help information.
 .TP
-.BR \-t ", " \-\-timesort
-Sort by time modified
+.BR \-\-version
+Display version information.
 .TP
-.BR \-S ", " \-\-sizesort
-Sort by size
+.BR \-v ", " \-\-verbose
+Enable verbose output.
 .TP
-.BR \-X ", " \-\-extensionsort
-Sort by file extension
+.BR \-d ", " \-\-debug
+Enable debug output.
+.\"
+.SS Banner Options
 .TP
-.BR \-G ", " \-\-gitsort
-Sort by git status
+.BR \-\-raw
+Output raw paths (no formatting, for piping).
 .TP
-.B \-\-versionsort
-Natural sort (version numbers)
+.BR \-\-json
+Output JSON (for scripting).
 .TP
-.B \-\-no\-sort
-No sort, directory order
-.TP
-.B \-\-reverse
-Reverse sort order
-.TP
-.BI \-\-group\-dirs " MODE"
-Group directories: none, first, last
-.SS Display
+.BR \-c ", " \-\-compact
+Compact output (fewer lines).
 .TP
 .BR \-a ", " \-\-hidden
-Show hidden files (dotfiles)
+Show hidden files (dotfiles).
 .TP
-.BI \-\-tree " [DEPTH]"
-Tree view (0 = unlimited depth)
+.BR \-\-classify
+Append type indicator (*/=>@|).
 .TP
-.B \-\-group
-Group by type (dirs, files, symlinks)
+.BR \-\-relative\-date
+Show relative dates (e.g., "2h ago", "just now").
 .TP
-.BI \-\-filter " PATTERN"
-Filter by name pattern
+.BI \-\-sort " MODE"
+Sort order: name, size, date, type, git, extension, version.
 .TP
-.BI \-\-max " N"
-Limit items displayed
+.BR \-t ", " \-\-timesort
+Sort by time modified.
 .TP
-.B \-\-compact
-Less info
+.BR \-S ", " \-\-sizesort
+Sort by size.
 .TP
-.B \-\-verbose
-More info
-.SS Output
+.BR \-X ", " \-\-extensionsort
+Sort by file extension.
 .TP
-.B \-\-json
-JSON output
+.BR \-G ", " \-\-gitsort
+Sort by git status.
 .TP
-.B \-\-raw
-Plain text output
-.SH COMMANDS
+.BR \-\-versionsort
+Natural sort (version numbers).
+.TP
+.BR \-U ", " \-\-no\-sort
+No sort \(em list in directory order.
+.TP
+.BR \-\-reverse
+Reverse sort order.
+.TP
+.BR \-\-group\-dirs \fR=\fIMODE
+Group directories: none, first, last.
+.TP
+.BR \-g ", " \-\-group
+Group items by type (dirs, files, symlinks).
+.TP
+.BR \-f ", " \-\-filter \fR=\fIPATTERN
+Filter items by pattern (glob or extension).
+.TP
+.BR \-m ", " \-\-max \fR=\fIN
+Maximum number of items to display.
+.TP
+.BR \-\-blocks \fR=\fICOLUMNS
+Columns to display (comma-separated: permission,owner,group,size,contents,date,name).
+.TP
+.BR \-\-tree [\fIDEPTH\fR]
+Tree view with specified depth (0 = unlimited).
+.\"
+.SH EXAMPLES
 .TP
 .B f
-Directory listing + context (default)
+Show the contextual directory dashboard.
 .TP
-.B f PATH
-Listing for specific directory
+.B f /path/to/dir
+Show dashboard for a specific directory.
+.TP
+.B f \-\-json
+Output as JSON for scripting.
+.TP
+.B f \-\-raw
+Output raw paths for piping.
+.TP
+.B f \-\-classify
+Show type indicators after filenames.
+.TP
+.B f \-\-relative\-date
+Show dates as relative times.
+.TP
+.B f \-\-blocks name,size,git
+Show only name, size, and git columns.
 .TP
 .B f env
-Output shell aliases for current project type
+Output shell aliases for current project type.
 .TP
 .B f config
-Open configuration file in editor
-.TP
-.B f daemon stop
-Stop the background daemon
+Open configuration file in editor.
 .TP
 .B f daemon status
-Show daemon status
+Check if daemon is running.
+.\"
 .SH CONFIGURATION
-Configuration file: ~/.config/cfm/config.toml
+Configuration file is located at
+.IR ~/.config/cfm/config.toml .
 .PP
-Open with: f config
-.PP
-Example:
-.PP
-.RS
-[display]
-.br
-permission = "rwx"
-.br
-size = "default"
-.br
-date = "date"
-.br
-classify = true
-.RE
+See the README for full configuration options.
+.\"
 .SH ENVIRONMENT
 .TP
-.B CFM_NO_TODOS
-Set to 1 to disable TODO scanning
+.B CFM_ICONS
+Set to "1" to enable icons.
 .TP
-.B CFM_NO_PORTS
-Set to 1 to disable port detection
-.TP
-.B CFM_NO_DOCKER
-Set to 1 to disable Docker detection
-.TP
-.B CFM_NO_METRICS
-Set to 1 to disable code metrics
+.B CFM_COLORS
+Set to "1" to enable colors.
 .TP
 .B NO_COLOR
-Disable colors (per spec)
+Disable colors when set.
 .TP
-.B EDITOR
-Editor for f config (default: vi)
-.SH EXAMPLES
-.PP
-Directory listing:
-.PP
-.RS
-f
-.RE
-.PP
-Sort by size:
-.PP
-.RS
-f -S
-.RE
-.PP
-Show dotfiles:
-.PP
-.RS
-f -a
-.RE
-.PP
-Tree view:
-.PP
-.RS
-f --tree
-.RE
-.PP
-JSON output:
-.PP
-.RS
-f --json
-.RE
+.B CFM_NO_TODOS
+Set to "1" to disable TODO counting.
+.TP
+.B CFM_NO_PORTS
+Set to "1" to disable port detection.
+.TP
+.B CFM_NO_DOCKER
+Set to "1" to disable Docker detection.
+.TP
+.B CFM_NO_METRICS
+Set to "1" to disable code metrics.
+.\"
+.SH FILES
+.TP
+.I ~/.config/cfm/config.toml
+Configuration file.
+.TP
+.I ~/.local/share/cfm/cfmd.sock
+Daemon socket file.
+.TP
+.I ~/.local/share/cfm/banner_cache.json
+Cached banner data.
+.TP
+.I ~/.local/share/cfm/dir_sizes.json
+Cached directory sizes.
+.\"
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Error occurred.
+.\"
 .SH SEE ALSO
 .BR ls (1),
 .BR exa (1),
-.BR lsd (1)
-.SH AUTHOR
-Dracon Nonis
+.BR lsd (1),
+.BR git (1)
+.\"
+.SH AUTHORS
+Written by Dracon.
+.\"
 .SH LICENSE
-MIT
+MIT License.
