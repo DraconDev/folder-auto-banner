@@ -582,11 +582,25 @@ fn output_rich(
             }
         }
         
-        // Combine rows
+        // Combine rows with dynamic truncation
         if details.is_empty() {
             row1
         } else {
-            format!("{}\n{}", row1, details.join(" │ "))
+            let details_str = details.join(" │ ");
+            let term_width = get_terminal_width();
+            let row1_width = strip_ansi(&row1).len();
+            
+            if term_width > 0 && row1_width + details_str.len() > term_width {
+                let available = term_width.saturating_sub(row1_width + 3);
+                if available > 20 {
+                    let truncated = truncate_details(&details, available);
+                    format!("{}\n{}", row1, truncated)
+                } else {
+                    row1
+                }
+            } else {
+                format!("{}\n{}", row1, details_str)
+            }
         }
     } else {
         // Row 1: Core info
@@ -726,11 +740,25 @@ fn output_rich(
         
         details.push(format!("{}│ {} total{}", color(DIM), summary.total_items, color(RESET)));
         
-        // Combine rows
+        // Combine rows with dynamic truncation
         if details.is_empty() {
             row1
         } else {
-            format!("{}\n{}", row1, details.join(" │ "))
+            let details_str = details.join(" │ ");
+            let term_width = get_terminal_width();
+            let row1_width = strip_ansi(&row1).len();
+            
+            if term_width > 0 && row1_width + details_str.len() > term_width {
+                let available = term_width.saturating_sub(row1_width + 3);
+                if available > 20 {
+                    let truncated = truncate_details(&details, available);
+                    format!("{}\n{}", row1, truncated)
+                } else {
+                    row1
+                }
+            } else {
+                format!("{}\n{}", row1, details_str)
+            }
         }
     };
 
