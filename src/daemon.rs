@@ -425,11 +425,8 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
                 .iter()
                 .map(|item| item.name.clone())
                 .collect();
-            eprintln!("file_statuses before filter: {}", gi.file_statuses.len());
-            eprintln!("keep set: {:?}", keep);
             gi.file_statuses
                 .retain(|path_str, _| {
-                    // Get the first component of the path (e.g., "src" from "src/git/mod.rs")
                     let first_component = std::path::Path::new(path_str)
                         .components()
                         .next()
@@ -439,13 +436,8 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
                         .file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
-                    let should_keep = keep.contains(path_str) || keep.contains(&name) || keep.contains(&first_component);
-                    if !should_keep {
-                        eprintln!("Filtering out: {} (first_component: {}, name: {})", path_str, first_component, name);
-                    }
-                    should_keep
+                    keep.contains(path_str) || keep.contains(&name) || keep.contains(&first_component)
                 });
-            eprintln!("file_statuses after filter: {}", gi.file_statuses.len());
         }
     }
 
