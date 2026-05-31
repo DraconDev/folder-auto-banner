@@ -131,7 +131,9 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
                 file_statuses.insert(file_path, fs);
             } else if status.contains(git2::Status::WT_NEW) {
                 untracked += 1;
-                file_statuses.insert(file_path, FileStatus::Untracked);
+                // Don't store untracked file paths — just count them.
+                // In large repos (e.g. with target/), this HashMap can have
+                // 36K+ entries and serialize to 3.4MB over IPC.
             }
         }
     }
