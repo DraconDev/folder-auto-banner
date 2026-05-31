@@ -102,6 +102,9 @@
 
 ## 🔴 Current Issues
 
+### Performance (Critical)
+- [ ] **file_statuses bloat** — `get_git_info()` stores every untracked file in `file_statuses` HashMap. In this repo: 36,501 entries (from `target/` build dir) = 3.4MB serialized over IPC on every request. Fix: count only, don't store paths.
+
 ### Daemon
 - [ ] Fix daemon log spam for non-existent directories
 - [ ] Fix daemon to handle dead symlinks gracefully
