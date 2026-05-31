@@ -69,6 +69,7 @@ pub struct BannerOptions<'a> {
     pub filter: Option<&'a str>,
     pub max: Option<usize>,
     pub group: bool,
+    pub classify: bool,
     pub tree: Option<Option<usize>>,
 }
 
