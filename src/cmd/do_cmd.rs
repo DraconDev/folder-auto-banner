@@ -85,7 +85,7 @@ pub fn run_do(action: Option<&str>, verbose: bool, dry_run: bool) -> Result<()> 
                                 "{:x}",
                                 std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
+                                    .unwrap_or_default()
                                     .as_nanos()
                             );
                             let dest = trash_dir.join(&id);

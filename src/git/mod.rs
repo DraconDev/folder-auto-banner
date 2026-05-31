@@ -187,7 +187,10 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
         let today_start = {
             let now = chrono::Utc::now();
             let today = now.date_naive();
-            today.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp()
+            today
+                .and_hms_opt(0, 0, 0)
+                .map(|dt| dt.and_utc().timestamp())
+                .unwrap_or(0)
         };
         
         let mut revwalk = repo.revwalk().ok();

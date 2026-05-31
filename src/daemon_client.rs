@@ -128,7 +128,11 @@ pub fn ensure_daemon_running() {
         return;
     };
 
-    let daemon_bin = exe.parent().unwrap().join("cfmd");
+    let Some(parent) = exe.parent() else {
+        tracing::warn!("Cannot determine parent directory of executable");
+        return;
+    };
+    let daemon_bin = parent.join("cfmd");
     if !daemon_bin.exists() {
         tracing::warn!("cfmd binary not found at {}", daemon_bin.display());
         return;

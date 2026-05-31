@@ -250,6 +250,40 @@ fn warm_nearby_dirs(path: &Path) {
 
 /// Output rich formatted banner — compact lsd-style layout
 #[allow(clippy::too_many_arguments)]
+/// Build git branch display with color (blue if clean, yellow if dirty)
+fn build_branch_display(git_info: &GitInfo) -> String {
+    let git_branch = git_info.branch.as_deref().unwrap_or("");
+    if git_branch.is_empty() {
+        return String::new();
+    }
+    if git_info.is_dirty {
+        format!("{}[{}*{}]", color(YELLOW), git_branch, color(RESET))
+    } else {
+        format!("{}[{}{}]", color(BLUE_BOLD), git_branch, color(RESET))
+    }
+}
+
+/// Build git status indicators (p10k-style): *modified +staged ?untracked ↑ahead ↓behind
+fn build_git_status_indicators(git_info: &GitInfo) -> String {
+    let mut indicators = Vec::new();
+    if git_info.modified > 0 {
+        indicators.push(format!("{}*{}{}", color(YELLOW), git_info.modified, color(RESET)));
+    }
+    if git_info.staged > 0 {
+        indicators.push(format!("{}+{}{}", color(GREEN), git_info.staged, color(RESET)));
+    }
+    if git_info.untracked > 0 {
+        indicators.push(format!("{}?{}{}", color(DIM), git_info.untracked, color(RESET)));
+    }
+    if git_info.ahead > 0 {
+        indicators.push(format!("{}↑{}{}", color(CYAN), git_info.ahead, color(RESET)));
+    }
+    if git_info.behind > 0 {
+        indicators.push(format!("{}↓{}{}", color(RED), git_info.behind, color(RESET)));
+    }
+    indicators.join(" ")
+}
+
 fn output_rich(
     path: &Path,
     summary: &DirSummary,
@@ -300,57 +334,15 @@ fn output_rich(
         .count();
 
     // Build git branch with color: blue if clean, yellow if dirty
-    let branch_display = if !git_branch.is_empty() {
-        if git_info.is_dirty {
-            format!("{}[{}*{}]", color(YELLOW), git_branch, color(RESET))
-        } else {
-            format!("{}[{}{}]", color(BLUE_BOLD), git_branch, color(RESET))
-        }
-    } else {
-        String::new()
-    };
+    let branch_display = build_branch_display(git_info);
 
     // Build git status indicators (p10k-style)
-    let mut git_status = Vec::new();
-    if git_info.modified > 0 {
-        git_status.push(format!(
-            "{}*{}{}",
-            color(YELLOW),
-            git_info.modified,
-            color(RESET)
-        ));
-    }
-    if git_info.staged > 0 {
-        git_status.push(format!(
-            "{}+{}{}",
-            color(GREEN),
-            git_info.staged,
-            color(RESET)
-        ));
-    }
-    if git_info.untracked > 0 {
-        git_status.push(format!(
-            "{}?{}{}",
-            color(DIM),
-            git_info.untracked,
-            color(RESET)
-        ));
-    }
-    if git_info.ahead > 0 {
-        git_status.push(format!(
-            "{}↑{}{}",
-            color(CYAN),
-            git_info.ahead,
-            color(RESET)
-        ));
-    }
-    if git_info.behind > 0 {
-        git_status.push(format!(
-            "{}↓{}{}",
-            color(RED),
-            git_info.behind,
-            color(RESET)
-        ));
+    let git_status_str = build_git_status_indicators(git_info);
+    let mut git_status = if git_status_str.is_empty() {
+        Vec::new()
+    } else {
+        git_status_str.split(' ').map(String::from).collect()
+    };
     }
     if git_info.stash_count > 0 {
         git_status.push(format!(
