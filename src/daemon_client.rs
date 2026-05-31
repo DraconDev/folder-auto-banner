@@ -35,6 +35,8 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
             // Socket missing or stale — clean up and start daemon
             let _ = std::fs::remove_file(&socket);
             ensure_daemon_running();
+            // Wait for daemon to be ready
+            std::thread::sleep(Duration::from_millis(200));
             UnixStream::connect(&socket).ok()?
         }
     };
@@ -68,8 +70,8 @@ pub fn is_daemon_running() -> bool {
             return false;
         }
     };
-    stream.set_read_timeout(Some(Duration::from_secs(500))).ok();
-    stream.set_write_timeout(Some(Duration::from_secs(500))).ok();
+    stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
     let request = Request::Ping;
     match send_and_recv(&stream, &request) {
