@@ -423,35 +423,13 @@ fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
-    let mut git_info = cfm_lib::git::get_git_info(path).ok();
-
-    // Filter file_statuses to ONLY include immediate children (depth 0 or 1).
-    // get_git_info returns statuses for the entire repo (which can be 39K+
-    // entries from target/). We only need entries for items we actually display.
-    if let Some(ref mut gi) = git_info {
-        if !gi.file_statuses.is_empty() {
-            let keep: std::collections::HashSet<_> = summary
-                .top_items
-                .iter()
-                .map(|item| item.name.clone())
-                .collect();
-            gi.file_statuses.retain(|path_str, _| {
-                // Parse the path into components
-                let components: Vec<_> = std::path::Path::new(path_str)
-                    .components()
-                    .map(|c| c.as_os_str().to_string_lossy().to_string())
-                    .collect();
-                // Match if:
-                // - exact match of a top_item name (e.g., "README.md")
-                // - first component matches a top_item dir (e.g., "src/foo.rs" when "src" is in top_items)
-                // - but NOT deeper nesting (e.g., "target/debug/something" should be excluded)
-                match components.len() {
-                    0 => false,
-                    1 => keep.contains(&components[0]),
-                    2 => keep.contains(&components[0]),  // depth 1: "src/file.rs"
-                    _ => false,  // depth 2+: "target/debug/build/..." — exclude
-                }
-            });
+    
+    // Build filter list: use relative paths from banner directory for git status filtering
+    // e.g., for banner ~/Dev/cli-file-manager, filter on "src", "Cargo.toml", etc.
+    let filter_paths: Vec<String> = summary.top_items.iter().map(|item| item.name.clone()).collect();
+    
+    // Use filtered git info — only collects statuses for top_items (much faster for large repos)
+    let git_info = cfm_lib::git::get_git_info_filtered(path, &filter_paths).ok();
         }
     }
 
