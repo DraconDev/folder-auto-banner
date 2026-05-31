@@ -105,6 +105,10 @@ pub enum Commands {
         #[arg(long)]
         group: bool,
 
+        /// Append type indicator (*/=>@|)
+        #[arg(long)]
+        classify: bool,
+
         /// Tree view with specified depth (0 = unlimited)
         #[arg(long)]
         tree: Option<Option<usize>>,
@@ -173,6 +177,7 @@ impl Cli {
                 filter,
                 max,
                 group,
+                classify,
                 tree,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());

@@ -326,7 +326,7 @@ fn output_rich(
         path_str.to_string()
     };
 
-    let git_branch = git_info.branch.as_deref().unwrap_or("");
+    let _git_branch = git_info.branch.as_deref().unwrap_or("");
     let hidden_count = summary
         .top_items
         .iter()
@@ -343,7 +343,6 @@ fn output_rich(
     } else {
         git_status_str.split(' ').map(String::from).collect()
     };
-    }
     if git_info.stash_count > 0 {
         git_status.push(format!(
             "{}≡{}{}",
