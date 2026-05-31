@@ -1345,10 +1345,14 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
                     let mut a_num = String::new();
                     let mut b_num = String::new();
                     while a_chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                        a_num.push(a_chars.next().unwrap());
+                        if let Some(c) = a_chars.next() {
+                            a_num.push(c);
+                        }
                     }
                     while b_chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                        b_num.push(b_chars.next().unwrap());
+                        if let Some(c) = b_chars.next() {
+                            b_num.push(c);
+                        }
                     }
                     let a_val: u64 = a_num.parse().unwrap_or(0);
                     let b_val: u64 = b_num.parse().unwrap_or(0);
