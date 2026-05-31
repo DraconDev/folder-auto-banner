@@ -415,9 +415,9 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
     let mut git_info = cfm_lib::git::get_git_info(path).ok();
 
-    // Filter file_statuses to only include files in this directory.
+    // Filter file_statuses to only include files in this directory and its immediate subdirs.
     // get_git_info returns statuses for the entire repo (which can be 36K+
-    // entries from target/). We only need entries for the ~20 files we display.
+    // entries from target/). We only need entries for files we display.
     if let Some(ref mut gi) = git_info {
         if !gi.file_statuses.is_empty() {
             let keep: std::collections::HashSet<_> = summary
@@ -427,12 +427,18 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
                 .collect();
             gi.file_statuses
                 .retain(|path_str, _| {
-                    // Match by filename (for files in this dir) or by relative path
+                    // Get the first component of the path (e.g., "src" from "src/git/mod.rs")
+                    let first_component = std::path::Path::new(path_str)
+                        .components()
+                        .next()
+                        .map(|c| c.as_os_str().to_string_lossy().to_string())
+                        .unwrap_or_default();
                     let name = std::path::Path::new(path_str)
                         .file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
-                    keep.contains(path_str) || keep.contains(&name)
+                    // Keep if: exact match, filename match, or first component matches a top_item
+                    keep.contains(path_str) || keep.contains(&name) || keep.contains(&first_component)
                 });
         }
     }
