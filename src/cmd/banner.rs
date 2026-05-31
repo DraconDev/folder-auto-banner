@@ -1078,11 +1078,23 @@ fn output_rich(
         // Colorize permissions based on config
         let perm_colored = match config.permission.as_str() {
             "octal" => {
-                // Convert to octal format
-                let mode = item.perms.chars().enumerate().fold(0u32, |_acc, (i, c)| {
-                    if c == '-' { 0 } else { 1 << (9 - i) }
-                });
-                format!("{}{:04o}{}", color(DIM), mode & 0o777, color(RESET))
+                // Convert rwx string to octal
+                let perms = &item.perms;
+                if perms.len() >= 9 {
+                    let user = if perms.len() > 2 && perms.as_bytes()[2] == b'x' { 4 } else { 0 }
+                        + if perms.len() > 1 && perms.as_bytes()[1] == b'w' { 2 } else { 0 }
+                        + if !perms.is_empty() && perms.as_bytes()[0] == b'r' { 1 } else { 0 };
+                    let group = if perms.len() > 5 && perms.as_bytes()[5] == b'x' { 4 } else { 0 }
+                        + if perms.len() > 4 && perms.as_bytes()[4] == b'w' { 2 } else { 0 }
+                        + if perms.len() > 3 && perms.as_bytes()[3] == b'r' { 1 } else { 0 };
+                    let other = if perms.len() > 8 && perms.as_bytes()[8] == b'x' { 4 } else { 0 }
+                        + if perms.len() > 7 && perms.as_bytes()[7] == b'w' { 2 } else { 0 }
+                        + if perms.len() > 6 && perms.as_bytes()[6] == b'r' { 1 } else { 0 };
+                    let octal = user * 100 + group * 10 + other;
+                    format!("{}{:03}{}", color(DIM), octal, color(RESET))
+                } else {
+                    colorize_perms(&item.perms)
+                }
             }
             "disable" => String::new(),
             _ => colorize_perms(&item.perms), // default: rwx
