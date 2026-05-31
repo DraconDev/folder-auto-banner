@@ -123,6 +123,20 @@ pub enum Commands {
 
     /// Open configuration file in editor
     Config,
+
+    /// Manage the background daemon
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum DaemonAction {
+    /// Stop the daemon
+    Stop,
+    /// Show daemon status
+    Status,
 }
 
 impl Cli {
@@ -235,6 +249,27 @@ impl Cli {
                 
                 Ok(())
             }
+            
+            // Daemon
+            Some(Daemon { action }) => match action {
+                DaemonAction::Stop => {
+                    if crate::daemon_client::is_daemon_running() {
+                        crate::daemon_client::send_shutdown();
+                        println!("✅ Daemon stopped");
+                    } else {
+                        println!("ℹ️  Daemon is not running");
+                    }
+                    Ok(())
+                }
+                DaemonAction::Status => {
+                    if crate::daemon_client::is_daemon_running() {
+                        println!("✅ Daemon is running");
+                    } else {
+                        println!("ℹ️  Daemon is not running");
+                    }
+                    Ok(())
+                }
+            },
         }
     }
 }
