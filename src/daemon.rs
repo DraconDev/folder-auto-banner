@@ -425,6 +425,8 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
                 .iter()
                 .map(|item| item.name.clone())
                 .collect();
+            eprintln!("file_statuses before filter: {}", gi.file_statuses.len());
+            eprintln!("keep set: {:?}", keep);
             gi.file_statuses
                 .retain(|path_str, _| {
                     // Get the first component of the path (e.g., "src" from "src/git/mod.rs")
@@ -437,9 +439,13 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
                         .file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
-                    // Keep if: exact match, filename match, or first component matches a top_item
-                    keep.contains(path_str) || keep.contains(&name) || keep.contains(&first_component)
+                    let should_keep = keep.contains(path_str) || keep.contains(&name) || keep.contains(&first_component);
+                    if !should_keep {
+                        eprintln!("Filtering out: {} (first_component: {}, name: {})", path_str, first_component, name);
+                    }
+                    should_keep
                 });
+            eprintln!("file_statuses after filter: {}", gi.file_statuses.len());
         }
     }
 
