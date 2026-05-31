@@ -200,6 +200,7 @@ impl Cli {
                     filter: filter.as_deref(),
                     max: *max,
                     group: *group,
+                    classify: *classify,
                     tree: *tree,
                 })
             }

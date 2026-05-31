@@ -115,7 +115,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -146,7 +146,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -306,6 +306,7 @@ fn output_rich(
     filter: Option<&str>,
     max: Option<usize>,
     group: bool,
+    classify: bool,
 ) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
@@ -1034,7 +1035,7 @@ fn output_rich(
 
         // Build name with optional symlink target
         // Add classify indicator if enabled
-        let classify_suffix = if config.classify {
+        let classify_suffix = if opts.classify || config.classify {
             if item.is_dir {
                 "/".to_string()
             } else if item.is_symlink {
