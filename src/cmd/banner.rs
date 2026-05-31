@@ -885,12 +885,14 @@ fn output_rich(
             let ordering = match sort_mode.as_str() {
                 "size" => a.size.cmp(&b.size),
                 "date" => {
-                    let a_time = a
-                        .modified
-                        .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
-                    let b_time = b
-                        .modified
-                        .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+                    let a_time = a.modified.unwrap_or_else(|| {
+                        chrono::DateTime::from_timestamp(0, 0)
+                            .unwrap_or_default()
+                    });
+                    let b_time = b.modified.unwrap_or_else(|| {
+                        chrono::DateTime::from_timestamp(0, 0)
+                            .unwrap_or_default()
+                    });
                     a_time.cmp(&b_time)
                 }
                 "type" => {
@@ -1271,7 +1273,10 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
         }
     });
 
-    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&output).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
+    );
 }
 
 fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
