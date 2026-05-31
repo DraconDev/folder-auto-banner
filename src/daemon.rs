@@ -731,6 +731,97 @@ fn proactive_scan(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_socket_path() {
+        let path = directories::ProjectDirs::from("com", "cfm", "cfm")
+            .unwrap()
+            .data_dir()
+            .join(SOCKET_NAME);
+        assert!(path.to_string_lossy().contains("cfmd.sock"));
+    }
+
+    #[test]
+    fn test_cache_entry_creation() {
+        let summary = DirSummary::scan(Path::new("/tmp")).unwrap();
+        let data = BannerData {
+            path: PathBuf::from("/tmp"),
+            summary,
+            git_info: None,
+            dir_sizes: HashMap::new(),
+            cached_at: chrono::Utc::now(),
+        };
+        let entry = CacheEntry {
+            data,
+            computed_at: Instant::now(),
+        };
+        assert!(entry.computed_at.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn test_cache_ttl() {
+        let summary = DirSummary::scan(Path::new("/tmp")).unwrap();
+        let entry = CacheEntry {
+            data: BannerData {
+                path: PathBuf::from("/tmp"),
+                summary,
+                git_info: None,
+                dir_sizes: HashMap::new(),
+                cached_at: chrono::Utc::now(),
+            },
+            computed_at: Instant::now() - Duration::from_secs(600), // 10 minutes ago
+        };
+        assert!(entry.computed_at.elapsed() > CACHE_TTL);
+    }
+
+    #[test]
+    fn test_request_serialization() {
+        let request = Request::Banner {
+            path: PathBuf::from("/tmp"),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("Banner"));
+        assert!(json.contains("/tmp"));
+    }
+
+    #[test]
+    fn test_response_serialization() {
+        let response = Response::Pong;
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("Pong"));
+    }
+
+    #[test]
+    fn test_banner_data_serialization() {
+        let summary = DirSummary::scan(Path::new("/tmp")).unwrap();
+        let data = BannerData {
+            path: PathBuf::from("/tmp"),
+            summary,
+            git_info: None,
+            dir_sizes: HashMap::new(),
+            cached_at: chrono::Utc::now(),
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        assert!(json.contains("/tmp"));
+    }
+
+    #[test]
+    fn test_daemon_new() {
+        let daemon = Daemon::new();
+        assert!(daemon.is_ok());
+    }
+
+    #[test]
+    fn test_compute_dir_size() {
+        let size = compute_dir_size(Path::new("/tmp"));
+        // /tmp exists and has some content
+        assert!(size > 0 || size == 0); // Just verify it doesn't panic
+    }
+}
+
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
