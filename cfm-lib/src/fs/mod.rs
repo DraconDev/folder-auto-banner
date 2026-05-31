@@ -14,6 +14,7 @@ use std::cell::RefCell;
 thread_local! {
     static UID_CACHE: RefCell<HashMap<u32, String>> = RefCell::new(HashMap::new());
     static GID_CACHE: RefCell<HashMap<u32, String>> = RefCell::new(HashMap::new());
+    static PROJECT_TYPE_CACHE: RefCell<HashMap<PathBuf, ProjectType>> = RefCell::new(HashMap::new());
 }
 
 /// Project type detection
@@ -525,13 +526,22 @@ fn format_mode(mode: u32) -> String {
 /// Resolve uid to username from /etc/passwd
 #[cfg(unix)]
 fn resolve_uid(uid: u32) -> Option<String> {
+    // Check cache first
+    let cached = UID_CACHE.with(|cache| cache.borrow().get(&uid).cloned());
+    if let Some(name) = cached {
+        return Some(name);
+    }
+    
+    // Read from /etc/passwd and cache the result
     let content = std::fs::read_to_string("/etc/passwd").ok()?;
     for line in content.lines() {
         let parts: Vec<&str> = line.split(':').collect();
         if parts.len() >= 3 {
             if let Ok(file_uid) = parts[2].parse::<u32>() {
                 if file_uid == uid {
-                    return Some(parts[0].to_string());
+                    let name = parts[0].to_string();
+                    UID_CACHE.with(|cache| cache.borrow_mut().insert(uid, name.clone()));
+                    return Some(name);
                 }
             }
         }
@@ -542,13 +552,22 @@ fn resolve_uid(uid: u32) -> Option<String> {
 /// Resolve gid to group name from /etc/group
 #[cfg(unix)]
 fn resolve_gid(gid: u32) -> Option<String> {
+    // Check cache first
+    let cached = GID_CACHE.with(|cache| cache.borrow().get(&gid).cloned());
+    if let Some(name) = cached {
+        return Some(name);
+    }
+    
+    // Read from /etc/group and cache the result
     let content = std::fs::read_to_string("/etc/group").ok()?;
     for line in content.lines() {
         let parts: Vec<&str> = line.split(':').collect();
         if parts.len() >= 3 {
             if let Ok(file_gid) = parts[2].parse::<u32>() {
                 if file_gid == gid {
-                    return Some(parts[0].to_string());
+                    let name = parts[0].to_string();
+                    GID_CACHE.with(|cache| cache.borrow_mut().insert(gid, name.clone()));
+                    return Some(name);
                 }
             }
         }

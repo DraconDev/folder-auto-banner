@@ -25,7 +25,9 @@ Implement the high and medium priority performance improvements from AUDIT.md.
 - [x] Add short TTLs to subprocess checks (TODO, ports, docker, metrics)
   - Already implemented: TODO=60s, metrics=60s, ports=10s, docker=10s
 - [ ] Cache `ProjectType::detect()` result
-- [ ] Cache `resolve_uid()`/`resolve_gid()` lookups per scan
+- [x] Cache `resolve_uid()`/`resolve_gid()` lookups per scan
+  - Added thread-local caches for uid/gid lookups
+  - Avoids reading /etc/passwd and /etc/group for every file
 - [ ] Reduce mutex contention in proactive scan
 - [ ] Strip unnecessary fields from banner cache entries
 
@@ -40,6 +42,11 @@ Implement the high and medium priority performance improvements from AUDIT.md.
   - Cold start improved from ~2500ms to ~350ms (7x faster)
   - Warm cache improved from ~1800ms to ~100ms (18x faster)
   - Verified banner output still correct
+- [x] Iteration 2: Optimized `warm_nearby_dirs()` and uid/gid caching
+  - Reduced sibling directories warmed from 20 to 10
+  - Added `warm_paths()` for single connection reuse
+  - Added thread-local caches for uid/gid lookups
+  - Final performance: ~400ms cold, ~100ms warm
 
 ## Notes
 - Starting with git optimizations as they have highest impact
