@@ -1325,3 +1325,77 @@ fn format_loc(loc: usize) -> String {
         format!("{}k", loc / 1000)
     }
 }
+
+/// Get terminal width (returns 0 if cannot determine)
+fn get_terminal_width() -> usize {
+    #[cfg(unix)]
+    {
+        unsafe {
+            let mut winsize: libc::winsize = std::mem::zeroed();
+            if libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut winsize) == 0 {
+                winsize.ws_col as usize
+            } else {
+                0
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        0
+    }
+}
+
+/// Strip ANSI escape codes from a string
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip until 'm' or end
+            while let Some(&next) = chars.peek() {
+                chars.next();
+                if next == 'm' {
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Truncate details to fit within available width
+fn truncate_details(details: &[String], available: usize) -> String {
+    if details.is_empty() {
+        return String::new();
+    }
+    
+    // Priority order: keep most important, remove least important
+    // Most important: commit time, languages, clean status
+    // Less important: branch count, ports, docker, test results
+    
+    let mut kept = Vec::new();
+    let mut current_len = 0;
+    
+    for detail in details {
+        let plain = strip_ansi(detail);
+        let item_len = plain.len() + if kept.is_empty() { 0 } else { 3 }; // 3 for " │ "
+        
+        if current_len + item_len <= available {
+            kept.push(detail.clone());
+            current_len += item_len;
+        } else {
+            // Try to fit a truncated version
+            let remaining = available.saturating_sub(current_len);
+            if remaining > 10 {
+                // Truncate this item
+                let truncated = format!("{}…", &plain[..remaining - 1]);
+                kept.push(truncated);
+            }
+            break;
+        }
+    }
+    
+    kept.join(" │ ")
+}
