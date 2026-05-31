@@ -6,7 +6,15 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::cell::RefCell;
+
+// Thread-local caches for uid/gid lookups (avoid reading /etc/passwd for every file)
+thread_local! {
+    static UID_CACHE: RefCell<HashMap<u32, String>> = RefCell::new(HashMap::new());
+    static GID_CACHE: RefCell<HashMap<u32, String>> = RefCell::new(HashMap::new());
+}
 
 /// Project type detection
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
