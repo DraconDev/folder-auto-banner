@@ -113,6 +113,10 @@ pub enum Commands {
         #[arg(long)]
         classify: bool,
 
+        /// Columns to display (comma-separated: permission,owner,group,size,contents,date,name)
+        #[arg(long)]
+        blocks: Option<String>,
+
         /// Tree view with specified depth (0 = unlimited)
         #[arg(long)]
         tree: Option<Option<usize>>,
@@ -183,6 +187,7 @@ impl Cli {
                 max,
                 group,
                 classify,
+                blocks,
                 tree,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
@@ -207,6 +212,7 @@ impl Cli {
                     max: *max,
                     group: *group,
                     classify: *classify,
+                    blocks: blocks.as_deref(),
                     tree: *tree,
                 })
             }

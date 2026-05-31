@@ -71,6 +71,7 @@ pub struct BannerOptions<'a> {
     pub max: Option<usize>,
     pub group: bool,
     pub classify: bool,
+    pub blocks: Option<&'a str>,
     pub tree: Option<Option<usize>>,
 }
 
@@ -116,7 +117,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify, opts.relative_date);
+            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify, opts.relative_date, opts.blocks);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -147,7 +148,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify, opts.relative_date);
+        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify, opts.relative_date, opts.blocks);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -309,6 +310,7 @@ fn output_rich(
     group: bool,
     classify: bool,
     relative_date: bool,
+    blocks: Option<&str>,
 ) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
@@ -1152,24 +1154,30 @@ fn output_rich(
             git_icon
         };
 
-        // Build row based on config columns
+        // Build row based on config columns (or --blocks override)
+        let columns = if let Some(blocks_str) = blocks {
+            blocks_str.split(',').map(|s| s.trim().to_string()).collect::<Vec<_>>()
+        } else {
+            config.columns.clone()
+        };
+        
         let mut row_parts = Vec::new();
-        if config.columns.contains(&"permission".to_string()) && !perm_colored.is_empty() {
+        if columns.contains(&"permission".to_string()) && !perm_colored.is_empty() {
             row_parts.push(perm_colored);
         }
-        if config.columns.contains(&"owner".to_string()) {
+        if columns.contains(&"owner".to_string()) {
             row_parts.push(owner_colored);
         }
-        if config.columns.contains(&"group".to_string()) {
+        if columns.contains(&"group".to_string()) {
             row_parts.push(group_colored);
         }
-        if config.columns.contains(&"date".to_string()) {
+        if columns.contains(&"date".to_string()) {
             row_parts.push(modified);
         }
-        if config.columns.contains(&"size".to_string()) {
+        if columns.contains(&"size".to_string()) {
             row_parts.push(size_colored);
         }
-        if config.columns.contains(&"contents".to_string()) {
+        if columns.contains(&"contents".to_string()) {
             row_parts.push(contents_colored);
         }
         if config.git_status {
