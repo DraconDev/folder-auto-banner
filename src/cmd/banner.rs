@@ -1035,7 +1035,7 @@ fn output_rich(
 
         // Build name with optional symlink target
         // Add classify indicator if enabled
-        let classify_suffix = if opts.classify || config.classify {
+        let classify_suffix = if classify || config.classify {
             if item.is_dir {
                 "/".to_string()
             } else if item.is_symlink {
