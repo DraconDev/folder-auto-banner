@@ -266,6 +266,9 @@ fn output_rich(
     max: Option<usize>,
     group: bool,
 ) {
+    // Load config for display settings
+    let config = crate::state::Config::load().unwrap_or_default();
+    
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
