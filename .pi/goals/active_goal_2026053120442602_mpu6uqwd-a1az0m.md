@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 3935,
-    "activeSeconds": 392
+    "tokensUsed": 43043,
+    "activeSeconds": 843
   },
   "sisyphus": false,
   "createdAt": "2026-05-31T19:44:26.029Z",
-  "updatedAt": "2026-05-31T19:50:58.721Z",
+  "updatedAt": "2026-05-31T19:58:30.763Z",
   "activePath": ".pi/goals/active_goal_2026053120442602_mpu6uqwd-a1az0m.md",
   "taskList": {
     "tasks": [
@@ -59,8 +59,8 @@ Perform a comprehensive audit of the CFM (Contextual File Manager) Rust project,
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6m32s
-- Tokens used: 3.9K (3,935) tokens
+- Time spent: 14m03s
+- Tokens used: 43K (43,043) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
