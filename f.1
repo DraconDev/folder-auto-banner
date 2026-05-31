@@ -1,0 +1,166 @@
+.TH FM 1 "2024-05-31" "cfm 0.4.0" "User Commands"
+.SH NAME
+f \- contextual file manager
+.SH SYNOPSIS
+.B f
+.RB [ OPTIONS ]
+.RB [ PATH ]
+.br
+.B f
+.RB [ COMMAND ]
+.SH DESCRIPTION
+.B cfm
+is a directory listing with instant context. It shows file listing (like ls/exa/lsd) along with git status, build status, TODO count, languages breakdown, and more.
+.SH OPTIONS
+.SS Sorting
+.TP
+.BI \-\-sort " FIELD"
+Sort by field: name, size, date, type, git, extension, version
+.TP
+.BR \-t ", " \-\-timesort
+Sort by time modified
+.TP
+.BR \-S ", " \-\-sizesort
+Sort by size
+.TP
+.BR \-X ", " \-\-extensionsort
+Sort by file extension
+.TP
+.BR \-G ", " \-\-gitsort
+Sort by git status
+.TP
+.B \-\-versionsort
+Natural sort (version numbers)
+.TP
+.B \-\-no\-sort
+No sort, directory order
+.TP
+.B \-\-reverse
+Reverse sort order
+.TP
+.BI \-\-group\-dirs " MODE"
+Group directories: none, first, last
+.SS Display
+.TP
+.BR \-a ", " \-\-hidden
+Show hidden files (dotfiles)
+.TP
+.BI \-\-tree " [DEPTH]"
+Tree view (0 = unlimited depth)
+.TP
+.B \-\-group
+Group by type (dirs, files, symlinks)
+.TP
+.BI \-\-filter " PATTERN"
+Filter by name pattern
+.TP
+.BI \-\-max " N"
+Limit items displayed
+.TP
+.B \-\-compact
+Less info
+.TP
+.B \-\-verbose
+More info
+.SS Output
+.TP
+.B \-\-json
+JSON output
+.TP
+.B \-\-raw
+Plain text output
+.SH COMMANDS
+.TP
+.B f
+Directory listing + context (default)
+.TP
+.B f PATH
+Listing for specific directory
+.TP
+.B f env
+Output shell aliases for current project type
+.TP
+.B f config
+Open configuration file in editor
+.TP
+.B f daemon stop
+Stop the background daemon
+.TP
+.B f daemon status
+Show daemon status
+.SH CONFIGURATION
+Configuration file: ~/.config/cfm/config.toml
+.PP
+Open with: f config
+.PP
+Example:
+.PP
+.RS
+[display]
+.br
+permission = "rwx"
+.br
+size = "default"
+.br
+date = "date"
+.br
+classify = true
+.RE
+.SH ENVIRONMENT
+.TP
+.B CFM_NO_TODOS
+Set to 1 to disable TODO scanning
+.TP
+.B CFM_NO_PORTS
+Set to 1 to disable port detection
+.TP
+.B CFM_NO_DOCKER
+Set to 1 to disable Docker detection
+.TP
+.B CFM_NO_METRICS
+Set to 1 to disable code metrics
+.TP
+.B NO_COLOR
+Disable colors (per spec)
+.TP
+.B EDITOR
+Editor for f config (default: vi)
+.SH EXAMPLES
+.PP
+Directory listing:
+.PP
+.RS
+f
+.RE
+.PP
+Sort by size:
+.PP
+.RS
+f -S
+.RE
+.PP
+Show dotfiles:
+.PP
+.RS
+f -a
+.RE
+.PP
+Tree view:
+.PP
+.RS
+f --tree
+.RE
+.PP
+JSON output:
+.PP
+.RS
+f --json
+.RE
+.SH SEE ALSO
+.BR ls (1),
+.BR exa (1),
+.BR lsd (1)
+.SH AUTHOR
+Dracon Nonis
+.SH LICENSE
+MIT
