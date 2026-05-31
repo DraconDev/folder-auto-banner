@@ -422,6 +422,17 @@ fn output_rich(
                     color(RESET)
                 ));
             }
+            if git_info.stash_count > 0 {
+                details.push(format!(
+                    "{}📦 {} stash{}",
+                    color(YELLOW),
+                    git_info.stash_count,
+                    if git_info.stash_count > 1 { "es" } else { "" }
+                ));
+            }
+            if let Some(ref state) = git_info.merge_state {
+                details.push(format!("{}⚠️ {}{}", color(YELLOW), state, color(RESET)));
+            }
         }
         
         // TODO count
