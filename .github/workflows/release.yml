@@ -12,31 +12,74 @@ jobs:
   release:
     name: Release ${{ github.ref_name }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "cfm"
+          shared-key: "cfm-${{ matrix.target }}"
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build release
-        run: cargo build --release --locked
+        run: cargo build --release --locked --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
       - name: Run tests
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: cargo test --release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: f-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/f
+            target/${{ matrix.target }}/release/cfmd
+
+  publish:
+    name: Create Release
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           files: |
-            target/release/f
-            target/release/cfmd
+            f-x86_64-unknown-linux-gnu/f
+            f-x86_64-unknown-linux-gnu/cfmd
+            f-aarch64-unknown-linux-gnu/f
+            f-aarch64-unknown-linux-gnu/cfmd
+            f-x86_64-apple-darwin/f
+            f-x86_64-apple-darwin/cfmd
           body: |
             Release ${{ github.ref_name }}
           draft: false
