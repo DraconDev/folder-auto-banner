@@ -27,6 +27,7 @@
 - [x] Proactive home directory scanning
 - [x] Resource limits (nice=10, ionice=idle)
 - [x] Systemd service for auto-start
+- [x] `f daemon stop/status` commands
 
 ### CLI Flags (Actions)
 - [x] `--sort name|size|date|type|git|extension|version` — sorting
@@ -85,8 +86,9 @@
 ### Display Improvements
 - [x] Two-row layout for better readability
 - [x] Dynamic truncation for narrow terminals
+- [x] Classify mode (append */=>@|)
 
-### Configuration
+### Configuration (v0.4.0)
 - [x] `f config` command — opens config in $EDITOR
 - [x] Config file at `~/.config/cfm/config.toml`
 - [x] Permission mode (rwx, octal, disable)
@@ -114,7 +116,6 @@
 ## 🟡 Future Improvements
 
 ### Display Enhancements
-- [ ] Add `--classify` flag to append indicators (*/=>@|)
 - [ ] Add `--hyperlink` flag to attach hyperlinks
 - [ ] Add `--header` flag to show block headers
 - [ ] Add `--total-size` flag to show total directory size
@@ -143,11 +144,11 @@
 
 ### Documentation
 - [x] Update README with vision and scope
-- [x] Update CHANGELOG with v0.3.0 changes
+- [x] Update CHANGELOG with v0.4.0 changes
 - [x] Create VISION.md with project direction
 - [x] Create AUDIT.md with comparison to lsd/exa
 - [ ] Add man page
-- [ ] Document config file options
+- [x] Document config file options
 
 ### CI/CD
 - [ ] Add cross-compilation (macOS, Linux ARM)
@@ -166,7 +167,7 @@
 
 **Current state:** Simple, focused tool with config-based customization
 **Core feature:** Directory listing with instant context
-**Commands:** `f` (banner), `f env` (shell aliases), `f config` (edit config)
+**Commands:** `f` (banner), `f env` (shell aliases), `f config` (edit config), `f daemon` (manage daemon)
 **CLI flags:** Sorting, filtering, tree view, compact/verbose, JSON/raw
 **Config file:** Display preferences, column selection, feature toggles
 
