@@ -294,7 +294,14 @@ fn handle_client(
 
     let mut stream = stream;
 
-    let request: Request = serde_json::from_reader(&mut stream)?;
+    // Length-prefixed bincode: read 4-byte LE length, then payload.
+    // Bulk reads via read_exact avoid 1-byte-at-a-time I/O.
+    let mut len_bytes = [0u8; 4];
+    stream.read_exact(&mut len_bytes)?;
+    let req_len = u32::from_le_bytes(len_bytes) as usize;
+    let mut req_buf = vec![0u8; req_len];
+    stream.read_exact(&mut req_buf)?;
+    let request: Request = bincode::deserialize(&req_buf)?;
     tracing::debug!("Received request: {:?}", request);
 
     let response = match request {
@@ -454,10 +461,24 @@ fn handle_client(
 
 fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
     use std::io::Write;
-    serde_json::to_writer(&mut *stream, response)?;
+    // Length-prefixed bincode: 4-byte LE length, then payload.
+    // Buffering in Vec<u8> avoids 1-byte-at-a-time I/O.
+    let resp_bytes = bincode::serialize(response)?;
+    let resp_len = resp_bytes.len() as u32;
+    let mut header = [0u8; 4];
+    header[..4].copy_from_slice(&resp_len.to_le_bytes());
+    let mut combined = Vec::with_capacity(4 + resp_bytes.len());
+    combined.extend_from_slice(&header);
+    combined.extend_from_slice(&resp_bytes);
+    match stream.write_all(&combined) {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::warn!("Failed to write response: {}", e);
+            return Err(e.into());
+        }
+    }
     stream.flush()?;
-    // Shutdown write end so client sees EOF and knows response is complete
-    stream.shutdown(std::net::Shutdown::Write)?;
+    tracing::trace!("Sent bincode response: {} bytes payload", resp_bytes.len());
     Ok(())
 }
 

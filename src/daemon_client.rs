@@ -15,11 +15,28 @@ fn socket_path() -> Result<std::path::PathBuf> {
     Ok(path)
 }
 
-fn send_and_recv(stream: &UnixStream, request: &Request) -> Result<Response> {
-    serde_json::to_writer(stream, request)?;
-    // Shutdown write end so daemon sees EOF on read
+fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response> {
+    use std::io::{Read, Write};
+    // Length-prefixed bincode: 4-byte LE length, then payload.
+    // Buffering in Vec<u8> avoids 1-byte-at-a-time I/O (2500+ syscalls).
+    let req_bytes = bincode::serialize(request)?;
+    let req_len = req_bytes.len() as u32;
+    // Write length prefix and payload in a single write_all call
+    let mut header = [0u8; 4];
+    header[..4].copy_from_slice(&req_len.to_le_bytes());
+    let mut combined = Vec::with_capacity(4 + req_bytes.len());
+    combined.extend_from_slice(&header);
+    combined.extend_from_slice(&req_bytes);
+    stream.write_all(&combined)?;
+    // Shutdown write end so daemon sees EOF on read and starts processing
     stream.shutdown(std::net::Shutdown::Write)?;
-    let response: Response = serde_json::from_reader(stream)?;
+    // Read 4-byte length prefix, then payload (bulk read, not 1-byte)
+    let mut len_bytes = [0u8; 4];
+    stream.read_exact(&mut len_bytes)?;
+    let resp_len = u32::from_le_bytes(len_bytes) as usize;
+    let mut resp_bytes = vec![0u8; resp_len];
+    stream.read_exact(&mut resp_bytes)?;
+    let response: Response = bincode::deserialize(&resp_bytes)?;
     Ok(response)
 }
 
@@ -30,7 +47,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let socket = socket_path().ok()?;
 
     // Try connecting — if it fails, start daemon and retry once
-    let stream = match UnixStream::connect(&socket) {
+    let mut stream = match UnixStream::connect(&socket) {
         Ok(s) => s,
         Err(_) => {
             // Socket missing or stale — clean up and start daemon
@@ -43,7 +60,9 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     };
     let t1 = std::time::Instant::now();
 
-    stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(30)))
+        .ok()?;
     stream
         .set_write_timeout(Some(Duration::from_secs(1)))
         .ok()?;
@@ -51,7 +70,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let request = Request::Banner {
         path: path.to_path_buf(),
     };
-    let response = send_and_recv(&stream, &request).ok()?;
+    let response = send_and_recv(&mut stream, &request).ok()?;
     let t2 = std::time::Instant::now();
     if std::env::var("CFM_PROFILE").is_ok() {
         let payload_bytes = serde_json::to_string(&response)
@@ -79,7 +98,7 @@ pub fn is_daemon_running() -> bool {
     if !socket.exists() {
         return false;
     }
-    let stream = match UnixStream::connect(&socket) {
+    let mut stream = match UnixStream::connect(&socket) {
         Ok(s) => s,
         Err(_) => {
             // Socket file exists but nobody is listening — remove stale socket
@@ -91,7 +110,7 @@ pub fn is_daemon_running() -> bool {
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
     let request = Request::Ping;
-    match send_and_recv(&stream, &request) {
+    match send_and_recv(&mut stream, &request) {
         Ok(Response::Pong) => true,
         _ => {
             // Socket connected but daemon is unresponsive — remove stale socket
@@ -127,11 +146,11 @@ pub fn send_shutdown() {
     let Ok(socket) = socket_path() else {
         return;
     };
-    if let Ok(stream) = UnixStream::connect(&socket) {
+    if let Ok(mut stream) = UnixStream::connect(&socket) {
         stream.set_read_timeout(Some(Duration::from_secs(1))).ok();
         stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
         let request = Request::Shutdown;
-        if let Err(e) = send_and_recv(&stream, &request) {
+        if let Err(e) = send_and_recv(&mut stream, &request) {
             tracing::warn!("Failed to send shutdown request: {}", e);
         }
     }
