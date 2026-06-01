@@ -31,12 +31,16 @@ pub enum Response {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BannerData {
+    #[serde(skip_serializing, default)]
+    #[allow(dead_code)]
     pub path: PathBuf,
     pub summary: DirSummary,
     pub git_info: Option<GitInfo>,
     #[serde(skip_serializing, default)]
     #[allow(dead_code)]
     pub dir_sizes: HashMap<PathBuf, u64>,
+    #[serde(skip_serializing, default)]
+    #[allow(dead_code)]
     pub cached_at: DateTime<Utc>,
 }
 
@@ -167,10 +171,10 @@ mod tests {
             cached_at: Utc::now(),
         };
 
+        // path, dir_sizes, and cached_at are skipped during serialization
         let json = serde_json::to_string(&data).unwrap();
-        assert!(json.contains("/tmp"));
-
         let deserialized: BannerData = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.path, PathBuf::from("/tmp"));
+        // path defaults to empty PathBuf since it's skipped
+        assert_eq!(deserialized.path, PathBuf::new());
     }
 }

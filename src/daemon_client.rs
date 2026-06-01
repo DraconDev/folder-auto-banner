@@ -87,7 +87,7 @@ pub fn is_daemon_running() -> bool {
             return false;
         }
     };
-    stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+    stream.set_read_timeout(Some(Duration::from_secs(10))).ok();
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
     let request = Request::Ping;

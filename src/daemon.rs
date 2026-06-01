@@ -206,7 +206,11 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                     }
                     match inotify.watches().add(
                         path,
-                        WatchMask::CREATE | WatchMask::DELETE | WatchMask::MODIFY | WatchMask::MOVE | WatchMask::CLOSE_WRITE,
+                        WatchMask::CREATE
+                            | WatchMask::DELETE
+                            | WatchMask::MODIFY
+                            | WatchMask::MOVE
+                            | WatchMask::CLOSE_WRITE,
                     ) {
                         Ok(wd) => {
                             tracing::info!("Watching: {}", path.display());
@@ -288,10 +292,10 @@ fn handle_client(
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
 
-    let reader = stream.try_clone()?;
-    let mut writer = stream;
+    let mut stream = stream;
 
-    let request: Request = serde_json::from_reader(&reader)?;
+    let request: Request = serde_json::from_reader(&mut stream)?;
+    tracing::debug!("Received request: {:?}", request);
 
     let response = match request {
         Request::Banner { path } => {
@@ -321,7 +325,18 @@ fn handle_client(
                         }
                         drop(global_sizes);
                         // Don't refresh git on cache hit — it's cached with TTL
-                        return send_response(&mut writer, &Response::Banner(Box::new(data)));
+                        use std::io::Read;
+                        send_response(&mut stream, &Response::Banner(Box::new(data)))?;
+                        // Keep stream alive while client reads
+                        let mut discard = [0u8; 256];
+                        loop {
+                            match stream.read(&mut discard) {
+                                Ok(0) => break,
+                                Ok(_) => continue,
+                                Err(_) => break,
+                            }
+                        }
+                        return Ok(());
                     }
                 }
             }
@@ -420,11 +435,29 @@ fn handle_client(
         }
     };
 
-    send_response(&mut writer, &response)
+    send_response(&mut stream, &response)?;
+
+    // Keep stream alive while client reads. The client signals it's done by
+    // closing the connection (dropping its UnixStream). Until then, the client
+    // may still be reading the response.
+    use std::io::Read;
+    let mut discard = [0u8; 256];
+    loop {
+        match stream.read(&mut discard) {
+            Ok(0) => break, // EOF — client closed
+            Ok(_) => continue,
+            Err(_) => break, // timeout or error
+        }
+    }
+    Ok(())
 }
 
-fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
-    serde_json::to_writer(writer, response)?;
+fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
+    use std::io::Write;
+    serde_json::to_writer(&mut *stream, response)?;
+    stream.flush()?;
+    // Shutdown write end so client sees EOF and knows response is complete
+    stream.shutdown(std::net::Shutdown::Write)?;
     Ok(())
 }
 
