@@ -26,6 +26,7 @@ fn send_and_recv(stream: &UnixStream, request: &Request) -> Result<Response> {
 /// Try to get cached banner data from daemon.
 /// Auto-starts daemon if socket doesn't exist or is stale.
 pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
+    let t0 = std::time::Instant::now();
     let socket = socket_path().ok()?;
 
     // Try connecting — if it fails, start daemon and retry once
@@ -40,6 +41,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
             UnixStream::connect(&socket).ok()?
         }
     };
+    let t1 = std::time::Instant::now();
 
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
     stream
@@ -50,6 +52,17 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
         path: path.to_path_buf(),
     };
     let response = send_and_recv(&stream, &request).ok()?;
+    let t2 = std::time::Instant::now();
+    if std::env::var("CFM_PROFILE").is_ok() {
+        let payload_bytes = serde_json::to_string(&response).map(|s| s.len()).unwrap_or(0);
+        eprintln!(
+            "[CFM_PROFILE] ipc: connect={:?} send_recv={:?} total={:?} payload={}B",
+            t1 - t0,
+            t2 - t1,
+            t2 - t0,
+            payload_bytes,
+        );
+    }
     match response {
         Response::Banner(data) => Some(*data),
         _ => None,
