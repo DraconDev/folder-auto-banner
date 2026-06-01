@@ -191,7 +191,7 @@ impl Cli {
                 tree,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
-                crate::cmd::banner::run_banner(&crate::cmd::banner::BannerOptions {
+                crate::cmd::banner::run_banner(crate::cmd::banner::BannerOptions {
                     path: p,
                     raw: *raw,
                     json: *json,
@@ -214,12 +214,13 @@ impl Cli {
                     classify: *classify,
                     blocks: blocks.as_deref(),
                     tree: *tree,
+                    ..Default::default()
                 })
             }
             None => {
                 // `f` with no args = `f banner`
                 let p: Option<&Path> = self.path.as_deref();
-                crate::cmd::banner::run_banner(&crate::cmd::banner::BannerOptions {
+                crate::cmd::banner::run_banner(crate::cmd::banner::BannerOptions {
                     path: p,
                     ..Default::default()
                 })

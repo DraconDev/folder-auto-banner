@@ -49,6 +49,7 @@ const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating row
 
 /// Options for the banner command
 #[derive(Default)]
+#[allow(dead_code)]
 pub struct BannerOptions<'a> {
     pub path: Option<&'a Path>,
     pub raw: bool,
@@ -81,7 +82,7 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
-pub fn run_banner(opts: &BannerOptions) -> Result<()> {
+pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let path = opts
         .path
@@ -102,9 +103,11 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
             .map(|v| v == "1")
             .unwrap_or(config.colors)
     };
-    let _compact = opts.compact || config.compact;
     let max_items = config.max_display_items;
-    set_colors_enabled(colors);
+    opts.icons = icons;
+    opts.colors = colors;
+    opts.max_items = max_items;
+    set_colors_enabled(opts.colors);
 
     // Tree view mode
     if let Some(depth) = opts.tree {
@@ -127,26 +130,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
                 &path,
                 &summary,
                 &git_info,
-                opts.compact,
-                opts.sort,
-                opts.timesort,
-                opts.sizesort,
-                opts.extensionsort,
-                opts.gitsort,
-                opts.versionsort,
-                opts.no_sort,
-                opts.group_dirs,
-                opts.reverse,
-                icons,
-                colors,
-                max_items,
-                opts.hidden,
-                opts.filter,
-                opts.max,
-                opts.group,
-                opts.classify,
-                opts.relative_date,
-                opts.blocks,
+                &opts,
             );
         }
 
@@ -182,26 +166,7 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
             &path,
             &summary,
             &git_info,
-            opts.compact,
-            opts.sort,
-            opts.timesort,
-            opts.sizesort,
-            opts.extensionsort,
-            opts.gitsort,
-            opts.versionsort,
-            opts.no_sort,
-            opts.group_dirs,
-            opts.reverse,
-            icons,
-            colors,
-            max_items,
-            opts.hidden,
-            opts.filter,
-            opts.max,
-            opts.group,
-            opts.classify,
-            opts.relative_date,
-            opts.blocks,
+            &opts,
         );
     }
 
@@ -983,20 +948,20 @@ fn output_rich(
         };
 
         // Group dirs handling
-        let group_dirs_mode = group_dirs.unwrap_or("first");
+        let group_dirs_mode = opts.group_dirs.unwrap_or("first");
 
         display_items.sort_by(|a, b| {
             // Group directories if requested
             if group_dirs_mode != "none" && a.is_dir != b.is_dir {
                 return if group_dirs_mode == "last" {
-                    if reverse {
+                    if opts.reverse {
                         a.is_dir.cmp(&b.is_dir)
                     } else {
                         b.is_dir.cmp(&a.is_dir)
                     }
                 } else {
                     // first (default)
-                    if reverse {
+                    if opts.reverse {
                         b.is_dir.cmp(&a.is_dir)
                     } else {
                         a.is_dir.cmp(&b.is_dir)
@@ -1050,7 +1015,7 @@ fn output_rich(
                 _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()), // "name" or default
             };
 
-            if reverse {
+            if opts.reverse {
                 ordering.reverse()
             } else {
                 ordering
@@ -1084,7 +1049,7 @@ fn output_rich(
     for (idx, item) in display_items.iter().enumerate() {
         let row_tint = if idx % 2 == 0 { ROW_TINT } else { "" };
         let tint_reset = if idx % 2 == 0 { color(RESET) } else { "" };
-        let icon_str = if icons {
+        let icon_str = if opts.icons {
             icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink)
         } else {
             String::new()
@@ -1162,7 +1127,7 @@ fn output_rich(
 
         // Build name with optional symlink target
         // Add classify indicator if enabled
-        let classify_suffix = if classify || config.classify {
+        let classify_suffix = if opts.classify || config.classify {
             if item.is_dir {
                 "/".to_string()
             } else if item.is_symlink {
@@ -1207,7 +1172,7 @@ fn output_rich(
             .modified
             .as_ref()
             .map(|dt| {
-                let formatted = if relative_date {
+                let formatted = if opts.relative_date {
                     crate::fs::format_relative_time(dt)
                 } else {
                     format_exact_time(dt)
@@ -1309,7 +1274,7 @@ fn output_rich(
         };
 
         // Build row based on config columns (or --blocks override)
-        let columns = if let Some(blocks_str) = blocks {
+        let columns = if let Some(blocks_str) = opts.blocks {
             blocks_str
                 .split(',')
                 .map(|s| s.trim().to_string())
