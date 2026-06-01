@@ -28,6 +28,7 @@ pub struct GitInfo {
     pub lines_added: usize,
     pub lines_deleted: usize,
     pub is_dirty: bool,
+    #[serde(skip_serializing_if = "std::collections::HashMap::is_empty", default)]
     pub file_statuses: std::collections::HashMap<String, FileStatus>,
 }
 
@@ -206,7 +207,15 @@ fn get_git_info_inner(path: &Path, collect_file_statuses: bool, filter_paths: &[
             let msg = commit
                 .message()
                 .ok()
-                .map(|m| m.lines().next().unwrap_or("").to_string());
+                .map(|m| {
+                    let first_line = m.lines().next().unwrap_or("");
+                    // Truncate to 80 chars to keep IPC payload small
+                    if first_line.len() > 80 {
+                        first_line[..80].to_string()
+                    } else {
+                        first_line.to_string()
+                    }
+                });
             let hash = commit
                 .as_object()
                 .short_id()

@@ -134,12 +134,13 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         return Ok(());
     }
 
-    // Daemon not available or cache miss — try direct scan
+    // Daemon not available or cache miss — try direct scan.
+    // Todos/ports/docker/metrics are disabled by default for speed; set CFM_*=1 to enable.
     eprintln!("cfmd: daemon not available, falling back to direct scan");
-    let no_todos = std::env::var("CFM_NO_TODOS").unwrap_or_default() == "1";
-    let no_ports = std::env::var("CFM_NO_PORTS").unwrap_or_default() == "1";
-    let no_docker = std::env::var("CFM_NO_DOCKER").unwrap_or_default() == "1";
-    let no_metrics = std::env::var("CFM_NO_METRICS").unwrap_or_default() == "1";
+    let no_todos = std::env::var("CFM_TODOS").unwrap_or_default() != "1";
+    let no_ports = std::env::var("CFM_PORTS").unwrap_or_default() != "1";
+    let no_docker = std::env::var("CFM_DOCKER").unwrap_or_default() != "1";
+    let no_metrics = std::env::var("CFM_METRICS").unwrap_or_default() != "1";
 
     let summary = DirSummary::scan_with_options(
         &path,
@@ -278,7 +279,7 @@ fn warm_nearby_dirs(path: &Path) {
     let mut paths_to_warm = vec![parent.to_path_buf()];
 
     if let Ok(entries) = std::fs::read_dir(parent) {
-        for entry in entries.flatten().take(5) {
+        for entry in entries.flatten().take(3) {
             if entry.path().is_dir() && entry.path() != path {
                 paths_to_warm.push(entry.path());
             }

@@ -31,9 +31,15 @@ pub enum Response {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BannerData {
+    #[serde(skip_serializing, default)]
+    #[allow(dead_code)]
     pub path: PathBuf,
     pub summary: DirSummary,
     pub git_info: Option<GitInfo>,
+    #[serde(skip_serializing, default)]
+    #[allow(dead_code)]
     pub dir_sizes: HashMap<PathBuf, u64>,
+    #[serde(skip_serializing, default)]
+    #[allow(dead_code)]
     pub cached_at: DateTime<Utc>,
 }

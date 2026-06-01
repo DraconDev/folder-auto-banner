@@ -117,12 +117,14 @@ pub struct DirEntry {
     pub is_dir: bool,
     pub is_file: bool,
     pub is_symlink: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
     pub is_exec: bool,
     pub size: u64,
     pub modified: Option<DateTime<Utc>>,
     pub perms: String,
     pub owner: String,
     pub group: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub symlink_target: Option<String>,
 }
 

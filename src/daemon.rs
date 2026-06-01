@@ -125,6 +125,13 @@ impl Daemon {
                         break;
                     }
 
+                    // Check for signal-based shutdown request
+                    #[cfg(unix)]
+                    if SHUTDOWN_REQUESTED.load(std::sync::atomic::Ordering::SeqCst) {
+                        tracing::info!("Shutdown signal received, shutting down gracefully");
+                        break;
+                    }
+
                     // Periodic save every 5 minutes
                     if last_save.elapsed() > Duration::from_secs(300) {
                         let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
@@ -199,7 +206,7 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                     }
                     match inotify.watches().add(
                         path,
-                        WatchMask::CREATE | WatchMask::DELETE | WatchMask::MODIFY | WatchMask::MOVE,
+                        WatchMask::CREATE | WatchMask::DELETE | WatchMask::MODIFY | WatchMask::MOVE | WatchMask::CLOSE_WRITE,
                     ) {
                         Ok(wd) => {
                             tracing::info!("Watching: {}", path.display());
@@ -281,54 +288,10 @@ fn handle_client(
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
 
-    // Use the single stream for both read and write (sequential protocol).
-    // Cloning a UnixStream on Unix can cause buffering issues with read_exact.
-    let mut stream = stream;
+    let reader = stream.try_clone()?;
+    let mut writer = stream;
 
-    // Read magic byte to determine format: 'J' = JSON, 'B' = bincode
-    // Default to JSON (known working). Set CFM_IPC=bincode to use bincode.
-    let mut magic = [b'J']; // default to JSON
-    use std::io::Read;
-    let _ = stream.read_exact(&mut magic); // ignore error — default is already set
-    let use_bincode = magic[0] == b'B';
-    tracing::trace!("IPC format: {}", if use_bincode { "bincode" } else { "json" });
-
-    let request: Request = if use_bincode {
-        // Length-prefixed bincode: 4-byte LE length, then payload
-        let mut len_bytes = [0u8; 4];
-        match stream.read_exact(&mut len_bytes) {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::warn!("Failed to read bincode length prefix: {}", e);
-                return Ok(());
-            }
-        }
-        let len = u32::from_le_bytes(len_bytes) as usize;
-        tracing::trace!("Bincode request length: {} bytes", len);
-        let mut buf = vec![0u8; len];
-        match stream.read_exact(&mut buf) {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::warn!("Failed to read bincode payload ({} bytes): {}", len, e);
-                return Ok(());
-            }
-        }
-        match bincode::deserialize(&buf) {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::warn!("Failed to deserialize bincode request: {}", e);
-                return Ok(());
-            }
-        }
-    } else {
-        match serde_json::from_reader(&mut stream) {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::warn!("Failed to deserialize JSON request: {}", e);
-                return Ok(());
-            }
-        }
-    };
+    let request: Request = serde_json::from_reader(&reader)?;
 
     let response = match request {
         Request::Banner { path } => {
@@ -358,7 +321,7 @@ fn handle_client(
                         }
                         drop(global_sizes);
                         // Don't refresh git on cache hit — it's cached with TTL
-                        return send_response(&mut stream, &Response::Banner(Box::new(data)));
+                        return send_response(&mut writer, &Response::Banner(Box::new(data)));
                     }
                 }
             }
@@ -457,38 +420,11 @@ fn handle_client(
         }
     };
 
-    send_response(&mut stream, &response)?;
-
-    // Keep the stream open until the client closes it (reads until EOF).
-    // This prevents the daemon from closing the socket while the client
-    // is still reading the response.
-    let mut discard = [0u8; 256];
-    loop {
-        match stream.read(&mut discard) {
-            Ok(0) => break, // EOF — client closed
-            Ok(_) => continue,
-            Err(_) => break, // timeout or error
-        }
-    }
-    Ok(())
+    send_response(&mut writer, &response)
 }
 
-fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
-    use std::io::Write;
-    // Default: JSON (known working, uses shutdown-write for EOF)
-    // When CFM_IPC=bincode, use length-prefixed bincode
-    if std::env::var("CFM_IPC").as_deref() == Ok("bincode") {
-        stream.write_all(&[b'B'])?;
-        let bytes = bincode::serialize(response)?;
-        let len = bytes.len() as u32;
-        stream.write_all(&len.to_le_bytes())?;
-        stream.write_all(&bytes)?;
-        stream.flush()?;
-    } else {
-        stream.write_all(&[b'J'])?;
-        serde_json::to_writer(&mut *stream, response)?;
-        stream.flush()?;
-    }
+fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
+    serde_json::to_writer(writer, response)?;
     Ok(())
 }
 
@@ -862,10 +798,30 @@ fn main() -> Result<()> {
             .output();
     }
 
+    // Install signal handler for graceful shutdown (SIGTERM/SIGINT)
+    #[cfg(unix)]
+    {
+        let handler = signal_wrapper as *const () as libc::sighandler_t;
+        unsafe {
+            libc::signal(libc::SIGTERM, handler);
+            libc::signal(libc::SIGINT, handler);
+        }
+    }
+
     tracing::info!("cfmd started with resource limits (nice=10, ionice=idle)");
 
     let daemon = Daemon::new()?;
     daemon.run()
+}
+
+// Global shutdown flag — set by signal handler, checked by daemon loop
+#[cfg(unix)]
+static SHUTDOWN_REQUESTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(unix)]
+extern "C" fn signal_wrapper(_sig: libc::c_int) {
+    SHUTDOWN_REQUESTED.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
 #[cfg(test)]
