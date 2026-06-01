@@ -13,8 +13,13 @@ pub fn icon_for(name: &str, is_dir: bool, is_exec: bool, is_symlink: bool) -> St
 }
 
 /// Get icon for a file/directory entry with explicit nerd mode
-pub fn icon_for_mode(name: &str, is_dir: bool, is_exec: bool, is_symlink: bool, use_nerd: bool) -> String {
-
+pub fn icon_for_mode(
+    name: &str,
+    is_dir: bool,
+    is_exec: bool,
+    is_symlink: bool,
+    use_nerd: bool,
+) -> String {
     if is_symlink {
         return "🔗".to_string();
     }
@@ -203,8 +208,14 @@ mod tests {
 
     #[test]
     fn test_exact_name() {
-        assert_eq!(icon_for_mode("Cargo.toml", false, false, false, false), "🦀");
-        assert_eq!(icon_for_mode("package.json", false, false, false, false), "📦");
+        assert_eq!(
+            icon_for_mode("Cargo.toml", false, false, false, false),
+            "🦀"
+        );
+        assert_eq!(
+            icon_for_mode("package.json", false, false, false, false),
+            "📦"
+        );
         assert_eq!(icon_for_mode("README.md", false, false, false, false), "📖");
     }
 
@@ -212,7 +223,10 @@ mod tests {
     fn test_extension() {
         assert_eq!(icon_for_mode("main.rs", false, false, false, false), "🦀");
         assert_eq!(icon_for_mode("app.py", false, false, false, false), "🐍");
-        assert_eq!(icon_for_mode("index.html", false, false, false, false), "🌐");
+        assert_eq!(
+            icon_for_mode("index.html", false, false, false, false),
+            "🌐"
+        );
         assert_eq!(icon_for_mode("style.css", false, false, false, false), "🎨");
     }
 

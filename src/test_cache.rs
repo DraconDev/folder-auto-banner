@@ -29,7 +29,7 @@ impl TestResults {
         let path = Self::cache_path()?;
         let content = fs::read_to_string(&path).ok()?;
         let results: TestResults = serde_json::from_str(&content).ok()?;
-        
+
         // Check if cache is expired (older than 1 hour)
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -38,13 +38,13 @@ impl TestResults {
         if now - results.timestamp > 3600 {
             return None; // Expired
         }
-        
+
         Some(results)
     }
 
     /// Save test results to cache
     #[allow(dead_code)]
-pub fn save(passed: usize, failed: usize, ignored: usize, duration_ms: u64) {
+    pub fn save(passed: usize, failed: usize, ignored: usize, duration_ms: u64) {
         let results = TestResults {
             passed,
             failed,
@@ -55,7 +55,7 @@ pub fn save(passed: usize, failed: usize, ignored: usize, duration_ms: u64) {
                 .unwrap_or_default()
                 .as_secs() as i64,
         };
-        
+
         if let Some(path) = Self::cache_path() {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
@@ -68,7 +68,7 @@ pub fn save(passed: usize, failed: usize, ignored: usize, duration_ms: u64) {
 
     /// Format duration as human-readable string
     #[allow(dead_code)]
-pub fn format_duration(&self) -> String {
+    pub fn format_duration(&self) -> String {
         if self.duration_ms < 1000 {
             format!("{}ms", self.duration_ms)
         } else {
@@ -83,7 +83,7 @@ pub fn format_duration(&self) -> String {
             .unwrap_or_default()
             .as_secs() as i64;
         let diff = now - self.timestamp;
-        
+
         if diff < 60 {
             "just now".to_string()
         } else if diff < 3600 {

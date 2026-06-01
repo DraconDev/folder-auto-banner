@@ -45,11 +45,11 @@ impl FileStatus {
     pub fn icon(&self) -> &'static str {
         match self {
             FileStatus::Modified => "\u{25cf}",  // ●
-            FileStatus::Added => "\u{25cf}",      // ●
-            FileStatus::Deleted => "\u{25cf}",    // ●
-            FileStatus::Renamed => "\u{25cf}",    // ●
-            FileStatus::Untracked => "\u{25cf}",  // ●
-            FileStatus::Conflict => "\u{25cf}",   // ●
+            FileStatus::Added => "\u{25cf}",     // ●
+            FileStatus::Deleted => "\u{25cf}",   // ●
+            FileStatus::Renamed => "\u{25cf}",   // ●
+            FileStatus::Untracked => "\u{25cf}", // ●
+            FileStatus::Conflict => "\u{25cf}",  // ●
         }
     }
 
@@ -66,7 +66,7 @@ impl FileStatus {
 }
 
 /// Get Git info for a directory
-/// 
+///
 /// If `collect_file_statuses` is false, skips building the per-file status map
 /// (which can be 39K+ entries for large repos). Use false when you only need
 /// aggregate counts (staged/modified/untracked) for the banner header.
@@ -74,19 +74,11 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
     get_git_info_inner(path, true, &[])
 }
 
-/// Get Git info without per-file status map (faster, for banner header only)
-pub fn get_git_info_summary(path: &Path) -> Result<GitInfo> {
-    get_git_info_inner(path, false, &[])
-}
-
-/// Get Git info with filtered file statuses (only paths matching the filter)
-/// This is much faster for large repos — only collects statuses for files
-/// that will actually be displayed in the banner.
-pub fn get_git_info_filtered(path: &Path, filter_paths: &[String]) -> Result<GitInfo> {
-    get_git_info_inner(path, true, filter_paths)
-}
-
-fn get_git_info_inner(path: &Path, collect_file_statuses: bool, filter_paths: &[String]) -> Result<GitInfo> {
+fn get_git_info_inner(
+    path: &Path,
+    collect_file_statuses: bool,
+    filter_paths: &[String],
+) -> Result<GitInfo> {
     let mut repo = match Repository::discover(path) {
         Ok(r) => r,
         Err(_) => return Ok(GitInfo::default()),
@@ -127,7 +119,7 @@ fn get_git_info_inner(path: &Path, collect_file_statuses: bool, filter_paths: &[
     } else {
         repo.statuses(None).ok()
     };
-    
+
     if let Some(statuses) = statuses {
         for entry in statuses.iter() {
             let status = entry.status();
@@ -229,12 +221,14 @@ fn get_git_info_inner(path: &Path, collect_file_statuses: bool, filter_paths: &[
                 .map(|dt| dt.and_utc().timestamp())
                 .unwrap_or(0)
         };
-        
+
         let mut revwalk = repo.revwalk().ok();
         if let Some(ref mut walk) = revwalk {
             let _ = walk.push_head();
             for (i, oid) in walk.enumerate() {
-                if i >= 1000 { break; } // Limit to avoid slow repos
+                if i >= 1000 {
+                    break;
+                } // Limit to avoid slow repos
                 if let Ok(oid) = oid {
                     if let Ok(commit) = repo.find_commit(oid) {
                         if commit.time().seconds() >= today_start {

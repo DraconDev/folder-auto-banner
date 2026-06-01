@@ -51,7 +51,7 @@ mod tests {
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("Banner"));
         assert!(json.contains("/tmp"));
-        
+
         let deserialized: Request = serde_json::from_str(&json).unwrap();
         match deserialized {
             Request::Banner { path } => assert_eq!(path, PathBuf::from("/tmp")),
@@ -66,7 +66,7 @@ mod tests {
         };
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("Warm"));
-        
+
         let deserialized: Request = serde_json::from_str(&json).unwrap();
         match deserialized {
             Request::Warm { path } => assert_eq!(path, PathBuf::from("/home")),
@@ -79,7 +79,7 @@ mod tests {
         let request = Request::Ping;
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("Ping"));
-        
+
         let deserialized: Request = serde_json::from_str(&json).unwrap();
         assert!(matches!(deserialized, Request::Ping));
     }
@@ -89,7 +89,7 @@ mod tests {
         let request = Request::Shutdown;
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("Shutdown"));
-        
+
         let deserialized: Request = serde_json::from_str(&json).unwrap();
         assert!(matches!(deserialized, Request::Shutdown));
     }
@@ -99,7 +99,7 @@ mod tests {
         let response = Response::Pong;
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("Pong"));
-        
+
         let deserialized: Response = serde_json::from_str(&json).unwrap();
         assert!(matches!(deserialized, Response::Pong));
     }
@@ -112,7 +112,7 @@ mod tests {
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("Error"));
         assert!(json.contains("test error"));
-        
+
         let deserialized: Response = serde_json::from_str(&json).unwrap();
         match deserialized {
             Response::Error { message } => assert_eq!(message, "test error"),
@@ -129,7 +129,7 @@ mod tests {
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("DirSize"));
         assert!(json.contains("12345"));
-        
+
         let deserialized: Response = serde_json::from_str(&json).unwrap();
         match deserialized {
             Response::DirSize { path, size } => {
@@ -149,7 +149,7 @@ mod tests {
             dir_sizes: HashMap::new(),
             cached_at: Utc::now(),
         };
-        
+
         assert_eq!(data.path, PathBuf::from("/tmp"));
         assert!(data.git_info.is_none());
         assert!(data.dir_sizes.is_empty());
@@ -164,10 +164,10 @@ mod tests {
             dir_sizes: HashMap::new(),
             cached_at: Utc::now(),
         };
-        
+
         let json = serde_json::to_string(&data).unwrap();
         assert!(json.contains("/tmp"));
-        
+
         let deserialized: BannerData = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.path, PathBuf::from("/tmp"));
     }

@@ -49,7 +49,6 @@ const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating row
 
 /// Options for the banner command
 #[derive(Default)]
-#[allow(dead_code)]
 pub struct BannerOptions<'a> {
     pub path: Option<&'a Path>,
     pub raw: bool,
@@ -73,6 +72,9 @@ pub struct BannerOptions<'a> {
     pub classify: bool,
     pub blocks: Option<&'a str>,
     pub tree: Option<Option<usize>>,
+    pub icons: bool,
+    pub colors: bool,
+    pub max_items: usize,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -89,12 +91,16 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
 
     // Load config and apply env var overrides
     let config = crate::state::Config::load().unwrap_or_default();
-    let icons = std::env::var("CFM_ICONS").map(|v| v == "1").unwrap_or(config.icons);
+    let icons = std::env::var("CFM_ICONS")
+        .map(|v| v == "1")
+        .unwrap_or(config.icons);
     let no_color = std::env::var("NO_COLOR").is_ok();
     let colors = if no_color {
         false
     } else {
-        std::env::var("CFM_COLORS").map(|v| v == "1").unwrap_or(config.colors)
+        std::env::var("CFM_COLORS")
+            .map(|v| v == "1")
+            .unwrap_or(config.colors)
     };
     let _compact = opts.compact || config.compact;
     let max_items = config.max_display_items;
@@ -117,7 +123,31 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify, opts.relative_date, opts.blocks);
+            output_rich(
+                &path,
+                &summary,
+                &git_info,
+                opts.compact,
+                opts.sort,
+                opts.timesort,
+                opts.sizesort,
+                opts.extensionsort,
+                opts.gitsort,
+                opts.versionsort,
+                opts.no_sort,
+                opts.group_dirs,
+                opts.reverse,
+                icons,
+                colors,
+                max_items,
+                opts.hidden,
+                opts.filter,
+                opts.max,
+                opts.group,
+                opts.classify,
+                opts.relative_date,
+                opts.blocks,
+            );
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -148,7 +178,31 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(&path, &summary, &git_info, opts.compact, opts.sort, opts.timesort, opts.sizesort, opts.extensionsort, opts.gitsort, opts.versionsort, opts.no_sort, opts.group_dirs, opts.reverse, icons, colors, max_items, opts.hidden, opts.filter, opts.max, opts.group, opts.classify, opts.relative_date, opts.blocks);
+        output_rich(
+            &path,
+            &summary,
+            &git_info,
+            opts.compact,
+            opts.sort,
+            opts.timesort,
+            opts.sizesort,
+            opts.extensionsort,
+            opts.gitsort,
+            opts.versionsort,
+            opts.no_sort,
+            opts.group_dirs,
+            opts.reverse,
+            icons,
+            colors,
+            max_items,
+            opts.hidden,
+            opts.filter,
+            opts.max,
+            opts.group,
+            opts.classify,
+            opts.relative_date,
+            opts.blocks,
+        );
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -158,12 +212,27 @@ pub fn run_banner(opts: &BannerOptions) -> Result<()> {
 }
 
 /// Output tree view of directory
-fn output_tree(path: &Path, max_depth: usize, show_hidden: bool, filter: Option<&str>, icons: bool, _colors: bool) {
+fn output_tree(
+    path: &Path,
+    max_depth: usize,
+    show_hidden: bool,
+    filter: Option<&str>,
+    icons: bool,
+    _colors: bool,
+) {
     println!("{}", path.display());
     print_tree_recursive(path, "", max_depth, 0, show_hidden, filter, icons);
 }
 
-fn print_tree_recursive(path: &Path, prefix: &str, max_depth: usize, current_depth: usize, show_hidden: bool, filter: Option<&str>, icons: bool) {
+fn print_tree_recursive(
+    path: &Path,
+    prefix: &str,
+    max_depth: usize,
+    current_depth: usize,
+    show_hidden: bool,
+    filter: Option<&str>,
+    icons: bool,
+) {
     if max_depth > 0 && current_depth >= max_depth {
         return;
     }
@@ -198,7 +267,11 @@ fn print_tree_recursive(path: &Path, prefix: &str, max_depth: usize, current_dep
         match (a_is_dir, b_is_dir) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
-            _ => a.file_name().to_string_lossy().to_lowercase().cmp(&b.file_name().to_string_lossy().to_lowercase()),
+            _ => a
+                .file_name()
+                .to_string_lossy()
+                .to_lowercase()
+                .cmp(&b.file_name().to_string_lossy().to_lowercase()),
         }
     });
 
@@ -212,7 +285,11 @@ fn print_tree_recursive(path: &Path, prefix: &str, max_depth: usize, current_dep
         let child_prefix = if is_last { "    " } else { "│   " };
 
         let icon_str = if icons {
-            if is_dir { "📁 " } else { "📄 " }
+            if is_dir {
+                "📁 "
+            } else {
+                "📄 "
+            }
         } else {
             ""
         };
@@ -220,7 +297,15 @@ fn print_tree_recursive(path: &Path, prefix: &str, max_depth: usize, current_dep
         if is_dir {
             println!("{}{}{}{}/", prefix, connector, icon_str, name);
             let new_prefix = format!("{}{}", prefix, child_prefix);
-            print_tree_recursive(&entry.path(), &new_prefix, max_depth, current_depth + 1, show_hidden, filter, icons);
+            print_tree_recursive(
+                &entry.path(),
+                &new_prefix,
+                max_depth,
+                current_depth + 1,
+                show_hidden,
+                filter,
+                icons,
+            );
         } else {
             println!("{}{}{}{}", prefix, connector, icon_str, name);
         }
@@ -230,13 +315,16 @@ fn print_tree_recursive(path: &Path, prefix: &str, max_depth: usize, current_dep
 /// Pre-compute banners for parent and sibling directories
 fn warm_nearby_dirs(path: &Path) {
     let Some(parent) = path.parent() else { return };
-    if !parent.is_dir() { return; }
+    if !parent.is_dir() {
+        return;
+    }
 
     // Collect paths to warm, then spawn background thread to avoid blocking
     let mut paths_to_warm = vec![parent.to_path_buf()];
 
     if let Ok(entries) = std::fs::read_dir(parent) {
-        for entry in entries.flatten().take(10) { // Reduced from 20 to 10
+        for entry in entries.flatten().take(10) {
+            // Reduced from 20 to 10
             if entry.path().is_dir() && entry.path() != path {
                 paths_to_warm.push(entry.path());
             }
@@ -269,19 +357,44 @@ fn build_branch_display(git_info: &GitInfo) -> String {
 fn build_git_status_indicators(git_info: &GitInfo) -> String {
     let mut indicators = Vec::new();
     if git_info.modified > 0 {
-        indicators.push(format!("{}*{}{}", color(YELLOW), git_info.modified, color(RESET)));
+        indicators.push(format!(
+            "{}*{}{}",
+            color(YELLOW),
+            git_info.modified,
+            color(RESET)
+        ));
     }
     if git_info.staged > 0 {
-        indicators.push(format!("{}+{}{}", color(GREEN), git_info.staged, color(RESET)));
+        indicators.push(format!(
+            "{}+{}{}",
+            color(GREEN),
+            git_info.staged,
+            color(RESET)
+        ));
     }
     if git_info.untracked > 0 {
-        indicators.push(format!("{}?{}{}", color(DIM), git_info.untracked, color(RESET)));
+        indicators.push(format!(
+            "{}?{}{}",
+            color(DIM),
+            git_info.untracked,
+            color(RESET)
+        ));
     }
     if git_info.ahead > 0 {
-        indicators.push(format!("{}↑{}{}", color(CYAN), git_info.ahead, color(RESET)));
+        indicators.push(format!(
+            "{}↑{}{}",
+            color(CYAN),
+            git_info.ahead,
+            color(RESET)
+        ));
     }
     if git_info.behind > 0 {
-        indicators.push(format!("{}↓{}{}", color(RED), git_info.behind, color(RESET)));
+        indicators.push(format!(
+            "{}↓{}{}",
+            color(RED),
+            git_info.behind,
+            color(RESET)
+        ));
     }
     indicators.join(" ")
 }
@@ -290,30 +403,11 @@ fn output_rich(
     path: &Path,
     summary: &DirSummary,
     git_info: &GitInfo,
-    _compact: bool,
-    sort: Option<&str>,
-    timesort: bool,
-    sizesort: bool,
-    extensionsort: bool,
-    gitsort: bool,
-    versionsort: bool,
-    no_sort: bool,
-    group_dirs: Option<&str>,
-    reverse: bool,
-    icons: bool,
-    _colors: bool,
-    _max_items: usize,
-    show_hidden: bool,
-    filter: Option<&str>,
-    max: Option<usize>,
-    group: bool,
-    classify: bool,
-    relative_date: bool,
-    blocks: Option<&str>,
+    opts: &BannerOptions,
 ) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
-    
+
     let path_str = path.to_string_lossy();
     let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
@@ -391,7 +485,7 @@ fn output_rich(
 
         // Row 2: Details
         let mut details = Vec::new();
-        
+
         // Git enhancements
         if git_info.is_repo {
             if let Some(time) = git_info.last_commit_time {
@@ -436,7 +530,7 @@ fn output_rich(
                 details.push(format!("{}⚠️ {}{}", color(YELLOW), state, color(RESET)));
             }
         }
-        
+
         // TODO count
         if let Some(ref todos) = summary.todo_info {
             if todos.count > 0 {
@@ -448,7 +542,7 @@ fn output_rich(
                 ));
             }
         }
-        
+
         // Code metrics — show languages breakdown
         if let Some(ref metrics) = summary.code_metrics {
             if metrics.total_loc > 0 {
@@ -461,37 +555,42 @@ fn output_rich(
                 ));
                 // Show top 3 languages with percentages
                 if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                    let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
-                        let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                        let name = match ext.as_str() {
-                            "rs" => "Rust",
-                            "md" | "mdx" => "Markdown",
-                            "sh" | "bash" => "Shell",
-                            "py" => "Python",
-                            "js" | "mjs" => "JavaScript",
-                            "ts" | "tsx" => "TypeScript",
-                            "go" => "Go",
-                            "c" | "h" => "C",
-                            "cpp" | "cc" | "cxx" | "hpp" => "C++",
-                            "java" => "Java",
-                            "rb" => "Ruby",
-                            "toml" => "TOML",
-                            "yaml" | "yml" => "YAML",
-                            "json" => "JSON",
-                            "html" | "htm" => "HTML",
-                            "css" => "CSS",
-                            "sql" => "SQL",
-                            "vim" => "VimL",
-                            "el" => "Emacs Lisp",
-                            _ => ext,
-                        };
-                        format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
-                    }).collect();
+                    let lang_parts: Vec<String> = metrics
+                        .by_extension
+                        .iter()
+                        .take(3)
+                        .map(|(ext, loc)| {
+                            let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
+                            let name = match ext.as_str() {
+                                "rs" => "Rust",
+                                "md" | "mdx" => "Markdown",
+                                "sh" | "bash" => "Shell",
+                                "py" => "Python",
+                                "js" | "mjs" => "JavaScript",
+                                "ts" | "tsx" => "TypeScript",
+                                "go" => "Go",
+                                "c" | "h" => "C",
+                                "cpp" | "cc" | "cxx" | "hpp" => "C++",
+                                "java" => "Java",
+                                "rb" => "Ruby",
+                                "toml" => "TOML",
+                                "yaml" | "yml" => "YAML",
+                                "json" => "JSON",
+                                "html" | "htm" => "HTML",
+                                "css" => "CSS",
+                                "sql" => "SQL",
+                                "vim" => "VimL",
+                                "el" => "Emacs Lisp",
+                                _ => ext,
+                            };
+                            format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
+                        })
+                        .collect();
                     details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
                 }
             }
         }
-        
+
         // Build status
         if let Some(ref build) = summary.build_status {
             if build.ok {
@@ -524,7 +623,7 @@ fn output_rich(
                 ));
             }
         }
-        
+
         // Port usage
         if let Some(ref ports) = summary.port_info {
             if !ports.ports.is_empty() {
@@ -537,7 +636,7 @@ fn output_rich(
                 ));
             }
         }
-        
+
         // Docker info
         if let Some(ref docker) = summary.docker_info {
             let running = docker
@@ -550,12 +649,16 @@ fn output_rich(
                 details.push(format!(
                     "{}🐳 {} container(s){}",
                     color(CYAN),
-                    if running > 0 { format!("{} up", running) } else { total.to_string() },
+                    if running > 0 {
+                        format!("{} up", running)
+                    } else {
+                        total.to_string()
+                    },
                     color(RESET)
                 ));
             }
         }
-        
+
         // Diff stats
         if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
             details.push(format!(
@@ -568,7 +671,7 @@ fn output_rich(
                 color(RESET)
             ));
         }
-        
+
         // Clean indicator
         if !git_info.is_dirty
             && git_info.modified == 0
@@ -577,7 +680,7 @@ fn output_rich(
         {
             details.push(format!("{}✓ clean{}", color(GREEN), color(RESET)));
         }
-        
+
         // Cached test results
         if let Some(test_results) = crate::test_cache::TestResults::load() {
             if test_results.failed > 0 {
@@ -597,7 +700,7 @@ fn output_rich(
                 ));
             }
         }
-        
+
         // Combine rows with dynamic truncation
         if details.is_empty() {
             row1
@@ -605,7 +708,7 @@ fn output_rich(
             let details_str = details.join(" │ ");
             let term_width = get_terminal_width();
             let row1_width = strip_ansi(&row1).len();
-            
+
             if term_width > 0 && row1_width + details_str.len() > term_width {
                 let available = term_width.saturating_sub(row1_width + 3);
                 if available > 20 {
@@ -639,10 +742,10 @@ fn output_rich(
             parts.push(format!("│ {} hidden", hidden_count));
         }
         let row1 = parts.join(" ");
-        
+
         // Row 2: Details
         let mut details = Vec::new();
-        
+
         // Build status
         if let Some(ref build) = summary.build_status {
             if build.ok {
@@ -665,7 +768,7 @@ fn output_rich(
                 details.push(format!("{}✗ build errors{}", color(RED), color(RESET)));
             }
         }
-        
+
         // TODO count
         if let Some(ref todos) = summary.todo_info {
             if todos.count > 0 {
@@ -677,7 +780,7 @@ fn output_rich(
                 ));
             }
         }
-        
+
         // Code metrics — show languages breakdown
         if let Some(ref metrics) = summary.code_metrics {
             if metrics.total_loc > 0 {
@@ -690,37 +793,42 @@ fn output_rich(
                 ));
                 // Show top 3 languages with percentages
                 if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                    let lang_parts: Vec<String> = metrics.by_extension.iter().take(3).map(|(ext, loc)| {
-                        let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                        let name = match ext.as_str() {
-                            "rs" => "Rust",
-                            "md" | "mdx" => "Markdown",
-                            "sh" | "bash" => "Shell",
-                            "py" => "Python",
-                            "js" | "mjs" => "JavaScript",
-                            "ts" | "tsx" => "TypeScript",
-                            "go" => "Go",
-                            "c" | "h" => "C",
-                            "cpp" | "cc" | "cxx" | "hpp" => "C++",
-                            "java" => "Java",
-                            "rb" => "Ruby",
-                            "toml" => "TOML",
-                            "yaml" | "yml" => "YAML",
-                            "json" => "JSON",
-                            "html" | "htm" => "HTML",
-                            "css" => "CSS",
-                            "sql" => "SQL",
-                            "vim" => "VimL",
-                            "el" => "Emacs Lisp",
-                            _ => ext,
-                        };
-                        format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
-                    }).collect();
+                    let lang_parts: Vec<String> = metrics
+                        .by_extension
+                        .iter()
+                        .take(3)
+                        .map(|(ext, loc)| {
+                            let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
+                            let name = match ext.as_str() {
+                                "rs" => "Rust",
+                                "md" | "mdx" => "Markdown",
+                                "sh" | "bash" => "Shell",
+                                "py" => "Python",
+                                "js" | "mjs" => "JavaScript",
+                                "ts" | "tsx" => "TypeScript",
+                                "go" => "Go",
+                                "c" | "h" => "C",
+                                "cpp" | "cc" | "cxx" | "hpp" => "C++",
+                                "java" => "Java",
+                                "rb" => "Ruby",
+                                "toml" => "TOML",
+                                "yaml" | "yml" => "YAML",
+                                "json" => "JSON",
+                                "html" | "htm" => "HTML",
+                                "css" => "CSS",
+                                "sql" => "SQL",
+                                "vim" => "VimL",
+                                "el" => "Emacs Lisp",
+                                _ => ext,
+                            };
+                            format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
+                        })
+                        .collect();
                     details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
                 }
             }
         }
-        
+
         // Port usage
         if let Some(ref ports) = summary.port_info {
             if !ports.ports.is_empty() {
@@ -733,7 +841,7 @@ fn output_rich(
                 ));
             }
         }
-        
+
         // Docker info
         if let Some(ref docker) = summary.docker_info {
             let running = docker
@@ -746,16 +854,25 @@ fn output_rich(
                 details.push(format!(
                     "{}🐳 {} container(s){}",
                     color(CYAN),
-                    if running > 0 { format!("{} up", running) } else { total.to_string() },
+                    if running > 0 {
+                        format!("{} up", running)
+                    } else {
+                        total.to_string()
+                    },
                     color(RESET)
                 ));
             } else if docker.has_compose || docker.has_dockerfile {
                 details.push(format!("{}🐳 docker{}", color(DIM), color(RESET)));
             }
         }
-        
-        details.push(format!("{}│ {} total{}", color(DIM), summary.total_items, color(RESET)));
-        
+
+        details.push(format!(
+            "{}│ {} total{}",
+            color(DIM),
+            summary.total_items,
+            color(RESET)
+        ));
+
         // Combine rows with dynamic truncation
         if details.is_empty() {
             row1
@@ -763,7 +880,7 @@ fn output_rich(
             let details_str = details.join(" │ ");
             let term_width = get_terminal_width();
             let row1_width = strip_ansi(&row1).len();
-            
+
             if term_width > 0 && row1_width + details_str.len() > term_width {
                 let available = term_width.saturating_sub(row1_width + 3);
                 if available > 20 {
@@ -828,9 +945,18 @@ fn output_rich(
 
     // Group by type if requested
     if group {
-        let mut dirs: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_dir).copied().collect();
-        let mut files: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_file && !i.is_symlink).copied().collect();
-        let mut symlinks: Vec<&crate::fs::DirEntry> = display_items.iter().filter(|i| i.is_symlink).copied().collect();
+        let mut dirs: Vec<&crate::fs::DirEntry> =
+            display_items.iter().filter(|i| i.is_dir).copied().collect();
+        let mut files: Vec<&crate::fs::DirEntry> = display_items
+            .iter()
+            .filter(|i| i.is_file && !i.is_symlink)
+            .copied()
+            .collect();
+        let mut symlinks: Vec<&crate::fs::DirEntry> = display_items
+            .iter()
+            .filter(|i| i.is_symlink)
+            .copied()
+            .collect();
         dirs.sort_by_key(|i| i.name.to_lowercase());
         files.sort_by_key(|i| i.name.to_lowercase());
         symlinks.sort_by_key(|i| i.name.to_lowercase());
@@ -882,12 +1008,10 @@ fn output_rich(
                 "size" => a.size.cmp(&b.size),
                 "date" => {
                     let a_time = a.modified.unwrap_or_else(|| {
-                        chrono::DateTime::from_timestamp(0, 0)
-                            .unwrap_or_default()
+                        chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
                     });
                     let b_time = b.modified.unwrap_or_else(|| {
-                        chrono::DateTime::from_timestamp(0, 0)
-                            .unwrap_or_default()
+                        chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
                     });
                     a_time.cmp(&b_time)
                 }
@@ -902,8 +1026,8 @@ fn output_rich(
                     }
                 }
                 "extension" => {
-                    let a_ext = a.name.rfind('.').map(|i| &a.name[i+1..]).unwrap_or("");
-                    let b_ext = b.name.rfind('.').map(|i| &b.name[i+1..]).unwrap_or("");
+                    let a_ext = a.name.rfind('.').map(|i| &a.name[i + 1..]).unwrap_or("");
+                    let b_ext = b.name.rfind('.').map(|i| &b.name[i + 1..]).unwrap_or("");
                     let ext_cmp = a_ext.to_lowercase().cmp(&b_ext.to_lowercase());
                     if ext_cmp != std::cmp::Ordering::Equal {
                         ext_cmp
@@ -1054,11 +1178,7 @@ fn output_rich(
 
         let name_display = if item.is_symlink {
             if let Some(target) = &item.symlink_target {
-                let indicator = if item.symlink_valid {
-                    "→"
-                } else {
-                    "✗→"
-                };
+                let indicator = if item.symlink_valid { "→" } else { "✗→" };
                 format!(
                     "{}{}{}{} {}{}{} {}",
                     name_prefix,
@@ -1071,10 +1191,16 @@ fn output_rich(
                     target
                 )
             } else {
-                format!("{}{}{}{}", name_prefix, item.name, classify_suffix, name_suffix)
+                format!(
+                    "{}{}{}{}",
+                    name_prefix, item.name, classify_suffix, name_suffix
+                )
             }
         } else {
-            format!("{}{}{}{}", name_prefix, item.name, classify_suffix, name_suffix)
+            format!(
+                "{}{}{}{}",
+                name_prefix, item.name, classify_suffix, name_suffix
+            )
         };
 
         let modified = item
@@ -1116,15 +1242,45 @@ fn output_rich(
                 // Convert rwx string to octal
                 let perms = &item.perms;
                 if perms.len() >= 9 {
-                    let user = if perms.len() > 2 && perms.as_bytes()[2] == b'x' { 4 } else { 0 }
-                        + if perms.len() > 1 && perms.as_bytes()[1] == b'w' { 2 } else { 0 }
-                        + if !perms.is_empty() && perms.as_bytes()[0] == b'r' { 1 } else { 0 };
-                    let group = if perms.len() > 5 && perms.as_bytes()[5] == b'x' { 4 } else { 0 }
-                        + if perms.len() > 4 && perms.as_bytes()[4] == b'w' { 2 } else { 0 }
-                        + if perms.len() > 3 && perms.as_bytes()[3] == b'r' { 1 } else { 0 };
-                    let other = if perms.len() > 8 && perms.as_bytes()[8] == b'x' { 4 } else { 0 }
-                        + if perms.len() > 7 && perms.as_bytes()[7] == b'w' { 2 } else { 0 }
-                        + if perms.len() > 6 && perms.as_bytes()[6] == b'r' { 1 } else { 0 };
+                    let user = if perms.len() > 2 && perms.as_bytes()[2] == b'x' {
+                        4
+                    } else {
+                        0
+                    } + if perms.len() > 1 && perms.as_bytes()[1] == b'w' {
+                        2
+                    } else {
+                        0
+                    } + if !perms.is_empty() && perms.as_bytes()[0] == b'r' {
+                        1
+                    } else {
+                        0
+                    };
+                    let group = if perms.len() > 5 && perms.as_bytes()[5] == b'x' {
+                        4
+                    } else {
+                        0
+                    } + if perms.len() > 4 && perms.as_bytes()[4] == b'w' {
+                        2
+                    } else {
+                        0
+                    } + if perms.len() > 3 && perms.as_bytes()[3] == b'r' {
+                        1
+                    } else {
+                        0
+                    };
+                    let other = if perms.len() > 8 && perms.as_bytes()[8] == b'x' {
+                        4
+                    } else {
+                        0
+                    } + if perms.len() > 7 && perms.as_bytes()[7] == b'w' {
+                        2
+                    } else {
+                        0
+                    } + if perms.len() > 6 && perms.as_bytes()[6] == b'r' {
+                        1
+                    } else {
+                        0
+                    };
                     let octal = user * 100 + group * 10 + other;
                     format!("{}{:03}{}", color(DIM), octal, color(RESET))
                 } else {
@@ -1143,8 +1299,7 @@ fn output_rich(
         let size_colored = format!("{}{}{}", color(ORANGE), size_padded, color(RESET));
 
         // Contents: orange (like size)
-        let contents_colored =
-            format!("{}{}{}", color(ORANGE), contents_padded, color(RESET));
+        let contents_colored = format!("{}{}{}", color(ORANGE), contents_padded, color(RESET));
 
         // Git status: colored dot (right-aligned in column)
         let git_colored = if git_icon.is_empty() {
@@ -1155,11 +1310,14 @@ fn output_rich(
 
         // Build row based on config columns (or --blocks override)
         let columns = if let Some(blocks_str) = blocks {
-            blocks_str.split(',').map(|s| s.trim().to_string()).collect::<Vec<_>>()
+            blocks_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect::<Vec<_>>()
         } else {
             config.columns.clone()
         };
-        
+
         let mut row_parts = Vec::new();
         if columns.contains(&"permission".to_string()) && !perm_colored.is_empty() {
             row_parts.push(perm_colored);
@@ -1281,7 +1439,8 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
 
     println!(
         "{}",
-        serde_json::to_string_pretty(&output).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
+        serde_json::to_string_pretty(&output)
+            .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
     );
 }
 
@@ -1455,14 +1614,14 @@ fn truncate_details(details: &[String], available: usize) -> String {
     if details.is_empty() {
         return String::new();
     }
-    
+
     let mut kept = Vec::new();
     let mut current_len = 0;
-    
+
     for detail in details {
         let plain = strip_ansi(detail);
         let item_len = plain.len() + if kept.is_empty() { 0 } else { 3 }; // 3 for " │ "
-        
+
         if current_len + item_len <= available {
             kept.push(detail.clone());
             current_len += item_len;
@@ -1478,7 +1637,7 @@ fn truncate_details(details: &[String], available: usize) -> String {
             break;
         }
     }
-    
+
     kept.join(" │ ")
 }
 
@@ -1531,12 +1690,12 @@ mod tests {
             "medium length".to_string(),
             "this is a very long detail that should be truncated".to_string(),
         ];
-        
+
         // Test with enough space
         let result = truncate_details(&details, 100);
         assert!(result.contains("short"));
         assert!(result.contains("medium length"));
-        
+
         // Test with limited space
         let result = truncate_details(&details, 20);
         assert!(result.contains("short"));

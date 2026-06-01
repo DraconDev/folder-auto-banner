@@ -135,5 +135,3 @@ fn try_lsof_with_dir(project_path: &Path) -> Result<Vec<u16>> {
     ports.sort();
     Ok(ports)
 }
-
-

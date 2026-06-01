@@ -121,8 +121,6 @@ fn count_zip_entries(bytes: &[u8]) -> Option<usize> {
     }
 }
 
-
-
 /// Count SQLite tables by reading schema
 fn count_sqlite_tables(path: &Path) -> Option<usize> {
     let bytes = std::fs::read(path).ok()?;

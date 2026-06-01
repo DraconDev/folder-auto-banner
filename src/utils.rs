@@ -10,7 +10,8 @@ use std::time::Duration;
 #[allow(dead_code)]
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
     std::fs::create_dir_all(dst)?;
-    let mut visited: std::collections::HashSet<std::path::PathBuf> = std::collections::HashSet::new();
+    let mut visited: std::collections::HashSet<std::path::PathBuf> =
+        std::collections::HashSet::new();
     copy_dir_recursive_inner(src, dst, &mut visited)
 }
 
@@ -20,7 +21,10 @@ fn copy_dir_recursive_inner(
     visited: &mut std::collections::HashSet<std::path::PathBuf>,
 ) -> Result<()> {
     if !visited.insert(src.to_path_buf()) {
-        return Err(anyhow::anyhow!("Symlink loop detected at {}", src.display()));
+        return Err(anyhow::anyhow!(
+            "Symlink loop detected at {}",
+            src.display()
+        ));
     }
 
     for entry in std::fs::read_dir(src)? {
@@ -177,11 +181,7 @@ pub fn run_with_timeout(
 }
 
 /// Run a command with a timeout, returning just stdout as a String
-pub fn run_with_timeout_stdout(
-    cmd: &str,
-    args: &[&str],
-    timeout: Duration,
-) -> Result<String> {
+pub fn run_with_timeout_stdout(cmd: &str, args: &[&str], timeout: Duration) -> Result<String> {
     let mut command = std::process::Command::new(cmd);
     command.args(args);
     command.stdout(std::process::Stdio::piped());
@@ -224,10 +224,10 @@ pub const SKIP_DIRS: &[&str] = &[
 
 /// Binary file extensions to skip (shared between todo_scanner and code_metrics)
 pub const BINARY_EXTS: &[&str] = &[
-    "exe", "bin", "o", "so", "dll", "dylib", "a", "lib", "obj", "pdb", "png", "jpg", "jpeg",
-    "gif", "webp", "ico", "svg", "bmp", "tiff", "mp3", "mp4", "avi", "mkv", "mov", "webm",
-    "flac", "wav", "ogg", "zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz", "woff", "woff2",
-    "ttf", "eot", "pdf", "doc", "docx", "xls", "xlsx", "sqlite", "sqlite3", "db",
+    "exe", "bin", "o", "so", "dll", "dylib", "a", "lib", "obj", "pdb", "png", "jpg", "jpeg", "gif",
+    "webp", "ico", "svg", "bmp", "tiff", "mp3", "mp4", "avi", "mkv", "mov", "webm", "flac", "wav",
+    "ogg", "zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz", "woff", "woff2", "ttf", "eot",
+    "pdf", "doc", "docx", "xls", "xlsx", "sqlite", "sqlite3", "db",
     "lock", // Cargo.lock, package-lock.json etc.
 ];
 
@@ -252,13 +252,17 @@ pub fn is_protected_path(path: &Path) -> bool {
     if let Ok(home) = std::env::var("HOME") {
         let home_lower = home.to_lowercase();
         let sensitive = [
-            ".ssh", ".gnupg", ".config", ".local/share/keyrings",
-            ".mozilla", ".thunderbird", ".docker",
+            ".ssh",
+            ".gnupg",
+            ".config",
+            ".local/share/keyrings",
+            ".mozilla",
+            ".thunderbird",
+            ".docker",
         ];
         for s in &sensitive {
             let sensitive_path = format!("{}/{}", home_lower, s);
-            if path_str == sensitive_path || path_str.starts_with(&format!("{}/", sensitive_path))
-            {
+            if path_str == sensitive_path || path_str.starts_with(&format!("{}/", sensitive_path)) {
                 return true;
             }
         }
@@ -337,7 +341,10 @@ mod tests {
         assert!(dst.join("file1.txt").exists());
         assert!(dst.join("sub/file2.txt").exists());
         assert_eq!(fs::read_to_string(dst.join("file1.txt")).unwrap(), "hello");
-        assert_eq!(fs::read_to_string(dst.join("sub/file2.txt")).unwrap(), "world");
+        assert_eq!(
+            fs::read_to_string(dst.join("sub/file2.txt")).unwrap(),
+            "world"
+        );
     }
 
     #[test]

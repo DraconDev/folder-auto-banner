@@ -42,7 +42,9 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     };
 
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
-    stream.set_write_timeout(Some(Duration::from_secs(1))).ok()?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(1)))
+        .ok()?;
 
     let request = Request::Banner {
         path: path.to_path_buf(),
@@ -84,24 +86,6 @@ pub fn is_daemon_running() -> bool {
     }
 }
 
-/// Fire-and-forget: ask daemon to pre-compute banner for a path
-pub fn send_warm(path: &Path) {
-    let Ok(socket) = socket_path() else {
-        return;
-    };
-    let Ok(stream) = UnixStream::connect(&socket) else {
-        return;
-    };
-    stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
-    let request = Request::Warm {
-        path: path.to_path_buf(),
-    };
-    // Fire and forget — don't wait for response
-    if let Err(e) = serde_json::to_writer(&stream, &request) {
-        tracing::warn!("Failed to send warm request: {}", e);
-    }
-}
-
 /// Fire-and-forget: warm multiple paths using a single connection (faster)
 pub fn warm_paths(paths: &[PathBuf]) {
     let Ok(socket) = socket_path() else {
@@ -111,12 +95,10 @@ pub fn warm_paths(paths: &[PathBuf]) {
         return;
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
-    
+
     // Send all warm requests over the same connection
     for path in paths {
-        let request = Request::Warm {
-            path: path.clone(),
-        };
+        let request = Request::Warm { path: path.clone() };
         if let Err(e) = serde_json::to_writer(&stream, &request) {
             tracing::warn!("Failed to send warm request: {}", e);
             break; // Connection broken, stop sending
@@ -217,12 +199,6 @@ mod tests {
         // This test checks the function doesn't panic when daemon is not running
         // It may return false, which is expected
         let _result = is_daemon_running();
-    }
-
-    #[test]
-    fn test_send_warm_does_not_panic() {
-        // send_warm is fire-and-forget, just verify it doesn't panic
-        send_warm(Path::new("/tmp"));
     }
 
     #[test]

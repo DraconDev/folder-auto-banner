@@ -34,7 +34,7 @@ pub fn check_build(path: &Path, project_type: &ProjectType) -> Option<BuildStatu
         _ => return None,
     };
     let duration_ms = start.elapsed().as_millis() as u64;
-    
+
     result.ok().map(|mut bs| {
         bs.duration_ms = duration_ms;
         bs
@@ -54,7 +54,7 @@ fn check_rust_build(path: &Path) -> Result<BuildStatus> {
     let ok = errors == 0 && output.status.success();
 
     Ok(BuildStatus {
-                duration_ms: 0,
+        duration_ms: 0,
         ok,
         errors,
         warnings,
@@ -71,7 +71,7 @@ fn check_node_build(path: &Path) -> Result<BuildStatus> {
         let ok = errors == 0 && output.status.success();
 
         return Ok(BuildStatus {
-                duration_ms: 0,
+            duration_ms: 0,
             ok,
             errors,
             warnings,
@@ -100,7 +100,7 @@ fn check_node_build(path: &Path) -> Result<BuildStatus> {
     }
 
     Ok(BuildStatus {
-                duration_ms: 0,
+        duration_ms: 0,
         ok: true,
         errors: 0,
         warnings: 0,
@@ -115,7 +115,7 @@ fn check_go_build(path: &Path) -> Result<BuildStatus> {
     let ok = errors == 0 && output.status.success();
 
     Ok(BuildStatus {
-                duration_ms: 0,
+        duration_ms: 0,
         ok,
         errors,
         warnings,
@@ -134,7 +134,7 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
 
     if py_files.is_empty() {
         return Ok(BuildStatus {
-                duration_ms: 0,
+            duration_ms: 0,
             ok: true,
             errors: 0,
             warnings: 0,
@@ -142,12 +142,11 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
         });
     }
 
-    let output =
-        utils::run_with_timeout("python3", &["-m", "py_compile"], path, BUILD_TIMEOUT)?;
+    let output = utils::run_with_timeout("python3", &["-m", "py_compile"], path, BUILD_TIMEOUT)?;
     let errors = if output.status.success() { 0 } else { 1 };
 
     Ok(BuildStatus {
-                duration_ms: 0,
+        duration_ms: 0,
         ok: output.status.success(),
         errors,
         warnings: 0,

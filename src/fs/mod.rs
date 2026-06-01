@@ -172,12 +172,10 @@ impl DirSummary {
             let metadata = if is_symlink {
                 // For symlinks, try symlink_metadata first (reads the link itself)
                 // If that fails, the symlink might be broken but we can still read permissions
-                std::fs::symlink_metadata(entry.path())
-                    .ok()
-                    .or_else(|| {
-                        // Fallback: try to read metadata from the parent directory
-                        entry.metadata().ok()
-                    })
+                std::fs::symlink_metadata(entry.path()).ok().or_else(|| {
+                    // Fallback: try to read metadata from the parent directory
+                    entry.metadata().ok()
+                })
             } else {
                 entry.metadata().ok()
             };
@@ -239,11 +237,21 @@ impl DirSummary {
                 // For broken symlinks, show symlink permissions (usually lrwxrwxrwx)
                 #[cfg(unix)]
                 {
-                    ("lrwxrwxrwx".to_string(), false, "?".to_string(), "?".to_string())
+                    (
+                        "lrwxrwxrwx".to_string(),
+                        false,
+                        "?".to_string(),
+                        "?".to_string(),
+                    )
                 }
                 #[cfg(not(unix))]
                 {
-                    ("----------".to_string(), false, "?".to_string(), "?".to_string())
+                    (
+                        "----------".to_string(),
+                        false,
+                        "?".to_string(),
+                        "?".to_string(),
+                    )
                 }
             } else {
                 (
@@ -256,24 +264,22 @@ impl DirSummary {
 
             // Symlink target and validity
             let (symlink_target, symlink_valid) = if is_symlink {
-                let target = std::fs::read_link(entry.path())
-                    .ok()
-                    .map(|p| {
-                        // Try to resolve to absolute path for display
-                        if p.is_absolute() {
-                            p.to_string_lossy().to_string()
+                let target = std::fs::read_link(entry.path()).ok().map(|p| {
+                    // Try to resolve to absolute path for display
+                    if p.is_absolute() {
+                        p.to_string_lossy().to_string()
+                    } else {
+                        // Resolve relative path from parent directory
+                        let parent = entry.path().parent().unwrap_or_else(|| Path::new("."));
+                        let absolute = parent.join(&p);
+                        if let Ok(canonical) = absolute.canonicalize() {
+                            canonical.to_string_lossy().to_string()
                         } else {
-                            // Resolve relative path from parent directory
-                            let parent = entry.path().parent().unwrap_or_else(|| Path::new("."));
-                            let absolute = parent.join(&p);
-                            if let Ok(canonical) = absolute.canonicalize() {
-                                canonical.to_string_lossy().to_string()
-                            } else {
-                                // Can't resolve (dead symlink), show relative path
-                                p.to_string_lossy().to_string()
-                            }
+                            // Can't resolve (dead symlink), show relative path
+                            p.to_string_lossy().to_string()
                         }
-                    });
+                    }
+                });
                 let valid = target.is_some() && std::fs::metadata(entry.path()).is_ok();
                 (target, valid)
             } else {
@@ -332,11 +338,41 @@ impl DirSummary {
             };
         }
 
-        let build_status = cached_check!(check_build, cache, "build", 30, crate::build_status::check_build(path, &project_type));
-        let todo_info = cached_check!(scan_todos, cache, "todos", 60, crate::todo_scanner::scan_todos(path).ok());
-        let code_metrics = cached_check!(check_metrics, cache, "metrics", 60, crate::code_metrics::scan_metrics(path).ok());
-        let port_info = cached_check!(check_ports, cache, "ports", 10, crate::port_usage::detect_ports(path).ok());
-        let docker_info = cached_check!(check_docker, cache, "docker", 10, crate::docker::detect_docker(path).ok());
+        let build_status = cached_check!(
+            check_build,
+            cache,
+            "build",
+            30,
+            crate::build_status::check_build(path, &project_type)
+        );
+        let todo_info = cached_check!(
+            scan_todos,
+            cache,
+            "todos",
+            60,
+            crate::todo_scanner::scan_todos(path).ok()
+        );
+        let code_metrics = cached_check!(
+            check_metrics,
+            cache,
+            "metrics",
+            60,
+            crate::code_metrics::scan_metrics(path).ok()
+        );
+        let port_info = cached_check!(
+            check_ports,
+            cache,
+            "ports",
+            10,
+            crate::port_usage::detect_ports(path).ok()
+        );
+        let docker_info = cached_check!(
+            check_docker,
+            cache,
+            "docker",
+            10,
+            crate::docker::detect_docker(path).ok()
+        );
 
         Ok(DirSummary {
             total_items: files + dirs,
@@ -599,7 +635,9 @@ mod tests {
 
     #[test]
     fn test_format_exact_time() {
-        let dt = chrono::Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap();
+        let dt = chrono::Utc
+            .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
+            .unwrap();
         let formatted = format_exact_time(&dt);
         assert_eq!(formatted, "2024-01-15 10:30:00");
     }
@@ -634,8 +672,8 @@ mod tests {
                     owner: String::new(),
                     group: String::new(),
                     symlink_target: None,
-                symlink_valid: true,
-            },
+                    symlink_valid: true,
+                },
                 DirEntry {
                     name: "main.rs".into(),
                     path: "".into(),
@@ -649,8 +687,8 @@ mod tests {
                     owner: String::new(),
                     group: String::new(),
                     symlink_target: None,
-                symlink_valid: true,
-            },
+                    symlink_valid: true,
+                },
                 DirEntry {
                     name: "readme.md".into(),
                     path: "".into(),
@@ -664,8 +702,8 @@ mod tests {
                     owner: String::new(),
                     group: String::new(),
                     symlink_target: None,
-                symlink_valid: true,
-            },
+                    symlink_valid: true,
+                },
             ],
             project_type: ProjectType::Rust,
             last_modified: None,

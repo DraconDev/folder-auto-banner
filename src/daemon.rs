@@ -96,9 +96,9 @@ impl Daemon {
             // Save to disk when done
             if let Some(dir) = socket_dir {
                 let sizes = dir_sizes_clone.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+                    tracing::warn!("Mutex poisoned, recovering");
+                    e.into_inner()
+                });
                 save_size_cache(&dir, &sizes);
             }
         });
@@ -131,9 +131,9 @@ impl Daemon {
                             .map(|p| p.data_dir().to_path_buf());
                         if let Some(dir) = socket_dir {
                             let cache = self.cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+                                tracing::warn!("Mutex poisoned, recovering");
+                                e.into_inner()
+                            });
                             save_banner_cache(&dir, &cache);
                         }
                         last_save = Instant::now();
@@ -230,9 +230,9 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
                     // Invalidate affected cache entries
                     if !invalidated.is_empty() {
                         let mut cache_guard = cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+                            tracing::warn!("Mutex poisoned, recovering");
+                            e.into_inner()
+                        });
                         for path in &invalidated {
                             cache_guard.remove(path);
                             tracing::info!("Cache invalidated: {}", path.display());
@@ -293,18 +293,18 @@ fn handle_client(
             // Check cache — if hit, inject sizes and refresh git status
             {
                 let cache = cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+                    tracing::warn!("Mutex poisoned, recovering");
+                    e.into_inner()
+                });
                 if let Some(entry) = cache.get(&path) {
                     if entry.computed_at.elapsed() < CACHE_TTL {
                         let mut data = entry.data.clone();
                         drop(cache);
                         // Inject sizes from global cache
                         let global_sizes = dir_sizes.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+                            tracing::warn!("Mutex poisoned, recovering");
+                            e.into_inner()
+                        });
                         for item in &mut data.summary.top_items {
                             if item.is_dir {
                                 if let Some(&size) = global_sizes.get(&item.path) {
@@ -339,9 +339,9 @@ fn handle_client(
             // Store in cache
             {
                 let mut cache = cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+                    tracing::warn!("Mutex poisoned, recovering");
+                    e.into_inner()
+                });
                 cache.insert(
                     path.clone(),
                     CacheEntry {
@@ -360,9 +360,9 @@ fn handle_client(
             thread::spawn(move || {
                 let cache_hit = {
                     let c = cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+                        tracing::warn!("Mutex poisoned, recovering");
+                        e.into_inner()
+                    });
                     c.get(&path)
                         .map(|e| e.computed_at.elapsed() < CACHE_TTL)
                         .unwrap_or(false)
@@ -370,9 +370,9 @@ fn handle_client(
                 if !cache_hit {
                     if let Ok(data) = compute_banner_data(&path) {
                         let mut c = cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+                            tracing::warn!("Mutex poisoned, recovering");
+                            e.into_inner()
+                        });
                         c.insert(
                             path,
                             CacheEntry {
@@ -400,8 +400,8 @@ fn handle_client(
         Request::Shutdown => {
             tracing::info!("Shutdown requested");
             // Save banner cache before exiting
-            let socket_dir =
-                directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
+            let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+                .map(|p| p.data_dir().to_path_buf());
             if let Some(dir) = socket_dir {
                 let c = cache.lock().unwrap_or_else(|e| {
                     tracing::warn!("Mutex poisoned, recovering");
@@ -423,16 +423,20 @@ fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
-    
+
     // Build filter list for git status collection:
     // - For files at root: just the filename (e.g., "Cargo.toml")
     // - For directories: the directory name (e.g., "src") to match all children
     // This tells git2 to only collect statuses for files we'll actually display
-    let filter_paths: Vec<String> = summary.top_items.iter().map(|item| item.name.clone()).collect();
-    
+    let filter_paths: Vec<String> = summary
+        .top_items
+        .iter()
+        .map(|item| item.name.clone())
+        .collect();
+
     // Use filtered git info — only collects statuses for top_items (much faster for large repos)
     let mut git_info = cfm_lib::git::get_git_info_filtered(path, &filter_paths).ok();
-    
+
     // For directories, we need to also collect statuses for their immediate children
     // because git pathspec "src" matches src/*, but we display src/daemon.rs etc.
     // The filter already handles this via pathspec matching.
@@ -452,8 +456,8 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
                 match components.len() {
                     0 => false,
                     1 => keep.contains(&components[0]),
-                    2 => keep.contains(&components[0]),  // "src/daemon.rs"
-                    _ => false,  // "target/debug/build/..." — exclude
+                    2 => keep.contains(&components[0]), // "src/daemon.rs"
+                    _ => false,                         // "target/debug/build/..." — exclude
                 }
             });
         }
@@ -578,11 +582,12 @@ fn proactive_scan(
                 Ok(m) => m,
                 Err(_) => continue,
             };
-            
+
             if meta.is_symlink() {
                 // For symlinks, try to resolve the target
                 if let Ok(target_meta) = std::fs::metadata(entry.path()) {
-                    if target_meta.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
+                    if target_meta.is_dir() && !entry.file_name().to_string_lossy().starts_with('.')
+                    {
                         dirs_to_scan.push(entry.path());
                     }
                 }
@@ -602,7 +607,7 @@ fn proactive_scan(
                     Ok(m) => m,
                     Err(_) => continue,
                 };
-                
+
                 if meta.is_symlink() {
                     if let Ok(target_meta) = std::fs::metadata(entry.path()) {
                         if target_meta.is_dir() {
@@ -628,7 +633,7 @@ fn proactive_scan(
                     Ok(m) => m,
                     Err(_) => continue,
                 };
-                
+
                 if meta.is_symlink() {
                     if let Ok(target_meta) = std::fs::metadata(entry.path()) {
                         if target_meta.is_dir() {
@@ -651,13 +656,15 @@ fn proactive_scan(
                     Ok(m) => m,
                     Err(_) => continue,
                 };
-                
+
                 let is_dir = if meta.is_symlink() {
-                    std::fs::metadata(entry.path()).map(|m| m.is_dir()).unwrap_or(false)
+                    std::fs::metadata(entry.path())
+                        .map(|m| m.is_dir())
+                        .unwrap_or(false)
                 } else {
                     meta.is_dir()
                 };
-                
+
                 if is_dir {
                     dirs_to_scan.push(entry.path());
                 }
@@ -708,7 +715,10 @@ fn proactive_scan(
 
     // Pre-compute banner data for level 1 + level 2 dirs (most likely navigation targets)
     let banner_targets: Vec<PathBuf> = dirs_to_scan[..level2_end.min(dirs_to_scan.len())].to_vec();
-    tracing::info!("Pre-computing banners for {} directories", banner_targets.len());
+    tracing::info!(
+        "Pre-computing banners for {} directories",
+        banner_targets.len()
+    );
 
     let mut banner_count = 0;
     for path in &banner_targets {
@@ -718,13 +728,16 @@ fn proactive_scan(
                 tracing::warn!("Mutex poisoned, recovering");
                 e.into_inner()
             });
-            !cache.get(path).map(|e| e.computed_at.elapsed() < CACHE_TTL).unwrap_or(false)
+            !cache
+                .get(path)
+                .map(|e| e.computed_at.elapsed() < CACHE_TTL)
+                .unwrap_or(false)
         };
-        
+
         if !should_compute {
             continue;
         }
-        
+
         // Compute banner data outside the lock (expensive operation)
         if let Ok(data) = compute_banner_data(path) {
             // Brief lock to insert
@@ -750,11 +763,38 @@ fn proactive_scan(
         directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
     if let Some(dir) = socket_dir {
         let cache = banner_cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        });
         save_banner_cache(&dir, &cache);
     }
+}
+
+fn main() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
+    // Set resource limits: low CPU priority and idle IO priority
+    #[cfg(unix)]
+    {
+        // nice: 10 = lower priority (range -20 to 19, higher = lower priority)
+        unsafe {
+            libc::nice(10);
+        }
+        // ionice: 3 = idle priority class
+        let _ = std::process::Command::new("ionice")
+            .args(["-c", "3", "-p", &std::process::id().to_string()])
+            .output();
+    }
+
+    tracing::info!("cfmd started with resource limits (nice=10, ionice=idle)");
+
+    let daemon = Daemon::new()?;
+    daemon.run()
 }
 
 #[cfg(test)]
@@ -842,35 +882,7 @@ mod tests {
 
     #[test]
     fn test_compute_dir_size() {
-        let size = compute_dir_size(Path::new("/tmp"));
-        // /tmp exists and has some content
-        assert!(size > 0 || size == 0); // Just verify it doesn't panic
+        let _size = compute_dir_size(Path::new("/tmp"));
+        // Just verify it doesn't panic
     }
-}
-
-fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
-
-    // Set resource limits: low CPU priority and idle IO priority
-    #[cfg(unix)]
-    {
-        // nice: 10 = lower priority (range -20 to 19, higher = lower priority)
-        unsafe {
-            libc::nice(10);
-        }
-        // ionice: 3 = idle priority class
-        let _ = std::process::Command::new("ionice")
-            .args(["-c", "3", "-p", &std::process::id().to_string()])
-            .output();
-    }
-
-    tracing::info!("cfmd started with resource limits (nice=10, ionice=idle)");
-
-    let daemon = Daemon::new()?;
-    daemon.run()
 }

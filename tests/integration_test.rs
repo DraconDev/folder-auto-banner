@@ -147,7 +147,9 @@ fn test_banner_sort_flag() {
 #[test]
 fn test_banner_reverse_flag() {
     let mut cmd = Command::cargo_bin("f").unwrap();
-    cmd.args(["banner", "--sort", "name", "--reverse"]).assert().success();
+    cmd.args(["banner", "--sort", "name", "--reverse"])
+        .assert()
+        .success();
 }
 
 #[test]
@@ -165,7 +167,9 @@ fn test_banner_raw_output() {
 #[test]
 fn test_banner_combined_flags() {
     let mut cmd = Command::cargo_bin("f").unwrap();
-    cmd.args(["banner", "--hidden", "--filter", "rs", "--max", "10", "--sort", "size", "--group"])
-        .assert()
-        .success();
+    cmd.args([
+        "banner", "--hidden", "--filter", "rs", "--max", "10", "--sort", "size", "--group",
+    ])
+    .assert()
+    .success();
 }

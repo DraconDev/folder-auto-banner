@@ -107,5 +107,3 @@ fn detect_containers(path: &Path) -> Result<Vec<ContainerInfo>> {
 
     Ok(containers)
 }
-
-
