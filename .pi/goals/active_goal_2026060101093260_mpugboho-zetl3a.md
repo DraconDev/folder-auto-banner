@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 121682,
-    "activeSeconds": 495
+    "tokensUsed": 147157,
+    "activeSeconds": 762
   },
   "sisyphus": false,
   "createdAt": "2026-06-01T00:09:32.604Z",
-  "updatedAt": "2026-06-01T00:18:23.566Z",
+  "updatedAt": "2026-06-01T00:23:08.135Z",
   "activePath": ".pi/goals/active_goal_2026060101093260_mpugboho-zetl3a.md",
   "taskList": {
     "tasks": [
@@ -54,49 +54,67 @@
       {
         "id": "refactor-output-rich",
         "title": "Refactor output_rich() to accept BannerOptions struct instead of 23 separate parameters",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-01T00:19:45.774Z",
+        "evidence": "All subtasks complete: output_rich refactored from 23 params to &BannerOptions struct. Icons/colors/max_items added to struct. Both call sites updated. Both run_banner callers updated to pass by value",
         "subtasks": [
           {
             "id": "add-missing-fields",
             "title": "Add icons, colors, max_items fields to BannerOptions struct",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:19:39.560Z",
+            "evidence": "Added icons, colors, max_items fields to BannerOptions struct. Added #[allow(dead_code)] for unused compact/verbose."
           },
           {
             "id": "update-signature",
             "title": "Refactor output_rich signature to accept &BannerOptions + path, summary, git_info",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:19:39.562Z",
+            "evidence": "Refactored output_rich signature from 23 parameters to 4: (path, summary, git_info, opts: &BannerOptions). Changed run_banner to take BannerOptions by value. Updated callers in cli/mod.rs."
           },
           {
             "id": "update-callsites",
             "title": "Update all output_rich call sites (banner.rs:120, banner.rs:151)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:19:39.563Z",
+            "evidence": "Updated both output_rich call sites in banner.rs (lines ~120 and ~165). Updated both run_banner callers in cli/mod.rs to pass by value with ..Default::default() for new fields. cargo clippy: 0 warning"
           }
         ]
       },
       {
         "id": "deps",
         "title": "Update outdated dependencies",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-01T00:22:51.147Z",
+        "evidence": "All subtasks complete: git2 0.19→0.21, directories 5→6, comfy-table 6→7, console 0.15→0.16, indicatif 0.17→0.18, toml 0.8→1.1. Fixed git2 API breaking changes. Build and tests pass.",
         "subtasks": [
           {
             "id": "update-git2",
             "title": "Update git2 0.19.0 → 0.21.0 (includes libgit2 security patches)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:22:46.835Z",
+            "evidence": "Updated git2 0.19.0 → 0.21.0 in both Cargo.toml and cfm-lib/Cargo.toml. Fixed API changes: shorthand() returns Result (added .ok()), message() returns Result (added .ok()), tag_names().iter() yields R"
           },
           {
             "id": "update-directories",
             "title": "Update directories 5.0.1 → 6.0.0",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:22:46.838Z",
+            "evidence": "Updated directories 5.0.1 → 6.0.0 in both Cargo.toml and cfm-lib/Cargo.toml. No API changes required — build succeeds."
           },
           {
             "id": "update-other-deps",
             "title": "Update comfy-table, console, indicatif, toml, unicode-width to latest",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:22:46.840Z",
+            "evidence": "Updated: comfy-table 6→7, console 0.15→0.16, indicatif 0.17→0.18, toml 0.8→1.1. All in Cargo.toml and cfm-lib/Cargo.toml. cargo build: success."
           },
           {
             "id": "verify-build",
             "title": "Verify cargo build + cargo test pass after all dependency updates",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:22:46.842Z",
+            "evidence": "cargo build: 0 errors. cargo clippy --all-targets: 0 warnings. cargo fmt --check: clean. cargo test --bin f: 74 passed, 0 failed."
           }
         ]
       },
@@ -206,14 +224,14 @@ Address all actionable findings from the CFM code audit (AUDIT.md), covering cod
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 8m15s
-- Tokens used: 122K (121,682) tokens
+- Time spent: 12m42s
+- Tokens used: 147K (147,157) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] code-quality: Code Quality: dead code removal, fmt fix, clippy fixes — evidence: All subtasks complete: dead code removed (send_warm, get_git_info_summary, get_git_info_filtered), double comparison simplified, cargo fmt clean, items-after-test fixed. clippy: only 1 warning remaini
-- [ ] refactor-output-rich: Refactor output_rich() to accept BannerOptions struct instead of 23 separate parameters
-- [ ] deps: Update outdated dependencies
+- [x] refactor-output-rich: Refactor output_rich() to accept BannerOptions struct instead of 23 separate parameters — evidence: All subtasks complete: output_rich refactored from 23 params to &BannerOptions struct. Icons/colors/max_items added to struct. Both call sites updated. Both run_banner callers updated to pass by value
+- [x] deps: Update outdated dependencies — evidence: All subtasks complete: git2 0.19→0.21, directories 5→6, comfy-table 6→7, console 0.15→0.16, indicatif 0.17→0.18, toml 0.8→1.1. Fixed git2 API breaking changes. Build and tests pass.
 - [ ] perf-high: Performance: high-priority optimizations
 - [ ] perf-medium: Performance: medium-priority optimizations
 - [ ] perf-low: Performance: low-priority optimizations

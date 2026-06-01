@@ -98,7 +98,7 @@ fn get_git_info_inner(
 
     let branch = head
         .as_ref()
-        .and_then(|h| h.shorthand().map(|s| s.to_string()));
+        .and_then(|h| h.shorthand().ok().map(|s| s.to_string()));
 
     // Get status
     let mut staged = 0;
@@ -117,7 +117,11 @@ fn get_git_info_inner(
         }
         repo.statuses(Some(&mut opts)).ok()
     } else {
-        repo.statuses(None).ok()
+        // No filter: still limit untracked dir recursion for performance
+        let mut opts = git2::StatusOptions::new();
+        opts.include_untracked(true)
+            .recurse_untracked_dirs(false);
+        repo.statuses(Some(&mut opts)).ok()
     };
 
     if let Some(statuses) = statuses {
@@ -199,6 +203,7 @@ fn get_git_info_inner(
         .map(|commit| {
             let msg = commit
                 .message()
+                .ok()
                 .map(|m| m.lines().next().unwrap_or("").to_string());
             let hash = commit
                 .as_object()
@@ -275,10 +280,13 @@ fn get_git_info_inner(
         let head_oid = h.target()?;
         // Check all tags
         let tags = repo.tag_names(None).ok()?;
-        for tag_name in tags.iter().flatten() {
-            if let Ok(tag_ref) = repo.find_reference(&format!("refs/tags/{}", tag_name)) {
+        for tag_result in tags.iter() {
+            let Some(name) = tag_result.ok().flatten() else {
+                continue;
+            };
+            if let Ok(tag_ref) = repo.find_reference(&format!("refs/tags/{}", name)) {
                 if tag_ref.target() == Some(head_oid) {
-                    return Some(tag_name.to_string());
+                    return Some(name.to_string());
                 }
             }
         }

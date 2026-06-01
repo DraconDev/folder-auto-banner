@@ -126,12 +126,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         } else if opts.raw {
             output_raw(&summary);
         } else {
-            output_rich(
-                &path,
-                &summary,
-                &git_info,
-                &opts,
-            );
+            output_rich(&path, &summary, &git_info, &opts);
         }
 
         // Warm daemon cache for likely next directories (parent + siblings)
@@ -162,12 +157,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     } else if opts.raw {
         output_raw(&summary);
     } else {
-        output_rich(
-            &path,
-            &summary,
-            &git_info,
-            &opts,
-        );
+        output_rich(&path, &summary, &git_info, &opts);
     }
 
     // Warm daemon cache for likely next directories (parent + siblings)
@@ -364,12 +354,7 @@ fn build_git_status_indicators(git_info: &GitInfo) -> String {
     indicators.join(" ")
 }
 
-fn output_rich(
-    path: &Path,
-    summary: &DirSummary,
-    git_info: &GitInfo,
-    opts: &BannerOptions,
-) {
+fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &BannerOptions) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
 
