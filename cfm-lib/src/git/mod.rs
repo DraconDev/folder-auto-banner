@@ -125,7 +125,11 @@ fn get_git_info_inner(path: &Path, collect_file_statuses: bool, filter_paths: &[
         }
         repo.statuses(Some(&mut opts)).ok()
     } else {
-        repo.statuses(None).ok()
+        // No filter: still limit untracked dir recursion for performance
+        let mut opts = git2::StatusOptions::new();
+        opts.include_untracked(true)
+            .recurse_untracked_dirs(false);
+        repo.statuses(Some(&mut opts)).ok()
     };
     
     if let Some(statuses) = statuses {

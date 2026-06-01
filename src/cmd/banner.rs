@@ -278,8 +278,7 @@ fn warm_nearby_dirs(path: &Path) {
     let mut paths_to_warm = vec![parent.to_path_buf()];
 
     if let Ok(entries) = std::fs::read_dir(parent) {
-        for entry in entries.flatten().take(10) {
-            // Reduced from 20 to 10
+        for entry in entries.flatten().take(5) {
             if entry.path().is_dir() && entry.path() != path {
                 paths_to_warm.push(entry.path());
             }
@@ -1495,14 +1494,36 @@ fn colorize_perms(perms: &str) -> String {
     let mut result = String::with_capacity(perms.len() * 10);
     for c in perms.chars() {
         match c {
-            'd' => result.push_str(&format!("{}d{}", color(BLUE_BOLD), color(RESET))),
-            'l' => result.push_str(&format!("{}l{}", color(MAGENTA), color(RESET))),
-            'r' => result.push_str(&format!("{}r{}", color(GREEN), color(RESET))),
-            'w' => result.push_str(&format!("{}w{}", color(YELLOW), color(RESET))),
-            'x' | 's' | 'S' | 't' | 'T' => {
-                result.push_str(&format!("{}{}{}", color(RED), c, color(RESET)))
+            'd' => {
+                result.push_str(color(BLUE_BOLD));
+                result.push('d');
+                result.push_str(color(RESET));
             }
-            '-' => result.push_str(&format!("{}-{}", color(DIM), color(RESET))),
+            'l' => {
+                result.push_str(color(MAGENTA));
+                result.push('l');
+                result.push_str(color(RESET));
+            }
+            'r' => {
+                result.push_str(color(GREEN));
+                result.push('r');
+                result.push_str(color(RESET));
+            }
+            'w' => {
+                result.push_str(color(YELLOW));
+                result.push('w');
+                result.push_str(color(RESET));
+            }
+            'x' | 's' | 'S' | 't' | 'T' => {
+                result.push_str(color(RED));
+                result.push(c);
+                result.push_str(color(RESET));
+            }
+            '-' => {
+                result.push_str(color(DIM));
+                result.push('-');
+                result.push_str(color(RESET));
+            }
             _ => result.push(c),
         }
     }

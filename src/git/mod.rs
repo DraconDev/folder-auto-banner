@@ -119,8 +119,7 @@ fn get_git_info_inner(
     } else {
         // No filter: still limit untracked dir recursion for performance
         let mut opts = git2::StatusOptions::new();
-        opts.include_untracked(true)
-            .recurse_untracked_dirs(false);
+        opts.include_untracked(true).recurse_untracked_dirs(false);
         repo.statuses(Some(&mut opts)).ok()
     };
 

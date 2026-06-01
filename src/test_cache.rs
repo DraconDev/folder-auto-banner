@@ -30,12 +30,12 @@ impl TestResults {
         let content = fs::read_to_string(&path).ok()?;
         let results: TestResults = serde_json::from_str(&content).ok()?;
 
-        // Check if cache is expired (older than 1 hour)
+        // Check if cache is expired (older than 5 minutes)
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64;
-        if now - results.timestamp > 3600 {
+        if now - results.timestamp > 300 {
             return None; // Expired
         }
 

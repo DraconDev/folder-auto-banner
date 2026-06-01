@@ -26,7 +26,12 @@ impl ProjectType {
     /// Detect project type from directory contents, walking up to ancestors
     pub fn detect(path: &Path) -> Self {
         let mut current = Some(path);
+        let mut depth = 0;
         while let Some(dir) = current {
+            if depth >= 10 {
+                break;
+            } // Limit ancestor traversal
+            depth += 1;
             if let Ok(d) = std::fs::read_dir(dir) {
                 for entry in d.flatten() {
                     let name = entry.file_name();
@@ -142,6 +147,10 @@ impl DirSummary {
         let mut total_size: u64 = 0;
         let mut files = 0;
         let mut dirs = 0;
+
+        // Pre-load uid/gid caches to avoid reading /etc/passwd and /etc/group per file
+        let uid_cache = load_uid_cache();
+        let gid_cache = load_gid_cache();
         let mut top_items = Vec::new();
         let mut last_modified: Option<DateTime<Utc>> = None;
 
@@ -218,8 +227,14 @@ impl DirSummary {
                     use std::os::unix::fs::MetadataExt;
                     let uid = meta.uid();
                     let gid = meta.gid();
-                    let owner = resolve_uid(uid).unwrap_or_else(|| uid.to_string());
-                    let group = resolve_gid(gid).unwrap_or_else(|| gid.to_string());
+                    let owner = uid_cache
+                        .get(&uid)
+                        .cloned()
+                        .unwrap_or_else(|| uid.to_string());
+                    let group = gid_cache
+                        .get(&gid)
+                        .cloned()
+                        .unwrap_or_else(|| gid.to_string());
 
                     (perms_str, exec, owner, group)
                 }
@@ -521,38 +536,38 @@ fn format_mode(mode: u32) -> String {
     )
 }
 
-/// Resolve uid to username from /etc/passwd
+/// Load uid→username cache from /etc/passwd
 #[cfg(unix)]
-fn resolve_uid(uid: u32) -> Option<String> {
-    let content = std::fs::read_to_string("/etc/passwd").ok()?;
-    for line in content.lines() {
-        let parts: Vec<&str> = line.split(':').collect();
-        if parts.len() >= 3 {
-            if let Ok(file_uid) = parts[2].parse::<u32>() {
-                if file_uid == uid {
-                    return Some(parts[0].to_string());
+fn load_uid_cache() -> std::collections::HashMap<u32, String> {
+    let mut cache = std::collections::HashMap::new();
+    if let Ok(content) = std::fs::read_to_string("/etc/passwd") {
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() >= 3 {
+                if let Ok(uid) = parts[2].parse::<u32>() {
+                    cache.insert(uid, parts[0].to_string());
                 }
             }
         }
     }
-    Some(uid.to_string())
+    cache
 }
 
-/// Resolve gid to group name from /etc/group
+/// Load gid→groupname cache from /etc/group
 #[cfg(unix)]
-fn resolve_gid(gid: u32) -> Option<String> {
-    let content = std::fs::read_to_string("/etc/group").ok()?;
-    for line in content.lines() {
-        let parts: Vec<&str> = line.split(':').collect();
-        if parts.len() >= 3 {
-            if let Ok(file_gid) = parts[2].parse::<u32>() {
-                if file_gid == gid {
-                    return Some(parts[0].to_string());
+fn load_gid_cache() -> std::collections::HashMap<u32, String> {
+    let mut cache = std::collections::HashMap::new();
+    if let Ok(content) = std::fs::read_to_string("/etc/group") {
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() >= 3 {
+                if let Ok(gid) = parts[2].parse::<u32>() {
+                    cache.insert(gid, parts[0].to_string());
                 }
             }
         }
     }
-    Some(gid.to_string())
+    cache
 }
 
 #[cfg(test)]

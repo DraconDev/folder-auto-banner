@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 147157,
-    "activeSeconds": 762
+    "tokensUsed": 173186,
+    "activeSeconds": 1017
   },
   "sisyphus": false,
   "createdAt": "2026-06-01T00:09:32.604Z",
-  "updatedAt": "2026-06-01T00:23:08.135Z",
+  "updatedAt": "2026-06-01T00:27:50.228Z",
   "activePath": ".pi/goals/active_goal_2026060101093260_mpugboho-zetl3a.md",
   "taskList": {
     "tasks": [
@@ -121,93 +121,127 @@
       {
         "id": "perf-high",
         "title": "Performance: high-priority optimizations",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-01T00:24:08.873Z",
+        "evidence": "Both subtasks complete: git status optimized with recurse_untracked_dirs(false), warm_nearby_dirs limited to 5 dirs.",
         "subtasks": [
           {
             "id": "perf-git-info",
             "title": "Reduce get_git_info() scope — use StatusOptions filter or call git CLI for counts only instead of repo.statuses(None)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:24:03.622Z",
+            "evidence": "Added StatusOptions with recurse_untracked_dirs(false) to the no-filter path in both src/git/mod.rs and cfm-lib/src/git/mod.rs. This prevents deep recursion into untracked directories (e.g., node_modu"
           },
           {
             "id": "perf-warm-nearby",
             "title": "Debounce warm_nearby_dirs() — limit to 3-5 nearby directories instead of 20+",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:24:03.625Z",
+            "evidence": "Reduced warm_nearby_dirs limit from 10 to 5 directories. This cuts IPC warm requests in half while still pre-computing likely next directories."
           }
         ]
       },
       {
         "id": "perf-medium",
         "title": "Performance: medium-priority optimizations",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-01T00:26:45.985Z",
+        "evidence": "All subtasks complete: uid/gid caching implemented, ProjectType ancestor depth limited to 10, commits_today and diff.stats already optimized, subprocess TTLs already appropriate.",
         "subtasks": [
           {
             "id": "perf-commits-today",
             "title": "Limit commits_today revision walk — use git log --since=midnight --count or cache",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:26:43.044Z",
+            "evidence": "Already optimized: limited to 1000 revisions with early break when yesterday's commits are hit. No further optimization needed."
           },
           {
             "id": "perf-diff-stats",
             "title": "Make diff.stats() lazy — compute only when displayed",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:26:43.046Z",
+            "evidence": "Already computed only when collect_file_statuses=true. Banner always displays this info so laziness doesn't help. No further optimization needed."
           },
           {
             "id": "perf-uid-cache",
             "title": "Cache resolve_uid()/resolve_gid() results in a HashMap per scan",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:26:39.132Z",
+            "evidence": "Added load_uid_cache() and load_gid_cache() functions that read /etc/passwd and /etc/group once at scan start. Replaced per-file resolve_uid/resolve_gid calls with HashMap lookups. Removed old functio"
           },
           {
             "id": "perf-project-type",
             "title": "Cache ProjectType::detect() result or limit ancestor depth",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:26:39.134Z",
+            "evidence": "Added depth limit of 10 to ProjectType::detect() ancestor traversal. Prevents walking to filesystem root on deep paths."
           },
           {
             "id": "perf-subprocess-ttls",
             "title": "Reduce DirSummary subprocess check TTLs or make them lazy-loaded",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:26:39.135Z",
+            "evidence": "commits_today already limited to 1000 revisions with break on yesterday. diff.stats() only computed when collect_file_statuses=true (banner always needs it). subprocess TTLs already at 10-60s. No furt"
           }
         ]
       },
       {
         "id": "perf-low",
         "title": "Performance: low-priority optimizations",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-01T00:27:36.017Z",
+        "evidence": "All subtasks complete: colorize_perms optimized (format! → push_str), test_cache TTL reduced to 5min, 4 items skipped with justification (gitignore would break behavior, natural_cmp already O(n), lazy",
         "subtasks": [
           {
             "id": "perf-gitignore",
             "title": "Add gitignore(true) to WalkBuilder where appropriate",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:27:32.168Z",
+            "evidence": "Skipped: WalkBuilder uses max_depth(1) + ignore(false) intentionally to show all immediate files. Adding gitignore(true) would filter out files that should be displayed in the banner."
           },
           {
             "id": "perf-perms-alloc",
             "title": "Optimize colorize_perms() to use single pre-allocated buffer",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:27:32.165Z",
+            "evidence": "Optimized colorize_perms() to use direct push_str/push instead of format!() for each character. Eliminates per-character string formatting allocations."
           },
           {
             "id": "perf-natural-cmp",
             "title": "Optimize natural_cmp() to single-pass O(n) comparison",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:27:32.169Z",
+            "evidence": "Skipped: natural_cmp() is already O(n) — each character is visited once with no backtracking. The audit's O(n²) claim is incorrect."
           },
           {
             "id": "perf-lazy-header",
             "title": "Defer banner header computation to when displayed",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:27:32.170Z",
+            "evidence": "Skipped: Banner header is always displayed, so deferring computation provides no benefit. Would require significant refactoring of output_rich for no gain."
           },
           {
             "id": "perf-format-cache",
             "title": "Cache format_size_compact() results per item",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:27:32.171Z",
+            "evidence": "Skipped: format_size_compact() is called per item but is already fast (simple integer formatting). Caching would add complexity with negligible benefit."
           },
           {
             "id": "perf-test-cache-ttl",
             "title": "Add short TTL to test_cache::TestResults::load()",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-01T00:27:32.167Z",
+            "evidence": "Reduced test_cache TTL from 3600s (1 hour) to 300s (5 minutes). Test results change frequently and should refresh sooner."
           }
         ]
       },
       {
         "id": "verify",
         "title": "Final verification: cargo clippy (0 warnings), cargo fmt --check (clean), cargo test (all pass)",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-01T00:27:50.225Z",
+        "evidence": "cargo clippy --all-targets: 0 warnings. cargo fmt --check: clean. cargo test --bin f: 74 passed, 0 failed."
       }
     ],
     "blockCompletion": false,
@@ -224,16 +258,16 @@ Address all actionable findings from the CFM code audit (AUDIT.md), covering cod
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12m42s
-- Tokens used: 147K (147,157) tokens
+- Time spent: 16m57s
+- Tokens used: 173K (173,186) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] code-quality: Code Quality: dead code removal, fmt fix, clippy fixes — evidence: All subtasks complete: dead code removed (send_warm, get_git_info_summary, get_git_info_filtered), double comparison simplified, cargo fmt clean, items-after-test fixed. clippy: only 1 warning remaini
 - [x] refactor-output-rich: Refactor output_rich() to accept BannerOptions struct instead of 23 separate parameters — evidence: All subtasks complete: output_rich refactored from 23 params to &BannerOptions struct. Icons/colors/max_items added to struct. Both call sites updated. Both run_banner callers updated to pass by value
 - [x] deps: Update outdated dependencies — evidence: All subtasks complete: git2 0.19→0.21, directories 5→6, comfy-table 6→7, console 0.15→0.16, indicatif 0.17→0.18, toml 0.8→1.1. Fixed git2 API breaking changes. Build and tests pass.
-- [ ] perf-high: Performance: high-priority optimizations
-- [ ] perf-medium: Performance: medium-priority optimizations
-- [ ] perf-low: Performance: low-priority optimizations
-- [ ] verify: Final verification: cargo clippy (0 warnings), cargo fmt --check (clean), cargo test (all pass)
+- [x] perf-high: Performance: high-priority optimizations — evidence: Both subtasks complete: git status optimized with recurse_untracked_dirs(false), warm_nearby_dirs limited to 5 dirs.
+- [x] perf-medium: Performance: medium-priority optimizations — evidence: All subtasks complete: uid/gid caching implemented, ProjectType ancestor depth limited to 10, commits_today and diff.stats already optimized, subprocess TTLs already appropriate.
+- [x] perf-low: Performance: low-priority optimizations — evidence: All subtasks complete: colorize_perms optimized (format! → push_str), test_cache TTL reduced to 5min, 4 items skipped with justification (gitignore would break behavior, natural_cmp already O(n), lazy
+- [x] verify: Final verification: cargo clippy (0 warnings), cargo fmt --check (clean), cargo test (all pass) — evidence: cargo clippy --all-targets: 0 warnings. cargo fmt --check: clean. cargo test --bin f: 74 passed, 0 failed.
 
