@@ -301,7 +301,7 @@ fn handle_client(
     let request: Request = if use_bincode {
         // Length-prefixed bincode: 4-byte LE length, then payload
         let mut len_bytes = [0u8; 4];
-        match reader.read_exact(&mut len_bytes) {
+        match stream.read_exact(&mut len_bytes) {
             Ok(_) => {}
             Err(e) => {
                 tracing::warn!("Failed to read bincode length prefix: {}", e);
@@ -311,7 +311,7 @@ fn handle_client(
         let len = u32::from_le_bytes(len_bytes) as usize;
         tracing::trace!("Bincode request length: {} bytes", len);
         let mut buf = vec![0u8; len];
-        match reader.read_exact(&mut buf) {
+        match stream.read_exact(&mut buf) {
             Ok(_) => {}
             Err(e) => {
                 tracing::warn!("Failed to read bincode payload ({} bytes): {}", len, e);
@@ -326,7 +326,7 @@ fn handle_client(
             }
         }
     } else {
-        match serde_json::from_reader(&reader) {
+        match serde_json::from_reader(&mut stream) {
             Ok(r) => r,
             Err(e) => {
                 tracing::warn!("Failed to deserialize JSON request: {}", e);
@@ -363,7 +363,7 @@ fn handle_client(
                         }
                         drop(global_sizes);
                         // Don't refresh git on cache hit — it's cached with TTL
-                        return send_response(&mut writer, &Response::Banner(Box::new(data)));
+                        return send_response(&mut stream, &Response::Banner(Box::new(data)));
                     }
                 }
             }
@@ -462,18 +462,19 @@ fn handle_client(
         }
     };
 
-    send_response(&mut writer, &response)
+    send_response(&mut stream, &response)
 }
 
-fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
+fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
     use std::io::Write;
     // Write magic byte + length-prefixed bincode (default, ~5-10x faster than JSON)
-    writer.write_all(&[b'B'])?;
+    stream.write_all(&[b'B'])?;
     let bytes = bincode::serialize(response)?;
     let len = bytes.len() as u32;
-    writer.write_all(&len.to_le_bytes())?;
-    writer.write_all(&bytes)?;
-    writer.flush()?;
+    stream.write_all(&len.to_le_bytes())?;
+    stream.write_all(&bytes)?;
+    stream.flush()?;
+    tracing::trace!("Sent response: {} bytes (magic + len + payload)", 1 + 4 + bytes.len());
     Ok(())
 }
 

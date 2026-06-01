@@ -72,10 +72,20 @@ fn send_and_recv_bincode(stream: &mut UnixStream, request: &Request) -> Result<R
     stream.shutdown(std::net::Shutdown::Write)?;
     // Read 4-byte length prefix, then payload
     let mut len_bytes = [0u8; 4];
-    stream.read_exact(&mut len_bytes)?;
+    if let Err(e) = stream.read_exact(&mut len_bytes) {
+        if std::env::var("CFM_PROFILE").is_ok() {
+            eprintln!("[CFM_PROFILE] bincode read length failed: {}", e);
+        }
+        return Err(e.into());
+    }
     let resp_len = u32::from_le_bytes(len_bytes) as usize;
     let mut resp_bytes = vec![0u8; resp_len];
-    stream.read_exact(&mut resp_bytes)?;
+    if let Err(e) = stream.read_exact(&mut resp_bytes) {
+        if std::env::var("CFM_PROFILE").is_ok() {
+            eprintln!("[CFM_PROFILE] bincode read payload failed: {}", e);
+        }
+        return Err(e.into());
+    }
     let response: Response = bincode::deserialize(&resp_bytes)?;
     Ok(response)
 }
