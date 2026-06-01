@@ -68,8 +68,9 @@ fn send_and_recv_bincode(stream: &mut UnixStream, request: &Request) -> Result<R
     stream.write_all(&len.to_le_bytes())?;
     stream.write_all(&bytes)?;
     stream.flush()?;
-    // Shutdown write end so daemon sees EOF on read
-    stream.shutdown(std::net::Shutdown::Write)?;
+    // Do NOT shutdown write end here — the daemon needs the connection open
+    // to write the response. With length-prefixed protocol, the daemon knows
+    // exactly how many bytes to write and the client knows how many to read.
     // Read 4-byte length prefix, then payload
     let mut len_bytes = [0u8; 4];
     if let Err(e) = stream.read_exact(&mut len_bytes) {
