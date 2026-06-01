@@ -5,44 +5,56 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 522823,
-    "activeSeconds": 299
+    "tokensUsed": 568336,
+    "activeSeconds": 558
   },
   "sisyphus": false,
   "createdAt": "2026-06-01T11:57:44.559Z",
-  "updatedAt": "2026-06-01T12:02:51.810Z",
+  "updatedAt": "2026-06-01T12:07:18.985Z",
   "activePath": ".pi/goals/active_goal_2026060112574455_mpv5mfhr-idgtck.md",
   "taskList": {
     "tasks": [
       {
         "id": "profile-current",
         "title": "Profile current daemon performance to establish baseline and identify hotspots",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-01T12:03:43.337Z",
+        "evidence": "Profiled with CFM_PROFILE=1 instrumentation added to daemon_client.rs. Key findings:\n- Warm time (direct binary): 96-100ms\n- IPC breakdown: connect=20µs, send_recv=95ms (JSON), payload=8.4KB\n- Cold co"
       },
       {
         "id": "audit-ipc",
         "title": "Audit IPC layer (Unix socket, JSON, request/response protocol)",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-01T12:04:28.412Z",
+        "evidence": "IPC audit findings (src/daemon_client.rs, src/daemon.rs):\n1. **JSON serialization dominates**: ~95ms for 8.4KB response. Bincode would be ~5-10x faster. rkyv zero-copy would be ~20x faster.\n2. **No co"
       },
       {
         "id": "audit-cache",
         "title": "Audit cache strategy (TTL, invalidation, proactive scan, warm paths)",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-01T12:04:58.162Z",
+        "evidence": "Cache audit findings (src/daemon.rs):\n1. **TTL=300s (5min)**: Reasonable for most use cases but no per-path variance. Frequently-changing dirs (e.g., ~/.local/share) should have shorter TTL.\n2. **inot"
       },
       {
         "id": "audit-daemon-lifecycle",
         "title": "Audit daemon lifecycle (auto-start, idle timeout, shutdown, respawn)",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-01T12:05:28.672Z",
+        "evidence": "Daemon lifecycle audit findings (src/daemon.rs, src/daemon_client.rs):\n1. **200ms hardcoded sleep in ensure_daemon_running**: Daemon is ready in <50ms typically. Reducing to 50ms saves ~150ms on cold "
       },
       {
         "id": "audit-payload",
         "title": "Audit BannerData payload — what fields are actually needed for display?",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-01T12:06:24.689Z",
+        "evidence": "Payload audit findings (cfm-lib/src/fs/mod.rs, cfm-lib/src/git/mod.rs):\n1. **DirEntry has 12 fields**: Many could be `#[serde(skip)]` if not displayed: symlink_target (only for symlinks), is_exec (onl"
       },
       {
         "id": "audit-cold-start",
         "title": "Audit cold-start path (when daemon isn't running) — why is direct scan so slow?",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-01T12:07:18.714Z",
+        "evidence": "Cold-start audit findings (cfm-lib/src/fs/mod.rs, cfm-lib/src/git/mod.rs, cfm-lib/src/todo_scanner/mod.rs, etc.):\n1. **No daemon = full scan + render in one process**: 462ms includes cargo startup (~1"
       },
       {
         "id": "produce-plan",
@@ -64,16 +76,26 @@ Audit the CFM daemon architecture and produce a prioritized optimization plan to
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 4m59s
-- Tokens used: 523K (522,823) tokens
+- Time spent: 9m18s
+- Tokens used: 568K (568,336) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] profile-current: Profile current daemon performance to establish baseline and identify hotspots
-- [ ] audit-ipc: Audit IPC layer (Unix socket, JSON, request/response protocol)
-- [ ] audit-cache: Audit cache strategy (TTL, invalidation, proactive scan, warm paths)
-- [ ] audit-daemon-lifecycle: Audit daemon lifecycle (auto-start, idle timeout, shutdown, respawn)
-- [ ] audit-payload: Audit BannerData payload — what fields are actually needed for display?
-- [ ] audit-cold-start: Audit cold-start path (when daemon isn't running) — why is direct scan so slow?
+- [x] profile-current: Profile current daemon performance to establish baseline and identify hotspots — evidence: Profiled with CFM_PROFILE=1 instrumentation added to daemon_client.rs. Key findings:
+- Warm time (direct binary): 96-100ms
+- IPC breakdown: connect=20µs, send_recv=95ms (JSON), payload=8.4KB
+- Cold co
+- [x] audit-ipc: Audit IPC layer (Unix socket, JSON, request/response protocol) — evidence: IPC audit findings (src/daemon_client.rs, src/daemon.rs):
+1. **JSON serialization dominates**: ~95ms for 8.4KB response. Bincode would be ~5-10x faster. rkyv zero-copy would be ~20x faster.
+2. **No co
+- [x] audit-cache: Audit cache strategy (TTL, invalidation, proactive scan, warm paths) — evidence: Cache audit findings (src/daemon.rs):
+1. **TTL=300s (5min)**: Reasonable for most use cases but no per-path variance. Frequently-changing dirs (e.g., ~/.local/share) should have shorter TTL.
+2. **inot
+- [x] audit-daemon-lifecycle: Audit daemon lifecycle (auto-start, idle timeout, shutdown, respawn) — evidence: Daemon lifecycle audit findings (src/daemon.rs, src/daemon_client.rs):
+1. **200ms hardcoded sleep in ensure_daemon_running**: Daemon is ready in <50ms typically. Reducing to 50ms saves ~150ms on cold 
+- [x] audit-payload: Audit BannerData payload — what fields are actually needed for display? — evidence: Payload audit findings (cfm-lib/src/fs/mod.rs, cfm-lib/src/git/mod.rs):
+1. **DirEntry has 12 fields**: Many could be `#[serde(skip)]` if not displayed: symlink_target (only for symlinks), is_exec (onl
+- [x] audit-cold-start: Audit cold-start path (when daemon isn't running) — why is direct scan so slow? — evidence: Cold-start audit findings (cfm-lib/src/fs/mod.rs, cfm-lib/src/git/mod.rs, cfm-lib/src/todo_scanner/mod.rs, etc.):
+1. **No daemon = full scan + render in one process**: 462ms includes cargo startup (~1
 - [ ] produce-plan: Produce prioritized optimization plan with expected impact estimates
 
