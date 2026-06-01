@@ -910,7 +910,7 @@ fn output_rich(
     }
 
     let total_visible = visible_items.len();
-    let show_hidden_flag = show_hidden || total_visible < 30;
+    let show_hidden_flag = opts.hidden || total_visible < 30;
 
     let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden_flag {
         visible_items
@@ -923,7 +923,7 @@ fn output_rich(
     };
 
     // Apply filter if specified
-    if let Some(pattern) = filter {
+    if let Some(pattern) = opts.filter {
         let lower_pattern = pattern.to_lowercase();
         display_items.retain(|item| {
             let name_lower = item.name.to_lowercase();
@@ -939,12 +939,12 @@ fn output_rich(
     }
 
     // Apply max limit if specified
-    if let Some(max_items) = max {
+    if let Some(max_items) = opts.max {
         display_items.truncate(max_items);
     }
 
     // Group by type if requested
-    if group {
+    if opts.group {
         let mut dirs: Vec<&crate::fs::DirEntry> =
             display_items.iter().filter(|i| i.is_dir).copied().collect();
         let mut files: Vec<&crate::fs::DirEntry> = display_items
@@ -964,19 +964,19 @@ fn output_rich(
     }
 
     // Sort based on --sort flag or short flags
-    if !no_sort {
+    if !opts.no_sort {
         // Resolve sort mode from flags
-        let sort_mode = if let Some(s) = sort {
+        let sort_mode = if let Some(s) = opts.sort {
             s.to_string()
-        } else if timesort {
+        } else if opts.timesort {
             "date".to_string()
-        } else if sizesort {
+        } else if opts.sizesort {
             "size".to_string()
-        } else if extensionsort {
+        } else if opts.extensionsort {
             "extension".to_string()
-        } else if gitsort {
+        } else if opts.gitsort {
             "git".to_string()
-        } else if versionsort {
+        } else if opts.versionsort {
             "version".to_string()
         } else {
             "name".to_string()

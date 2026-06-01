@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 104653,
-    "activeSeconds": 220
+    "tokensUsed": 107299,
+    "activeSeconds": 242
   },
   "sisyphus": false,
   "createdAt": "2026-06-01T00:09:32.604Z",
-  "updatedAt": "2026-06-01T00:13:30.859Z",
+  "updatedAt": "2026-06-01T00:13:54.610Z",
   "activePath": ".pi/goals/active_goal_2026060101093260_mpugboho-zetl3a.md",
   "taskList": {
     "tasks": [
@@ -206,8 +206,8 @@ Address all actionable findings from the CFM code audit (AUDIT.md), covering cod
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m40s
-- Tokens used: 105K (104,653) tokens
+- Time spent: 4m02s
+- Tokens used: 107K (107,299) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
