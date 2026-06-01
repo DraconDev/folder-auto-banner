@@ -48,7 +48,12 @@ impl ProjectType {
     
     fn detect_inner(path: &Path) -> Self {
         let mut current = Some(path);
+        let mut depth = 0;
         while let Some(dir) = current {
+            if depth >= 10 {
+                break;
+            } // Limit ancestor traversal
+            depth += 1;
             if let Ok(d) = std::fs::read_dir(dir) {
                 for entry in d.flatten() {
                     let name = entry.file_name();
@@ -163,7 +168,7 @@ impl DirSummary {
         let walker = WalkBuilder::new(path)
             .max_depth(Some(1)) // Only immediate directory
             .hidden(false)
-            .ignore(false)
+            .git_ignore(true)
             .build();
 
         for entry in walker.flatten() {
@@ -439,7 +444,17 @@ pub fn format_size(bytes: u64) -> String {
 
 /// Human-readable size — very compact (like exa: 4.3k, 1.1k, 983)
 pub fn format_size_compact(bytes: u64) -> String {
-    if bytes == 0 {
+    // Simple cache for common sizes to avoid repeated formatting
+    use std::collections::HashMap;
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<std::sync::Mutex<HashMap<u64, String>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| std::sync::Mutex::new(HashMap::new()));
+    if let Ok(c) = cache.lock() {
+        if let Some(v) = c.get(&bytes) {
+            return v.clone();
+        }
+    }
+    let result = if bytes == 0 {
         "0".to_string()
     } else if bytes < 1024 {
         format!("{}", bytes)
@@ -464,7 +479,14 @@ pub fn format_size_compact(bytes: u64) -> String {
         } else {
             format!("{:.1}G", gb)
         }
+    };
+    // Cache the result (limit cache size to avoid unbounded growth)
+    if let Ok(mut c) = cache.lock() {
+        if c.len() < 1000 {
+            c.insert(bytes, result.clone());
+        }
     }
+    result
 }
 
 /// Format exact date/time — ISO-style with time: "2026-05-27 23:06:44"

@@ -74,14 +74,8 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
     get_git_info_inner(path, true, &[])
 }
 
-/// Get Git info without per-file status map (faster, for banner header only)
-pub fn get_git_info_summary(path: &Path) -> Result<GitInfo> {
-    get_git_info_inner(path, false, &[])
-}
-
-/// Get Git info with filtered file statuses (only paths matching the filter)
-/// This is much faster for large repos — only collects statuses for files
-/// that will actually be displayed in the banner.
+/// Get Git info with optional path filtering for performance.
+/// When filter_paths is non-empty, only collects statuses for those paths.
 pub fn get_git_info_filtered(path: &Path, filter_paths: &[String]) -> Result<GitInfo> {
     get_git_info_inner(path, true, filter_paths)
 }
@@ -294,7 +288,8 @@ fn get_git_info_inner(path: &Path, collect_file_statuses: bool, filter_paths: &[
         None
     });
 
-    // Get diff stats (lines added/deleted) - skip if not collecting file statuses
+    // Get diff stats (lines added/deleted) — only when collecting file statuses
+    // to avoid expensive diff computation when only aggregate counts are needed
     let (lines_added, lines_deleted) = if collect_file_statuses {
         if let Ok(head) = repo.head() {
             if let Ok(commit) = head.peel_to_commit() {

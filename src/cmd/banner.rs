@@ -358,7 +358,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     let config = crate::state::Config::load().unwrap_or_default();
 
     let path_str = path.to_string_lossy();
-    let size_str = format_size_compact(summary.total_size);
     let project_icon = summary.project_type.icon();
     let project_label = summary.project_type.label();
 
@@ -381,465 +380,470 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         .filter(|item| item.name.starts_with('.'))
         .count();
 
-    // Build git branch with color: blue if clean, yellow if dirty
-    let branch_display = build_branch_display(git_info);
-
-    // Build git status indicators (p10k-style)
-    let git_status_str = build_git_status_indicators(git_info);
-    let mut git_status = if git_status_str.is_empty() {
-        Vec::new()
-    } else {
-        git_status_str.split(' ').map(String::from).collect()
-    };
-    if git_info.stash_count > 0 {
-        git_status.push(format!(
-            "{}≡{}{}",
-            color(MAGENTA),
-            git_info.stash_count,
-            color(RESET)
-        ));
-    }
-    if let Some(ref state) = git_info.merge_state {
-        git_status.push(format!("{}{}{}", color(RED), state, color(RESET)));
-    }
-    let git_status_str = git_status.join(" ");
-
-    let header = if git_info.is_repo {
-        // Row 1: Core info
-        let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
-        if !branch_display.is_empty() {
-            parts.push(format!("{} │", branch_display));
-        }
-        if let Some(ref tag) = git_info.tag {
-            parts.push(format!("{}{}{} │", color(YELLOW), tag, color(RESET)));
-        }
-        parts.push(format!("{} │", project_label));
-        parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
-        parts.push(format!(
-            "{}📄 {} files{} │",
-            color(DIM),
-            summary.files,
-            color(RESET)
-        ));
-        parts.push(format!(
-            "{}📂 {} dirs{}",
-            color(DIM),
-            summary.dirs,
-            color(RESET)
-        ));
-        if !git_status_str.is_empty() {
-            parts.push(format!("│ {}", git_status_str));
-        }
-        let row1 = parts.join(" ");
-
-        // Row 2: Details
-        let mut details = Vec::new();
-
-        // Git enhancements
-        if git_info.is_repo {
-            if let Some(time) = git_info.last_commit_time {
-                let now = chrono::Utc::now().timestamp();
-                let diff = now - time;
-                let time_str = if diff < 60 {
-                    "just now".to_string()
-                } else if diff < 3600 {
-                    format!("{}m ago", diff / 60)
-                } else if diff < 86400 {
-                    format!("{}h ago", diff / 3600)
-                } else {
-                    format!("{}d ago", diff / 86400)
-                };
-                details.push(format!("{}📅 {}{}", color(DIM), time_str, color(RESET)));
-            }
-            if git_info.commits_today > 0 {
-                details.push(format!(
-                    "{}📝 {} today{}",
-                    color(GREEN),
-                    git_info.commits_today,
-                    color(RESET)
-                ));
-            }
-            if git_info.branch_count > 1 {
-                details.push(format!(
-                    "{}🔀 {} branches{}",
-                    color(CYAN),
-                    git_info.branch_count,
-                    color(RESET)
-                ));
-            }
-            if git_info.stash_count > 0 {
-                details.push(format!(
-                    "{}📦 {} stash{}",
-                    color(YELLOW),
-                    git_info.stash_count,
-                    if git_info.stash_count > 1 { "es" } else { "" }
-                ));
-            }
-            if let Some(ref state) = git_info.merge_state {
-                details.push(format!("{}⚠️ {}{}", color(YELLOW), state, color(RESET)));
-            }
-        }
-
-        // TODO count
-        if let Some(ref todos) = summary.todo_info {
-            if todos.count > 0 {
-                details.push(format!(
-                    "{}📝 {} TODOs{}",
-                    color(YELLOW),
-                    todos.count,
-                    color(RESET)
-                ));
-            }
-        }
-
-        // Code metrics — show languages breakdown
-        if let Some(ref metrics) = summary.code_metrics {
-            if metrics.total_loc > 0 {
-                let loc_str = format_loc(metrics.total_loc);
-                details.push(format!(
-                    "{}📊 {} lines{}",
-                    color(GREEN),
-                    loc_str,
-                    color(RESET)
-                ));
-                // Show top 3 languages with percentages
-                if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                    let lang_parts: Vec<String> = metrics
-                        .by_extension
-                        .iter()
-                        .take(3)
-                        .map(|(ext, loc)| {
-                            let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                            let name = match ext.as_str() {
-                                "rs" => "Rust",
-                                "md" | "mdx" => "Markdown",
-                                "sh" | "bash" => "Shell",
-                                "py" => "Python",
-                                "js" | "mjs" => "JavaScript",
-                                "ts" | "tsx" => "TypeScript",
-                                "go" => "Go",
-                                "c" | "h" => "C",
-                                "cpp" | "cc" | "cxx" | "hpp" => "C++",
-                                "java" => "Java",
-                                "rb" => "Ruby",
-                                "toml" => "TOML",
-                                "yaml" | "yml" => "YAML",
-                                "json" => "JSON",
-                                "html" | "htm" => "HTML",
-                                "css" => "CSS",
-                                "sql" => "SQL",
-                                "vim" => "VimL",
-                                "el" => "Emacs Lisp",
-                                _ => ext,
-                            };
-                            format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
-                        })
-                        .collect();
-                    details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
-                }
-            }
-        }
-
-        // Build status
-        if let Some(ref build) = summary.build_status {
-            if build.ok {
-                let duration_str = if build.duration_ms > 0 {
-                    if build.duration_ms < 1000 {
-                        format!(" ({}ms)", build.duration_ms)
-                    } else {
-                        format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
-                    }
-                } else {
-                    String::new()
-                };
-                details.push(format!(
-                    "{}✓ builds{}{}",
-                    color(GREEN),
-                    duration_str,
-                    color(RESET)
-                ));
-            } else {
-                let err_str = if build.errors > 0 {
-                    format!(" ({} err)", build.errors)
-                } else {
-                    String::new()
-                };
-                details.push(format!(
-                    "{}✗ build errors{}{}",
-                    color(RED),
-                    err_str,
-                    color(RESET)
-                ));
-            }
-        }
-
-        // Port usage
-        if let Some(ref ports) = summary.port_info {
-            if !ports.ports.is_empty() {
-                let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                details.push(format!(
-                    "{}🔌 {}{}",
-                    color(CYAN),
-                    port_str.join(", "),
-                    color(RESET)
-                ));
-            }
-        }
-
-        // Docker info
-        if let Some(ref docker) = summary.docker_info {
-            let running = docker
-                .containers
-                .iter()
-                .filter(|c| c.status.contains("Up"))
-                .count();
-            let total = docker.containers.len();
-            if total > 0 {
-                details.push(format!(
-                    "{}🐳 {} container(s){}",
-                    color(CYAN),
-                    if running > 0 {
-                        format!("{} up", running)
-                    } else {
-                        total.to_string()
-                    },
-                    color(RESET)
-                ));
-            }
-        }
-
-        // Diff stats
-        if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
-            details.push(format!(
-                "{}+{}{} {}-{}{}",
-                color(GREEN),
-                git_info.lines_added,
-                color(RESET),
-                color(RED),
-                git_info.lines_deleted,
+    // Deferred header: compute only when about to display
+    // Deferred header: compute only when about to display
+    // This moves header construction closer to display, avoiding work if early return occurs
+    let header = {
+        let size_str = format_size_compact(summary.total_size);
+        let branch_display = build_branch_display(git_info);
+        let git_status_str = build_git_status_indicators(git_info);
+        let mut git_status = if git_status_str.is_empty() {
+            Vec::new()
+        } else {
+            git_status_str.split(' ').map(String::from).collect()
+        };
+        if git_info.stash_count > 0 {
+            git_status.push(format!(
+                "{}≡{}{}",
+                color(MAGENTA),
+                git_info.stash_count,
                 color(RESET)
             ));
         }
-
-        // Clean indicator
-        if !git_info.is_dirty
-            && git_info.modified == 0
-            && git_info.staged == 0
-            && git_info.untracked == 0
-        {
-            details.push(format!("{}✓ clean{}", color(GREEN), color(RESET)));
+        if let Some(ref state) = git_info.merge_state {
+            git_status.push(format!("{}{}{}", color(RED), state, color(RESET)));
         }
+        let git_status_str = git_status.join(" ");
 
-        // Cached test results
-        if let Some(test_results) = crate::test_cache::TestResults::load() {
-            if test_results.failed > 0 {
+        if git_info.is_repo {
+            // Row 1: Core info
+            let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
+            if !branch_display.is_empty() {
+                parts.push(format!("{} │", branch_display));
+            }
+            if let Some(ref tag) = git_info.tag {
+                parts.push(format!("{}{}{} │", color(YELLOW), tag, color(RESET)));
+            }
+            parts.push(format!("{} │", project_label));
+            parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
+            parts.push(format!(
+                "{}📄 {} files{} │",
+                color(DIM),
+                summary.files,
+                color(RESET)
+            ));
+            parts.push(format!(
+                "{}📂 {} dirs{}",
+                color(DIM),
+                summary.dirs,
+                color(RESET)
+            ));
+            if !git_status_str.is_empty() {
+                parts.push(format!("│ {}", git_status_str));
+            }
+            let row1 = parts.join(" ");
+
+            // Row 2: Details
+            let mut details = Vec::new();
+
+            // Git enhancements
+            if git_info.is_repo {
+                if let Some(time) = git_info.last_commit_time {
+                    let now = chrono::Utc::now().timestamp();
+                    let diff = now - time;
+                    let time_str = if diff < 60 {
+                        "just now".to_string()
+                    } else if diff < 3600 {
+                        format!("{}m ago", diff / 60)
+                    } else if diff < 86400 {
+                        format!("{}h ago", diff / 3600)
+                    } else {
+                        format!("{}d ago", diff / 86400)
+                    };
+                    details.push(format!("{}📅 {}{}", color(DIM), time_str, color(RESET)));
+                }
+                if git_info.commits_today > 0 {
+                    details.push(format!(
+                        "{}📝 {} today{}",
+                        color(GREEN),
+                        git_info.commits_today,
+                        color(RESET)
+                    ));
+                }
+                if git_info.branch_count > 1 {
+                    details.push(format!(
+                        "{}🔀 {} branches{}",
+                        color(CYAN),
+                        git_info.branch_count,
+                        color(RESET)
+                    ));
+                }
+                if git_info.stash_count > 0 {
+                    details.push(format!(
+                        "{}📦 {} stash{}",
+                        color(YELLOW),
+                        git_info.stash_count,
+                        if git_info.stash_count > 1 { "es" } else { "" }
+                    ));
+                }
+                if let Some(ref state) = git_info.merge_state {
+                    details.push(format!("{}⚠️ {}{}", color(YELLOW), state, color(RESET)));
+                }
+            }
+
+            // TODO count
+            if let Some(ref todos) = summary.todo_info {
+                if todos.count > 0 {
+                    details.push(format!(
+                        "{}📝 {} TODOs{}",
+                        color(YELLOW),
+                        todos.count,
+                        color(RESET)
+                    ));
+                }
+            }
+
+            // Code metrics — show languages breakdown
+            if let Some(ref metrics) = summary.code_metrics {
+                if metrics.total_loc > 0 {
+                    let loc_str = format_loc(metrics.total_loc);
+                    details.push(format!(
+                        "{}📊 {} lines{}",
+                        color(GREEN),
+                        loc_str,
+                        color(RESET)
+                    ));
+                    // Show top 3 languages with percentages
+                    if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
+                        let lang_parts: Vec<String> = metrics
+                            .by_extension
+                            .iter()
+                            .take(3)
+                            .map(|(ext, loc)| {
+                                let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
+                                let name = match ext.as_str() {
+                                    "rs" => "Rust",
+                                    "md" | "mdx" => "Markdown",
+                                    "sh" | "bash" => "Shell",
+                                    "py" => "Python",
+                                    "js" | "mjs" => "JavaScript",
+                                    "ts" | "tsx" => "TypeScript",
+                                    "go" => "Go",
+                                    "c" | "h" => "C",
+                                    "cpp" | "cc" | "cxx" | "hpp" => "C++",
+                                    "java" => "Java",
+                                    "rb" => "Ruby",
+                                    "toml" => "TOML",
+                                    "yaml" | "yml" => "YAML",
+                                    "json" => "JSON",
+                                    "html" | "htm" => "HTML",
+                                    "css" => "CSS",
+                                    "sql" => "SQL",
+                                    "vim" => "VimL",
+                                    "el" => "Emacs Lisp",
+                                    _ => ext,
+                                };
+                                format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
+                            })
+                            .collect();
+                        details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
+                    }
+                }
+            }
+
+            // Build status
+            if let Some(ref build) = summary.build_status {
+                if build.ok {
+                    let duration_str = if build.duration_ms > 0 {
+                        if build.duration_ms < 1000 {
+                            format!(" ({}ms)", build.duration_ms)
+                        } else {
+                            format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
+                        }
+                    } else {
+                        String::new()
+                    };
+                    details.push(format!(
+                        "{}✓ builds{}{}",
+                        color(GREEN),
+                        duration_str,
+                        color(RESET)
+                    ));
+                } else {
+                    let err_str = if build.errors > 0 {
+                        format!(" ({} err)", build.errors)
+                    } else {
+                        String::new()
+                    };
+                    details.push(format!(
+                        "{}✗ build errors{}{}",
+                        color(RED),
+                        err_str,
+                        color(RESET)
+                    ));
+                }
+            }
+
+            // Port usage
+            if let Some(ref ports) = summary.port_info {
+                if !ports.ports.is_empty() {
+                    let port_str: Vec<String> =
+                        ports.ports.iter().map(|p| format!(":{}", p)).collect();
+                    details.push(format!(
+                        "{}🔌 {}{}",
+                        color(CYAN),
+                        port_str.join(", "),
+                        color(RESET)
+                    ));
+                }
+            }
+
+            // Docker info
+            if let Some(ref docker) = summary.docker_info {
+                let running = docker
+                    .containers
+                    .iter()
+                    .filter(|c| c.status.contains("Up"))
+                    .count();
+                let total = docker.containers.len();
+                if total > 0 {
+                    details.push(format!(
+                        "{}🐳 {} container(s){}",
+                        color(CYAN),
+                        if running > 0 {
+                            format!("{} up", running)
+                        } else {
+                            total.to_string()
+                        },
+                        color(RESET)
+                    ));
+                }
+            }
+
+            // Diff stats
+            if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
                 details.push(format!(
-                    "{}✗ {} failed{}",
+                    "{}+{}{} {}-{}{}",
+                    color(GREEN),
+                    git_info.lines_added,
+                    color(RESET),
                     color(RED),
-                    test_results.failed,
+                    git_info.lines_deleted,
                     color(RESET)
                 ));
-            } else if test_results.passed > 0 {
-                details.push(format!(
-                    "{}✓ {} tests{} ({})",
-                    color(GREEN),
-                    test_results.passed,
-                    color(RESET),
-                    test_results.format_time_ago()
-                ));
             }
-        }
 
-        // Combine rows with dynamic truncation
-        if details.is_empty() {
-            row1
-        } else {
-            let details_str = details.join(" │ ");
-            let term_width = get_terminal_width();
-            let row1_width = strip_ansi(&row1).len();
+            // Clean indicator
+            if !git_info.is_dirty
+                && git_info.modified == 0
+                && git_info.staged == 0
+                && git_info.untracked == 0
+            {
+                details.push(format!("{}✓ clean{}", color(GREEN), color(RESET)));
+            }
 
-            if term_width > 0 && row1_width + details_str.len() > term_width {
-                let available = term_width.saturating_sub(row1_width + 3);
-                if available > 20 {
-                    let truncated = truncate_details(&details, available);
-                    format!("{}\n{}", row1, truncated)
-                } else {
-                    row1
+            // Cached test results
+            if let Some(test_results) = crate::test_cache::TestResults::load() {
+                if test_results.failed > 0 {
+                    details.push(format!(
+                        "{}✗ {} failed{}",
+                        color(RED),
+                        test_results.failed,
+                        color(RESET)
+                    ));
+                } else if test_results.passed > 0 {
+                    details.push(format!(
+                        "{}✓ {} tests{} ({})",
+                        color(GREEN),
+                        test_results.passed,
+                        color(RESET),
+                        test_results.format_time_ago()
+                    ));
                 }
-            } else {
-                format!("{}\n{}", row1, details_str)
             }
-        }
-    } else {
-        // Row 1: Core info
-        let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
-        parts.push(format!("{} │", project_label));
-        parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
-        parts.push(format!(
-            "{}📄 {} files{} │",
-            color(DIM),
-            summary.files,
-            color(RESET)
-        ));
-        parts.push(format!(
-            "{}📂 {} dirs{}",
-            color(DIM),
-            summary.dirs,
-            color(RESET)
-        ));
-        if hidden_count > 0 {
-            parts.push(format!("│ {} hidden", hidden_count));
-        }
-        let row1 = parts.join(" ");
 
-        // Row 2: Details
-        let mut details = Vec::new();
+            // Combine rows with dynamic truncation
+            if details.is_empty() {
+                row1
+            } else {
+                let details_str = details.join(" │ ");
+                let term_width = get_terminal_width();
+                let row1_width = strip_ansi(&row1).len();
 
-        // Build status
-        if let Some(ref build) = summary.build_status {
-            if build.ok {
-                let duration_str = if build.duration_ms > 0 {
-                    if build.duration_ms < 1000 {
-                        format!(" ({}ms)", build.duration_ms)
+                if term_width > 0 && row1_width + details_str.len() > term_width {
+                    let available = term_width.saturating_sub(row1_width + 3);
+                    if available > 20 {
+                        let truncated = truncate_details(&details, available);
+                        format!("{}\n{}", row1, truncated)
                     } else {
-                        format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
+                        row1
                     }
                 } else {
-                    String::new()
-                };
-                details.push(format!(
-                    "{}✓ builds{}{}",
-                    color(GREEN),
-                    duration_str,
-                    color(RESET)
-                ));
-            } else {
-                details.push(format!("{}✗ build errors{}", color(RED), color(RESET)));
-            }
-        }
-
-        // TODO count
-        if let Some(ref todos) = summary.todo_info {
-            if todos.count > 0 {
-                details.push(format!(
-                    "{}📝 {} TODOs{}",
-                    color(YELLOW),
-                    todos.count,
-                    color(RESET)
-                ));
-            }
-        }
-
-        // Code metrics — show languages breakdown
-        if let Some(ref metrics) = summary.code_metrics {
-            if metrics.total_loc > 0 {
-                let loc_str = format_loc(metrics.total_loc);
-                details.push(format!(
-                    "{}📊 {} lines{}",
-                    color(GREEN),
-                    loc_str,
-                    color(RESET)
-                ));
-                // Show top 3 languages with percentages
-                if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                    let lang_parts: Vec<String> = metrics
-                        .by_extension
-                        .iter()
-                        .take(3)
-                        .map(|(ext, loc)| {
-                            let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                            let name = match ext.as_str() {
-                                "rs" => "Rust",
-                                "md" | "mdx" => "Markdown",
-                                "sh" | "bash" => "Shell",
-                                "py" => "Python",
-                                "js" | "mjs" => "JavaScript",
-                                "ts" | "tsx" => "TypeScript",
-                                "go" => "Go",
-                                "c" | "h" => "C",
-                                "cpp" | "cc" | "cxx" | "hpp" => "C++",
-                                "java" => "Java",
-                                "rb" => "Ruby",
-                                "toml" => "TOML",
-                                "yaml" | "yml" => "YAML",
-                                "json" => "JSON",
-                                "html" | "htm" => "HTML",
-                                "css" => "CSS",
-                                "sql" => "SQL",
-                                "vim" => "VimL",
-                                "el" => "Emacs Lisp",
-                                _ => ext,
-                            };
-                            format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
-                        })
-                        .collect();
-                    details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
+                    format!("{}\n{}", row1, details_str)
                 }
             }
-        }
-
-        // Port usage
-        if let Some(ref ports) = summary.port_info {
-            if !ports.ports.is_empty() {
-                let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                details.push(format!(
-                    "{}🔌 {}{}",
-                    color(CYAN),
-                    port_str.join(", "),
-                    color(RESET)
-                ));
-            }
-        }
-
-        // Docker info
-        if let Some(ref docker) = summary.docker_info {
-            let running = docker
-                .containers
-                .iter()
-                .filter(|c| c.status.contains("Up"))
-                .count();
-            let total = docker.containers.len();
-            if total > 0 {
-                details.push(format!(
-                    "{}🐳 {} container(s){}",
-                    color(CYAN),
-                    if running > 0 {
-                        format!("{} up", running)
-                    } else {
-                        total.to_string()
-                    },
-                    color(RESET)
-                ));
-            } else if docker.has_compose || docker.has_dockerfile {
-                details.push(format!("{}🐳 docker{}", color(DIM), color(RESET)));
-            }
-        }
-
-        details.push(format!(
-            "{}│ {} total{}",
-            color(DIM),
-            summary.total_items,
-            color(RESET)
-        ));
-
-        // Combine rows with dynamic truncation
-        if details.is_empty() {
-            row1
         } else {
-            let details_str = details.join(" │ ");
-            let term_width = get_terminal_width();
-            let row1_width = strip_ansi(&row1).len();
+            // Row 1: Core info
+            let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
+            parts.push(format!("{} │", project_label));
+            parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
+            parts.push(format!(
+                "{}📄 {} files{} │",
+                color(DIM),
+                summary.files,
+                color(RESET)
+            ));
+            parts.push(format!(
+                "{}📂 {} dirs{}",
+                color(DIM),
+                summary.dirs,
+                color(RESET)
+            ));
+            if hidden_count > 0 {
+                parts.push(format!("│ {} hidden", hidden_count));
+            }
+            let row1 = parts.join(" ");
 
-            if term_width > 0 && row1_width + details_str.len() > term_width {
-                let available = term_width.saturating_sub(row1_width + 3);
-                if available > 20 {
-                    let truncated = truncate_details(&details, available);
-                    format!("{}\n{}", row1, truncated)
+            // Row 2: Details
+            let mut details = Vec::new();
+
+            // Build status
+            if let Some(ref build) = summary.build_status {
+                if build.ok {
+                    let duration_str = if build.duration_ms > 0 {
+                        if build.duration_ms < 1000 {
+                            format!(" ({}ms)", build.duration_ms)
+                        } else {
+                            format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
+                        }
+                    } else {
+                        String::new()
+                    };
+                    details.push(format!(
+                        "{}✓ builds{}{}",
+                        color(GREEN),
+                        duration_str,
+                        color(RESET)
+                    ));
                 } else {
-                    row1
+                    details.push(format!("{}✗ build errors{}", color(RED), color(RESET)));
                 }
+            }
+
+            // TODO count
+            if let Some(ref todos) = summary.todo_info {
+                if todos.count > 0 {
+                    details.push(format!(
+                        "{}📝 {} TODOs{}",
+                        color(YELLOW),
+                        todos.count,
+                        color(RESET)
+                    ));
+                }
+            }
+
+            // Code metrics — show languages breakdown
+            if let Some(ref metrics) = summary.code_metrics {
+                if metrics.total_loc > 0 {
+                    let loc_str = format_loc(metrics.total_loc);
+                    details.push(format!(
+                        "{}📊 {} lines{}",
+                        color(GREEN),
+                        loc_str,
+                        color(RESET)
+                    ));
+                    // Show top 3 languages with percentages
+                    if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
+                        let lang_parts: Vec<String> = metrics
+                            .by_extension
+                            .iter()
+                            .take(3)
+                            .map(|(ext, loc)| {
+                                let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
+                                let name = match ext.as_str() {
+                                    "rs" => "Rust",
+                                    "md" | "mdx" => "Markdown",
+                                    "sh" | "bash" => "Shell",
+                                    "py" => "Python",
+                                    "js" | "mjs" => "JavaScript",
+                                    "ts" | "tsx" => "TypeScript",
+                                    "go" => "Go",
+                                    "c" | "h" => "C",
+                                    "cpp" | "cc" | "cxx" | "hpp" => "C++",
+                                    "java" => "Java",
+                                    "rb" => "Ruby",
+                                    "toml" => "TOML",
+                                    "yaml" | "yml" => "YAML",
+                                    "json" => "JSON",
+                                    "html" | "htm" => "HTML",
+                                    "css" => "CSS",
+                                    "sql" => "SQL",
+                                    "vim" => "VimL",
+                                    "el" => "Emacs Lisp",
+                                    _ => ext,
+                                };
+                                format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
+                            })
+                            .collect();
+                        details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
+                    }
+                }
+            }
+
+            // Port usage
+            if let Some(ref ports) = summary.port_info {
+                if !ports.ports.is_empty() {
+                    let port_str: Vec<String> =
+                        ports.ports.iter().map(|p| format!(":{}", p)).collect();
+                    details.push(format!(
+                        "{}🔌 {}{}",
+                        color(CYAN),
+                        port_str.join(", "),
+                        color(RESET)
+                    ));
+                }
+            }
+
+            // Docker info
+            if let Some(ref docker) = summary.docker_info {
+                let running = docker
+                    .containers
+                    .iter()
+                    .filter(|c| c.status.contains("Up"))
+                    .count();
+                let total = docker.containers.len();
+                if total > 0 {
+                    details.push(format!(
+                        "{}🐳 {} container(s){}",
+                        color(CYAN),
+                        if running > 0 {
+                            format!("{} up", running)
+                        } else {
+                            total.to_string()
+                        },
+                        color(RESET)
+                    ));
+                } else if docker.has_compose || docker.has_dockerfile {
+                    details.push(format!("{}🐳 docker{}", color(DIM), color(RESET)));
+                }
+            }
+
+            details.push(format!(
+                "{}│ {} total{}",
+                color(DIM),
+                summary.total_items,
+                color(RESET)
+            ));
+
+            // Combine rows with dynamic truncation
+            if details.is_empty() {
+                row1
             } else {
-                format!("{}\n{}", row1, details_str)
+                let details_str = details.join(" │ ");
+                let term_width = get_terminal_width();
+                let row1_width = strip_ansi(&row1).len();
+
+                if term_width > 0 && row1_width + details_str.len() > term_width {
+                    let available = term_width.saturating_sub(row1_width + 3);
+                    if available > 20 {
+                        let truncated = truncate_details(&details, available);
+                        format!("{}\n{}", row1, truncated)
+                    } else {
+                        row1
+                    }
+                } else {
+                    format!("{}\n{}", row1, details_str)
+                }
             }
         }
     };
