@@ -58,8 +58,10 @@ fn send_and_recv_json(stream: &mut UnixStream, request: &Request) -> Result<Resp
 }
 
 fn send_and_recv_bincode(stream: &mut UnixStream, request: &Request) -> Result<Response> {
+    use std::io::{Read, Write};
     // Magic byte to signal bincode
     stream.write_all(&[MAGIC_BINCODE])?;
+    stream.flush()?;
     // Length-prefixed: 4-byte little-endian length, then payload
     let bytes = bincode::serialize(request)?;
     let len = bytes.len() as u32;

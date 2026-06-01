@@ -281,25 +281,58 @@ fn handle_client(
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
 
-    let mut reader = stream.try_clone()?;
-    let mut writer = stream;
+    // Use the single stream for both read and write (sequential protocol).
+    // Cloning a UnixStream on Unix can cause buffering issues with read_exact.
+    let mut stream = stream;
 
     // Read magic byte to determine format: 'J' = JSON, 'B' = bincode
     let mut magic = [0u8; 1];
     use std::io::Read;
-    reader.read_exact(&mut magic)?;
+    match stream.read_exact(&mut magic) {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::debug!("Client disconnected before sending magic: {}", e);
+            return Ok(());
+        }
+    }
     let use_bincode = magic[0] == b'B';
+    tracing::trace!("IPC format: {}", if use_bincode { "bincode" } else { "json" });
 
     let request: Request = if use_bincode {
         // Length-prefixed bincode: 4-byte LE length, then payload
         let mut len_bytes = [0u8; 4];
-        reader.read_exact(&mut len_bytes)?;
+        match reader.read_exact(&mut len_bytes) {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::warn!("Failed to read bincode length prefix: {}", e);
+                return Ok(());
+            }
+        }
         let len = u32::from_le_bytes(len_bytes) as usize;
+        tracing::trace!("Bincode request length: {} bytes", len);
         let mut buf = vec![0u8; len];
-        reader.read_exact(&mut buf)?;
-        bincode::deserialize(&buf)?
+        match reader.read_exact(&mut buf) {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::warn!("Failed to read bincode payload ({} bytes): {}", len, e);
+                return Ok(());
+            }
+        }
+        match bincode::deserialize(&buf) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("Failed to deserialize bincode request: {}", e);
+                return Ok(());
+            }
+        }
     } else {
-        serde_json::from_reader(&reader)?
+        match serde_json::from_reader(&reader) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("Failed to deserialize JSON request: {}", e);
+                return Ok(());
+            }
+        }
     };
 
     let response = match request {
