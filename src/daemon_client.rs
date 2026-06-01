@@ -15,11 +15,12 @@ const MAGIC_BINCODE: u8 = b'B';
 
 /// Returns true if bincode IPC should be used (opt-in via env var or default).
 fn use_bincode() -> bool {
-    match std::env::var("CFM_IPC").as_deref() {
-        Ok("bincode") => true,
-        Ok("json") => false,
-        _ => true, // default: bincode (faster)
+    // Temporarily disabled: bincode protocol has issues with the current
+    // daemon stream handling. Use JSON until protocol is fixed.
+    if let Ok(val) = std::env::var("CFM_IPC") {
+        return val == "bincode";
     }
+    false // default: JSON (known working)
 }
 
 fn socket_path() -> Result<std::path::PathBuf> {
@@ -44,9 +45,7 @@ fn send_and_recv_json(stream: &mut UnixStream, request: &Request) -> Result<Resp
     // Magic byte to signal JSON
     use std::io::Write;
     stream.write_all(&[MAGIC_JSON])?;
-    // Write request JSON directly to the stream
-    let request_json = serde_json::to_string(request)?;
-    stream.write_all(request_json.as_bytes())?;
+    serde_json::to_writer(&mut *stream, request)?;
     // Shutdown write end so daemon sees EOF on read
     stream.shutdown(std::net::Shutdown::Write)?;
     // Read response: JSON has no length prefix, so read until EOF
@@ -68,9 +67,8 @@ fn send_and_recv_bincode(stream: &mut UnixStream, request: &Request) -> Result<R
     stream.write_all(&len.to_le_bytes())?;
     stream.write_all(&bytes)?;
     stream.flush()?;
-    // Do NOT shutdown write end here — the daemon needs the connection open
-    // to write the response. With length-prefixed protocol, the daemon knows
-    // exactly how many bytes to write and the client knows how many to read.
+    // Shutdown write end so daemon sees EOF on read and starts processing
+    stream.shutdown(std::net::Shutdown::Write)?;
     // Read 4-byte length prefix, then payload
     let mut len_bytes = [0u8; 4];
     if let Err(e) = stream.read_exact(&mut len_bytes) {
@@ -88,6 +86,9 @@ fn send_and_recv_bincode(stream: &mut UnixStream, request: &Request) -> Result<R
         return Err(e.into());
     }
     let response: Response = bincode::deserialize(&resp_bytes)?;
+    // Signal the daemon we're done reading by shutting down the write end.
+    // This allows the daemon to exit its read-until-EOF loop.
+    stream.shutdown(std::net::Shutdown::Write).ok();
     Ok(response)
 }
 
@@ -103,8 +104,7 @@ fn send_fire_and_forget(stream: &mut UnixStream, request: &Request) -> Result<()
         stream.flush()?;
     } else {
         stream.write_all(&[MAGIC_JSON])?;
-        let request_json = serde_json::to_string(request)?;
-        stream.write_all(request_json.as_bytes())?;
+        serde_json::to_writer(&mut *stream, request)?;
         stream.flush()?;
     }
     Ok(())

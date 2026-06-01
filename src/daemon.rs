@@ -286,15 +286,10 @@ fn handle_client(
     let mut stream = stream;
 
     // Read magic byte to determine format: 'J' = JSON, 'B' = bincode
-    let mut magic = [0u8; 1];
+    // Default to JSON (known working). Set CFM_IPC=bincode to use bincode.
+    let mut magic = [b'J']; // default to JSON
     use std::io::Read;
-    match stream.read_exact(&mut magic) {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::debug!("Client disconnected before sending magic: {}", e);
-            return Ok(());
-        }
-    }
+    let _ = stream.read_exact(&mut magic); // ignore error — default is already set
     let use_bincode = magic[0] == b'B';
     tracing::trace!("IPC format: {}", if use_bincode { "bincode" } else { "json" });
 
@@ -462,19 +457,38 @@ fn handle_client(
         }
     };
 
-    send_response(&mut stream, &response)
+    send_response(&mut stream, &response)?;
+
+    // Keep the stream open until the client closes it (reads until EOF).
+    // This prevents the daemon from closing the socket while the client
+    // is still reading the response.
+    let mut discard = [0u8; 256];
+    loop {
+        match stream.read(&mut discard) {
+            Ok(0) => break, // EOF — client closed
+            Ok(_) => continue,
+            Err(_) => break, // timeout or error
+        }
+    }
+    Ok(())
 }
 
 fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
     use std::io::Write;
-    // Write magic byte + length-prefixed bincode (default, ~5-10x faster than JSON)
-    stream.write_all(&[b'B'])?;
-    let bytes = bincode::serialize(response)?;
-    let len = bytes.len() as u32;
-    stream.write_all(&len.to_le_bytes())?;
-    stream.write_all(&bytes)?;
-    stream.flush()?;
-    tracing::trace!("Sent response: {} bytes (magic + len + payload)", 1 + 4 + bytes.len());
+    // Default: JSON (known working, uses shutdown-write for EOF)
+    // When CFM_IPC=bincode, use length-prefixed bincode
+    if std::env::var("CFM_IPC").as_deref() == Ok("bincode") {
+        stream.write_all(&[b'B'])?;
+        let bytes = bincode::serialize(response)?;
+        let len = bytes.len() as u32;
+        stream.write_all(&len.to_le_bytes())?;
+        stream.write_all(&bytes)?;
+        stream.flush()?;
+    } else {
+        stream.write_all(&[b'J'])?;
+        serde_json::to_writer(&mut *stream, response)?;
+        stream.flush()?;
+    }
     Ok(())
 }
 
