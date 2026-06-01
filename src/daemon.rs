@@ -281,10 +281,26 @@ fn handle_client(
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
 
-    let reader = stream.try_clone()?;
+    let mut reader = stream.try_clone()?;
     let mut writer = stream;
 
-    let request: Request = serde_json::from_reader(&reader)?;
+    // Read magic byte to determine format: 'J' = JSON, 'B' = bincode
+    let mut magic = [0u8; 1];
+    use std::io::Read;
+    reader.read_exact(&mut magic)?;
+    let use_bincode = magic[0] == b'B';
+
+    let request: Request = if use_bincode {
+        // Length-prefixed bincode: 4-byte LE length, then payload
+        let mut len_bytes = [0u8; 4];
+        reader.read_exact(&mut len_bytes)?;
+        let len = u32::from_le_bytes(len_bytes) as usize;
+        let mut buf = vec![0u8; len];
+        reader.read_exact(&mut buf)?;
+        bincode::deserialize(&buf)?
+    } else {
+        serde_json::from_reader(&reader)?
+    };
 
     let response = match request {
         Request::Banner { path } => {
@@ -417,7 +433,14 @@ fn handle_client(
 }
 
 fn send_response(writer: &mut UnixStream, response: &Response) -> Result<()> {
-    serde_json::to_writer(writer, response)?;
+    use std::io::Write;
+    // Write magic byte + length-prefixed bincode (default, ~5-10x faster than JSON)
+    writer.write_all(&[b'B'])?;
+    let bytes = bincode::serialize(response)?;
+    let len = bytes.len() as u32;
+    writer.write_all(&len.to_le_bytes())?;
+    writer.write_all(&bytes)?;
+    writer.flush()?;
     Ok(())
 }
 
