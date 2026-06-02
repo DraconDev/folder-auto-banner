@@ -86,6 +86,76 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
+/// Apply gradient color based on age (recent=green, old=red)
+fn gradient_age(dt: &DateTime<Utc>, formatted: &str, mode: &str) -> String {
+    let now = Utc::now();
+    let age_secs = (now - *dt).num_seconds().max(0) as f64;
+    
+    // Age tiers: <1h, <1d, <1w, <1m, <1y, >1y
+    let color_code = if mode == "fixed" {
+        if age_secs < 3600.0 {
+            "32" // green
+        } else if age_secs < 86400.0 {
+            "33" // yellow
+        } else if age_secs < 604800.0 {
+            "33" // yellow
+        } else if age_secs < 2592000.0 {
+            "38;5;208" // orange
+        } else if age_secs < 31536000.0 {
+            "31" // red
+        } else {
+            "31" // red
+        }
+    } else {
+        // Gradient mode: interpolate between green (0s) and red (1y)
+        let max_age = 31536000.0; // 1 year
+        let ratio = (age_secs / max_age).min(1.0);
+        // Green (32) -> Yellow (33) -> Red (31)
+        if ratio < 0.5 {
+            "32" // green for recent
+        } else if ratio < 0.75 {
+            "33" // yellow for medium
+        } else {
+            "31" // red for old
+        }
+    };
+    
+    format!("\x1b[{}m{}\x1b[0m", color_code, formatted)
+}
+
+/// Apply gradient color based on size (small=cool, large=warm)
+fn gradient_size(size: u64, formatted: &str, mode: &str) -> String {
+    // Size tiers: <1KB, <10KB, <100KB, <1MB, <10MB, >10MB
+    let color_code = if mode == "fixed" {
+        if size < 1024 {
+            "36" // cyan (tiny)
+        } else if size < 10240 {
+            "34" // blue (small)
+        } else if size < 102400 {
+            "32" // green (medium)
+        } else if size < 1048576 {
+            "33" // yellow (large)
+        } else if size < 10485760 {
+            "38;5;208" // orange (very large)
+        } else {
+            "31" // red (huge)
+        }
+    } else {
+        // Gradient mode
+        if size < 10240 {
+            "36" // cyan for small
+        } else if size < 1048576 {
+            "32" // green for medium
+        } else if size < 10485760 {
+            "33" // yellow for large
+        } else {
+            "31" // red for huge
+        }
+    };
+    
+    format!("\x1b[{}m{}\x1b[0m", color_code, formatted)
+}
+
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let path = opts
