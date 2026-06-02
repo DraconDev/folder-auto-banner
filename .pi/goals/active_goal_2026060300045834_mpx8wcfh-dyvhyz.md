@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 396677,
-    "activeSeconds": 146
+    "tokensUsed": 397316,
+    "activeSeconds": 160
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T23:04:58.349Z",
-  "updatedAt": "2026-06-02T23:07:33.588Z",
+  "updatedAt": "2026-06-02T23:07:48.067Z",
   "activePath": ".pi/goals/active_goal_2026060300045834_mpx8wcfh-dyvhyz.md",
   "taskList": {
     "tasks": [
@@ -107,8 +107,8 @@ Add gradient color scale for date and size columns, giving visual information at
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m26s
-- Tokens used: 397K (396,677) tokens
+- Time spent: 2m40s
+- Tokens used: 397K (397,316) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
