@@ -370,6 +370,8 @@ impl Cli {
                     only_files: self.only_files,
                     git_ignore: self.git_ignore,
                     level: self.level,
+                    color_scale: self.color_scale.clone(),
+                    color_scale_mode: self.color_scale_mode.clone(),
                 })
             }
 

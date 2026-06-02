@@ -78,6 +78,8 @@ pub struct BannerOptions<'a> {
     pub only_files: bool,
     pub git_ignore: bool,
     pub level: Option<usize>,
+    pub color_scale: Option<String>,
+    pub color_scale_mode: Option<String>,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
