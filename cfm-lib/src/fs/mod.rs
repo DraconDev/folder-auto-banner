@@ -126,6 +126,8 @@ pub struct DirEntry {
     pub group: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub symlink_target: Option<String>,
+    #[serde(default)]
+    pub symlink_valid: bool,
 }
 
 /// Directory summary
@@ -281,6 +283,7 @@ impl DirSummary {
                 owner,
                 group,
                 symlink_target,
+                symlink_valid: false,
             });
         }
 

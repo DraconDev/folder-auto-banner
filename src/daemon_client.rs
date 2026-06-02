@@ -17,26 +17,36 @@ fn socket_path() -> Result<std::path::PathBuf> {
 
 fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response> {
     use std::io::{Read, Write};
-    // Length-prefixed bincode: 4-byte LE length, then payload.
-    // Buffering in Vec<u8> avoids 1-byte-at-a-time I/O (2500+ syscalls).
-    let req_bytes = bincode::serialize(request)?;
+    // Length-prefixed JSON: 4-byte LE length, then payload.
+    let req_bytes = serde_json::to_vec(request)?;
     let req_len = req_bytes.len() as u32;
-    // Write length prefix and payload in a single write_all call
-    let mut header = [0u8; 4];
-    header[..4].copy_from_slice(&req_len.to_le_bytes());
     let mut combined = Vec::with_capacity(4 + req_bytes.len());
-    combined.extend_from_slice(&header);
+    let len_bytes = req_len.to_le_bytes();
+    combined.extend_from_slice(&len_bytes);
     combined.extend_from_slice(&req_bytes);
+    let t0 = std::time::Instant::now();
     stream.write_all(&combined)?;
-    // Shutdown write end so daemon sees EOF on read and starts processing
     stream.shutdown(std::net::Shutdown::Write)?;
-    // Read 4-byte length prefix, then payload (bulk read, not 1-byte)
+    let t1 = std::time::Instant::now();
     let mut len_bytes = [0u8; 4];
     stream.read_exact(&mut len_bytes)?;
+    let t2 = std::time::Instant::now();
     let resp_len = u32::from_le_bytes(len_bytes) as usize;
     let mut resp_bytes = vec![0u8; resp_len];
     stream.read_exact(&mut resp_bytes)?;
-    let response: Response = bincode::deserialize(&resp_bytes)?;
+    let t3 = std::time::Instant::now();
+    let response: Response = serde_json::from_slice(&resp_bytes)?;
+    let t4 = std::time::Instant::now();
+    if std::env::var("CFM_PROFILE").is_ok() {
+        eprintln!(
+            "[CFM_PROFILE] ipc: write={:?} len_read={:?} payload_read={:?} deser={:?} total={:?}",
+            t1 - t0,
+            t2 - t1,
+            t3 - t2,
+            t4 - t3,
+            t4 - t0
+        );
+    }
     Ok(response)
 }
 
@@ -70,18 +80,21 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let request = Request::Banner {
         path: path.to_path_buf(),
     };
-    let response = send_and_recv(&mut stream, &request).ok()?;
+    let result = send_and_recv(&mut stream, &request);
+    let response = match result {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[CFM_DEBUG] send_and_recv error: {} (kind: {:?})", e, e);
+            return None;
+        }
+    };
     let t2 = std::time::Instant::now();
     if std::env::var("CFM_PROFILE").is_ok() {
-        let payload_bytes = serde_json::to_string(&response)
-            .map(|s| s.len())
-            .unwrap_or(0);
         eprintln!(
-            "[CFM_PROFILE] ipc: connect={:?} send_recv={:?} total={:?} payload={}B",
+            "[CFM_PROFILE] ipc: connect={:?} send_recv={:?} total={:?}",
             t1 - t0,
             t2 - t1,
             t2 - t0,
-            payload_bytes,
         );
     }
     match response {
@@ -122,20 +135,32 @@ pub fn is_daemon_running() -> bool {
 
 /// Fire-and-forget: warm multiple paths using a single connection (faster)
 pub fn warm_paths(paths: &[PathBuf]) {
+    use std::io::Write;
     let Ok(socket) = socket_path() else {
         return;
     };
-    let Ok(stream) = UnixStream::connect(&socket) else {
+    let Ok(mut stream) = UnixStream::connect(&socket) else {
         return;
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
-    // Send all warm requests over the same connection
+    // Send all warm requests over the same connection using length-prefixed protocol
     for path in paths {
         let request = Request::Warm { path: path.clone() };
-        if let Err(e) = serde_json::to_writer(&stream, &request) {
+        let req_bytes = match serde_json::to_vec(&request) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!("Failed to serialize warm request: {}", e);
+                break;
+            }
+        };
+        let req_len = req_bytes.len() as u32;
+        let mut combined = Vec::with_capacity(4 + req_bytes.len());
+        combined.extend_from_slice(&req_len.to_le_bytes());
+        combined.extend_from_slice(&req_bytes);
+        if let Err(e) = stream.write_all(&combined) {
             tracing::warn!("Failed to send warm request: {}", e);
-            break; // Connection broken, stop sending
+            break;
         }
     }
 }

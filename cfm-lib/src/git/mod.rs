@@ -130,7 +130,9 @@ fn get_git_info_inner(path: &Path, collect_file_statuses: bool, filter_paths: &[
     if let Some(statuses) = statuses {
         for entry in statuses.iter() {
             let status = entry.status();
-            let file_path = entry.path().unwrap_or("").to_string();
+            let file_path = Path::new(entry.path().unwrap_or(""))
+                .to_string_lossy()
+                .to_string();
 
             if status.contains(git2::Status::INDEX_NEW)
                 || status.contains(git2::Status::INDEX_MODIFIED)

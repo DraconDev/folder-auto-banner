@@ -95,12 +95,14 @@ pub struct DirEntry {
     pub is_dir: bool,
     pub is_file: bool,
     pub is_symlink: bool,
+    #[serde(default)]
     pub is_exec: bool,
     pub size: u64,
     pub modified: Option<DateTime<Utc>>,
     pub perms: String,
     pub owner: String,
     pub group: String,
+    #[serde(default)]
     pub symlink_target: Option<String>,
     #[serde(default = "default_true")]
     pub symlink_valid: bool,

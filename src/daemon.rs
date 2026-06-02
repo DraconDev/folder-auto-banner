@@ -146,11 +146,11 @@ impl Daemon {
                         last_save = Instant::now();
                     }
 
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(10));
                 }
                 Err(e) => {
                     tracing::error!("Accept error: {}", e);
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(10));
                 }
             }
         }
@@ -294,15 +294,22 @@ fn handle_client(
 
     let mut stream = stream;
 
-    // Length-prefixed bincode: read 4-byte LE length, then payload.
-    // Bulk reads via read_exact avoid 1-byte-at-a-time I/O.
+    let t_start = std::time::Instant::now();
+    // Length-prefixed JSON: read 4-byte LE length, then payload.
     let mut len_bytes = [0u8; 4];
     stream.read_exact(&mut len_bytes)?;
+    let t_read = std::time::Instant::now();
     let req_len = u32::from_le_bytes(len_bytes) as usize;
     let mut req_buf = vec![0u8; req_len];
     stream.read_exact(&mut req_buf)?;
-    let request: Request = bincode::deserialize(&req_buf)?;
-    tracing::debug!("Received request: {:?}", request);
+    let request: Request = serde_json::from_slice(&req_buf)?;
+    let t_parse = std::time::Instant::now();
+    tracing::debug!(
+        "Received request: {:?} (read={:?}, parse={:?})",
+        request,
+        t_read - t_start,
+        t_parse - t_read
+    );
 
     let response = match request {
         Request::Banner { path } => {
@@ -314,9 +321,14 @@ fn handle_client(
                     tracing::warn!("Mutex poisoned, recovering");
                     e.into_inner()
                 });
+                tracing::debug!("Cache lookup: path={:?}, entries={}", path, cache.len());
                 if let Some(entry) = cache.get(&path) {
-                    if entry.computed_at.elapsed() < CACHE_TTL {
+                    let age = entry.computed_at.elapsed();
+                    tracing::debug!("Cache hit: age={:?}, ttl={:?}", age, CACHE_TTL);
+                    if age < CACHE_TTL {
+                        let t0 = std::time::Instant::now();
                         let mut data = entry.data.clone();
+                        let t1 = std::time::Instant::now();
                         drop(cache);
                         // Inject sizes from global cache
                         let global_sizes = dir_sizes.lock().unwrap_or_else(|e| {
@@ -331,9 +343,16 @@ fn handle_client(
                             }
                         }
                         drop(global_sizes);
-                        // Don't refresh git on cache hit — it's cached with TTL
-                        use std::io::Read;
+                        let t2 = std::time::Instant::now();
+                        let t3 = std::time::Instant::now();
                         send_response(&mut stream, &Response::Banner(Box::new(data)))?;
+                        let t4 = std::time::Instant::now();
+                        tracing::debug!(
+                            "Cache hit: clone={:?} inject={:?} send={:?}",
+                            t1 - t0,
+                            t2 - t1,
+                            t4 - t3
+                        );
                         // Keep stream alive while client reads
                         let mut discard = [0u8; 256];
                         loop {
@@ -443,6 +462,7 @@ fn handle_client(
     };
 
     send_response(&mut stream, &response)?;
+    tracing::trace!("Sent response successfully");
 
     // Keep stream alive while client reads. The client signals it's done by
     // closing the connection (dropping its UnixStream). Until then, the client
@@ -461,24 +481,19 @@ fn handle_client(
 
 fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
     use std::io::Write;
-    // Length-prefixed bincode: 4-byte LE length, then payload.
-    // Buffering in Vec<u8> avoids 1-byte-at-a-time I/O.
-    let resp_bytes = bincode::serialize(response)?;
+    // Length-prefixed JSON: 4-byte LE length, then payload.
+    // Using JSON instead of bincode because bincode validates UTF-8 on
+    // String fields. JSON always produces valid UTF-8. The key insight:
+    // to_vec on a Vec<u8> buffers the entire output, then a single
+    // write_all sends it in one syscall — avoiding 1-byte-at-a-time I/O.
+    let resp_bytes = serde_json::to_vec(response)?;
     let resp_len = resp_bytes.len() as u32;
-    let mut header = [0u8; 4];
-    header[..4].copy_from_slice(&resp_len.to_le_bytes());
     let mut combined = Vec::with_capacity(4 + resp_bytes.len());
-    combined.extend_from_slice(&header);
+    let len_bytes = resp_len.to_le_bytes();
+    combined.extend_from_slice(&len_bytes);
     combined.extend_from_slice(&resp_bytes);
-    match stream.write_all(&combined) {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::warn!("Failed to write response: {}", e);
-            return Err(e.into());
-        }
-    }
+    stream.write_all(&combined)?;
     stream.flush()?;
-    tracing::trace!("Sent bincode response: {} bytes payload", resp_bytes.len());
     Ok(())
 }
 
@@ -541,12 +556,13 @@ fn compute_dir_size(path: &Path) -> u64 {
         .arg(path)
         .output()
     {
-        if let Ok(stdout) = String::from_utf8(output.stdout) {
-            if let Some(size_str) = stdout.split_whitespace().next() {
-                if let Ok(size) = size_str.parse::<u64>() {
-                    return size;
-                }
-            }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.is_empty() {
+            return 0;
+        }
+        let size_str = stdout.split_whitespace().next().unwrap_or("0");
+        if let Ok(size) = size_str.parse::<u64>() {
+            return size;
         }
     }
     // Fallback: just the directory inode size
@@ -748,15 +764,14 @@ fn proactive_scan(
 
         if let Ok(output) = std::process::Command::new("du").args(&du_args).output() {
             let mut batch_sizes = Vec::new();
-            if let Ok(stdout) = String::from_utf8(output.stdout) {
-                for line in stdout.lines() {
-                    let parts: Vec<&str> = line.splitn(2, '\t').collect();
-                    if parts.len() >= 2 {
-                        if let Ok(size) = parts[0].parse::<u64>() {
-                            let dir_path = PathBuf::from(parts[1]);
-                            batch_sizes.push((dir_path, size));
-                            count += 1;
-                        }
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.splitn(2, '\t').collect();
+                if parts.len() >= 2 {
+                    if let Ok(size) = parts[0].parse::<u64>() {
+                        let dir_path = PathBuf::from(parts[1]);
+                        batch_sizes.push((dir_path, size));
+                        count += 1;
                     }
                 }
             }

@@ -9,15 +9,10 @@ use crate::git::GitInfo;
 // IPC Protocol
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Request {
-    /// Get cached banner data for a directory
     Banner { path: PathBuf },
-    /// Pre-compute banner data for a directory (fire-and-forget)
     Warm { path: PathBuf },
-    /// Get directory size (recursive)
     DirSize { path: PathBuf },
-    /// Ping (health check)
     Ping,
-    /// Shutdown daemon
     Shutdown,
 }
 
@@ -43,11 +38,11 @@ pub struct BannerData {
     #[allow(dead_code)]
     pub cached_at: DateTime<Utc>,
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::Path;
+    use std::path::PathBuf;
 
     #[test]
     fn test_request_banner_serialization() {
@@ -148,9 +143,9 @@ mod tests {
 
     #[test]
     fn test_banner_data_creation() {
-        let data = BannerData {
+        let data = cfm_lib::daemon_types::BannerData {
             path: PathBuf::from("/tmp"),
-            summary: DirSummary::scan(Path::new("/tmp")).unwrap(),
+            summary: cfm_lib::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
             git_info: None,
             dir_sizes: HashMap::new(),
             cached_at: Utc::now(),
@@ -163,9 +158,9 @@ mod tests {
 
     #[test]
     fn test_banner_data_serialization() {
-        let data = BannerData {
+        let data = cfm_lib::daemon_types::BannerData {
             path: PathBuf::from("/tmp"),
-            summary: DirSummary::scan(Path::new("/tmp")).unwrap(),
+            summary: cfm_lib::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
             git_info: None,
             dir_sizes: HashMap::new(),
             cached_at: Utc::now(),
@@ -173,7 +168,7 @@ mod tests {
 
         // path, dir_sizes, and cached_at are skipped during serialization
         let json = serde_json::to_string(&data).unwrap();
-        let deserialized: BannerData = serde_json::from_str(&json).unwrap();
+        let deserialized: cfm_lib::daemon_types::BannerData = serde_json::from_str(&json).unwrap();
         // path defaults to empty PathBuf since it's skipped
         assert_eq!(deserialized.path, PathBuf::new());
     }
