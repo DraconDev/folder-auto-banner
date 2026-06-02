@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 646334,
-    "activeSeconds": 228
+    "tokensUsed": 648009,
+    "activeSeconds": 695
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T18:53:51.178Z",
-  "updatedAt": "2026-06-02T18:57:55.353Z",
+  "updatedAt": "2026-06-02T19:05:44.196Z",
   "activePath": ".pi/goals/active_goal_2026060219535117_mpwzxeiy-636yqb.md",
   "taskList": {
     "tasks": [
@@ -120,8 +120,8 @@ Fix new flags to work in banner mode, improve tree view, and make compact/verbos
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m48s
-- Tokens used: 646K (646,334) tokens
+- Time spent: 11m35s
+- Tokens used: 648K (648,009) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->

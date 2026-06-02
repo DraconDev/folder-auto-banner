@@ -316,13 +316,22 @@ fn print_tree_recursive(
 
         // Get file metadata for display
         let meta = entry.metadata().ok();
-        let size_str = meta.as_ref().map(|m| format_size_compact(m.len())).unwrap_or_default();
-        let date_str = meta.as_ref().map(|m| {
-            m.modified().ok().map(|t| {
-                let dt: chrono::DateTime<chrono::Utc> = t.into();
-                dt.format("%Y-%m-%d %H:%M").to_string()
-            }).unwrap_or_default()
-        }).unwrap_or_default();
+        let size_str = meta
+            .as_ref()
+            .map(|m| format_size_compact(m.len()))
+            .unwrap_or_default();
+        let date_str = meta
+            .as_ref()
+            .map(|m| {
+                m.modified()
+                    .ok()
+                    .map(|t| {
+                        let dt: chrono::DateTime<chrono::Utc> = t.into();
+                        dt.format("%Y-%m-%d %H:%M").to_string()
+                    })
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default();
 
         if is_dir {
             println!("{}{}{}{}/", prefix, connector, icon_str, name);
