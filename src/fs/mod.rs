@@ -630,7 +630,8 @@ mod tests {
 
     #[test]
     fn test_project_type_generic() {
-        let tmp = tempfile::tempdir().unwrap();
+        // Create temp dir in /var/tmp to avoid project marker detection from ancestors
+        let tmp = tempfile::Builder::new().tempdir_in("/var/tmp").unwrap();
         assert_eq!(ProjectType::detect(tmp.path()), ProjectType::Generic);
     }
 

@@ -1,6 +1,4 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::fs::DirSummary;
@@ -26,17 +24,8 @@ pub enum Response {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BannerData {
-    #[serde(skip_serializing, default)]
-    #[allow(dead_code)]
-    pub path: PathBuf,
     pub summary: DirSummary,
     pub git_info: Option<GitInfo>,
-    #[serde(skip_serializing, default)]
-    #[allow(dead_code)]
-    pub dir_sizes: HashMap<PathBuf, u64>,
-    #[serde(skip_serializing, default)]
-    #[allow(dead_code)]
-    pub cached_at: DateTime<Utc>,
 }
 #[cfg(test)]
 mod tests {
@@ -144,32 +133,22 @@ mod tests {
     #[test]
     fn test_banner_data_creation() {
         let data = cfm_lib::daemon_types::BannerData {
-            path: PathBuf::from("/tmp"),
             summary: cfm_lib::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
             git_info: None,
-            dir_sizes: HashMap::new(),
-            cached_at: Utc::now(),
         };
 
-        assert_eq!(data.path, PathBuf::from("/tmp"));
         assert!(data.git_info.is_none());
-        assert!(data.dir_sizes.is_empty());
     }
 
     #[test]
     fn test_banner_data_serialization() {
         let data = cfm_lib::daemon_types::BannerData {
-            path: PathBuf::from("/tmp"),
             summary: cfm_lib::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
             git_info: None,
-            dir_sizes: HashMap::new(),
-            cached_at: Utc::now(),
         };
 
-        // path, dir_sizes, and cached_at are skipped during serialization
         let json = serde_json::to_string(&data).unwrap();
         let deserialized: cfm_lib::daemon_types::BannerData = serde_json::from_str(&json).unwrap();
-        // path defaults to empty PathBuf since it's skipped
-        assert_eq!(deserialized.path, PathBuf::new());
+        assert!(deserialized.git_info.is_none());
     }
 }

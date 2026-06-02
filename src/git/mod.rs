@@ -346,38 +346,6 @@ fn get_git_info_inner(
     })
 }
 
-/// Format git status as compact string (e.g., "[main ↑2 ↓0]")
-#[allow(dead_code)]
-pub fn format_git_status(info: &GitInfo) -> String {
-    if !info.is_repo {
-        return String::new();
-    }
-
-    let branch = info.branch.as_deref().unwrap_or("?");
-
-    let mut status = String::new();
-    status.push_str(&format!("[{}", branch));
-
-    if info.ahead > 0 {
-        status.push_str(&format!(" ↑{}", info.ahead));
-    }
-    if info.behind > 0 {
-        status.push_str(&format!(" ↓{}", info.behind));
-    }
-    if info.modified > 0 {
-        status.push_str(&format!(" ✚{}", info.modified));
-    }
-    if info.untracked > 0 {
-        status.push_str(&format!(" ?{}", info.untracked));
-    }
-    if info.staged > 0 {
-        status.push_str(&format!(" ●{}", info.staged));
-    }
-
-    status.push(']');
-    status
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -540,13 +540,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     }
 
     // Return immediately — sizes come from global cache
-    Ok(BannerData {
-        path: path.to_path_buf(),
-        summary,
-        git_info,
-        dir_sizes: HashMap::new(),
-        cached_at: chrono::Utc::now(),
-    })
+    Ok(BannerData { summary, git_info })
 }
 
 fn compute_dir_size(path: &Path) -> u64 {
@@ -910,11 +904,8 @@ mod tests {
     fn test_cache_entry_creation() {
         let summary = DirSummary::scan(Path::new("/tmp")).unwrap();
         let data = BannerData {
-            path: PathBuf::from("/tmp"),
             summary,
             git_info: None,
-            dir_sizes: HashMap::new(),
-            cached_at: chrono::Utc::now(),
         };
         let entry = CacheEntry {
             data,
@@ -928,11 +919,8 @@ mod tests {
         let summary = DirSummary::scan(Path::new("/tmp")).unwrap();
         let entry = CacheEntry {
             data: BannerData {
-                path: PathBuf::from("/tmp"),
                 summary,
                 git_info: None,
-                dir_sizes: HashMap::new(),
-                cached_at: chrono::Utc::now(),
             },
             computed_at: Instant::now() - Duration::from_secs(600), // 10 minutes ago
         };
@@ -960,14 +948,11 @@ mod tests {
     fn test_banner_data_serialization() {
         let summary = DirSummary::scan(Path::new("/tmp")).unwrap();
         let data = BannerData {
-            path: PathBuf::from("/tmp"),
             summary,
             git_info: None,
-            dir_sizes: HashMap::new(),
-            cached_at: chrono::Utc::now(),
         };
         let json = serde_json::to_string(&data).unwrap();
-        assert!(json.contains("/tmp"));
+        assert!(json.contains("summary"));
     }
 
     #[test]
