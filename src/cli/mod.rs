@@ -101,6 +101,14 @@ pub struct Cli {
     #[arg(long = "git-ignore")]
     pub git_ignore: bool,
 
+    /// Color scale for date/size (all, age, size)
+    #[arg(long = "color-scale")]
+    pub color_scale: Option<String>,
+
+    /// Color scale mode (gradient, fixed)
+    #[arg(long = "color-scale-mode")]
+    pub color_scale_mode: Option<String>,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
