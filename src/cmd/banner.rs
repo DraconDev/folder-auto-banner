@@ -1340,7 +1340,18 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 } else {
                     format_exact_time(dt)
                 };
-                colorize_date(dt, &formatted)
+                // Apply color scale if enabled
+                if opts.color_scale.is_some() {
+                    let scale = opts.color_scale.as_deref().unwrap_or("all");
+                    let mode = opts.color_scale_mode.as_deref().unwrap_or("gradient");
+                    if scale == "all" || scale == "age" {
+                        gradient_age(dt, &formatted, mode)
+                    } else {
+                        colorize_date(dt, &formatted)
+                    }
+                } else {
+                    colorize_date(dt, &formatted)
+                }
             })
             .unwrap_or_default();
 
@@ -1424,7 +1435,17 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         let group_colored = format!("{}{}{}", color(BLUE), group_padded, color(RESET));
 
         // Size: orange
-        let size_colored = format!("{}{}{}", color(ORANGE), size_padded, color(RESET));
+        let size_colored = if opts.color_scale.is_some() {
+            let scale = opts.color_scale.as_deref().unwrap_or("all");
+            let mode = opts.color_scale_mode.as_deref().unwrap_or("gradient");
+            if scale == "all" || scale == "size" {
+                gradient_size(item.size, &size_padded, mode)
+            } else {
+                format!("{}{}{}", color(ORANGE), size_padded, color(RESET))
+            }
+        } else {
+            format!("{}{}{}", color(ORANGE), size_padded, color(RESET))
+        };
 
         // Contents: orange (like size)
         let contents_colored = format!("{}{}{}", color(ORANGE), contents_padded, color(RESET));
