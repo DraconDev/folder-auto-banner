@@ -218,6 +218,12 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     if !opts.hyperlink && config.hyperlink {
         opts.hyperlink = true;
     }
+    if opts.color_scale.is_none() && !config.color_scale.is_empty() {
+        opts.color_scale = Some(Box::leak(config.color_scale.into_boxed_str()));
+    }
+    if opts.color_scale_mode.is_none() && config.color_scale_mode != "gradient" {
+        opts.color_scale_mode = Some(Box::leak(config.color_scale_mode.into_boxed_str()));
+    }
 
     // Tree view mode
     if let Some(depth) = opts.tree {
