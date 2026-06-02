@@ -77,6 +77,7 @@ pub struct BannerOptions<'a> {
     pub only_dirs: bool,
     pub only_files: bool,
     pub git_ignore: bool,
+    pub level: Option<usize>,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -148,7 +149,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
 
     // Tree view mode
     if let Some(depth) = opts.tree {
-        let max_depth = depth.unwrap_or(0); // 0 = unlimited
+        let max_depth = opts.level.unwrap_or(depth.unwrap_or(0)); // -L overrides tree depth
         output_tree(&path, max_depth, opts.hidden, opts.filter, icons, colors);
         return Ok(());
     }
@@ -1455,7 +1456,7 @@ fn output_recursive(root: &Path, opts: &BannerOptions) -> Result<()> {
         };
 
         let mut items: Vec<_> = entries.filter_map(|e| e.ok()).collect();
-        items.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+        items.sort_by_key(|e| e.file_name());
 
         for entry in items {
             let name = entry.file_name();
@@ -1530,8 +1531,16 @@ fn is_git_ignored(path: &Path) -> bool {
     };
 
     // Common patterns to ignore
-    let ignore_patterns = [".git", "node_modules", "target", "__pycache__", ".venv", "dist", "build"];
-    
+    let ignore_patterns = [
+        ".git",
+        "node_modules",
+        "target",
+        "__pycache__",
+        ".venv",
+        "dist",
+        "build",
+    ];
+
     // Check if filename matches
     for pattern in &ignore_patterns {
         if name == *pattern {
@@ -1542,7 +1551,9 @@ fn is_git_ignored(path: &Path) -> bool {
     // Check if any parent component matches
     let path_str = path.to_string_lossy();
     for pattern in &ignore_patterns {
-        if path_str.contains(&format!("/{}/", pattern)) || path_str.ends_with(&format!("/{}", pattern)) {
+        if path_str.contains(&format!("/{}/", pattern))
+            || path_str.ends_with(&format!("/{}", pattern))
+        {
             return true;
         }
     }

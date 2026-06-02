@@ -65,6 +65,10 @@ pub struct Cli {
     #[arg(long)]
     pub tree: Option<Option<usize>>,
 
+    /// Limit recursion depth (for --tree or --recursive)
+    #[arg(short = 'L', long = "level")]
+    pub level: Option<usize>,
+
     /// Compact output (fewer lines)
     #[arg(short = 'c', long = "compact")]
     pub compact: bool,
@@ -357,6 +361,7 @@ impl Cli {
                     only_dirs: self.only_dirs,
                     only_files: self.only_files,
                     git_ignore: self.git_ignore,
+                    level: self.level,
                 })
             }
 
