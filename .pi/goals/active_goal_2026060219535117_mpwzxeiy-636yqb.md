@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 648009,
-    "activeSeconds": 695
+    "tokensUsed": 657747,
+    "activeSeconds": 1133
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T18:53:51.178Z",
-  "updatedAt": "2026-06-02T19:05:44.196Z",
+  "updatedAt": "2026-06-02T19:13:03.187Z",
   "activePath": ".pi/goals/active_goal_2026060219535117_mpwzxeiy-636yqb.md",
   "taskList": {
     "tasks": [
@@ -102,7 +102,8 @@
       {
         "id": "task-5",
         "title": "Final verification — all flags work in all modes",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-02T19:13:03.184Z",
         "verificationContract": "cargo test passes; all flags tested in banner, oneline, recursive, and tree modes"
       }
     ],
@@ -120,8 +121,8 @@ Fix new flags to work in banner mode, improve tree view, and make compact/verbos
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 11m35s
-- Tokens used: 648K (648,009) tokens
+- Time spent: 18m53s
+- Tokens used: 658K (657,747) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -129,5 +130,5 @@ Fix new flags to work in banner mode, improve tree view, and make compact/verbos
 - [x] task-2: Fix --git-ignore to work in banner mode
 - [x] task-3: Improve tree view to show file info (size, date, git status)
 - [x] task-4: Make compact and verbose actually different
-- [ ] task-5: Final verification — all flags work in all modes — contract: cargo test passes; all flags tested in banner, oneline, recursive, and tree modes
+- [x] task-5: Final verification — all flags work in all modes
 
