@@ -956,6 +956,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         });
     }
 
+    // Apply only-dirs / only-files filter
+    if opts.only_dirs {
+        display_items.retain(|item| item.is_dir);
+    }
+    if opts.only_files {
+        display_items.retain(|item| item.is_file);
+    }
+
+    // Apply git-ignore filter
+    if opts.git_ignore {
+        display_items.retain(|item| !is_git_ignored(&item.path));
+    }
+
     // Apply max limit if specified
     if let Some(max_items) = opts.max {
         display_items.truncate(max_items);
