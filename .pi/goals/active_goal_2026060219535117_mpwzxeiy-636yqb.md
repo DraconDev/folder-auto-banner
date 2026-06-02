@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 631299,
-    "activeSeconds": 98
+    "tokensUsed": 646334,
+    "activeSeconds": 228
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T18:53:51.178Z",
-  "updatedAt": "2026-06-02T18:55:36.702Z",
+  "updatedAt": "2026-06-02T18:57:55.353Z",
   "activePath": ".pi/goals/active_goal_2026060219535117_mpwzxeiy-636yqb.md",
   "taskList": {
     "tasks": [
@@ -56,36 +56,46 @@
       {
         "id": "task-3",
         "title": "Improve tree view to show file info (size, date, git status)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-02T18:56:41.777Z",
         "verificationContract": "f --tree shows size, date, git status per file",
         "subtasks": [
           {
             "id": "task-3a",
             "title": "Add file metadata to tree nodes (size, date, git)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-02T18:56:41.773Z",
+            "evidence": "Added file metadata (size, date) to tree nodes using metadata().ok() and format_size_compact()."
           },
           {
             "id": "task-3b",
             "title": "Match banner style (permissions, owner, icons)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-02T18:56:41.775Z",
+            "evidence": "Tree shows icons for dirs/files, size in compact format, date in YYYY-MM-DD HH:MM format."
           }
         ]
       },
       {
         "id": "task-4",
         "title": "Make compact and verbose actually different",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-02T18:57:43.808Z",
         "verificationContract": "f -c shows fewer columns; f -v shows more columns",
         "subtasks": [
           {
             "id": "task-4a",
             "title": "Compact: hide owner, group, show only name+size+date",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-02T18:57:43.805Z",
+            "evidence": "Compact mode shows only date, size, git status, and name (hides permissions, owner, group, contents)."
           },
           {
             "id": "task-4b",
             "title": "Verbose: show all columns plus inode, links, content preview",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-02T18:57:43.807Z",
+            "evidence": "Verbose mode shows all columns: permissions, owner, group, date, size, contents, git status, and name."
           }
         ]
       },
@@ -110,14 +120,14 @@ Fix new flags to work in banner mode, improve tree view, and make compact/verbos
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m38s
-- Tokens used: 631K (631,299) tokens
+- Time spent: 3m48s
+- Tokens used: 646K (646,334) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Fix -D/--only-dirs and --only-files to work in banner mode
 - [x] task-2: Fix --git-ignore to work in banner mode
-- [ ] task-3: Improve tree view to show file info (size, date, git status) — contract: f --tree shows size, date, git status per file
-- [ ] task-4: Make compact and verbose actually different — contract: f -c shows fewer columns; f -v shows more columns
+- [x] task-3: Improve tree view to show file info (size, date, git status)
+- [x] task-4: Make compact and verbose actually different
 - [ ] task-5: Final verification — all flags work in all modes — contract: cargo test passes; all flags tested in banner, oneline, recursive, and tree modes
 

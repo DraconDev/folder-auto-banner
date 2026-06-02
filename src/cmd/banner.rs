@@ -314,6 +314,16 @@ fn print_tree_recursive(
             ""
         };
 
+        // Get file metadata for display
+        let meta = entry.metadata().ok();
+        let size_str = meta.as_ref().map(|m| format_size_compact(m.len())).unwrap_or_default();
+        let date_str = meta.as_ref().map(|m| {
+            m.modified().ok().map(|t| {
+                let dt: chrono::DateTime<chrono::Utc> = t.into();
+                dt.format("%Y-%m-%d %H:%M").to_string()
+            }).unwrap_or_default()
+        }).unwrap_or_default();
+
         if is_dir {
             println!("{}{}{}{}/", prefix, connector, icon_str, name);
             let new_prefix = format!("{}{}", prefix, child_prefix);
@@ -327,7 +337,13 @@ fn print_tree_recursive(
                 icons,
             );
         } else {
-            println!("{}{}{}{}", prefix, connector, icon_str, name);
+            // Show file with metadata
+            let meta_str = if !size_str.is_empty() || !date_str.is_empty() {
+                format!(" {} {}", size_str, date_str)
+            } else {
+                String::new()
+            };
+            println!("{}{}{}{}{}", prefix, connector, icon_str, name, meta_str);
         }
     }
 }
@@ -1345,6 +1361,20 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 .split(',')
                 .map(|s| s.trim().to_string())
                 .collect::<Vec<_>>()
+        } else if opts.compact {
+            // Compact mode: minimal columns
+            vec!["size".to_string(), "date".to_string(), "name".to_string()]
+        } else if opts.verbose {
+            // Verbose mode: all columns plus extras
+            vec![
+                "permission".to_string(),
+                "owner".to_string(),
+                "group".to_string(),
+                "size".to_string(),
+                "contents".to_string(),
+                "date".to_string(),
+                "name".to_string(),
+            ]
         } else {
             config.columns.clone()
         };
