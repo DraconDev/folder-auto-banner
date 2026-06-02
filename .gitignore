@@ -40,6 +40,7 @@ repo-scanner/
 state/
 target/
 tasks*.json
+test_banner/
 !*.env
 !.env
 !.env.*
