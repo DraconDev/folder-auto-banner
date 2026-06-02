@@ -73,6 +73,10 @@ pub struct BannerOptions<'a> {
     pub ignore_glob: Vec<String>,
     pub no_symlink: bool,
     pub hyperlink: bool,
+    pub recursive: bool,
+    pub only_dirs: bool,
+    pub only_files: bool,
+    pub git_ignore: bool,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -149,6 +153,12 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         return Ok(());
     }
 
+    // Recursive mode
+    if opts.recursive {
+        output_recursive(&path, &opts)?;
+        return Ok(());
+    }
+
     // Try daemon cache — if daemon isn't running, start it and retry
     if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
         let summary = cached.summary;
@@ -161,6 +171,8 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
                 opts.filter,
                 opts.max,
                 &opts.ignore_glob,
+                opts.only_dirs,
+                opts.only_files,
             );
         } else if opts.json {
             output_json(&path, &summary, &git_info);
@@ -201,6 +213,8 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
             opts.filter,
             opts.max,
             &opts.ignore_glob,
+            opts.only_dirs,
+            opts.only_files,
         );
     } else if opts.json {
         output_json(&path, &summary, &git_info);
@@ -1371,10 +1385,19 @@ fn output_oneline(
     filter: Option<&str>,
     max: Option<usize>,
     ignore_glob: &[String],
+    only_dirs: bool,
+    only_files: bool,
 ) {
     let mut count = 0;
     for item in &summary.top_items {
         if !hidden && item.name.starts_with('.') {
+            continue;
+        }
+        // Only-dirs / only-files filter
+        if only_dirs && !item.is_dir {
+            continue;
+        }
+        if only_files && item.is_dir {
             continue;
         }
         // Filter by pattern
@@ -1413,6 +1436,138 @@ fn glob_match(pattern: &str, name: &str) -> bool {
         // exact match
         name == pattern
     }
+}
+
+/// Recursive directory listing (flat output like ls -R)
+fn output_recursive(root: &Path, opts: &BannerOptions) -> Result<()> {
+    use std::collections::VecDeque;
+    use std::path::PathBuf;
+
+    let mut queue: VecDeque<PathBuf> = VecDeque::new();
+    queue.push_back(root.to_path_buf());
+    let mut count = 0usize;
+    let max = opts.max.unwrap_or(usize::MAX);
+
+    while let Some(dir) = queue.pop_front() {
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let mut items: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+        items.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+        for entry in items {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+
+            // Hidden filter
+            if !opts.hidden && name_str.starts_with('.') {
+                continue;
+            }
+
+            // Ignore glob filter
+            if opts.ignore_glob.iter().any(|g| glob_match(g, &name_str)) {
+                continue;
+            }
+
+            // Pattern filter
+            if let Some(pat) = opts.filter {
+                if !name_str.contains(pat) && !entry.path().to_string_lossy().contains(pat) {
+                    continue;
+                }
+            }
+
+            let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+
+            // Only-dirs / only-files filter
+            if opts.only_dirs && !is_dir {
+                continue;
+            }
+            if opts.only_files && is_dir {
+                continue;
+            }
+
+            // Git-ignore filter
+            if opts.git_ignore && is_git_ignored(&entry.path()) {
+                continue;
+            }
+
+            // Output — show relative path from root
+            let path = entry.path();
+            let relative = path.strip_prefix(root).unwrap_or(&path);
+            let relative_str = relative.to_string_lossy();
+            if opts.oneline {
+                println!("{}", relative_str);
+            } else if opts.raw {
+                println!("{}", path.display());
+            } else {
+                // Rich mode — show type indicator
+                let prefix = if is_dir { "/" } else { "" };
+                println!("{}{}", relative_str, prefix);
+            }
+
+            count += 1;
+            if count >= max {
+                return Ok(());
+            }
+
+            // Queue subdirectories for recursion
+            if is_dir {
+                queue.push_back(entry.path());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Check if a path is git-ignored
+fn is_git_ignored(path: &Path) -> bool {
+    let name = match path.file_name() {
+        Some(n) => n.to_string_lossy(),
+        None => return false,
+    };
+
+    // Common patterns to ignore
+    let ignore_patterns = [".git", "node_modules", "target", "__pycache__", ".venv", "dist", "build"];
+    
+    // Check if filename matches
+    for pattern in &ignore_patterns {
+        if name == *pattern {
+            return true;
+        }
+    }
+
+    // Check if any parent component matches
+    let path_str = path.to_string_lossy();
+    for pattern in &ignore_patterns {
+        if path_str.contains(&format!("/{}/", pattern)) || path_str.ends_with(&format!("/{}", pattern)) {
+            return true;
+        }
+    }
+
+    // Check parent .gitignore files
+    let mut current = path.parent();
+    while let Some(dir) = current {
+        let gitignore = dir.join(".gitignore");
+        if gitignore.exists() {
+            if let Ok(content) = std::fs::read_to_string(&gitignore) {
+                for line in content.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with('#') {
+                        continue;
+                    }
+                    if glob_match(line, &name) {
+                        return true;
+                    }
+                }
+            }
+        }
+        current = dir.parent();
+    }
+
+    false
 }
 
 fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {

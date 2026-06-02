@@ -42,7 +42,7 @@ pub struct Cli {
     pub gitsort: bool,
 
     /// Reverse sort order
-    #[arg(short = 'R', long = "reverse")]
+    #[arg(short = 'r', long = "reverse")]
     pub reverse: bool,
 
     /// Show hidden files (dotfiles)
@@ -80,6 +80,22 @@ pub struct Cli {
     /// Output JSON (for scripting)
     #[arg(long)]
     pub json: bool,
+
+    /// Recurse into directories
+    #[arg(short = 'R', long = "recursive")]
+    pub recursive: bool,
+
+    /// List only directories
+    #[arg(short = 'D', long = "only-dirs")]
+    pub only_dirs: bool,
+
+    /// List only files
+    #[arg(long = "only-files")]
+    pub only_files: bool,
+
+    /// Respect .gitignore
+    #[arg(long = "git-ignore")]
+    pub git_ignore: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -337,6 +353,10 @@ impl Cli {
                     ignore_glob: vec![],
                     no_symlink: false,
                     hyperlink: false,
+                    recursive: self.recursive,
+                    only_dirs: self.only_dirs,
+                    only_files: self.only_files,
+                    git_ignore: self.git_ignore,
                 })
             }
 

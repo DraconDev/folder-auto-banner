@@ -101,7 +101,7 @@
 | Commits today | ✅ | ❌ | ❌ |
 | Branch count | ✅ | ❌ | ❌ |
 | Last commit time | ✅ | ❌ | ❌ |
-| Per-directory git status | ❌ | ❌ | ✅ `--git-repos` |
+| Per-directory git status | ✅ (via daemon cache) | ❌ | ✅ `--git-repos` |
 | Git theme customization | ❌ | ✅ | ❌ |
 
 ### Output Formats
@@ -139,6 +139,9 @@
 | **TODO/FIXME count** | Scans source for task markers |
 | **Config command** | `f config` opens config in editor |
 | **Shell hooks** | Auto-banner on `cd` (zsh/bash) |
+| **Long format by default** | No `-l` needed — detailed view is the default |
+| **Rich git integration** | Branch, ahead/behind, stash, merge state, commits today, branch count, last commit time |
+| **Per-file git status** | Modified, added, deleted, untracked indicators per file |
 
 ### Unique to lsd (not in CFM/eza)
 
@@ -174,11 +177,13 @@
 
 ### High Priority (would match competitors)
 
-1. **`-l` / `--long` mode** — Detailed metadata view (permissions, owner, group, size, date, name)
-2. **`-R` / `--recursive`** — Recursive directory listing
-3. **`-D` / `--only-dirs`** — List only directories
-4. **`-f` / `--only-files`** — List only files
-5. **`--git-ignore`** — Respect .gitignore in listings
+1. **`-R` / `--recursive`** — Flat recursive listing (vs tree's hierarchical view)
+2. **`-D` / `--only-dirs`** — List only directories
+3. **`-f` / `--only-files`** — List only files
+4. **`--git-ignore`** — Respect .gitignore in listings
+5. **`-L` / `--level`** — Limit tree recursion depth
+
+Note: `-l` / `--long` is NOT needed — CFM's default output already shows detailed metadata (permissions, owner, group, size, date, name). lsd/eza need `-l` because their default is a grid view.
 
 ### Medium Priority (nice to have)
 

@@ -16,6 +16,27 @@ When you run `f`, you see:
 
 **All instantly, no extra commands needed.**
 
+## vs lsd / eza
+
+CFM is **not a drop-in `ls` replacement** — it's a **contextual directory dashboard**. While lsd and eza focus on making `ls` pretty, CFM adds **project context** (git, TODOs, ports, docker, build status, code metrics) and **daemon caching** for instant repeated access.
+
+| Feature | CFM | lsd | eza |
+|---------|-----|-----|-----|
+| Pretty listing | ✅ | ✅ | ✅ |
+| Icons | ✅ | ✅ | ✅ |
+| Tree view | ✅ | ✅ | ✅ |
+| **Git status** | ✅ (rich) | ✅ | ✅ |
+| **Context banner** | ✅ | ❌ | ❌ |
+| **Daemon caching** | ✅ | ❌ | ❌ |
+| **TODO count** | ✅ | ❌ | ❌ |
+| **Port detection** | ✅ | ❌ | ❌ |
+| **Build status** | ✅ | ❌ | ❌ |
+| **Language breakdown** | ✅ | ❌ | ❌ |
+| Long format (`-l`) | ✅ (default) | ✅ | ✅ |
+| Recursive (`-R`) | ❌ | ✅ | ✅ |
+
+See [COMPETITORS.md](COMPETITORS.md) for the full comparison.
+
 ## Quick Start
 
 ```bash
