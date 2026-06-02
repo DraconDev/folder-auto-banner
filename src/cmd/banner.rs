@@ -1,4 +1,4 @@
-//! Banner command — the crown jewel
+//! Banner command - the crown jewel
 //!
 //! Prints a rich, context-aware directory dashboard and exits.
 //! This is the main feature that makes cfm magical.
@@ -11,7 +11,7 @@ use crate::fs::{format_exact_time, format_size_compact, DirSummary};
 use crate::git::GitInfo;
 use crate::icon;
 
-// ANSI color codes — only emitted when stdout is a tty
+// ANSI color codes - only emitted when stdout is a tty
 static COLORS_ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 fn color(code: &str) -> &str {
@@ -95,14 +95,10 @@ fn gradient_age(dt: &DateTime<Utc>, formatted: &str, mode: &str) -> String {
     let color_code = if mode == "fixed" {
         if age_secs < 3600.0 {
             "32" // green
-        } else if age_secs < 86400.0 {
-            "33" // yellow
-        } else if age_secs < 604800.0 {
+        } else if age_secs < 86400.0 || age_secs < 604800.0 {
             "33" // yellow
         } else if age_secs < 2592000.0 {
             "38;5;208" // orange
-        } else if age_secs < 31536000.0 {
-            "31" // red
         } else {
             "31" // red
         }
@@ -152,7 +148,7 @@ fn gradient_size(size: u64, formatted: &str, mode: &str) -> String {
             "31" // red for huge
         }
     };
-    
+
     format!("\x1b[{}m{}\x1b[0m", color_code, formatted)
 }
 
@@ -197,7 +193,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         opts.reverse = true;
     }
     if opts.group_dirs.is_none() && config.group_dirs != "none" {
-        // Leak the string for lifetime — acceptable for CLI tool
+        // Leak the string for lifetime - acceptable for CLI tool
         opts.group_dirs = Some(Box::leak(config.group_dirs.into_boxed_str()));
     }
     if !opts.hidden && config.hidden {
@@ -238,7 +234,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         return Ok(());
     }
 
-    // Try daemon cache — if daemon isn't running, start it and retry
+    // Try daemon cache - if daemon isn't running, start it and retry
     if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
         let summary = cached.summary;
         let git_info = cached.git_info.unwrap_or_default();
@@ -266,7 +262,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         return Ok(());
     }
 
-    // Daemon not available or cache miss — try direct scan.
+    // Daemon not available or cache miss - try direct scan.
     // Todos/ports/docker/metrics are disabled by default for speed; set CFM_*=1 to enable.
     eprintln!("cfmd: daemon not available, falling back to direct scan");
     let no_todos = std::env::var("CFM_TODOS").unwrap_or_default() != "1";
@@ -276,7 +272,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
 
     let summary = DirSummary::scan_with_options(
         &path,
-        false, // build check disabled by default — too slow (cargo check = 6.7s)
+        false, // build check disabled by default - too slow (cargo check = 6.7s)
         !no_todos,
         !no_ports,
         !no_docker,
@@ -453,14 +449,14 @@ fn warm_nearby_dirs(path: &Path) {
         }
     }
 
-    // Fire-and-forget in background thread — don't block the banner
+    // Fire-and-forget in background thread - don't block the banner
     std::thread::spawn(move || {
         // Use a single connection for all warm requests (faster)
         crate::daemon_client::warm_paths(&paths_to_warm);
     });
 }
 
-/// Output rich formatted banner — compact lsd-style layout
+/// Output rich formatted banner - compact lsd-style layout
 #[allow(clippy::too_many_arguments)]
 /// Build git branch display with color (blue if clean, yellow if dirty)
 fn build_branch_display(git_info: &GitInfo) -> String {
@@ -661,7 +657,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 }
             }
 
-            // Code metrics — show languages breakdown
+            // Code metrics - show languages breakdown
             if let Some(ref metrics) = summary.code_metrics {
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
@@ -900,7 +896,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 }
             }
 
-            // Code metrics — show languages breakdown
+            // Code metrics - show languages breakdown
             if let Some(ref metrics) = summary.code_metrics {
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
@@ -1214,7 +1210,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         max_git = 1;
     }
 
-    // Print each row — PERM OWNER GROUP CONTENTS SIZE DATE NAME
+    // Print each row - PERM OWNER GROUP CONTENTS SIZE DATE NAME
     for (idx, item) in display_items.iter().enumerate() {
         let row_tint = if idx % 2 == 0 { ROW_TINT } else { "" };
         let tint_reset = if idx % 2 == 0 { color(RESET) } else { "" };
@@ -1224,7 +1220,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             String::new()
         };
 
-        // Per-file git status — try relative path first, then filename
+        // Per-file git status - try relative path first, then filename
         // For directories, aggregate status from child files
         let git_icon = {
             let rel = item.path.strip_prefix(path).unwrap_or(&item.path);
@@ -1243,7 +1239,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     }
                 })
                 .unwrap_or_else(|| {
-                    // Tracked but clean — show dim dot
+                    // Tracked but clean - show dim dot
                     if git_info.is_repo {
                         format!("{}●{}", color(GREEN), color(RESET))
                     } else {
@@ -1576,13 +1572,13 @@ fn output_oneline(
 /// Simple glob matching for a single pattern against a filename
 fn glob_match(pattern: &str, name: &str) -> bool {
     if let Some(inner) = pattern.strip_prefix('*').and_then(|s| s.strip_suffix('*')) {
-        // *foo* — contains
+        // *foo* - contains
         name.contains(inner)
     } else if let Some(suffix) = pattern.strip_prefix('*') {
-        // *.ext — ends with
+        // *.ext - ends with
         name.ends_with(suffix)
     } else if let Some(prefix) = pattern.strip_suffix('*') {
-        // prefix* — starts with
+        // prefix* - starts with
         name.starts_with(prefix)
     } else {
         // exact match
@@ -1645,7 +1641,7 @@ fn output_recursive(root: &Path, opts: &BannerOptions) -> Result<()> {
                 continue;
             }
 
-            // Output — show relative path from root
+            // Output - show relative path from root
             let path = entry.path();
             let relative = path.strip_prefix(root).unwrap_or(&path);
             let relative_str = relative.to_string_lossy();
@@ -1654,7 +1650,7 @@ fn output_recursive(root: &Path, opts: &BannerOptions) -> Result<()> {
             } else if opts.raw {
                 println!("{}", path.display());
             } else {
-                // Rich mode — show type indicator
+                // Rich mode - show type indicator
                 let prefix = if is_dir { "/" } else { "" };
                 println!("{}{}", relative_str, prefix);
             }
@@ -1781,7 +1777,7 @@ fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
     crate::cmd::file_metadata::count_items_in_dir(entry)
 }
 
-/// Aggregate git status for a directory — returns the most severe status
+/// Aggregate git status for a directory - returns the most severe status
 /// from any child file (Conflict > Deleted > Modified > Added > Untracked)
 fn aggregate_dir_git_status(
     file_statuses: &std::collections::HashMap<String, crate::git::FileStatus>,
@@ -1865,7 +1861,7 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     }
 }
 
-/// Colorize permission string like exa — each char colored by meaning
+/// Colorize permission string like exa - each char colored by meaning
 /// d=blue, l=magenta, r=green, w=yellow, x=red, -=dim
 fn colorize_perms(perms: &str) -> String {
     let mut result = String::with_capacity(perms.len() * 10);
@@ -1978,9 +1974,9 @@ fn truncate_details(details: &[String], available: usize) -> String {
             let remaining = available.saturating_sub(current_len);
             if remaining > 10 {
                 // Truncate this item safely
-                let truncated_len = remaining.saturating_sub(1); // Leave room for "…"
+                let truncated_len = remaining.saturating_sub(1); // Leave room for "..."
                 let truncated: String = plain.chars().take(truncated_len).collect();
-                kept.push(format!("{}…", truncated));
+                kept.push(format!("{}...", truncated));
             }
             break;
         }
