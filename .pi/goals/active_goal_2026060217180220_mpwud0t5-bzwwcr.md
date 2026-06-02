@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 169681,
-    "activeSeconds": 159
+    "tokensUsed": 170246,
+    "activeSeconds": 170
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T16:18:02.201Z",
-  "updatedAt": "2026-06-02T16:20:49.243Z",
+  "updatedAt": "2026-06-02T16:21:00.509Z",
   "activePath": ".pi/goals/active_goal_2026060217180220_mpwud0t5-bzwwcr.md",
   "taskList": {
     "tasks": [
@@ -118,8 +118,8 @@ Restructure CFM CLI: separate ad-hoc action flags from config-level settings, ad
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m39s
-- Tokens used: 170K (169,681) tokens
+- Time spent: 2m50s
+- Tokens used: 170K (170,246) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
