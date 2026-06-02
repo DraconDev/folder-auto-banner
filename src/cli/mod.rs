@@ -25,6 +25,62 @@ pub struct Cli {
     #[arg(value_hint = ValueHint::DirPath)]
     pub path: Option<PathBuf>,
 
+    /// Sort by time modified
+    #[arg(short = 't', long = "timesort")]
+    pub timesort: bool,
+
+    /// Sort by size
+    #[arg(short = 'S', long = "sizesort")]
+    pub sizesort: bool,
+
+    /// Sort by file extension
+    #[arg(short = 'X', long = "extensionsort")]
+    pub extensionsort: bool,
+
+    /// Sort by git status
+    #[arg(short = 'G', long = "gitsort")]
+    pub gitsort: bool,
+
+    /// Reverse sort order
+    #[arg(short = 'R', long = "reverse")]
+    pub reverse: bool,
+
+    /// Show hidden files (dotfiles)
+    #[arg(short = 'a', long = "hidden")]
+    pub hidden: bool,
+
+    /// One file per line (for piping)
+    #[arg(short = '1', long = "oneline")]
+    pub oneline: bool,
+
+    /// Filter items by pattern
+    #[arg(short = 'f', long = "filter")]
+    pub filter: Option<String>,
+
+    /// Maximum number of items to display
+    #[arg(short = 'm', long = "max")]
+    pub max: Option<usize>,
+
+    /// Tree view with specified depth (0 = unlimited)
+    #[arg(long)]
+    pub tree: Option<Option<usize>>,
+
+    /// Compact output (fewer lines)
+    #[arg(short = 'c', long = "compact")]
+    pub compact: bool,
+
+    /// Verbose output (more info)
+    #[arg(short = 'v', long = "verbose")]
+    pub verbose: bool,
+
+    /// Output raw paths (no formatting, for piping)
+    #[arg(long = "raw")]
+    pub raw: bool,
+
+    /// Output JSON (for scripting)
+    #[arg(long)]
+    pub json: bool,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -120,6 +176,26 @@ pub enum Commands {
         /// Tree view with specified depth (0 = unlimited)
         #[arg(long)]
         tree: Option<Option<usize>>,
+
+        /// Display one entry per line (for piping)
+        #[arg(short = '1', long = "oneline")]
+        oneline: bool,
+
+        /// Show total directory size in header
+        #[arg(long)]
+        total_size: bool,
+
+        /// Exclude files matching glob pattern (can repeat)
+        #[arg(long)]
+        ignore_glob: Vec<String>,
+
+        /// Hide symlink targets
+        #[arg(long)]
+        no_symlink: bool,
+
+        /// Attach terminal hyperlinks to filenames
+        #[arg(long)]
+        hyperlink: bool,
     },
 
     /// Output shell aliases for current project type
@@ -189,6 +265,11 @@ impl Cli {
                 classify,
                 blocks,
                 tree,
+                oneline,
+                total_size,
+                ignore_glob,
+                no_symlink,
+                hyperlink,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
                 crate::cmd::banner::run_banner(crate::cmd::banner::BannerOptions {
@@ -214,15 +295,48 @@ impl Cli {
                     classify: *classify,
                     blocks: blocks.as_deref(),
                     tree: *tree,
+                    oneline: *oneline,
+                    total_size: *total_size,
+                    ignore_glob: ignore_glob.clone(),
+                    no_symlink: *no_symlink,
+                    hyperlink: *hyperlink,
                     ..Default::default()
                 })
             }
             None => {
-                // `f` with no args = `f banner`
+                // `f` with no args = `f banner` — use top-level flags
                 let p: Option<&Path> = self.path.as_deref();
                 crate::cmd::banner::run_banner(crate::cmd::banner::BannerOptions {
                     path: p,
-                    ..Default::default()
+                    raw: self.raw,
+                    json: self.json,
+                    compact: self.compact,
+                    verbose: self.verbose,
+                    sort: None,
+                    timesort: self.timesort,
+                    sizesort: self.sizesort,
+                    extensionsort: self.extensionsort,
+                    gitsort: self.gitsort,
+                    versionsort: false,
+                    no_sort: false,
+                    group_dirs: None,
+                    reverse: self.reverse,
+                    hidden: self.hidden,
+                    relative_date: false,
+                    filter: self.filter.as_deref(),
+                    max: self.max,
+                    group: false,
+                    classify: false,
+                    blocks: None,
+                    tree: self.tree,
+                    icons: false,
+                    colors: false,
+                    max_items: 0,
+                    oneline: self.oneline,
+                    total_size: false,
+                    ignore_glob: vec![],
+                    no_symlink: false,
+                    hyperlink: false,
                 })
             }
 

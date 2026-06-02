@@ -68,6 +68,11 @@ pub struct BannerOptions<'a> {
     pub icons: bool,
     pub colors: bool,
     pub max_items: usize,
+    pub oneline: bool,
+    pub total_size: bool,
+    pub ignore_glob: Vec<String>,
+    pub no_symlink: bool,
+    pub hyperlink: bool,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -101,6 +106,42 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     opts.max_items = max_items;
     set_colors_enabled(opts.colors);
 
+    // Apply config defaults (CLI flags override these)
+    if !opts.compact && config.compact {
+        opts.compact = true;
+    }
+    if !opts.verbose && config.verbose {
+        opts.verbose = true;
+    }
+    if opts.sort.is_none() && config.sort != "name" {
+        opts.sort = Some(Box::leak(config.sort.into_boxed_str()));
+    }
+    if !opts.reverse && config.reverse {
+        opts.reverse = true;
+    }
+    if opts.group_dirs.is_none() && config.group_dirs != "none" {
+        // Leak the string for lifetime — acceptable for CLI tool
+        opts.group_dirs = Some(Box::leak(config.group_dirs.into_boxed_str()));
+    }
+    if !opts.hidden && config.hidden {
+        opts.hidden = true;
+    }
+    if !opts.classify && config.classify {
+        opts.classify = true;
+    }
+    if !opts.relative_date && config.date == "relative" {
+        opts.relative_date = true;
+    }
+    if !opts.total_size && config.total_size {
+        opts.total_size = true;
+    }
+    if !opts.no_symlink && config.no_symlink {
+        opts.no_symlink = true;
+    }
+    if !opts.hyperlink && config.hyperlink {
+        opts.hyperlink = true;
+    }
+
     // Tree view mode
     if let Some(depth) = opts.tree {
         let max_depth = depth.unwrap_or(0); // 0 = unlimited
@@ -113,7 +154,15 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         let summary = cached.summary;
         let git_info = cached.git_info.unwrap_or_default();
 
-        if opts.json {
+        if opts.oneline {
+            output_oneline(
+                &summary,
+                opts.hidden,
+                opts.filter,
+                opts.max,
+                &opts.ignore_glob,
+            );
+        } else if opts.json {
             output_json(&path, &summary, &git_info);
         } else if opts.raw {
             output_raw(&summary);
@@ -145,7 +194,15 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let git_info = crate::git::get_git_info(&path)?;
 
     // Display the banner
-    if opts.json {
+    if opts.oneline {
+        output_oneline(
+            &summary,
+            opts.hidden,
+            opts.filter,
+            opts.max,
+            &opts.ignore_glob,
+        );
+    } else if opts.json {
         output_json(&path, &summary, &git_info);
     } else if opts.raw {
         output_raw(&summary);
@@ -1304,6 +1361,57 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 fn output_raw(summary: &DirSummary) {
     for item in &summary.top_items {
         println!("{}", item.path.display());
+    }
+}
+
+/// One file per line output (like ls -1)
+fn output_oneline(
+    summary: &DirSummary,
+    hidden: bool,
+    filter: Option<&str>,
+    max: Option<usize>,
+    ignore_glob: &[String],
+) {
+    let mut count = 0;
+    for item in &summary.top_items {
+        if !hidden && item.name.starts_with('.') {
+            continue;
+        }
+        // Filter by pattern
+        if let Some(pat) = filter {
+            if !item.name.contains(pat) && !item.path.to_string_lossy().contains(pat) {
+                continue;
+            }
+        }
+        // Filter by ignore glob
+        let dominated = ignore_glob.iter().any(|g| glob_match(g, &item.name));
+        if dominated {
+            continue;
+        }
+        println!("{}", item.name);
+        count += 1;
+        if let Some(m) = max {
+            if count >= m {
+                break;
+            }
+        }
+    }
+}
+
+/// Simple glob matching for a single pattern against a filename
+fn glob_match(pattern: &str, name: &str) -> bool {
+    if let Some(inner) = pattern.strip_prefix('*').and_then(|s| s.strip_suffix('*')) {
+        // *foo* — contains
+        name.contains(inner)
+    } else if let Some(suffix) = pattern.strip_prefix('*') {
+        // *.ext — ends with
+        name.ends_with(suffix)
+    } else if let Some(prefix) = pattern.strip_suffix('*') {
+        // prefix* — starts with
+        name.starts_with(prefix)
+    } else {
+        // exact match
+        name == pattern
     }
 }
 
