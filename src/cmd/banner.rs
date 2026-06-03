@@ -1479,8 +1479,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 if opts.color_scale.is_some() {
                     let scale = opts.color_scale.as_deref().unwrap_or("all");
                     if scale == "all" || scale == "age" {
-                        let level = recency_intensity(dt);
-                        apply_recency_to_row(&row_parts.join(" "), level)
+                        let ratio = recency_ratio(dt);
+                        apply_recency_to_row(&row_parts.join(" "), ratio)
                     } else {
                         row_parts.join(" ")
                     }
