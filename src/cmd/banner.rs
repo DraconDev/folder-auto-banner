@@ -90,32 +90,39 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
 fn gradient_age(dt: &DateTime<Utc>, formatted: &str, mode: &str) -> String {
     let now = Utc::now();
     let age_secs = (now - *dt).num_seconds().max(0) as f64;
-    
+
     // Age tiers: <1h, <1d, <1w, <1m, <1y, >1y
+    // 1h = 3600, 1d = 86400, 1w = 604800, 1m = 2592000, 1y = 31536000
     let color_code = if mode == "fixed" {
         if age_secs < 3600.0 {
-            "32" // green
-        } else if age_secs < 86400.0 || age_secs < 604800.0 {
-            "33" // yellow
+            "38;5;82" // bright green (last hour)
+        } else if age_secs < 86400.0 {
+            "32" // green (today)
+        } else if age_secs < 604800.0 {
+            "33" // yellow (this week)
         } else if age_secs < 2592000.0 {
-            "38;5;208" // orange
+            "38;5;208" // orange (this month)
         } else {
-            "31" // red
+            "31" // red (older)
         }
     } else {
-        // Gradient mode: interpolate between green (0s) and red (1y)
-        let max_age = 31536000.0; // 1 year
+        // Gradient mode: scale based on 1 month being ~"old"
+        // Anything within a day is vivid green, fading through yellow to red by 1 month
+        let max_age = 2592000.0; // 30 days = "old"
         let ratio = (age_secs / max_age).min(1.0);
-        // Green (32) -> Yellow (33) -> Red (31)
-        if ratio < 0.5 {
-            "32" // green for recent
-        } else if ratio < 0.75 {
-            "33" // yellow for medium
+        if age_secs < 3600.0 {
+            "38;5;82" // bright green for last hour
+        } else if age_secs < 86400.0 {
+            "32" // green for today
+        } else if ratio < 0.25 {
+            "33" // yellow (week-old)
+        } else if ratio < 0.5 {
+            "38;5;208" // orange (2-week-old)
         } else {
-            "31" // red for old
+            "31" // red (1 month+)
         }
     };
-    
+
     format!("\x1b[{}m{}\x1b[0m", color_code, formatted)
 }
 
