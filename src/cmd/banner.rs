@@ -547,24 +547,42 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         let git_status_str = git_status.join(" ");
 
         if git_info.is_repo {
-            // Row 1: Project + Git branch + status
+            // Row 1: Path + Git details (explicit)
             let mut parts = vec![format!("{} {}", project_icon, path_display)];
-            parts.push(format!("{} │", project_label));
             if !branch_display.is_empty() {
-                parts.push(format!(
-                    "{}{}{} │",
-                    color(BOLD),
-                    branch_display,
-                    color(RESET)
-                ));
+                parts.push(format!("{}{}{}", color(BOLD), branch_display, color(RESET)));
             }
             if let Some(ref tag) = git_info.tag {
-                parts.push(format!("{}{}{} │", color(YELLOW), tag, color(RESET)));
+                parts.push(format!("{}{}{}", color(YELLOW), tag, color(RESET)));
             }
+            // Git status indicators
             if !git_status_str.is_empty() {
                 parts.push(git_status_str.clone());
             }
-            let row1 = parts.join(" ");
+            // Last commit time
+            if let Some(time) = git_info.last_commit_time {
+                let now = chrono::Utc::now().timestamp();
+                let diff = now - time;
+                let time_str = if diff < 60 {
+                    "just now".to_string()
+                } else if diff < 3600 {
+                    format!("{}m ago", diff / 60)
+                } else if diff < 86400 {
+                    format!("{}h ago", diff / 3600)
+                } else {
+                    format!("{}d ago", diff / 86400)
+                };
+                parts.push(format!("last {}", time_str));
+            }
+            // Commits today
+            if git_info.commits_today > 0 {
+                parts.push(format!("{} today", git_info.commits_today));
+            }
+            // Diff stats
+            if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
+                parts.push(format!("+{} -{}", git_info.lines_added, git_info.lines_deleted));
+            }
+            let row1 = parts.join(" │ ");
 
             // Row 2: Files + Activity + Code
             let mut details = Vec::new();
