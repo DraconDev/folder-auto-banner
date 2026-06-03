@@ -152,20 +152,6 @@ fn apply_recency_to_row(row: &str, level: RecencyLevel) -> String {
     }
 }
 
-/// Return a size-based intensity modifier (large=bright, small=dim).
-/// Same hue, just brighter for larger files. (Not used at column level —
-/// recency-based row intensity is applied at print time. Kept for potential
-/// future per-column size intensity.)
-#[allow(dead_code)]
-fn size_intensity(size: u64) -> &'static str {
-    if size >= 1_048_576 {
-        "\x1b[1m" // bold for >=1MB
-    } else if size >= 10_240 {
-        "\x1b[22m" // normal for >=10KB
-    } else {
-        "\x1b[2m" // dim for tiny files
-    }
-}
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
