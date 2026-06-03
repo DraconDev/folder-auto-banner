@@ -100,7 +100,7 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
     if bg_color.is_empty() || bg_color == "none" {
         return row.to_string();
     }
-    
+
     // Convert color name to 256-color code
     let color_code = match bg_color {
         "green" => "22",
@@ -114,7 +114,7 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
         "light" => "252",
         _ => bg_color, // assume it's already a color code
     };
-    
+
     format!("\x1b[48;5;{}m{}\x1b[0m", color_code, row)
 }
 
