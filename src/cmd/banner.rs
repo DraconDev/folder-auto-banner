@@ -125,15 +125,14 @@ enum RecencyLevel {
 fn apply_recency_to_row(row: &str, level: RecencyLevel) -> String {
     match level {
         // Fresh: bold + bright saturation
-        RecencyLevel::Fresh => {
-            row.replace("\x1b[32m", "\x1b[1;32m")
-                .replace("\x1b[33m", "\x1b[1;33m")
-                .replace("\x1b[34m", "\x1b[1;34m")
-                .replace("\x1b[31m", "\x1b[1;31m")
-                .replace("\x1b[36m", "\x1b[1;36m")
-                .replace("\x1b[35m", "\x1b[1;35m")
-                .replace("\x1b[38;5;214m", "\x1b[1;38;5;214m")
-        }
+        RecencyLevel::Fresh => row
+            .replace("\x1b[32m", "\x1b[1;32m")
+            .replace("\x1b[33m", "\x1b[1;33m")
+            .replace("\x1b[34m", "\x1b[1;34m")
+            .replace("\x1b[31m", "\x1b[1;31m")
+            .replace("\x1b[36m", "\x1b[1;36m")
+            .replace("\x1b[35m", "\x1b[1;35m")
+            .replace("\x1b[38;5;214m", "\x1b[1;38;5;214m"),
         // Recent: bright but not bold
         RecencyLevel::Recent => {
             row.replace("\x1b[32m", "\x1b[38;5;82m") // bright green
