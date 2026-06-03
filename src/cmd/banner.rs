@@ -111,19 +111,47 @@ fn color256(r: u8, g: u8, b: u8) -> String {
 /// Same hues preserved, brightness fades gradually with age.
 fn apply_recency_to_row(row: &str, ratio: f64) -> String {
     // Green palette: bright lime → forest green → dark olive
-    let g = color256(lerp(80, 30, ratio), lerp(220, 100, ratio), lerp(80, 30, ratio));
+    let g = color256(
+        lerp(80, 30, ratio),
+        lerp(220, 100, ratio),
+        lerp(80, 30, ratio),
+    );
     // Blue palette: sky blue → royal blue → navy
-    let b = color256(lerp(60, 20, ratio), lerp(120, 50, ratio), lerp(220, 120, ratio));
+    let b = color256(
+        lerp(60, 20, ratio),
+        lerp(120, 50, ratio),
+        lerp(220, 120, ratio),
+    );
     // Orange palette: bright orange → burnt orange → dark brown
-    let o = color256(lerp(255, 120, ratio), lerp(160, 60, ratio), lerp(40, 20, ratio));
+    let o = color256(
+        lerp(255, 120, ratio),
+        lerp(160, 60, ratio),
+        lerp(40, 20, ratio),
+    );
     // Red palette: bright red → crimson → dark maroon
-    let r = color256(lerp(220, 80, ratio), lerp(60, 20, ratio), lerp(60, 20, ratio));
+    let r = color256(
+        lerp(220, 80, ratio),
+        lerp(60, 20, ratio),
+        lerp(60, 20, ratio),
+    );
     // Cyan palette: bright cyan → teal → dark teal
-    let c = color256(lerp(60, 20, ratio), lerp(200, 80, ratio), lerp(220, 100, ratio));
+    let c = color256(
+        lerp(60, 20, ratio),
+        lerp(200, 80, ratio),
+        lerp(220, 100, ratio),
+    );
     // Yellow palette: bright yellow → gold → dark gold
-    let y = color256(lerp(240, 120, ratio), lerp(220, 100, ratio), lerp(60, 30, ratio));
+    let y = color256(
+        lerp(240, 120, ratio),
+        lerp(220, 100, ratio),
+        lerp(60, 30, ratio),
+    );
     // Magenta palette: bright magenta → plum → dark plum
-    let m = color256(lerp(200, 80, ratio), lerp(60, 30, ratio), lerp(200, 100, ratio));
+    let m = color256(
+        lerp(200, 80, ratio),
+        lerp(60, 30, ratio),
+        lerp(200, 100, ratio),
+    );
 
     row.replace("\x1b[32m", &g)
         .replace("\x1b[34m", &b)
