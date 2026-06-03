@@ -87,13 +87,16 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
 }
 
 /// Return a recency ratio (0.0 = just now, 1.0 = very old).
-/// Used for continuous color interpolation.
+/// Uses logarithmic scaling so small age differences in recent files
+/// produce visible color shifts (e.g., 1 day vs 5 days is very noticeable).
 fn recency_ratio(dt: &DateTime<Utc>) -> f64 {
     let now = Utc::now();
     let age_secs = (now - *dt).num_seconds().max(0) as f64;
-    // Map 0-30 days to 0.0-1.0
+    // Logarithmic scale: log(1 + age) / log(1 + max_age)
+    // This makes recent differences (hours/days) very visible
+    // while compressing the long tail (months/years)
     let max_age = 2592000.0; // 30 days
-    (age_secs / max_age).min(1.0)
+    (1.0 + age_secs).ln() / (1.0 + max_age).ln()
 }
 
 /// Interpolate between two u8 values.
