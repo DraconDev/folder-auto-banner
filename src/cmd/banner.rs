@@ -1476,14 +1476,17 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             })
             .unwrap_or("");
 
-        println!(
-            "{}{}{}{}{}",
-            row_intensity,
-            row_tint,
-            row_parts.join(" "),
-            tint_reset,
-            color(RESET)
-        );
+        // Apply row-level intensity: re-inject after every RESET
+        // so each colored element keeps the row's brightness
+        let mut row_str = row_parts.join(" ");
+        if !row_intensity.is_empty() {
+            row_str = row_str.replace(
+                color(RESET),
+                &format!("{}{}", color(RESET), row_intensity),
+            );
+        }
+
+        println!("{}{}{}{}{}", row_intensity, row_tint, row_str, tint_reset, color(RESET));
     }
 
     if !show_hidden_flag && !hidden_items.is_empty() {
