@@ -584,70 +584,24 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
             let row1 = parts.join(" │ ");
 
-            // Row 2: Files + Activity + Code
+            // Row 2: Stats with labels
             let mut details = Vec::new();
-
+            
             // File stats
-            details.push(format!("{}💾 {}{}", color(CYAN), size_str, color(RESET)));
-            details.push(format!(
-                "{}📄 {} files{}",
-                color(DIM),
-                summary.files,
-                color(RESET)
-            ));
-            details.push(format!(
-                "{}📂 {} dirs{}",
-                color(DIM),
-                summary.dirs,
-                color(RESET)
-            ));
-
-            // Git activity
-            if let Some(time) = git_info.last_commit_time {
-                let now = chrono::Utc::now().timestamp();
-                let diff = now - time;
-                let time_str = if diff < 60 {
-                    "just now".to_string()
-                } else if diff < 3600 {
-                    format!("{}m ago", diff / 60)
-                } else if diff < 86400 {
-                    format!("{}h ago", diff / 3600)
-                } else {
-                    format!("{}d ago", diff / 86400)
-                };
-                details.push(format!("{}📅 {}{}", color(DIM), time_str, color(RESET)));
-            }
-            if git_info.commits_today > 0 {
-                details.push(format!(
-                    "{}📝 {} today{}",
-                    color(GREEN),
-                    git_info.commits_today,
-                    color(RESET)
-                ));
-            }
-
-            // TODO count
+            details.push(format!("{}💾 {} total{}", color(CYAN), size_str, color(RESET)));
+            details.push(format!("{}📄 {} files{}", color(DIM), summary.files, color(RESET)));
+            details.push(format!("{}📂 {} dirs{}", color(DIM), summary.dirs, color(RESET)));
+            
+            // Code metrics
             if let Some(ref todos) = summary.todo_info {
                 if todos.count > 0 {
-                    details.push(format!(
-                        "{}📝 {} TODOs{}",
-                        color(YELLOW),
-                        todos.count,
-                        color(RESET)
-                    ));
+                    details.push(format!("{}📝 {} TODOs{}", color(YELLOW), todos.count, color(RESET)));
                 }
             }
-
-            // Code metrics
             if let Some(ref metrics) = summary.code_metrics {
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
-                    details.push(format!(
-                        "{}📊 {} lines{}",
-                        color(GREEN),
-                        loc_str,
-                        color(RESET)
-                    ));
+                    details.push(format!("{}📊 {} lines{}", color(GREEN), loc_str, color(RESET)));
                     // Show top 3 languages
                     if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
                         let lang_parts: Vec<String> = metrics
@@ -681,6 +635,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                                 format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
                             })
                             .collect();
+                        // Add crab icon before first language
+                        if !lang_parts.is_empty() {
+                            lang_parts[0] = format!("{}{}{}", project_icon, lang_parts[0], color(RESET));
+                        }
                         details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
                     }
                 }
