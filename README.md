@@ -138,6 +138,18 @@ reverse = false
 group_dirs = "first"
 ```
 
+### Recency Gradient
+```toml
+[display]
+# Color rows based on recency: same hues, dimmer for older files
+# Bright new, dim old — at-a-glance scan of what changed recently
+color_scale = "all"          # "all", "age", "size", or "" to disable
+color_scale_mode = "gradient" # "gradient" (default) or "fixed"
+```
+
+Tiers: <1h = bold, <1d = normal, <1w = faded gray, <1m = dim, >1m = very dim.
+Recent files pop out; old files recede into the background.
+
 ## Environment Variables
 
 | Variable | Description |

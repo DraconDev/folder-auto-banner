@@ -86,77 +86,38 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
-/// Apply gradient color based on age (recent=green, old=red)
-fn gradient_age(dt: &DateTime<Utc>, formatted: &str, mode: &str) -> String {
+/// Return a recency-based intensity modifier (bright/dim) and the base color.
+/// Recent = full intensity, old = dim. Same hue, just brighter or darker.
+/// 4 tiers: <1h=bright, <1d=normal, <1w=slight dim, <1m=dim, >1m=very dim
+fn recency_intensity(dt: &DateTime<Utc>) -> &'static str {
     let now = Utc::now();
     let age_secs = (now - *dt).num_seconds().max(0) as f64;
-
-    // Age tiers: <1h, <1d, <1w, <1m, <1y, >1y
-    // 1h = 3600, 1d = 86400, 1w = 604800, 1m = 2592000, 1y = 31536000
-    let color_code = if mode == "fixed" {
-        if age_secs < 3600.0 {
-            "38;5;82" // bright green (last hour)
-        } else if age_secs < 86400.0 {
-            "32" // green (today)
-        } else if age_secs < 604800.0 {
-            "33" // yellow (this week)
-        } else if age_secs < 2592000.0 {
-            "38;5;208" // orange (this month)
-        } else {
-            "31" // red (older)
-        }
+    if age_secs < 3600.0 {
+        "\x1b[1m" // bold/bright for last hour
+    } else if age_secs < 86400.0 {
+        "\x1b[22m" // normal intensity for today
+    } else if age_secs < 604800.0 {
+        "\x1b[38;5;245m" // slightly faded (gray) for this week
+    } else if age_secs < 2592000.0 {
+        "\x1b[2m" // dim for this month
     } else {
-        // Gradient mode: scale based on 1 month being ~"old"
-        // Anything within a day is vivid green, fading through yellow to red by 1 month
-        let max_age = 2592000.0; // 30 days = "old"
-        let ratio = (age_secs / max_age).min(1.0);
-        if age_secs < 3600.0 {
-            "38;5;82" // bright green for last hour
-        } else if age_secs < 86400.0 {
-            "32" // green for today
-        } else if ratio < 0.25 {
-            "33" // yellow (week-old)
-        } else if ratio < 0.5 {
-            "38;5;208" // orange (2-week-old)
-        } else {
-            "31" // red (1 month+)
-        }
-    };
-
-    format!("\x1b[{}m{}\x1b[0m", color_code, formatted)
+        "\x1b[2m\x1b[38;5;240m" // very dim and faded for older
+    }
 }
 
-/// Apply gradient color based on size (small=cool, large=warm)
-fn gradient_size(size: u64, formatted: &str, mode: &str) -> String {
-    // Size tiers: <1KB, <10KB, <100KB, <1MB, <10MB, >10MB
-    let color_code = if mode == "fixed" {
-        if size < 1024 {
-            "36" // cyan (tiny)
-        } else if size < 10240 {
-            "34" // blue (small)
-        } else if size < 102400 {
-            "32" // green (medium)
-        } else if size < 1048576 {
-            "33" // yellow (large)
-        } else if size < 10485760 {
-            "38;5;208" // orange (very large)
-        } else {
-            "31" // red (huge)
-        }
+/// Return a size-based intensity modifier (large=bright, small=dim).
+/// Same hue, just brighter for larger files. (Not used at column level —
+/// recency-based row intensity is applied at print time. Kept for potential
+/// future per-column size intensity.)
+#[allow(dead_code)]
+fn size_intensity(size: u64) -> &'static str {
+    if size >= 1_048_576 {
+        "\x1b[1m" // bold for >=1MB
+    } else if size >= 10_240 {
+        "\x1b[22m" // normal for >=10KB
     } else {
-        // Gradient mode
-        if size < 10240 {
-            "36" // cyan for small
-        } else if size < 1048576 {
-            "32" // green for medium
-        } else if size < 10485760 {
-            "33" // yellow for large
-        } else {
-            "31" // red for huge
-        }
-    };
-
-    format!("\x1b[{}m{}\x1b[0m", color_code, formatted)
+        "\x1b[2m" // dim for tiny files
+    }
 }
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
@@ -1349,18 +1310,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 } else {
                     format_exact_time(dt)
                 };
-                // Apply color scale if enabled
-                if opts.color_scale.is_some() {
-                    let scale = opts.color_scale.as_deref().unwrap_or("all");
-                    let mode = opts.color_scale_mode.as_deref().unwrap_or("gradient");
-                    if scale == "all" || scale == "age" {
-                        gradient_age(dt, &formatted, mode)
-                    } else {
-                        colorize_date(dt, &formatted)
-                    }
-                } else {
-                    colorize_date(dt, &formatted)
-                }
+                // Row-level recency intensity is applied at print time
+                colorize_date(dt, &formatted)
             })
             .unwrap_or_default();
 
@@ -1443,18 +1394,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         let owner_colored = format!("{}{}{}", color(BLUE), owner_padded, color(RESET));
         let group_colored = format!("{}{}{}", color(BLUE), group_padded, color(RESET));
 
-        // Size: orange
-        let size_colored = if opts.color_scale.is_some() {
-            let scale = opts.color_scale.as_deref().unwrap_or("all");
-            let mode = opts.color_scale_mode.as_deref().unwrap_or("gradient");
-            if scale == "all" || scale == "size" {
-                gradient_size(item.size, &size_padded, mode)
-            } else {
-                format!("{}{}{}", color(ORANGE), size_padded, color(RESET))
-            }
-        } else {
-            format!("{}{}{}", color(ORANGE), size_padded, color(RESET))
-        };
+        // Size: orange, row-level intensity applied at print time
+        let size_colored = format!("{}{}{}", color(ORANGE), size_padded, color(RESET));
 
         // Contents: orange (like size)
         let contents_colored = format!("{}{}{}", color(ORANGE), contents_padded, color(RESET));
@@ -1515,7 +1456,34 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         row_parts.push(icon_str);
         row_parts.push(name_display);
 
-        println!("{}{}{}", row_tint, row_parts.join(" "), tint_reset);
+        // Apply intensity to entire row based on recency (same hue, dimmer for older)
+        // Each row gets a global intensity prefix that affects all subsequent colors:
+        //   recent = bold/normal, old = dim. Per-file colors (dirs=blue, etc.) are preserved.
+        let row_intensity = item
+            .modified
+            .as_ref()
+            .and_then(|dt| {
+                if opts.color_scale.is_some() {
+                    let scale = opts.color_scale.as_deref().unwrap_or("all");
+                    if scale == "all" || scale == "age" {
+                        Some(recency_intensity(dt))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .unwrap_or("");
+
+        println!(
+            "{}{}{}{}{}",
+            row_intensity,
+            row_tint,
+            row_parts.join(" "),
+            tint_reset,
+            color(RESET)
+        );
     }
 
     if !show_hidden_flag && !hidden_items.is_empty() {
