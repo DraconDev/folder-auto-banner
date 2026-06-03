@@ -1454,22 +1454,35 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         row_parts.push(icon_str);
         row_parts.push(name_display);
 
-        // Apply recency-based color darkening to entire row.
-        // Same hues preserved, but older rows get darker color codes.
-        // Apply dim for old files (binary: bright if recent, dim if old)
+        // Apply recency-based highlight to entire row.
+        // Recent files get a background highlight, old files get no highlight.
         let row_str = item
             .modified
             .as_ref()
             .map(|dt| {
-                if opts.color_scale.is_some() {
-                    let scale = opts.color_scale.as_deref().unwrap_or("all");
-                    if (scale == "all" || scale == "age") && !is_recent(dt) {
-                        dim_row(&row_parts.join(" "))
+                let row = row_parts.join(" ");
+                if is_recent(dt) {
+                    // Recent file - apply highlight if configured
+                    if let Some(ref bg) = opts.highlight_recent {
+                        if !bg.is_empty() && bg != "none" {
+                            highlight_row(&row, bg)
+                        } else {
+                            row
+                        }
                     } else {
-                        row_parts.join(" ")
+                        row
                     }
                 } else {
-                    row_parts.join(" ")
+                    // Old file - apply highlight if configured
+                    if let Some(ref bg) = opts.highlight_old {
+                        if !bg.is_empty() && bg != "none" {
+                            highlight_row(&row, bg)
+                        } else {
+                            row
+                        }
+                    } else {
+                        row
+                    }
                 }
             })
             .unwrap_or_else(|| row_parts.join(" "));
