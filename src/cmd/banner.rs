@@ -547,14 +547,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         let git_status_str = git_status.join(" ");
 
         if git_info.is_repo {
-            // Row 1: Core info
-            let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
-            if !branch_display.is_empty() {
-                parts.push(format!("{} │", branch_display));
-            }
-            if let Some(ref tag) = git_info.tag {
-                parts.push(format!("{}{}{} │", color(YELLOW), tag, color(RESET)));
-            }
+            // Row 1: Project + Git branch + status
+            let mut parts = vec![format!("{} {}", project_icon, path_display)];
             parts.push(format!("{} │", project_label));
             if !branch_display.is_empty() {
                 parts.push(format!("{}{}{} │", color(BOLD), branch_display, color(RESET)));
