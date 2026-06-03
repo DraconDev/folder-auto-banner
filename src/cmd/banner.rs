@@ -105,7 +105,10 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
     if bg_color == "bold" {
         // Bold + underline for maximum visibility across terminals
         // Re-inject after every reset so it persists through the whole row
-        let highlighted = row.replace(color(RESET), &format!("{}{}{}", color(RESET), "\x1b[1m", "\x1b[4m"));
+        let highlighted = row.replace(
+            color(RESET),
+            &format!("{}{}{}", color(RESET), "\x1b[1m", "\x1b[4m"),
+        );
         return format!("\x1b[1m\x1b[4m{}{}", highlighted, color(RESET));
     }
 
