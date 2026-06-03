@@ -86,7 +86,7 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
-/// Return whether a file is recent enough to show as bright.
+/// Return whether a file is recent enough to highlight.
 /// Binary: files modified within the last 6 hours are "recent", everything else is "old".
 fn is_recent(dt: &DateTime<Utc>) -> bool {
     let now = Utc::now();
@@ -94,17 +94,28 @@ fn is_recent(dt: &DateTime<Utc>) -> bool {
     age_secs < 21600 // 6 hours
 }
 
-/// Apply a slight dim to an entire row for old files.
-/// Subtle: same hues but slightly muted, not drastic.
-fn dim_row(row: &str) -> String {
-    // Very subtle: reduce saturation/brightness by ~20%, same hues
-    row.replace("\x1b[32m", "\x1b[38;2;60;140;60m") // green → very slightly muted
-        .replace("\x1b[33m", "\x1b[38;2;140;120;40m") // yellow → very slightly muted
-        .replace("\x1b[34m", "\x1b[38;2;60;60;140m") // blue → very slightly muted
-        .replace("\x1b[31m", "\x1b[38;2;140;60;60m") // red → very slightly muted
-        .replace("\x1b[36m", "\x1b[38;2;60;130;140m") // cyan → very slightly muted
-        .replace("\x1b[35m", "\x1b[38;2;130;60;130m") // magenta → very slightly muted
-        .replace("\x1b[38;5;214m", "\x1b[38;2;200;130;40m") // orange → very slightly muted
+/// Apply a background highlight to an entire row.
+/// Uses 256-color or named color for the background.
+fn highlight_row(row: &str, bg_color: &str) -> String {
+    if bg_color.is_empty() || bg_color == "none" {
+        return row.to_string();
+    }
+    
+    // Convert color name to 256-color code
+    let color_code = match bg_color {
+        "green" => "22",
+        "blue" => "17",
+        "red" => "52",
+        "yellow" => "58",
+        "cyan" => "17",
+        "magenta" => "53",
+        "gray" | "grey" => "236",
+        "dark" => "234",
+        "light" => "252",
+        _ => bg_color, // assume it's already a color code
+    };
+    
+    format!("\x1b[48;5;{}m{}\x1b[0m", color_code, row)
 }
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
