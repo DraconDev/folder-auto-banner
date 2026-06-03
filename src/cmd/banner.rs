@@ -110,7 +110,8 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
         "cyan" => "17",
         "magenta" => "53",
         "gray" | "grey" => "236",
-        "dark" => "234",
+        "dark" => "235",
+        "black" => "234",
         "light" => "252",
         _ => bg_color, // assume it's already a color code
     };
