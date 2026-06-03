@@ -94,11 +94,17 @@ fn is_recent(dt: &DateTime<Utc>) -> bool {
     age_secs < 21600 // 6 hours
 }
 
-/// Apply a background highlight to an entire row.
-/// Uses 256-color or named color for the background.
+/// Apply a background highlight or bold to an entire row.
+/// Uses named colors or "bold" for theme-independent highlighting.
 fn highlight_row(row: &str, bg_color: &str) -> String {
     if bg_color.is_empty() || bg_color == "none" {
         return row.to_string();
+    }
+
+    // "bold" is universal — works on any terminal background
+    if bg_color == "bold" {
+        // Bold persists through color changes, so just wrap the row
+        return format!("\x1b[1m{}\x1b[0m", row);
     }
 
     // Convert color name to 256-color code
