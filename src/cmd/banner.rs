@@ -1480,7 +1480,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     None
                 }
             })
-            .unwrap_or("");
+            .unwrap_or_default();
 
         // Apply row-level intensity: re-inject after every RESET
         // so each colored element keeps the row's brightness
