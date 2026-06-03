@@ -604,7 +604,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     details.push(format!("{}📊 {} lines{}", color(GREEN), loc_str, color(RESET)));
                     // Show top 3 languages
                     if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                        let lang_parts: Vec<String> = metrics
+                        let mut lang_parts: Vec<String> = metrics
                             .by_extension
                             .iter()
                             .take(3)
