@@ -572,7 +572,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 } else {
                     format!("{}d ago", diff / 86400)
                 };
-                parts.push(format!("last {}", time_str));
+                parts.push(format!("{}", time_str));
             }
             // Commits today
             if git_info.commits_today > 0 {
