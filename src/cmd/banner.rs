@@ -86,39 +86,46 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
-/// Return a recency-based intensity modifier.
-/// For recent files: use brighter color codes (bold prefix).
-/// For old files: use darker 256-color equivalents.
-/// This ensures visible brightness difference across all terminals.
+/// Return a recency-based intensity level.
+/// 7 tiers for a smooth, gradual gradient.
 fn recency_intensity(dt: &DateTime<Utc>) -> RecencyLevel {
     let now = Utc::now();
     let age_secs = (now - *dt).num_seconds().max(0) as f64;
-    if age_secs < 86400.0 {
-        RecencyLevel::Recent // <1 day: brighter colors
+    if age_secs < 3600.0 {
+        RecencyLevel::Fresh // <1h: vivid bright
+    } else if age_secs < 21600.0 {
+        RecencyLevel::Recent // <6h: bright
+    } else if age_secs < 86400.0 {
+        RecencyLevel::Today // <1d: slightly bright
+    } else if age_secs < 259200.0 {
+        RecencyLevel::Week // <3d: normal
     } else if age_secs < 604800.0 {
-        RecencyLevel::Normal // <1 week: normal colors
+        RecencyLevel::Stale // <7d: slightly dim
     } else if age_secs < 2592000.0 {
-        RecencyLevel::Dim // <1 month: dimmer colors
+        RecencyLevel::Old // <30d: dim
     } else {
-        RecencyLevel::VeryDim // >1 month: very dim
+        RecencyLevel::Ancient // >30d: very dim, near-gray
     }
 }
 
 #[derive(Clone, Copy)]
 enum RecencyLevel {
-    Recent,  // <1d  - brighter
-    Normal,  // <1w  - default
-    Dim,     // <1m  - dimmer
-    VeryDim, // >1m  - very dim
+    Fresh,   // <1h   — vivid, saturated
+    Recent,  // <6h   — bright
+    Today,   // <1d   — normal-bright
+    Week,    // <3d   — normal
+    Stale,   // <7d   — slightly dim
+    Old,     // <30d  — dim
+    Ancient, // >30d  — very dim, near-gray
 }
 
 /// Apply recency-based color darkening to a row string.
-/// Replaces bright ANSI color codes with darker 256-color equivalents
-/// so old rows visually recede and new rows pop.
+/// 7-step gradient using 256-color palette for smooth transitions.
+/// Same hues preserved, brightness shifts gradually with age.
 fn apply_recency_to_row(row: &str, level: RecencyLevel) -> String {
     match level {
-        RecencyLevel::Recent => {
-            // Make bright: use bold prefix for all foreground colors
+        // Fresh: bold + bright saturation
+        RecencyLevel::Fresh => {
             row.replace("\x1b[32m", "\x1b[1;32m")
                 .replace("\x1b[33m", "\x1b[1;33m")
                 .replace("\x1b[34m", "\x1b[1;34m")
@@ -127,27 +134,57 @@ fn apply_recency_to_row(row: &str, level: RecencyLevel) -> String {
                 .replace("\x1b[35m", "\x1b[1;35m")
                 .replace("\x1b[38;5;214m", "\x1b[1;38;5;214m")
         }
-        RecencyLevel::Normal => row.to_string(),
-        RecencyLevel::Dim => {
-            // Darken: replace standard colors with 256-color dark equivalents
+        // Recent: bright but not bold
+        RecencyLevel::Recent => {
+            row.replace("\x1b[32m", "\x1b[38;5;82m") // bright green
+                .replace("\x1b[33m", "\x1b[38;5;227m") // bright yellow
+                .replace("\x1b[34m", "\x1b[38;5;69m") // bright blue
+                .replace("\x1b[31m", "\x1b[38;5;203m") // bright red
+                .replace("\x1b[36m", "\x1b[38;5;123m") // bright cyan
+                .replace("\x1b[35m", "\x1b[38;5;201m") // bright magenta
+                .replace("\x1b[38;5;214m", "\x1b[38;5;220m") // bright orange
+        }
+        // Today: slightly brighter than normal
+        RecencyLevel::Today => {
+            row.replace("\x1b[32m", "\x1b[38;5;71m") // green-ish
+                .replace("\x1b[33m", "\x1b[38;5;221m") // warm yellow
+                .replace("\x1b[34m", "\x1b[38;5;63m") // blue-ish
+                .replace("\x1b[31m", "\x1b[38;5;167m") // red-ish
+                .replace("\x1b[36m", "\x1b[38;5;80m") // cyan-ish
+                .replace("\x1b[35m", "\x1b[38;5;141m") // magenta-ish
+                .replace("\x1b[38;5;214m", "\x1b[38;5;215m") // warm orange
+        }
+        // Week: normal (no change)
+        RecencyLevel::Week => row.to_string(),
+        // Stale: slightly dim
+        RecencyLevel::Stale => {
+            row.replace("\x1b[32m", "\x1b[38;5;65m") // muted green
+                .replace("\x1b[33m", "\x1b[38;5;187m") // muted yellow
+                .replace("\x1b[34m", "\x1b[38;5;62m") // muted blue
+                .replace("\x1b[31m", "\x1b[38;5;138m") // muted red
+                .replace("\x1b[36m", "\x1b[38;5;66m") // muted cyan
+                .replace("\x1b[35m", "\x1b[38;5;139m") // muted magenta
+                .replace("\x1b[38;5;214m", "\x1b[38;5;180m") // muted orange
+        }
+        // Old: dim
+        RecencyLevel::Old => {
             row.replace("\x1b[32m", "\x1b[38;5;22m") // dark green
-                .replace("\x1b[33m", "\x1b[38;5;58m") // dark yellow
+                .replace("\x1b[33m", "\x1b[38;5;100m") // dark yellow
                 .replace("\x1b[34m", "\x1b[38;5;18m") // dark blue
-                .replace("\x1b[31m", "\x1b[38;5;52m") // dark red
-                .replace("\x1b[36m", "\x1b[38;5;30m") // dark cyan
+                .replace("\x1b[31m", "\x1b[38;5;88m") // dark red
+                .replace("\x1b[36m", "\x1b[38;5;23m") // dark cyan
                 .replace("\x1b[35m", "\x1b[38;5;54m") // dark magenta
                 .replace("\x1b[38;5;214m", "\x1b[38;5;130m") // dark orange
         }
-        RecencyLevel::VeryDim => {
-            // Very dark: shift everything to near-gray
-            row.replace("\x1b[32m", "\x1b[38;5;22m") // dark green
-                .replace("\x1b[33m", "\x1b[38;5;58m") // dark yellow
-                .replace("\x1b[34m", "\x1b[38;5;18m") // dark blue
-                .replace("\x1b[31m", "\x1b[38;5;52m") // dark red
+        // Ancient: very dim, near-gray
+        RecencyLevel::Ancient => {
+            row.replace("\x1b[32m", "\x1b[38;5;22m") // very dark green
+                .replace("\x1b[33m", "\x1b[38;5;58m") // gray-yellow
+                .replace("\x1b[34m", "\x1b[38;5;18m") // very dark blue
+                .replace("\x1b[31m", "\x1b[38;5;52m") // very dark red
                 .replace("\x1b[36m", "\x1b[38;5;24m") // very dark cyan
-                .replace("\x1b[35m", "\x1b[38;5;54m") // dark magenta
+                .replace("\x1b[35m", "\x1b[38;5;54m") // very dark magenta
                 .replace("\x1b[38;5;214m", "\x1b[38;5;94m") // very dark orange
-                .replace("\x1b[38;5;240m", "\x1b[38;5;236m") // near-black
         }
     }
 }
