@@ -86,106 +86,52 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
-/// Return a recency-based intensity level.
-/// 7 tiers for a smooth, gradual gradient.
-fn recency_intensity(dt: &DateTime<Utc>) -> RecencyLevel {
+/// Return a recency ratio (0.0 = just now, 1.0 = very old).
+/// Used for continuous color interpolation.
+fn recency_ratio(dt: &DateTime<Utc>) -> f64 {
     let now = Utc::now();
     let age_secs = (now - *dt).num_seconds().max(0) as f64;
-    if age_secs < 3600.0 {
-        RecencyLevel::Fresh // <1h: vivid bright
-    } else if age_secs < 21600.0 {
-        RecencyLevel::Recent // <6h: bright
-    } else if age_secs < 86400.0 {
-        RecencyLevel::Today // <1d: slightly bright
-    } else if age_secs < 259200.0 {
-        RecencyLevel::Week // <3d: normal
-    } else if age_secs < 604800.0 {
-        RecencyLevel::Stale // <7d: slightly dim
-    } else if age_secs < 2592000.0 {
-        RecencyLevel::Old // <30d: dim
-    } else {
-        RecencyLevel::Ancient // >30d: very dim, near-gray
-    }
+    // Map 0-30 days to 0.0-1.0
+    let max_age = 2592000.0; // 30 days
+    (age_secs / max_age).min(1.0)
 }
 
-#[derive(Clone, Copy)]
-enum RecencyLevel {
-    Fresh,   // <1h   — vivid, saturated
-    Recent,  // <6h   — bright
-    Today,   // <1d   — normal-bright
-    Week,    // <3d   — normal
-    Stale,   // <7d   — slightly dim
-    Old,     // <30d  — dim
-    Ancient, // >30d  — very dim, near-gray
+/// Interpolate between two u8 values.
+fn lerp(a: u8, b: u8, t: f64) -> u8 {
+    (a as f64 + (b as f64 - a as f64) * t).round() as u8
 }
 
-/// Apply recency-based color darkening to a row string.
-/// 7-step gradient using 256-color palette for smooth transitions.
-/// Same hues preserved, brightness shifts gradually with age.
-fn apply_recency_to_row(row: &str, level: RecencyLevel) -> String {
-    match level {
-        // Fresh: bold + bright saturation
-        RecencyLevel::Fresh => row
-            .replace("\x1b[32m", "\x1b[1;32m")
-            .replace("\x1b[33m", "\x1b[1;33m")
-            .replace("\x1b[34m", "\x1b[1;34m")
-            .replace("\x1b[31m", "\x1b[1;31m")
-            .replace("\x1b[36m", "\x1b[1;36m")
-            .replace("\x1b[35m", "\x1b[1;35m")
-            .replace("\x1b[38;5;214m", "\x1b[1;38;5;214m"),
-        // Recent: bright but not bold
-        RecencyLevel::Recent => {
-            row.replace("\x1b[32m", "\x1b[38;5;82m") // bright green
-                .replace("\x1b[33m", "\x1b[38;5;227m") // bright yellow
-                .replace("\x1b[34m", "\x1b[38;5;69m") // bright blue
-                .replace("\x1b[31m", "\x1b[38;5;203m") // bright red
-                .replace("\x1b[36m", "\x1b[38;5;123m") // bright cyan
-                .replace("\x1b[35m", "\x1b[38;5;201m") // bright magenta
-                .replace("\x1b[38;5;214m", "\x1b[38;5;220m") // bright orange
-        }
-        // Today: slightly brighter than normal
-        RecencyLevel::Today => {
-            row.replace("\x1b[32m", "\x1b[38;5;71m") // green-ish
-                .replace("\x1b[33m", "\x1b[38;5;221m") // warm yellow
-                .replace("\x1b[34m", "\x1b[38;5;63m") // blue-ish
-                .replace("\x1b[31m", "\x1b[38;5;167m") // red-ish
-                .replace("\x1b[36m", "\x1b[38;5;80m") // cyan-ish
-                .replace("\x1b[35m", "\x1b[38;5;141m") // magenta-ish
-                .replace("\x1b[38;5;214m", "\x1b[38;5;215m") // warm orange
-        }
-        // Week: normal (no change)
-        RecencyLevel::Week => row.to_string(),
-        // Stale: slightly dim
-        RecencyLevel::Stale => {
-            row.replace("\x1b[32m", "\x1b[38;5;65m") // muted green
-                .replace("\x1b[33m", "\x1b[38;5;187m") // muted yellow
-                .replace("\x1b[34m", "\x1b[38;5;62m") // muted blue
-                .replace("\x1b[31m", "\x1b[38;5;138m") // muted red
-                .replace("\x1b[36m", "\x1b[38;5;66m") // muted cyan
-                .replace("\x1b[35m", "\x1b[38;5;139m") // muted magenta
-                .replace("\x1b[38;5;214m", "\x1b[38;5;180m") // muted orange
-        }
-        // Old: dim
-        RecencyLevel::Old => {
-            row.replace("\x1b[32m", "\x1b[38;5;22m") // dark green
-                .replace("\x1b[33m", "\x1b[38;5;100m") // dark yellow
-                .replace("\x1b[34m", "\x1b[38;5;18m") // dark blue
-                .replace("\x1b[31m", "\x1b[38;5;88m") // dark red
-                .replace("\x1b[36m", "\x1b[38;5;23m") // dark cyan
-                .replace("\x1b[35m", "\x1b[38;5;54m") // dark magenta
-                .replace("\x1b[38;5;214m", "\x1b[38;5;130m") // dark orange
-        }
-        // Ancient: very dim, near-gray
-        RecencyLevel::Ancient => {
-            row.replace("\x1b[32m", "\x1b[38;5;22m") // very dark green
-                .replace("\x1b[33m", "\x1b[38;5;58m") // gray-yellow
-                .replace("\x1b[34m", "\x1b[38;5;18m") // very dark blue
-                .replace("\x1b[31m", "\x1b[38;5;52m") // very dark red
-                .replace("\x1b[36m", "\x1b[38;5;24m") // very dark cyan
-                .replace("\x1b[35m", "\x1b[38;5;54m") // very dark magenta
-                .replace("\x1b[38;5;214m", "\x1b[38;5;94m") // very dark orange
-        }
-    }
+/// Build a 256-color escape code from RGB values.
+fn color256(r: u8, g: u8, b: u8) -> String {
+    format!("\x1b[38;2;{};{};{}m", r, g, b)
+}
+
+/// Interpolate a full row's colors based on exact age.
+/// Uses true color (24-bit) for smooth, continuous gradient.
+/// Same hues preserved, brightness fades gradually with age.
+fn apply_recency_to_row(row: &str, ratio: f64) -> String {
+    // Green palette: bright lime → forest green → dark olive
+    let g = color256(lerp(80, 30, ratio), lerp(220, 100, ratio), lerp(80, 30, ratio));
+    // Blue palette: sky blue → royal blue → navy
+    let b = color256(lerp(60, 20, ratio), lerp(120, 50, ratio), lerp(220, 120, ratio));
+    // Orange palette: bright orange → burnt orange → dark brown
+    let o = color256(lerp(255, 120, ratio), lerp(160, 60, ratio), lerp(40, 20, ratio));
+    // Red palette: bright red → crimson → dark maroon
+    let r = color256(lerp(220, 80, ratio), lerp(60, 20, ratio), lerp(60, 20, ratio));
+    // Cyan palette: bright cyan → teal → dark teal
+    let c = color256(lerp(60, 20, ratio), lerp(200, 80, ratio), lerp(220, 100, ratio));
+    // Yellow palette: bright yellow → gold → dark gold
+    let y = color256(lerp(240, 120, ratio), lerp(220, 100, ratio), lerp(60, 30, ratio));
+    // Magenta palette: bright magenta → plum → dark plum
+    let m = color256(lerp(200, 80, ratio), lerp(60, 30, ratio), lerp(200, 100, ratio));
+
+    row.replace("\x1b[32m", &g)
+        .replace("\x1b[34m", &b)
+        .replace("\x1b[38;5;214m", &o)
+        .replace("\x1b[31m", &r)
+        .replace("\x1b[36m", &c)
+        .replace("\x1b[33m", &y)
+        .replace("\x1b[35m", &m)
 }
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
