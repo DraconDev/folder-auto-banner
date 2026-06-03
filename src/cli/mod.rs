@@ -101,13 +101,13 @@ pub struct Cli {
     #[arg(long = "git-ignore")]
     pub git_ignore: bool,
 
-    /// Color scale for date/size (all, age, size)
-    #[arg(long = "color-scale", default_missing_value = "all")]
-    pub color_scale: Option<String>,
+    /// Background highlight for recent files (e.g., "22", "green", "none")
+    #[arg(long = "highlight-recent")]
+    pub highlight_recent: Option<String>,
 
-    /// Color scale mode (gradient, fixed)
-    #[arg(long = "color-scale-mode", default_missing_value = "gradient")]
-    pub color_scale_mode: Option<String>,
+    /// Background highlight for old files (e.g., "236", "gray", "none")
+    #[arg(long = "highlight-old")]
+    pub highlight_old: Option<String>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
