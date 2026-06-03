@@ -730,15 +730,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 ));
             }
 
-            // Clean indicator
-            if !git_info.is_dirty
-                && git_info.modified == 0
-                && git_info.staged == 0
-                && git_info.untracked == 0
-            {
-                details.push(format!("{}✓ clean{}", color(GREEN), color(RESET)));
-            }
-
             // Cached test results
             if let Some(test_results) = crate::test_cache::TestResults::load() {
                 if test_results.failed > 0 {
