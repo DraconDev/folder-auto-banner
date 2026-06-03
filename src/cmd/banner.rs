@@ -1503,37 +1503,27 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         row_parts.push(icon_str);
         row_parts.push(name_display);
 
-        // Apply intensity to entire row based on recency (same hue, dimmer for older)
-        // Each row gets a global intensity prefix that affects all subsequent colors:
-        //   recent = bold/normal, old = dim. Per-file colors (dirs=blue, etc.) are preserved.
-        let row_intensity = item
+        // Apply recency-based color darkening to entire row.
+        // Same hues preserved, but older rows get darker color codes.
+        let row_str = item
             .modified
             .as_ref()
-            .and_then(|dt| {
+            .map(|dt| {
                 if opts.color_scale.is_some() {
                     let scale = opts.color_scale.as_deref().unwrap_or("all");
                     if scale == "all" || scale == "age" {
-                        Some(recency_intensity(dt))
+                        let level = recency_intensity(dt);
+                        apply_recency_to_row(&row_parts.join(" "), level)
                     } else {
-                        None
+                        row_parts.join(" ")
                     }
                 } else {
-                    None
+                    row_parts.join(" ")
                 }
             })
-            .unwrap_or_default();
+            .unwrap_or_else(|| row_parts.join(" "));
 
-        // Apply row-level intensity: re-inject after every RESET
-        // so each colored element keeps the row's brightness
-        let mut row_str = row_parts.join(" ");
-        if !row_intensity.is_empty() {
-            row_str = row_str.replace(
-                color(RESET),
-                &format!("{}{}", color(RESET), row_intensity),
-            );
-        }
-
-        println!("{}{}{}{}{}", row_intensity, row_tint, row_str, tint_reset, color(RESET));
+        println!("{}{}{}", row_tint, row_str, tint_reset);
     }
 
     if !show_hidden_flag && !hidden_items.is_empty() {
