@@ -87,27 +87,68 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
 }
 
 /// Return a recency-based intensity modifier.
-/// Recent = bold (bright colors), old = dim (faded colors).
-/// Uses SGR modifiers (bold/dim) which persist through color changes,
-/// so the per-file hues (blue dirs, green dates, etc.) are preserved
-/// but their brightness varies based on recency.
-///
-/// Tiers:
-///   <1h  = bold    (\x1b[1m) — files I just touched
-///   <1d  = normal  (\x1b[22m) — today's files, still fresh
-///   <1w  = dim     (\x1b[2m) — last week, less relevant
-///   >=1w = very dim (\x1b[2m\x1b[38;5;238m) — old files recede
-fn recency_intensity(dt: &DateTime<Utc>) -> String {
+/// For recent files: use brighter color codes (bold prefix).
+/// For old files: use darker 256-color equivalents.
+/// This ensures visible brightness difference across all terminals.
+fn recency_intensity(dt: &DateTime<Utc>) -> RecencyLevel {
     let now = Utc::now();
     let age_secs = (now - *dt).num_seconds().max(0) as f64;
-    if age_secs < 3600.0 {
-        "\x1b[1m".to_string() // bold for last hour
-    } else if age_secs < 86400.0 {
-        "".to_string() // normal for today
+    if age_secs < 86400.0 {
+        RecencyLevel::Recent // <1 day: brighter colors
     } else if age_secs < 604800.0 {
-        "\x1b[2m".to_string() // dim for this week
+        RecencyLevel::Normal // <1 week: normal colors
+    } else if age_secs < 2592000.0 {
+        RecencyLevel::Dim // <1 month: dimmer colors
     } else {
-        "\x1b[2m".to_string() // very dim for older
+        RecencyLevel::VeryDim // >1 month: very dim
+    }
+}
+
+#[derive(Clone, Copy)]
+enum RecencyLevel {
+    Recent,   // <1d  - brighter
+    Normal,   // <1w  - default
+    Dim,      // <1m  - dimmer
+    VeryDim,  // >1m  - very dim
+}
+
+/// Apply recency-based color darkening to a row string.
+/// Replaces bright ANSI color codes with darker 256-color equivalents
+/// so old rows visually recede and new rows pop.
+fn apply_recency_to_row(row: &str, level: RecencyLevel) -> String {
+    match level {
+        RecencyLevel::Recent => {
+            // Make bright: use bold prefix for all foreground colors
+            row.replace("\x1b[32m", "\x1b[1;32m")
+               .replace("\x1b[33m", "\x1b[1;33m")
+               .replace("\x1b[34m", "\x1b[1;34m")
+               .replace("\x1b[31m", "\x1b[1;31m")
+               .replace("\x1b[36m", "\x1b[1;36m")
+               .replace("\x1b[35m", "\x1b[1;35m")
+               .replace("\x1b[38;5;214m", "\x1b[1;38;5;214m")
+        }
+        RecencyLevel::Normal => row.to_string(),
+        RecencyLevel::Dim => {
+            // Darken: replace standard colors with 256-color dark equivalents
+            row.replace("\x1b[32m", "\x1b[38;5;22m")   // dark green
+               .replace("\x1b[33m", "\x1b[38;5;58m")   // dark yellow
+               .replace("\x1b[34m", "\x1b[38;5;18m")   // dark blue
+               .replace("\x1b[31m", "\x1b[38;5;52m")   // dark red
+               .replace("\x1b[36m", "\x1b[38;5;30m")   // dark cyan
+               .replace("\x1b[35m", "\x1b[38;5;54m")   // dark magenta
+               .replace("\x1b[38;5;214m", "\x1b[38;5;130m") // dark orange
+        }
+        RecencyLevel::VeryDim => {
+            // Very dark: shift everything to near-gray
+            row.replace("\x1b[32m", "\x1b[38;5;22m")   // dark green
+               .replace("\x1b[33m", "\x1b[38;5;58m")   // dark yellow
+               .replace("\x1b[34m", "\x1b[38;5;18m")   // dark blue
+               .replace("\x1b[31m", "\x1b[38;5;52m")   // dark red
+               .replace("\x1b[36m", "\x1b[38;5;24m")   // very dark cyan
+               .replace("\x1b[35m", "\x1b[38;5;54m")   // dark magenta
+               .replace("\x1b[38;5;214m", "\x1b[38;5;94m")  // very dark orange
+               .replace("\x1b[38;5;240m", "\x1b[38;5;236m") // near-black
+        }
     }
 }
 
