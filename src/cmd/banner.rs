@@ -106,10 +106,10 @@ fn recency_intensity(dt: &DateTime<Utc>) -> RecencyLevel {
 
 #[derive(Clone, Copy)]
 enum RecencyLevel {
-    Recent,   // <1d  - brighter
-    Normal,   // <1w  - default
-    Dim,      // <1m  - dimmer
-    VeryDim,  // >1m  - very dim
+    Recent,  // <1d  - brighter
+    Normal,  // <1w  - default
+    Dim,     // <1m  - dimmer
+    VeryDim, // >1m  - very dim
 }
 
 /// Apply recency-based color darkening to a row string.
@@ -120,38 +120,37 @@ fn apply_recency_to_row(row: &str, level: RecencyLevel) -> String {
         RecencyLevel::Recent => {
             // Make bright: use bold prefix for all foreground colors
             row.replace("\x1b[32m", "\x1b[1;32m")
-               .replace("\x1b[33m", "\x1b[1;33m")
-               .replace("\x1b[34m", "\x1b[1;34m")
-               .replace("\x1b[31m", "\x1b[1;31m")
-               .replace("\x1b[36m", "\x1b[1;36m")
-               .replace("\x1b[35m", "\x1b[1;35m")
-               .replace("\x1b[38;5;214m", "\x1b[1;38;5;214m")
+                .replace("\x1b[33m", "\x1b[1;33m")
+                .replace("\x1b[34m", "\x1b[1;34m")
+                .replace("\x1b[31m", "\x1b[1;31m")
+                .replace("\x1b[36m", "\x1b[1;36m")
+                .replace("\x1b[35m", "\x1b[1;35m")
+                .replace("\x1b[38;5;214m", "\x1b[1;38;5;214m")
         }
         RecencyLevel::Normal => row.to_string(),
         RecencyLevel::Dim => {
             // Darken: replace standard colors with 256-color dark equivalents
-            row.replace("\x1b[32m", "\x1b[38;5;22m")   // dark green
-               .replace("\x1b[33m", "\x1b[38;5;58m")   // dark yellow
-               .replace("\x1b[34m", "\x1b[38;5;18m")   // dark blue
-               .replace("\x1b[31m", "\x1b[38;5;52m")   // dark red
-               .replace("\x1b[36m", "\x1b[38;5;30m")   // dark cyan
-               .replace("\x1b[35m", "\x1b[38;5;54m")   // dark magenta
-               .replace("\x1b[38;5;214m", "\x1b[38;5;130m") // dark orange
+            row.replace("\x1b[32m", "\x1b[38;5;22m") // dark green
+                .replace("\x1b[33m", "\x1b[38;5;58m") // dark yellow
+                .replace("\x1b[34m", "\x1b[38;5;18m") // dark blue
+                .replace("\x1b[31m", "\x1b[38;5;52m") // dark red
+                .replace("\x1b[36m", "\x1b[38;5;30m") // dark cyan
+                .replace("\x1b[35m", "\x1b[38;5;54m") // dark magenta
+                .replace("\x1b[38;5;214m", "\x1b[38;5;130m") // dark orange
         }
         RecencyLevel::VeryDim => {
             // Very dark: shift everything to near-gray
-            row.replace("\x1b[32m", "\x1b[38;5;22m")   // dark green
-               .replace("\x1b[33m", "\x1b[38;5;58m")   // dark yellow
-               .replace("\x1b[34m", "\x1b[38;5;18m")   // dark blue
-               .replace("\x1b[31m", "\x1b[38;5;52m")   // dark red
-               .replace("\x1b[36m", "\x1b[38;5;24m")   // very dark cyan
-               .replace("\x1b[35m", "\x1b[38;5;54m")   // dark magenta
-               .replace("\x1b[38;5;214m", "\x1b[38;5;94m")  // very dark orange
-               .replace("\x1b[38;5;240m", "\x1b[38;5;236m") // near-black
+            row.replace("\x1b[32m", "\x1b[38;5;22m") // dark green
+                .replace("\x1b[33m", "\x1b[38;5;58m") // dark yellow
+                .replace("\x1b[34m", "\x1b[38;5;18m") // dark blue
+                .replace("\x1b[31m", "\x1b[38;5;52m") // dark red
+                .replace("\x1b[36m", "\x1b[38;5;24m") // very dark cyan
+                .replace("\x1b[35m", "\x1b[38;5;54m") // dark magenta
+                .replace("\x1b[38;5;214m", "\x1b[38;5;94m") // very dark orange
+                .replace("\x1b[38;5;240m", "\x1b[38;5;236m") // near-black
         }
     }
 }
-
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
