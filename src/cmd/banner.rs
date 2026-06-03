@@ -103,8 +103,8 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
 
     // "bold" is universal — works on any terminal background
     if bg_color == "bold" {
-        // Bold persists through color changes, so just wrap the row
-        return format!("\x1b[1m{}\x1b[0m", row);
+        // Underline is more visible than bold across terminals
+        return format!("\x1b[4m{}\x1b[0m", row);
     }
 
     // Convert color name to 256-color code
