@@ -544,6 +544,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         if let Some(ref state) = git_info.merge_state {
             git_status.push(format!("{}{}{}", color(RED), state, color(RESET)));
         }
+        // Clean indicator
+        if !git_info.is_dirty && git_info.modified == 0 && git_info.staged == 0 && git_info.untracked == 0 {
+            git_status.push(format!("{}✓ clean{}", color(GREEN), color(RESET)));
+        }
         let git_status_str = git_status.join(" ");
 
         if git_info.is_repo {
