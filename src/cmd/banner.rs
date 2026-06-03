@@ -94,16 +94,16 @@ fn is_recent(dt: &DateTime<Utc>) -> bool {
     age_secs < 21600 // 6 hours
 }
 
-/// Apply dim/dark to an entire row for old files.
-/// Recent files keep their normal bright colors.
+/// Apply a slight dim to an entire row for old files.
+/// Subtle: same hues but slightly muted, not drastic.
 fn dim_row(row: &str) -> String {
-    row.replace("\x1b[32m", "\x1b[38;5;22m") // green → dark green
-        .replace("\x1b[33m", "\x1b[38;5;58m") // yellow → dark yellow
-        .replace("\x1b[34m", "\x1b[38;5;18m") // blue → dark blue
-        .replace("\x1b[31m", "\x1b[38;5;52m") // red → dark red
-        .replace("\x1b[36m", "\x1b[38;5;23m") // cyan → dark cyan
-        .replace("\x1b[35m", "\x1b[38;5;54m") // magenta → dark magenta
-        .replace("\x1b[38;5;214m", "\x1b[38;5;94m") // orange → dark orange
+    row.replace("\x1b[32m", "\x1b[38;2;40;160;40m")    // green → slightly muted
+        .replace("\x1b[33m", "\x1b[38;2;160;140;40m")    // yellow → slightly muted
+        .replace("\x1b[34m", "\x1b[38;2;40;80;160m")    // blue → slightly muted
+        .replace("\x1b[31m", "\x1b[38;2;160;40;40m")    // red → slightly muted
+        .replace("\x1b[36m", "\x1b[38;2;40;140;160m")    // cyan → slightly muted
+        .replace("\x1b[35m", "\x1b[38;2;140;40;140m")    // magenta → slightly muted
+        .replace("\x1b[38;5;214m", "\x1b[38;2;160;100;30m") // orange → slightly muted
 }
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
