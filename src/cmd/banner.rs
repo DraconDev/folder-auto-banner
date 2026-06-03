@@ -78,8 +78,8 @@ pub struct BannerOptions<'a> {
     pub only_files: bool,
     pub git_ignore: bool,
     pub level: Option<usize>,
-    pub color_scale: Option<String>,
-    pub color_scale_mode: Option<String>,
+    pub highlight_recent: Option<String>,
+    pub highlight_old: Option<String>,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -180,11 +180,11 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     if !opts.hyperlink && config.hyperlink {
         opts.hyperlink = true;
     }
-    if opts.color_scale.is_none() && !config.color_scale.is_empty() {
-        opts.color_scale = Some(config.color_scale);
+    if opts.highlight_recent.is_none() && !config.highlight_recent.is_empty() {
+        opts.highlight_recent = Some(config.highlight_recent);
     }
-    if opts.color_scale_mode.is_none() && config.color_scale_mode != "gradient" {
-        opts.color_scale_mode = Some(config.color_scale_mode);
+    if opts.highlight_old.is_none() && !config.highlight_old.is_empty() {
+        opts.highlight_old = Some(config.highlight_old);
     }
 
     // Tree view mode
