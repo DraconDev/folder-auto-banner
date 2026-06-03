@@ -86,83 +86,24 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
-/// Return a recency ratio (0.0 = just now, 1.0 = very old).
-/// Uses logarithmic scaling so small age differences in recent files
-/// produce visible color shifts (e.g., 1 day vs 5 days is very noticeable).
-fn recency_ratio(dt: &DateTime<Utc>) -> f64 {
+/// Return whether a file is recent enough to show as bright.
+/// Binary: files modified within the last 6 hours are "recent", everything else is "old".
+fn is_recent(dt: &DateTime<Utc>) -> bool {
     let now = Utc::now();
-    let age_secs = (now - *dt).num_seconds().max(0) as f64;
-    // Logarithmic scale: log(1 + age) / log(1 + max_age)
-    // This makes recent differences (hours/days) very visible
-    // while compressing the long tail (months/years)
-    let max_age = 2592000.0; // 30 days
-    (1.0 + age_secs).ln() / (1.0 + max_age).ln()
+    let age_secs = (now - *dt).num_seconds().max(0);
+    age_secs < 21600 // 6 hours
 }
 
-/// Interpolate between two u8 values.
-fn lerp(a: u8, b: u8, t: f64) -> u8 {
-    (a as f64 + (b as f64 - a as f64) * t).round() as u8
-}
-
-/// Build a 256-color escape code from RGB values.
-fn color256(r: u8, g: u8, b: u8) -> String {
-    format!("\x1b[38;2;{};{};{}m", r, g, b)
-}
-
-/// Interpolate a full row's colors based on exact age.
-/// Uses true color (24-bit) for smooth, continuous gradient.
-/// Same hues preserved, brightness fades gradually with age.
-fn apply_recency_to_row(row: &str, ratio: f64) -> String {
-    // Green palette: bright lime → forest green → dark olive
-    let g = color256(
-        lerp(80, 30, ratio),
-        lerp(220, 100, ratio),
-        lerp(80, 30, ratio),
-    );
-    // Blue palette: sky blue → royal blue → navy
-    let b = color256(
-        lerp(60, 20, ratio),
-        lerp(120, 50, ratio),
-        lerp(220, 120, ratio),
-    );
-    // Orange palette: bright orange → burnt orange → dark brown
-    let o = color256(
-        lerp(255, 120, ratio),
-        lerp(160, 60, ratio),
-        lerp(40, 20, ratio),
-    );
-    // Red palette: bright red → crimson → dark maroon
-    let r = color256(
-        lerp(220, 80, ratio),
-        lerp(60, 20, ratio),
-        lerp(60, 20, ratio),
-    );
-    // Cyan palette: bright cyan → teal → dark teal
-    let c = color256(
-        lerp(60, 20, ratio),
-        lerp(200, 80, ratio),
-        lerp(220, 100, ratio),
-    );
-    // Yellow palette: bright yellow → gold → dark gold
-    let y = color256(
-        lerp(240, 120, ratio),
-        lerp(220, 100, ratio),
-        lerp(60, 30, ratio),
-    );
-    // Magenta palette: bright magenta → plum → dark plum
-    let m = color256(
-        lerp(200, 80, ratio),
-        lerp(60, 30, ratio),
-        lerp(200, 100, ratio),
-    );
-
-    row.replace("\x1b[32m", &g)
-        .replace("\x1b[34m", &b)
-        .replace("\x1b[38;5;214m", &o)
-        .replace("\x1b[31m", &r)
-        .replace("\x1b[36m", &c)
-        .replace("\x1b[33m", &y)
-        .replace("\x1b[35m", &m)
+/// Apply dim/dark to an entire row for old files.
+/// Recent files keep their normal bright colors.
+fn dim_row(row: &str) -> String {
+    row.replace("\x1b[32m", "\x1b[38;5;22m") // green → dark green
+        .replace("\x1b[33m", "\x1b[38;5;58m") // yellow → dark yellow
+        .replace("\x1b[34m", "\x1b[38;5;18m") // blue → dark blue
+        .replace("\x1b[31m", "\x1b[38;5;52m") // red → dark red
+        .replace("\x1b[36m", "\x1b[38;5;23m") // cyan → dark cyan
+        .replace("\x1b[35m", "\x1b[38;5;54m") // magenta → dark magenta
+        .replace("\x1b[38;5;214m", "\x1b[38;5;94m") // orange → dark orange
 }
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
@@ -1503,15 +1444,15 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 
         // Apply recency-based color darkening to entire row.
         // Same hues preserved, but older rows get darker color codes.
+        // Apply dim for old files (binary: bright if recent, dim if old)
         let row_str = item
             .modified
             .as_ref()
             .map(|dt| {
                 if opts.color_scale.is_some() {
                     let scale = opts.color_scale.as_deref().unwrap_or("all");
-                    if scale == "all" || scale == "age" {
-                        let ratio = recency_ratio(dt);
-                        apply_recency_to_row(&row_parts.join(" "), ratio)
+                    if (scale == "all" || scale == "age") && !is_recent(dt) {
+                        dim_row(&row_parts.join(" "))
                     } else {
                         row_parts.join(" ")
                     }
