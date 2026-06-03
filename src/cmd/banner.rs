@@ -637,7 +637,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                             .collect();
                         // Add crab icon before first language
                         if !lang_parts.is_empty() {
-                            lang_parts[0] = format!("{}{}{}", project_icon, lang_parts[0], color(RESET));
+                            lang_parts[0] = format!("{} {}", project_icon, lang_parts[0]);
                         }
                         details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
                     }
