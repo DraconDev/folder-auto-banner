@@ -115,7 +115,10 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
         _ => bg_color, // assume it's already a color code
     };
 
-    format!("\x1b[48;5;{}m{}\x1b[0m", color_code, row)
+    let bg_seq = format!("\x1b[48;5;{}m", color_code);
+    // Re-inject background after every reset so the highlight persists
+    let highlighted = row.replace(color(RESET), &format!("{}{}", color(RESET), bg_seq));
+    format!("{}{}{}", bg_seq, highlighted, color(RESET))
 }
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
