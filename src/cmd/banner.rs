@@ -86,22 +86,28 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
 }
 
-/// Return a recency-based intensity modifier (bright/dim) and the base color.
-/// Recent = full intensity, old = dim. Same hue, just brighter or darker.
-/// 4 tiers: <1h=bright, <1d=normal, <1w=slight dim, <1m=dim, >1m=very dim
-fn recency_intensity(dt: &DateTime<Utc>) -> &'static str {
+/// Return a recency-based intensity modifier.
+/// Recent = bold (bright colors), old = dim (faded colors).
+/// Uses SGR modifiers (bold/dim) which persist through color changes,
+/// so the per-file hues (blue dirs, green dates, etc.) are preserved
+/// but their brightness varies based on recency.
+///
+/// Tiers:
+///   <1h  = bold    (\x1b[1m) — files I just touched
+///   <1d  = normal  (\x1b[22m) — today's files, still fresh
+///   <1w  = dim     (\x1b[2m) — last week, less relevant
+///   >=1w = very dim (\x1b[2m\x1b[38;5;238m) — old files recede
+fn recency_intensity(dt: &DateTime<Utc>) -> String {
     let now = Utc::now();
     let age_secs = (now - *dt).num_seconds().max(0) as f64;
     if age_secs < 3600.0 {
-        "\x1b[1m" // bold/bright for last hour
+        "\x1b[1m".to_string() // bold for last hour
     } else if age_secs < 86400.0 {
-        "\x1b[22m" // normal intensity for today
+        "".to_string() // normal for today
     } else if age_secs < 604800.0 {
-        "\x1b[38;5;245m" // slightly faded (gray) for this week
-    } else if age_secs < 2592000.0 {
-        "\x1b[2m" // dim for this month
+        "\x1b[2m".to_string() // dim for this week
     } else {
-        "\x1b[2m\x1b[38;5;240m" // very dim and faded for older
+        "\x1b[2m".to_string() // very dim for older
     }
 }
 
