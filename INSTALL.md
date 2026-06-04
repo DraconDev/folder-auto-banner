@@ -81,4 +81,3 @@ f install-hook             # Print shell hook for manual setup
 cargo run                   # Test the banner
 cargo test                  # Run test suite
 ```
-audit_test_1780438846
