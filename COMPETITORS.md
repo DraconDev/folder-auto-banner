@@ -1,4 +1,4 @@
-# Competitive Analysis: CFM vs lsd vs eza
+# Competitive Analysis: fab vs lsd vs eza
 
 **Date:** 2026-06-02  
 **Scope:** Feature comparison of modern `ls` alternatives  
@@ -8,7 +8,7 @@
 
 ## Quick Summary
 
-| | CFM | lsd | eza |
+| | fab | lsd | eza |
 |---|-----|-----|-----|
 | **Purpose** | Contextual directory dashboard | Pretty ls replacement | Modern ls replacement |
 | **Language** | Rust | Rust | Rust |
@@ -27,7 +27,7 @@
 
 ### Display Options
 
-| Feature | CFM | lsd | eza |
+| Feature | fab | lsd | eza |
 |---------|-----|-----|-----|
 | Grid view (default) | ✅ | ✅ | ✅ |
 | Long format (`-l`) | ❌ | ✅ | ✅ |
@@ -44,7 +44,7 @@
 
 ### Sorting
 
-| Feature | CFM | lsd | eza |
+| Feature | fab | lsd | eza |
 |---------|-----|-----|-----|
 | Sort by name | ✅ | ✅ | ✅ |
 | Sort by time (`-t`) | ✅ | ✅ | ✅ |
@@ -59,7 +59,7 @@
 
 ### Filtering
 
-| Feature | CFM | lsd | eza |
+| Feature | fab | lsd | eza |
 |---------|-----|-----|-----|
 | Show hidden (`-a`) | ✅ `-a` | ✅ `-a` | ✅ `-a` |
 | Filter pattern (`-f`) | ✅ `--filter` | ❌ | ❌ |
@@ -74,7 +74,7 @@
 
 ### Metadata
 
-| Feature | CFM | lsd | eza |
+| Feature | fab | lsd | eza |
 |---------|-----|-----|-----|
 | Permissions | ✅ | ✅ | ✅ |
 | Owner/group | ✅ | ✅ | ✅ |
@@ -92,7 +92,7 @@
 
 ### Git Integration
 
-| Feature | CFM | lsd | eza |
+| Feature | fab | lsd | eza |
 |---------|-----|-----|-----|
 | Per-file git status | ✅ | ✅ | ✅ |
 | Branch/ahead/behind | ✅ | ✅ | ✅ |
@@ -106,7 +106,7 @@
 
 ### Output Formats
 
-| Feature | CFM | lsd | eza |
+| Feature | fab | lsd | eza |
 |---------|-----|-----|-----|
 | JSON output | ✅ `--json` | ❌ | ❌ |
 | Raw paths | ✅ `--raw` | ❌ | ❌ |
@@ -114,7 +114,7 @@
 
 ### Configuration
 
-| Feature | CFM | lsd | eza |
+| Feature | fab | lsd | eza |
 |---------|-----|-----|-----|
 | Config file | ✅ TOML | ✅ YAML | ✅ YAML |
 | Editable via command | ✅ `f config` | ❌ | ❌ |
@@ -123,7 +123,7 @@
 | Icon config | ❌ | ✅ `icons.yaml` | ✅ `theme.yml` |
 | Generate default config | ❌ | ✅ `--generate-config` | ❌ |
 
-### Unique to CFM (not in lsd/eza)
+### Unique to fab (not in lsd/eza)
 
 | Feature | Description |
 |---------|-------------|
@@ -143,7 +143,7 @@
 | **Rich git integration** | Branch, ahead/behind, stash, merge state, commits today, branch count, last commit time |
 | **Per-file git status** | Modified, added, deleted, untracked indicators per file |
 
-### Unique to lsd (not in CFM/eza)
+### Unique to lsd (not in fab/eza)
 
 | Feature | Description |
 |---------|-------------|
@@ -154,7 +154,7 @@
 | **Symlink arrow** | Customizable symlink target arrow |
 | **Truncate owner** | `--truncate-owner` for long owner names |
 
-### Unique to eza (not in CFM/lsd)
+### Unique to eza (not in fab/lsd)
 
 | Feature | Description |
 |---------|-------------|
@@ -173,7 +173,7 @@
 
 ---
 
-## Priority Feature Gaps for CFM
+## Priority Feature Gaps for fab
 
 ### High Priority (would match competitors)
 
@@ -183,7 +183,7 @@
 4. **`--git-ignore`** — Respect .gitignore in listings
 5. **`-L` / `--level`** — Limit tree recursion depth
 
-Note: `-l` / `--long` is NOT needed — CFM's default output already shows detailed metadata (permissions, owner, group, size, date, name). lsd/eza need `-l` because their default is a grid view.
+Note: `-l` / `--long` is NOT needed — fab's default output already shows detailed metadata (permissions, owner, group, size, date, name). lsd/eza need `-l` because their default is a grid view.
 
 ### Medium Priority (nice to have)
 
@@ -203,9 +203,9 @@ Note: `-l` / `--long` is NOT needed — CFM's default output already shows detai
 
 ---
 
-## CFM's Competitive Advantage
+## fab's Competitive Advantage
 
-CFM is **not a drop-in `ls` replacement** — it's a **contextual directory dashboard**. The key differentiators:
+fab is **not a drop-in `ls` replacement** — it's a **contextual directory dashboard**. The key differentiators:
 
 1. **Instant context**: See git status, TODOs, ports, docker, build status, and code metrics at a glance
 2. **Daemon caching**: First access computes, subsequent accesses are instant (~7ms)
@@ -220,7 +220,7 @@ CFM is **not a drop-in `ls` replacement** — it's a **contextual directory dash
 
 ## Installation Comparison
 
-| | CFM | lsd | eza |
+| | fab | lsd | eza |
 |---|-----|-----|-----|
 | Package managers | Build from source | ✅ Most distros | ✅ Most distros |
 | Cargo | `cargo install fab` | `cargo install lsd` | `cargo install eza` |
@@ -233,7 +233,7 @@ CFM is **not a drop-in `ls` replacement** — it's a **contextual directory dash
 
 | Use Case | Recommendation |
 |----------|----------------|
-| **Daily directory navigation with context** | CFM |
+| **Daily directory navigation with context** | fab |
 | **Drop-in `ls` replacement** | lsd or eza |
 | **Scripting/automation** | Standard `ls` or `find` |
 | **Maximum customization** | lsd (3-file config) |
