@@ -1430,6 +1430,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         row_parts.push(icon_str);
         row_parts.push(name_display);
 
+        // Add inline preview for directories if there's space
+        if item.is_dir && config.inline_preview {
+            let term_width = get_terminal_width();
+            let current_row_len = strip_ansi(&row_parts.join(" ")).len();
+            let available_for_preview = term_width.saturating_sub(current_row_len + 4); // +4 for spacing
+            if available_for_preview > 20 {
+                if let Some(preview) = get_dir_inline_preview(&item, available_for_preview) {
+                    row_parts.push(format!("{}│{}", color(DIM), color(RESET)));
+                    row_parts.push(preview);
+                }
+            }
+        }
+
         // Apply recency-based highlight to entire row.
         // Recent files get a background highlight, old files get no highlight.
         let row_str = item
