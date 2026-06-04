@@ -1467,6 +1467,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         if config.git_status {
             row_parts.push(git_colored);
         }
+        // Add navigation number if enabled
+        if config.numbered {
+            let num = idx + 1; // 1-based numbering
+            let num_str = format!("{}[{}{}]{}", color(DIM), color(CYAN_BOLD), num, color(RESET));
+            row_parts.push(num_str);
+        }
         row_parts.push(icon_str);
         row_parts.push(name_display);
 
