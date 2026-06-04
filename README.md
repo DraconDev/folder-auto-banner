@@ -18,9 +18,9 @@ When you run `f`, you see:
 
 ## vs lsd / eza
 
-CFM is **not a drop-in `ls` replacement** — it's a **contextual directory dashboard**. While lsd and eza focus on making `ls` pretty, CFM adds **project context** (git, TODOs, ports, docker, build status, code metrics) and **daemon caching** for instant repeated access.
+fab is **not a drop-in `ls` replacement** — it's a **contextual directory dashboard**. While lsd and eza focus on making `ls` pretty, fab adds **project context** (git, TODOs, ports, docker, build status, code metrics) and **daemon caching** for instant repeated access.
 
-| Feature | CFM | lsd | eza |
+| Feature | fab | lsd | eza |
 |---------|-----|-----|-----|
 | Pretty listing | ✅ | ✅ | ✅ |
 | Icons | ✅ | ✅ | ✅ |
@@ -154,10 +154,10 @@ Recent files pop out; old files recede into the background.
 
 | Variable | Description |
 |----------|-------------|
-| `CFM_NO_TODOS` | Set to `1` to disable TODO scanning |
-| `CFM_NO_PORTS` | Set to `1` to disable port detection |
-| `CFM_NO_DOCKER` | Set to `1` to disable Docker detection |
-| `CFM_NO_METRICS` | Set to `1` to disable code metrics |
+| `FAB_NO_TODOS` | Set to `1` to disable TODO scanning |
+| `FAB_NO_PORTS` | Set to `1` to disable port detection |
+| `FAB_NO_DOCKER` | Set to `1` to disable Docker detection |
+| `FAB_NO_METRICS` | Set to `1` to disable code metrics |
 | `NO_COLOR` | Disable colors (per spec) |
 | `EDITOR` | Editor for `f config` (default: vi) |
 
@@ -171,6 +171,3 @@ cargo clippy  # 0 warnings
 ## License
 
 MIT
-# test
-# test 1780433405
-# test 1780433579
