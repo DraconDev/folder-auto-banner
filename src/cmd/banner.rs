@@ -1058,16 +1058,16 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             if group_dirs_mode != "none" && a.is_dir != b.is_dir {
                 return if group_dirs_mode == "last" {
                     if opts.reverse {
-                        a.is_dir.cmp(&b.is_dir)
-                    } else {
                         b.is_dir.cmp(&a.is_dir)
+                    } else {
+                        a.is_dir.cmp(&b.is_dir)
                     }
                 } else {
                     // first (default)
                     if opts.reverse {
-                        b.is_dir.cmp(&a.is_dir)
-                    } else {
                         a.is_dir.cmp(&b.is_dir)
+                    } else {
+                        b.is_dir.cmp(&a.is_dir)
                     }
                 };
             }
