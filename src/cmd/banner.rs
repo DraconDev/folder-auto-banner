@@ -130,29 +130,64 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
 }
 
 /// Navigate to item by number - cd if directory, open in editor if file
+/// Uses same sorting as banner display (git status first, then name)
 fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     use std::fs;
     
-    // Read directory contents (same order as banner display)
+    // Load config
+    let config = crate::state::Config::load().unwrap_or_default();
+    
+    // Read directory contents
     let mut entries: Vec<_> = fs::read_dir(cwd)?
         .filter_map(|e| e.ok())
-        .filter(|e| !e.file_name().to_string_lossy().starts_with('.')) // skip hidden for now
+        .filter(|e| !e.file_name().to_string_lossy().starts_with('.')) // skip hidden
         .collect();
     
-    // Sort by name (matching default banner sort)
-    entries.sort_by(|a, b| a.file_name().to_string_lossy().to_lowercase().cmp(&b.file_name().to_string_lossy().to_lowercase()));
+    // Get git info for sorting (if in git repo)
+    let git_info = crate::git::get_git_info(cwd).ok().unwrap_or_default();
     
-    if num == 0 || num > entries.len() {
-        eprintln!("Error: number {} out of range (1-{})", num, entries.len());
+    // Sort by git status first (matching banner), then by name
+    entries.sort_by(|a, b| {
+        let a_path = a.path();
+        let b_path = b.path();
+        let a_rel = a_path.strip_prefix(cwd).unwrap_or(&a_path);
+        let b_rel = b_path.strip_prefix(cwd).unwrap_or(&b_path);
+        let a_name = a.file_name();
+        let b_name = b.file_name();
+        let a_name_str = a_name.to_string_lossy();
+        let b_name_str = b_name.to_string_lossy();
+        
+        // Git status priority: modified > added > untracked > clean
+        let a_git = git_info.file_statuses.get(a_rel.to_str().unwrap_or(""))
+            .or_else(|| git_info.file_statuses.get(a_name_str.as_ref()));
+        let b_git = git_info.file_statuses.get(b_rel.to_str().unwrap_or(""))
+            .or_else(|| git_info.file_statuses.get(b_name_str.as_ref()));
+        
+        let git_order = match (a_git, b_git) {
+            (Some(_), None) => std::cmp::Ordering::Less,    // git changes first
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        };
+        
+        if git_order != std::cmp::Ordering::Equal {
+            git_order
+        } else {
+            // Then by name
+            a_name_str.to_lowercase().cmp(&b_name_str.to_lowercase())
+        }
+    });
+    
+    // Apply max_display_items limit (matching banner behavior)
+    let max_items = config.max_display_items;
+    let display_items: Vec<_> = entries.into_iter().take(max_items).collect();
+    
+    if num == 0 || num > display_items.len() {
+        eprintln!("Error: number {} out of range (1-{}). Use 'f' to see available items.", num, display_items.len());
         std::process::exit(1);
     }
     
-    let entry = &entries[num - 1]; // Convert to 0-based
+    let entry = &display_items[num - 1]; // Convert to 0-based
     let path = entry.path();
-    
-    // Debug: show what we're checking
-    eprintln!("[debug] num={}, name={}, is_dir={}, path={}", 
-             num, entry.file_name().to_string_lossy(), path.is_dir(), path.display());
     
     if path.is_dir() {
         // For directories: print the path (shell function will cd to it)
@@ -160,7 +195,6 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     } else {
         // For files: open in editor
         let editor = std::env::var("EDITOR").unwrap_or_else(|_| "micro".to_string());
-        eprintln!("[debug] opening in editor: {}", editor);
         let status = std::process::Command::new(&editor)
             .arg(&path)
             .status()?;
