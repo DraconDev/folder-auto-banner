@@ -146,8 +146,17 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     // Get git info for sorting (if in git repo)
     let git_info = crate::git::get_git_info(cwd).ok().unwrap_or_default();
     
-    // Sort by git status first (matching banner), then by name
+    // Sort by: directories first, then git status, then name (matching banner)
     entries.sort_by(|a, b| {
+        // Directories first (matching banner default group_dirs="first")
+        if a.path().is_dir() != b.path().is_dir() {
+            return if a.path().is_dir() {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            };
+        }
+        
         let a_path = a.path();
         let b_path = b.path();
         let a_rel = a_path.strip_prefix(cwd).unwrap_or(&a_path);
@@ -188,6 +197,10 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     
     let entry = &display_items[num - 1]; // Convert to 0-based
     let path = entry.path();
+    
+    // Debug output
+    eprintln!("[debug] num={}, name={}, is_dir={}, is_file={}", 
+             num, entry.file_name().to_string_lossy(), path.is_dir(), path.is_file());
     
     if path.is_dir() {
         // For directories: print the path (shell function will cd to it)
