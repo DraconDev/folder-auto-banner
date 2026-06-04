@@ -146,44 +146,23 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     // Get git info for sorting (if in git repo)
     let git_info = crate::git::get_git_info(cwd).ok().unwrap_or_default();
     
-    // Sort by: directories first, then git status, then name (matching banner)
+    // Sort by: directories first, then name (matching banner default)
     entries.sort_by(|a, b| {
         // Directories first (matching banner default group_dirs="first")
-        if a.path().is_dir() != b.path().is_dir() {
-            return if a.path().is_dir() {
+        let a_is_dir = a.path().is_dir();
+        let b_is_dir = b.path().is_dir();
+        if a_is_dir != b_is_dir {
+            return if a_is_dir {
                 std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Greater
             };
         }
         
-        let a_path = a.path();
-        let b_path = b.path();
-        let a_rel = a_path.strip_prefix(cwd).unwrap_or(&a_path);
-        let b_rel = b_path.strip_prefix(cwd).unwrap_or(&b_path);
-        let a_name = a.file_name();
-        let b_name = b.file_name();
-        let a_name_str = a_name.to_string_lossy();
-        let b_name_str = b_name.to_string_lossy();
-        
-        // Git status priority: modified > added > untracked > clean
-        let a_git = git_info.file_statuses.get(a_rel.to_str().unwrap_or(""))
-            .or_else(|| git_info.file_statuses.get(a_name_str.as_ref()));
-        let b_git = git_info.file_statuses.get(b_rel.to_str().unwrap_or(""))
-            .or_else(|| git_info.file_statuses.get(b_name_str.as_ref()));
-        
-        let git_order = match (a_git, b_git) {
-            (Some(_), None) => std::cmp::Ordering::Less,    // git changes first
-            (None, Some(_)) => std::cmp::Ordering::Greater,
-            _ => std::cmp::Ordering::Equal,
-        };
-        
-        if git_order != std::cmp::Ordering::Equal {
-            git_order
-        } else {
-            // Then by name
-            a_name_str.to_lowercase().cmp(&b_name_str.to_lowercase())
-        }
+        // Then by name (matching banner default sort="name")
+        let a_name = a.file_name().to_string_lossy().to_lowercase();
+        let b_name = b.file_name().to_string_lossy().to_lowercase();
+        a_name.cmp(&b_name)
     });
     
     // Apply max_display_items limit (matching banner behavior)
