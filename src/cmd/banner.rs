@@ -130,7 +130,7 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
 }
 
 /// Navigate to item by number - cd if directory, open in editor if file
-/// Uses same DirSummary as banner to ensure items match exactly
+/// Uses same DirSummary and sorting as banner to ensure items match exactly
 fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     // Load config
     let config = crate::state::Config::load().unwrap_or_default();
@@ -151,9 +151,38 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
         }
     };
     
-    // Apply max_display_items limit
-    let max_items = config.max_display_items;
-    let display_items: Vec<_> = summary.top_items.iter().take(max_items).collect();
+    // Get git info for smart truncation sorting
+    let git_info = crate::git::get_git_info(cwd).ok().unwrap_or_default();
+    
+    // Apply same filtering as banner
+    let mut display_items: Vec<&crate::fs::DirEntry> = summary.top_items.iter().collect();
+    
+    // Apply smart truncation (matching banner logic)
+    let total_before_truncation = display_items.len();
+    if config.smart_truncation && total_before_truncation > config.max_display_items {
+        display_items.sort_by(|a, b| {
+            let a_git = git_info.file_statuses.get(a.name.as_str()).is_some();
+            let b_git = git_info.file_statuses.get(b.name.as_str()).is_some();
+            let git_order = b_git.cmp(&a_git);
+            if git_order != std::cmp::Ordering::Equal {
+                return git_order;
+            }
+            let a_time = a.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
+            let b_time = b.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
+            b_time.cmp(&a_time)
+        });
+        let term_height = get_terminal_height();
+        let max_fit = if term_height > 10 {
+            term_height.saturating_sub(7)
+        } else if config.inline_preview {
+            25
+        } else {
+            config.max_display_items
+        };
+        display_items.truncate(max_fit.max(config.max_display_items));
+    } else {
+        display_items.truncate(config.max_display_items);
+    }
     
     if num == 0 || num > display_items.len() {
         eprintln!("Error: number {} out of range (1-{}). Use 'f' to see available items.", num, display_items.len());
@@ -164,10 +193,8 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     let path = &entry.path;
     
     if entry.is_dir {
-        // For directories: print the path (shell function will cd to it)
         println!("{}", path.display());
     } else {
-        // For files: open in editor
         let editor = std::env::var("EDITOR").unwrap_or_else(|_| "micro".to_string());
         let status = std::process::Command::new(&editor)
             .arg(path)
