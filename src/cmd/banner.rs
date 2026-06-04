@@ -498,6 +498,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
     eprintln!("DEBUG: inline_preview={}", config.inline_preview);
+    eprintln!("DEBUG: config_path={:?}", crate::state::Config::config_path());
 
     let path_str = path.to_string_lossy();
     let project_icon = summary.project_type.icon();
