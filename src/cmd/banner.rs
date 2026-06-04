@@ -143,8 +143,7 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
         .filter(|e| !e.file_name().to_string_lossy().starts_with('.')) // skip hidden
         .collect();
     
-    // Get git info for sorting (if in git repo)
-    let git_info = crate::git::get_git_info(cwd).ok().unwrap_or_default();
+    // Note: git info not needed for sorting (matching banner default sort="name")
     
     // Sort by: directories first, then name (matching banner default)
     entries.sort_by(|a, b| {
