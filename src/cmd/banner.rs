@@ -772,7 +772,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
         } else {
             // Row 1: Core info
-            let mut parts = vec![format!("{} {} {}", project_icon, path_display, color(BOLD))];
+            let mut parts = vec![format!("{}{}", path_display, color(BOLD))];
             parts.push(format!("{} │", project_label));
             parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
             parts.push(format!(
