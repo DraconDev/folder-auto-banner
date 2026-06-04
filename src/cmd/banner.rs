@@ -497,8 +497,6 @@ fn build_git_status_indicators(git_info: &GitInfo) -> String {
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &BannerOptions) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
-    eprintln!("DEBUG: inline_preview={}", config.inline_preview);
-    eprintln!("DEBUG: config_path={:?}", crate::state::Config::config_path());
 
     let path_str = path.to_string_lossy();
     let project_icon = summary.project_type.icon();
@@ -1437,7 +1435,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             let term_width = get_terminal_width();
             let current_row_len = strip_ansi(&row_parts.join(" ")).len();
             let available_for_preview = term_width.saturating_sub(current_row_len + 4); // +4 for spacing
-            eprintln!("DEBUG: term_width={}, current_row_len={}, available_for_preview={}", term_width, current_row_len, available_for_preview);
             if available_for_preview > 20 {
                 if let Some(preview) = get_dir_inline_preview(&item, available_for_preview) {
                     row_parts.push(format!("{}│{}", color(DIM), color(RESET)));
