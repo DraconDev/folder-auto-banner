@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 108165,
-    "activeSeconds": 321
+    "tokensUsed": 111284,
+    "activeSeconds": 723
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T18:14:50.653Z",
-  "updatedAt": "2026-06-04T18:20:26.352Z",
+  "updatedAt": "2026-06-04T18:27:11.040Z",
   "activePath": ".pi/goals/active_goal_2026060419145065_mpztexwd-ku6fd2.md",
   "taskList": {
     "tasks": [
@@ -50,8 +50,8 @@ Fix git diff stats in banner: color the +N/-N in the first row (green/red) and r
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5m21s
-- Tokens used: 108K (108,165) tokens
+- Time spent: 12m03s
+- Tokens used: 111K (111,284) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
