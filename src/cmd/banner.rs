@@ -1529,7 +1529,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         // Add navigation number if enabled
         if config.numbered {
             let num = idx + 1; // 1-based numbering
-            let num_str = format!("{}[{}{}{:>width$}{}]{}", color(DIM), color(BOLD), color(CYAN), num, color(RESET), width = num_width);
+            let num_str = format!("{}[{}{}{:>w$}{}]{}", color(DIM), color(BOLD), color(CYAN), num, color(RESET), w = num_width);
             row_parts.push(num_str);
         }
         row_parts.push(icon_str);
