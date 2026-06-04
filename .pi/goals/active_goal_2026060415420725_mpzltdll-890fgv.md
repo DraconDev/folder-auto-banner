@@ -1,0 +1,150 @@
+{
+  "version": 3,
+  "id": "mpzltdll-890fgv",
+  "objective": "=== Goal ===\nObjective: Add recursive directory listing (`-R`/`--recursive`) to fab and exclude HTML files from git tracking so the repo no longer registers as HTML, while leaving the `micro` editor binary untouched.\n\nSuccess criteria (observable evidence the goal is done):\n  1. `f -R` and `f --recursive` both list entries recursively from the target directory.\n  2. A newly added `*.html` file is ignored by git (`git check-ignore` returns the file).\n  3. The currently tracked `pi-session-*.html` is removed from the git index but preserved on disk (`git rm --cached`).\n  4. The `micro` binary in the repo root is still tracked / not affected by the new ignore rule.\n  5. README's `vs lsd / eza` table shows ✅ next to `Recursive (`-R`)` (and a `--recursive` example appears under Usage).\n  6. `cargo test` is green and `cargo clippy --all-targets -- -D warnings` reports no new warnings.\n  7. `git status` after the change shows no HTML entries (other than intentional `.dracon` / dracon-managed patterns already in place).\n\nBoundaries:\n  In scope:\n    - New clap-derive flag(s) `-R` / `--recursive` on the `f` binary.\n    - Recursive walking wired into the existing scan pipeline (likely `src/fs`); reuse current sort/filter/group logic where possible.\n    - Unit / integration test(s) covering the recursive path.\n    - Add `*.html` rule to the repo-root `.gitignore` (not the dracon-managed `.gitignore-local`).\n    - `git rm --cached <pi-session html>` to untrack the existing file without deleting it.\n    - Doc updates: README (comparison table + Usage), `tasks.md` (move Recursive to ✅ Done).\n  Out of scope:\n    - Changes to `--tree` semantics, daemon caching, IPC payload shape, sort/filter behavior, color/recency gradient.\n    - Touching the `micro` binary or any unrelated gitignore entries.\n    - Removing the HTML file from disk; rewriting session-export tooling; CI changes.\n\nConstraints:\n  - Follow the existing CLI pattern: flags = actions (clap derive, matches the `--sort`, `--tree`, `-a` style).\n  - Recursion is opt-in (default `f` listing behavior is unchanged).\n  - The `*.html` rule must be a literal extension match, not a path glob that could ever catch `micro` (a non-HTML binary) — the extension rule is safe by construction.\n  - Do not introduce new heavy dependencies; the `ignore` crate is already a dep and supports recursion.\n  - Keep the public behavior of `f` identical when `-R` is not passed.\n\nVerification contract (required before marking complete):\n  - `cargo test` → all tests pass.\n  - `cargo clippy --all-targets -- -D warnings` → 0 warnings.\n  - `git check-ignore -v pi-session-2026-05-31T22-01-00-639Z_019e800d-fbdf-7fce-ba45-963160518d48.html` → returns the `.gitignore:*.html` rule.\n  - `git status` → does not list the HTML file; does still list `micro`.\n  - `git diff README.md` shows the Recursive row flipped from ❌ to ✅ and a `--recursive` example added.\n  - Manual: `f -R .` from a test directory prints recursive entries; `f .` (no flag) is byte-identical to current behavior on a known fixture.\n\nIf blocked: stop and ask the user (default — do not guess on recursion depth limits, symlink-loop interaction, or whether to also ignore `.htm`).",
+  "status": "active",
+  "autoContinue": true,
+  "usage": {
+    "tokensUsed": 739282,
+    "activeSeconds": 3827
+  },
+  "sisyphus": false,
+  "createdAt": "2026-06-04T14:42:07.257Z",
+  "updatedAt": "2026-06-04T15:47:25.043Z",
+  "activePath": ".pi/goals/active_goal_2026060415420725_mpzltdll-890fgv.md",
+  "taskList": {
+    "tasks": [
+      {
+        "id": "audit-existing-recursive",
+        "title": "Audit existing recursive implementation in src/cli/mod.rs and src/cmd/banner.rs",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:08:19.731Z",
+        "evidence": "Audited src/cli/mod.rs and src/cmd/banner.rs: -R/--recursive flag exists on top-level Cli struct (line ~93), None arm passes recursive:self.recursive to BannerOptions. Some(Banner{..}) arm uses ..Defa",
+        "verificationContract": "Read both files; confirm flags are wired into BannerOptions and run_banner calls output_recursive; if any wiring is missing, fix it."
+      },
+      {
+        "id": "gitignore-html",
+        "title": "Add `*.html` and `*.htm` rules to the repo-root `.gitignore` (outside the dracon managed block)",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:29:27.568Z",
+        "verificationContract": "Open .gitignore, append the rules after the existing content; verify with grep that the rules are present and that `micro` would not be caught."
+      },
+      {
+        "id": "untrack-html",
+        "title": "`git rm --cached` the tracked pi-session-*.html so it's untracked but preserved on disk",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:29:27.570Z",
+        "verificationContract": "Run `git rm --cached <file>`; verify with `git status` that the file no longer appears in the index, and `ls` confirms it is still on disk; `git ls-files | grep -i html` returns nothing."
+      },
+      {
+        "id": "check-ignore-html",
+        "title": "Verify `git check-ignore -v` returns the new `.gitignore` rule for the pi-session HTML",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:29:27.571Z",
+        "verificationContract": "Run the check-ignore command; output must reference the new line in `.gitignore`; assert `micro` is NOT ignored."
+      },
+      {
+        "id": "readme-update",
+        "title": "Update README: flip Recursive row to ✅ in the `vs lsd / eza` table and add a `--recursive` example under Usage",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:30:45.255Z",
+        "verificationContract": "Read README; confirm the Recursive row shows ❌ → ✅ and Usage lists `f --recursive` (or `-R`); save and `git diff README.md` to confirm."
+      },
+      {
+        "id": "tasks-md-update",
+        "title": "Move `Recursive (-R)` line in `tasks.md` from 🟡 Future to ✅ Done",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:30:45.257Z",
+        "verificationContract": "Open tasks.md; move the line; verify with grep."
+      },
+      {
+        "id": "cargo-test-clippy",
+        "title": "Run `cargo test` and `cargo clippy --all-targets -- -D warnings` and ensure both are green",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:46:49.978Z",
+        "verificationContract": "Both commands exit 0; capture output."
+      },
+      {
+        "id": "manual-f-R",
+        "title": "Manual smoke test: `f -R <fixture>` prints recursive entries; `f <fixture>` (no flag) is unchanged",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:46:49.979Z",
+        "verificationContract": "Build the binary, run both commands against a small fixture, capture and inspect the output."
+      },
+      {
+        "id": "commit-and-verify",
+        "title": "Commit the change set with a clear message and verify final `git status` shows no HTML entries",
+        "status": "complete",
+        "completedAt": "2026-06-04T15:47:25.041Z",
+        "verificationContract": "Run git status; HTML file must not appear; micro must appear; commit log shows the new commit."
+      }
+    ],
+    "blockCompletion": false,
+    "proposedAt": "2026-06-04T14:48:27.104Z"
+  }
+}
+
+# Goal Prompt
+
+=== Goal ===
+Objective: Add recursive directory listing (`-R`/`--recursive`) to fab and exclude HTML files from git tracking so the repo no longer registers as HTML, while leaving the `micro` editor binary untouched.
+
+Success criteria (observable evidence the goal is done):
+  1. `f -R` and `f --recursive` both list entries recursively from the target directory.
+  2. A newly added `*.html` file is ignored by git (`git check-ignore` returns the file).
+  3. The currently tracked `pi-session-*.html` is removed from the git index but preserved on disk (`git rm --cached`).
+  4. The `micro` binary in the repo root is still tracked / not affected by the new ignore rule.
+  5. README's `vs lsd / eza` table shows ✅ next to `Recursive (`-R`)` (and a `--recursive` example appears under Usage).
+  6. `cargo test` is green and `cargo clippy --all-targets -- -D warnings` reports no new warnings.
+  7. `git status` after the change shows no HTML entries (other than intentional `.dracon` / dracon-managed patterns already in place).
+
+Boundaries:
+  In scope:
+    - New clap-derive flag(s) `-R` / `--recursive` on the `f` binary.
+    - Recursive walking wired into the existing scan pipeline (likely `src/fs`); reuse current sort/filter/group logic where possible.
+    - Unit / integration test(s) covering the recursive path.
+    - Add `*.html` rule to the repo-root `.gitignore` (not the dracon-managed `.gitignore-local`).
+    - `git rm --cached <pi-session html>` to untrack the existing file without deleting it.
+    - Doc updates: README (comparison table + Usage), `tasks.md` (move Recursive to ✅ Done).
+  Out of scope:
+    - Changes to `--tree` semantics, daemon caching, IPC payload shape, sort/filter behavior, color/recency gradient.
+    - Touching the `micro` binary or any unrelated gitignore entries.
+    - Removing the HTML file from disk; rewriting session-export tooling; CI changes.
+
+Constraints:
+  - Follow the existing CLI pattern: flags = actions (clap derive, matches the `--sort`, `--tree`, `-a` style).
+  - Recursion is opt-in (default `f` listing behavior is unchanged).
+  - The `*.html` rule must be a literal extension match, not a path glob that could ever catch `micro` (a non-HTML binary) — the extension rule is safe by construction.
+  - Do not introduce new heavy dependencies; the `ignore` crate is already a dep and supports recursion.
+  - Keep the public behavior of `f` identical when `-R` is not passed.
+
+Verification contract (required before marking complete):
+  - `cargo test` → all tests pass.
+  - `cargo clippy --all-targets -- -D warnings` → 0 warnings.
+  - `git check-ignore -v pi-session-2026-05-31T22-01-00-639Z_019e800d-fbdf-7fce-ba45-963160518d48.html` → returns the `.gitignore:*.html` rule.
+  - `git status` → does not list the HTML file; does still list `micro`.
+  - `git diff README.md` shows the Recursive row flipped from ❌ to ✅ and a `--recursive` example added.
+  - Manual: `f -R .` from a test directory prints recursive entries; `f .` (no flag) is byte-identical to current behavior on a known fixture.
+
+If blocked: stop and ask the user (default — do not guess on recursion depth limits, symlink-loop interaction, or whether to also ignore `.htm`).
+
+## Progress
+
+- Status: running
+- Auto-continue: on
+- Sisyphus mode: no
+- Time spent: 1h03m47s
+- Tokens used: 739K (739,282) tokens
+## Tasks
+
+<!-- blockCompletion: false -->
+- [x] audit-existing-recursive: Audit existing recursive implementation in src/cli/mod.rs and src/cmd/banner.rs — evidence: Audited src/cli/mod.rs and src/cmd/banner.rs: -R/--recursive flag exists on top-level Cli struct (line ~93), None arm passes recursive:self.recursive to BannerOptions. Some(Banner{..}) arm uses ..Defa
+- [x] gitignore-html: Add `*.html` and `*.htm` rules to the repo-root `.gitignore` (outside the dracon managed block)
+- [x] untrack-html: `git rm --cached` the tracked pi-session-*.html so it's untracked but preserved on disk
+- [x] check-ignore-html: Verify `git check-ignore -v` returns the new `.gitignore` rule for the pi-session HTML
+- [x] readme-update: Update README: flip Recursive row to ✅ in the `vs lsd / eza` table and add a `--recursive` example under Usage
+- [x] tasks-md-update: Move `Recursive (-R)` line in `tasks.md` from 🟡 Future to ✅ Done
+- [x] cargo-test-clippy: Run `cargo test` and `cargo clippy --all-targets -- -D warnings` and ensure both are green
+- [x] manual-f-R: Manual smoke test: `f -R <fixture>` prints recursive entries; `f <fixture>` (no flag) is unchanged
+- [x] commit-and-verify: Commit the change set with a clear message and verify final `git status` shows no HTML entries
+
