@@ -6,7 +6,7 @@ use clap_complete::{generate, shells};
 pub fn run_completion(shell: &str) -> Result<()> {
     let mut cmd = Command::new("f")
         .version(env!("CARGO_PKG_VERSION"))
-        .about("cfm — Contextual File Manager")
+        .about("fab — Folder Auto Banner")
         .subcommand(Command::new("banner").about("Print the contextual directory dashboard"))
         .subcommand(Command::new("env").about("Output shell aliases for current project type"))
         .subcommand({

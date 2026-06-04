@@ -19,7 +19,7 @@ path = "src/daemon.rs"
 
 [dependencies]
 # Shared library
-cfm-lib = { path = "cfm-lib" }
+fab-lib = { path = "fab-lib" }
 
 # CLI parsing
 clap = { version = "4", features = ["derive", "env"] }

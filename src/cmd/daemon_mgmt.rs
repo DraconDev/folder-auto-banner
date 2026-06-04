@@ -48,7 +48,7 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
         }
         DaemonAction::ClearCache => {
             daemon_client::send_shutdown();
-            let cache_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+            let cache_dir = directories::ProjectDirs::from("com", "fab", "fab")
                 .map(|p| p.cache_dir().to_path_buf());
             if let Some(dir) = cache_dir {
                 if dir.exists() {

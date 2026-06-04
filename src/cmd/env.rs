@@ -32,7 +32,7 @@ fn generate_aliases(project_type: &ProjectType) -> Vec<String> {
             aliases.push("alias build='cargo build'".to_string());
             aliases.push("alias check='cargo check'".to_string());
             aliases.push("alias clippy='cargo clippy -- -W clippy::all'".to_string());
-            aliases.push("alias cfm_clean='cargo clean && fm banner'".to_string());
+            aliases.push("alias fab_clean='cargo clean && fm banner'".to_string());
         }
         ProjectType::Node => {
             aliases.push("alias run='npm run dev'".to_string());

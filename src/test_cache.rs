@@ -20,7 +20,7 @@ pub struct TestResults {
 impl TestResults {
     /// Get cache file path
     fn cache_path() -> Option<PathBuf> {
-        let proj_dirs = directories::ProjectDirs::from("com", "cfm", "cfm")?;
+        let proj_dirs = directories::ProjectDirs::from("com", "fab", "fab")?;
         Some(proj_dirs.cache_dir().join("test_results.json"))
     }
 

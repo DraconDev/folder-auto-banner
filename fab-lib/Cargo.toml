@@ -1,8 +1,8 @@
 [package]
-name = "cfm-lib"
+name = "fab-lib"
 version = "0.1.1"
 edition = "2021"
-description = "Contextual File Manager — shared library"
+description = "Folder Auto Banner — shared library"
 license = "MIT"
 
 [dependencies]

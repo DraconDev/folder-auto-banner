@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use cfm_lib::daemon_types::{BannerData, Request, Response};
-use cfm_lib::fs::DirSummary;
+use fab_lib::daemon_types::{BannerData, Request, Response};
+use fab_lib::fs::DirSummary;
 
 // Cache entry with TTL
 struct CacheEntry {
@@ -511,7 +511,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
         .collect();
 
     // Use filtered git info — only collects statuses for top_items (much faster for large repos)
-    let mut git_info = cfm_lib::git::get_git_info_filtered(path, &filter_paths).ok();
+    let mut git_info = fab_lib::git::get_git_info_filtered(path, &filter_paths).ok();
 
     // For directories, we need to also collect statuses for their immediate children
     // because git pathspec "src" matches src/*, but we display src/daemon.rs etc.
