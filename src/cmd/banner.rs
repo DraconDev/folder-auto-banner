@@ -1499,6 +1499,43 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             summary.total_items
         );
     }
+
+    // Show mini tree on the right side if there's enough terminal space
+    if config.mini_tree {
+        let term_width = get_terminal_width();
+        if term_width > 120 {
+            let tree_width = (term_width / 3).min(40); // Use 1/3 of terminal, max 40 chars
+            let dirs: Vec<&crate::fs::DirEntry> = summary.top_items.iter()
+                .filter(|i| i.is_dir && !i.name.starts_with('.'))
+                .take(5)
+                .collect();
+            if !dirs.is_empty() {
+                let mut tree_lines = Vec::new();
+                tree_lines.push(format!("{}{}{}", color(BOLD), path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.display().to_string()), color(RESET)));
+                for (i, dir) in dirs.iter().enumerate() {
+                    let is_last = i == dirs.len() - 1;
+                    let connector = if is_last { "└── " } else { "├── " };
+                    let name = if dir.name.len() > tree_width - 4 {
+                        format!("{}...{}", &dir.name[..tree_width - 7], color(RESET))
+                    } else {
+                        dir.name.clone()
+                    };
+                    tree_lines.push(format!("{}{}{}{}{}", color(DIM), connector, color(BLUE_BOLD), name, color(RESET)));
+                }
+                // Print tree aligned to the right
+                let tree_str = tree_lines.join("\n");
+                let tree_display_width = strip_ansi(&tree_str).lines().next().map(|l| l.len()).unwrap_or(0);
+                let padding = " ".repeat(term_width.saturating_sub(tree_display_width + 5));
+                for (i, line) in tree_str.lines().enumerate() {
+                    if i == 0 {
+                        println!("{}{}{}", padding, color(DIM), line);
+                    } else {
+                        println!("{}{}", padding, line);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn output_raw(summary: &DirSummary) {
