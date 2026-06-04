@@ -1251,6 +1251,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     }
 
     // Print each row - PERM OWNER GROUP CONTENTS SIZE DATE NAME
+    let num_width = display_items.len().to_string().len(); // for right-aligned numbering
     for (idx, item) in display_items.iter().enumerate() {
         let row_tint = if idx % 2 == 0 { ROW_TINT } else { "" };
         let tint_reset = if idx % 2 == 0 { color(RESET) } else { "" };
@@ -1528,7 +1529,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         // Add navigation number if enabled
         if config.numbered {
             let num = idx + 1; // 1-based numbering
-            let num_str = format!("{}[{}{}{}]{}", color(DIM), color(BOLD), color(CYAN), num, color(RESET));
+            let num_str = format!("{}[{}{}{:>width$}{}]{}", color(DIM), color(BOLD), color(CYAN), num, color(RESET), width = num_width);
             row_parts.push(num_str);
         }
         row_parts.push(icon_str);
