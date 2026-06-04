@@ -150,12 +150,17 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     let entry = &entries[num - 1]; // Convert to 0-based
     let path = entry.path();
     
+    // Debug: show what we're checking
+    eprintln!("[debug] num={}, name={}, is_dir={}, path={}", 
+             num, entry.file_name().to_string_lossy(), path.is_dir(), path.display());
+    
     if path.is_dir() {
         // For directories: print the path (shell function will cd to it)
         println!("{}", path.display());
     } else {
         // For files: open in editor
         let editor = std::env::var("EDITOR").unwrap_or_else(|_| "micro".to_string());
+        eprintln!("[debug] opening in editor: {}", editor);
         let status = std::process::Command::new(&editor)
             .arg(&path)
             .status()?;
