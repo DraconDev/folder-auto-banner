@@ -552,7 +552,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 
         if git_info.is_repo {
             // Row 1: Path + Git details (explicit)
-            let mut parts = vec![format!("{} {}", project_icon, path_display)];
+            let mut parts = vec![format!("{}", path_display)];
             if !branch_display.is_empty() {
                 parts.push(format!("{}{}{}", color(BOLD), branch_display, color(RESET)));
             }
