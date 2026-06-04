@@ -1010,10 +1010,28 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         display_items.retain(|item| !is_git_ignored(&item.path));
     }
 
-    // Apply max limit if specified
+    // Apply max limit if specified (smart truncation for big folders)
+    let total_before_truncation = display_items.len();
     if let Some(max_items) = opts.max {
         display_items.truncate(max_items);
+    } else if config.smart_truncation && total_before_truncation > config.max_display_items {
+        // Smart truncation: show most relevant items
+        // Sort by git status first, then by recency
+        display_items.sort_by(|a, b| {
+            let a_git = git_info.file_statuses.get(a.name.as_str()).is_some();
+            let b_git = git_info.file_statuses.get(b.name.as_str()).is_some();
+            let git_order = b_git.cmp(&a_git); // git changes first
+            if git_order != std::cmp::Ordering::Equal {
+                return git_order;
+            }
+            // Then by recency
+            let a_time = a.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
+            let b_time = b.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
+            b_time.cmp(&a_time) // most recent first
+        });
+        display_items.truncate(config.max_display_items);
     }
+    let hidden_count = total_before_truncation - display_items.len();
 
     // Group by type if requested
     if opts.group {
@@ -1498,6 +1516,26 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             hidden_items.len(),
             summary.total_items
         );
+    }
+
+    // Show smart truncation summary for big folders
+    if hidden_count > 0 && config.smart_truncation {
+        let hidden_dirs = summary.top_items.iter().filter(|i| i.is_dir && !display_items.iter().any(|d| d.path == i.path)).count();
+        let hidden_files = summary.top_items.iter().filter(|i| i.is_file && !display_items.iter().any(|d| d.path == i.path)).count();
+        if hidden_dirs > 0 || hidden_files > 0 {
+            let mut parts = Vec::new();
+            if hidden_dirs > 0 {
+                parts.push(format!("{}{} dirs{}", color(DIM), hidden_dirs, color(RESET)));
+            }
+            if hidden_files > 0 {
+                parts.push(format!("{}{} files{}", color(DIM), hidden_files, color(RESET)));
+            }
+            println!("  {} {} hidden (sorted by git status & recency){}",
+                color(DIM),
+                parts.join(", "),
+                color(RESET)
+            );
+        }
     }
 
     // Show mini tree on the right side if there's enough terminal space
