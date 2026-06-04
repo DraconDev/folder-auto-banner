@@ -1015,7 +1015,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     if let Some(max_items) = opts.max {
         display_items.truncate(max_items);
     } else if config.smart_truncation && total_before_truncation > config.max_display_items {
-        // Smart truncation: show most relevant items
+        // Smart truncation: show as many items as fit in the terminal
         // Sort by git status first, then by recency
         display_items.sort_by(|a, b| {
             let a_git = git_info.file_statuses.get(a.name.as_str()).is_some();
@@ -1029,9 +1029,16 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             let b_time = b.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
             b_time.cmp(&a_time) // most recent first
         });
-        // Show more items when inline_preview is enabled (user wants to see subfolders)
-        let limit = if config.inline_preview { 20 } else { config.max_display_items };
-        display_items.truncate(limit);
+        // Calculate how many items fit: terminal height - banner (4 lines) - hidden summary (1 line) - margin (2)
+        let term_height = get_terminal_height();
+        let max_fit = if term_height > 10 {
+            term_height.saturating_sub(7) // banner lines + hidden summary + margin
+        } else if config.inline_preview {
+            25 // generous default when terminal height unknown but inline_preview on
+        } else {
+            config.max_display_items
+        };
+        display_items.truncate(max_fit.max(config.max_display_items));
     }
     let hidden_count = total_before_truncation - display_items.len();
 
@@ -2033,6 +2040,25 @@ fn get_terminal_width() -> usize {
             let mut winsize: libc::winsize = std::mem::zeroed();
             if libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut winsize) == 0 {
                 winsize.ws_col as usize
+            } else {
+                0
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        0
+    }
+}
+
+/// Get terminal height (returns 0 if cannot determine)
+fn get_terminal_height() -> usize {
+    #[cfg(unix)]
+    {
+        unsafe {
+            let mut winsize: libc::winsize = std::mem::zeroed();
+            if libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut winsize) == 0 {
+                winsize.ws_row as usize
             } else {
                 0
             }
