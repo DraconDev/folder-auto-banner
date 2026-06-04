@@ -33,7 +33,7 @@ fab is **not a drop-in `ls` replacement** — it's a **contextual directory dash
 | **Build status** | ✅ | ❌ | ❌ |
 | **Language breakdown** | ✅ | ❌ | ❌ |
 | Long format (`-l`) | ✅ (default) | ✅ | ✅ |
-| Recursive (`-R`) | ❌ | ✅ | ✅ |
+| Recursive (`-R`) | ✅ | ✅ | ✅ |
 
 See [COMPETITORS.md](COMPETITORS.md) for the full comparison.
 
@@ -57,6 +57,7 @@ f --versionsort      # Natural sort (file1, file2, file10)
 f -a                 # Show dotfiles
 f --tree             # Tree view
 f --json             # JSON output
+f -R, --recursive    # Recurse into subdirectories
 f --filter rs        # Filter by pattern
 f config             # Open config file
 f daemon stop        # Stop daemon
@@ -87,6 +88,7 @@ f daemon status      # Check daemon status
 | `--filter <pattern>` | Filter by name |
 | `--max <N>` | Limit items |
 | `--compact` | Less info |
+| `-R`, `--recursive` | Recurse into subdirectories |
 | `--verbose` | More info |
 
 ### Output

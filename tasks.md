@@ -48,6 +48,7 @@
 - [x] `--verbose` — more info
 - [x] `--json` — JSON output
 - [x] `--raw` — plain text output
+- [x] `-R`, `--recursive` — recursive directory listing
 
 ### Shell Integration
 - [x] Zsh hook (chpwd)

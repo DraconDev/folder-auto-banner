@@ -103,3 +103,7 @@ test_banner/
 !rust-toolchain.toml
 !rustfmt.toml
 # --- END DRACON MANAGED BLOCK ---
+
+# HTML files (large pi-session exports make repo register as HTML)
+*.html
+*.htm
