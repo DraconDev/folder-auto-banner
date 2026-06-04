@@ -130,7 +130,7 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
 }
 
 /// Navigate to item by number - cd if directory, open in editor if file
-/// Uses same sorting as banner display (git status first, then name)
+/// Uses same sorting as banner display
 fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     use std::fs;
     
@@ -138,44 +138,42 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     let config = crate::state::Config::load().unwrap_or_default();
     
     // Read directory contents
-    let mut all_entries: Vec<_> = fs::read_dir(cwd)?
+    let all_entries: Vec<_> = fs::read_dir(cwd)?
         .filter_map(|e| e.ok())
         .collect();
     
-    // Count non-hidden items to decide whether to show hidden (matching banner logic)
-    let total_visible = all_entries.iter()
+    // Split into visible and hidden (matching banner logic)
+    let mut visible_entries: Vec<_> = all_entries.iter()
         .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
-        .count();
-    let show_hidden = total_visible < 30; // matching banner: show hidden when < 30 visible items
+        .collect();
+    let mut hidden_entries: Vec<_> = all_entries.iter()
+        .filter(|e| e.file_name().to_string_lossy().starts_with('.'))
+        .collect();
     
-    // Filter hidden if needed
-    if !show_hidden {
-        all_entries.retain(|e| !e.file_name().to_string_lossy().starts_with('.'));
-    }
-    let mut entries = all_entries;
+    // Show hidden when total visible < 30 (matching banner)
+    let show_hidden = visible_entries.len() < 30;
     
-    // Note: git info not needed for sorting (matching banner default sort="name")
-    
-    // Sort by: directories first, then name (matching banner default)
-    entries.sort_by(|a, b| {
-        // Directories first (matching banner default group_dirs="first")
+    // Sort each group: directories first, then by name
+    let sort_fn = |a: &&fs::DirEntry, b: &&fs::DirEntry| -> std::cmp::Ordering {
         let a_is_dir = a.path().is_dir();
         let b_is_dir = b.path().is_dir();
         if a_is_dir != b_is_dir {
-            return if a_is_dir {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Greater
-            };
+            return if a_is_dir { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater };
         }
-        
-        // Then by name (matching banner default sort="name")
         let a_name = a.file_name().to_string_lossy().to_lowercase();
         let b_name = b.file_name().to_string_lossy().to_lowercase();
         a_name.cmp(&b_name)
-    });
+    };
+    visible_entries.sort_by(sort_fn);
+    hidden_entries.sort_by(sort_fn);
     
-    // Apply max_display_items limit (matching banner behavior)
+    // Combine: visible first, then hidden (matching banner)
+    let mut entries: Vec<&fs::DirEntry> = visible_entries;
+    if show_hidden {
+        entries.extend(hidden_entries);
+    }
+    
+    // Apply max_display_items limit
     let max_items = config.max_display_items;
     let display_items: Vec<_> = entries.into_iter().take(max_items).collect();
     
