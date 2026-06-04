@@ -584,7 +584,15 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
             // Diff stats
             if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
-                parts.push(format!("+{} -{}", git_info.lines_added, git_info.lines_deleted));
+                parts.push(format!(
+                    "{}+{}{} {}-{}{}",
+                    color(GREEN),
+                    git_info.lines_added,
+                    color(RESET),
+                    color(RED),
+                    git_info.lines_deleted,
+                    color(RESET)
+                ));
             }
             let row1 = parts.join(" │ ");
 
@@ -717,18 +725,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 }
             }
 
-            // Diff stats
-            if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
-                details.push(format!(
-                    "{}+{}{} {}-{}{}",
-                    color(GREEN),
-                    git_info.lines_added,
-                    color(RESET),
-                    color(RED),
-                    git_info.lines_deleted,
-                    color(RESET)
-                ));
-            }
 
             // Cached test results
             if let Some(test_results) = crate::test_cache::TestResults::load() {
