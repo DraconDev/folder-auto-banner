@@ -947,7 +947,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     };
 
     println!("{}", header);
-    println!();
+    // Underline divider
+    let header_width = strip_ansi(&header).len();
+    println!("{}", "─".repeat(header_width));
 
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
     let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
