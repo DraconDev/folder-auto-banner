@@ -1583,14 +1583,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         println!("{}{}{}", row_tint, row_str, tint_reset);
     }
 
-    if !show_hidden_flag && !hidden_items.is_empty() {
-        println!(
-            "  ... and {} hidden items ({} total items)",
-            hidden_items.len(),
-            summary.total_items
-        );
-    }
-
     // Show smart truncation summary for big folders
     if hidden_count > 0 && config.smart_truncation {
         let hidden_dirs = summary.top_items.iter().filter(|i| i.is_dir && !display_items.iter().any(|d| d.path == i.path)).count();
