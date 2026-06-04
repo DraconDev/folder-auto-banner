@@ -137,11 +137,22 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     // Load config
     let config = crate::state::Config::load().unwrap_or_default();
     
-    // Read directory contents (same as banner default: no gitignore filter)
-    let mut entries: Vec<_> = fs::read_dir(cwd)?
+    // Read directory contents
+    let mut all_entries: Vec<_> = fs::read_dir(cwd)?
         .filter_map(|e| e.ok())
-        .filter(|e| !e.file_name().to_string_lossy().starts_with('.')) // skip hidden
         .collect();
+    
+    // Count non-hidden items to decide whether to show hidden (matching banner logic)
+    let total_visible = all_entries.iter()
+        .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
+        .count();
+    let show_hidden = total_visible < 30; // matching banner: show hidden when < 30 visible items
+    
+    // Filter hidden if needed
+    if !show_hidden {
+        all_entries.retain(|e| !e.file_name().to_string_lossy().starts_with('.'));
+    }
+    let mut entries = all_entries;
     
     // Note: git info not needed for sorting (matching banner default sort="name")
     
