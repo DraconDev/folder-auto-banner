@@ -89,9 +89,39 @@ Tested in:
 - `~/Dev/dracon-platform` (12 files) - inline preview shows subfolder contents
 - `~/Dev/folder-auto-banner` - standard project view
 
+## Smart Truncation for Big Folders
+
+### Implementation
+- Config option: `smart_truncation = true` (enabled by default)
+- Detects when folder has more items than `max_display_items` (default: 8)
+- Sorts items by git status first, then by recency
+- Shows summary of hidden items
+
+### Example Output
+```
+~/Dev Generic │ 💾 92k │ 📄 0 files │ 📂 23 dirs
+...
+  📁 avid
+  📁 browser-extensions-shared
+  📁 dracon-ai-lib
+  📁 dracon-platform
+  📁 dracon-terminal-engine
+  📁 folder-auto-banner
+  📁 one-mil-girls
+  📁 rust-ai-web-auto
+  16 dirs hidden (sorted by git status & recency)
+```
+
+### How It Works
+1. Counts total items before truncation
+2. Sorts by: git changes > recency > name
+3. Shows top N items (default: 8)
+4. Displays summary of hidden items
+
 ## Future Improvements
 
 1. Auto-enable based on terminal width
 2. Configurable depth for mini tree
 3. Show file counts in mini tree
 4. Combine both approaches intelligently
+5. Configurable smart_truncation threshold
