@@ -5,19 +5,20 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 109387,
-    "activeSeconds": 602
+    "tokensUsed": 112084,
+    "activeSeconds": 644
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T20:17:02.827Z",
-  "updatedAt": "2026-06-04T20:27:41.703Z",
+  "updatedAt": "2026-06-04T20:28:26.065Z",
   "activePath": ".pi/goals/active_goal_2026060421170282_mpzxs3fv-vgavqa.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Implement inline subfolder preview option",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T20:28:10.411Z",
         "verificationContract": "Run f in a folder with subfolders, verify inline previews show when terminal is wide enough"
       },
       {
@@ -53,12 +54,12 @@ Add smart tree feature: experiment with inline subfolder previews and right-side
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 10m02s
-- Tokens used: 109K (109,387) tokens
+- Time spent: 10m44s
+- Tokens used: 112K (112,084) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Implement inline subfolder preview option — contract: Run f in a folder with subfolders, verify inline previews show when terminal is wide enough
+- [x] task-1: Implement inline subfolder preview option
 - [ ] task-2: Implement right-side mini tree option — contract: Run f in a folder with subfolders, verify mini tree shows on right when terminal is wide enough
 - [ ] task-3: Add smart truncation for big folders — contract: Run f in ~/Dev (23+ dirs), verify most relevant items shown first with smart limit
 - [ ] task-4: Test both approaches and document findings — contract: Run f in multiple directories, compare approaches, document which works better
