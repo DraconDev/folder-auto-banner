@@ -223,7 +223,7 @@ CFM is **not a drop-in `ls` replacement** — it's a **contextual directory dash
 | | CFM | lsd | eza |
 |---|-----|-----|-----|
 | Package managers | Build from source | ✅ Most distros | ✅ Most distros |
-| Cargo | `cargo install cfm` | `cargo install lsd` | `cargo install eza` |
+| Cargo | `cargo install fab` | `cargo install lsd` | `cargo install eza` |
 | Binary releases | ✅ GitHub | ✅ GitHub | ✅ GitHub |
 | NixOS | Manual | ✅ `nixpkgs.lsd` | ✅ `nixpkgs.eza` |
 

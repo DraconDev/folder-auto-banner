@@ -62,7 +62,7 @@
 | **LIFE-7** | Stale socket cleanup only on startup (race window) | LOW | LOW (0.5h) |
 | **LIFE-8** | Daemon stderr null (errors invisible) | LOW (debuggability) | LOW (0.5h) |
 
-### 4. Payload (cfm-lib/src/fs/mod.rs, cfm-lib/src/git/mod.rs)
+### 4. Payload (fab-lib/src/fs/mod.rs, fab-lib/src/git/mod.rs)
 
 | ID | Finding | Impact | Effort |
 |----|---------|--------|--------|
@@ -77,7 +77,7 @@
 | **PAY-9** | DirSummary has 5 Option fields (always present) | LOW | LOW (0.5h) |
 | **PAY-10** | No field-level versioning (schema breaks cached banners) | LOW (correctness) | MEDIUM (2h) |
 
-### 5. Cold Start (cfm-lib/src/fs/mod.rs, etc.)
+### 5. Cold Start (fab-lib/src/fs/mod.rs, etc.)
 
 | ID | Finding | Impact | Effort |
 |----|---------|--------|--------|
@@ -201,7 +201,7 @@
 - Expected: -100ms cold (4 parallel checks → 1 sequential)
 
 ### Direct-scan disk cache (COLD-6)
-- Write BannerData to `~/.cache/cfm/cold_cache.json` on each direct scan
+- Write BannerData to `~/.cache/fab/cold_cache.json` on each direct scan
 - On startup, check if cache exists and is <5min old
 - Replaces the first cold start after daemon crash
 - Expected: 182ms → 50ms (warm restart)

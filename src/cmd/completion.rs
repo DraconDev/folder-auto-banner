@@ -4,7 +4,7 @@ use clap::Command;
 use clap_complete::{generate, shells};
 
 pub fn run_completion(shell: &str) -> Result<()> {
-    let mut cmd = Command::new("f")
+    let mut cmd = Command::new("fab")
         .version(env!("CARGO_PKG_VERSION"))
         .about("fab — Folder Auto Banner")
         .subcommand(Command::new("banner").about("Print the contextual directory dashboard"))
@@ -69,11 +69,11 @@ pub fn run_completion(shell: &str) -> Result<()> {
         .subcommand(Command::new("config").about("Edit configuration"));
 
     match shell.to_lowercase().as_str() {
-        "bash" => generate(shells::Bash, &mut cmd, "f", &mut std::io::stdout()),
-        "zsh" => generate(shells::Zsh, &mut cmd, "f", &mut std::io::stdout()),
-        "fish" => generate(shells::Fish, &mut cmd, "f", &mut std::io::stdout()),
-        "powershell" | "ps" => generate(shells::PowerShell, &mut cmd, "f", &mut std::io::stdout()),
-        "elvish" => generate(shells::Elvish, &mut cmd, "f", &mut std::io::stdout()),
+        "bash" => generate(shells::Bash, &mut cmd, "fab", &mut std::io::stdout()),
+        "zsh" => generate(shells::Zsh, &mut cmd, "fab", &mut std::io::stdout()),
+        "fish" => generate(shells::Fish, &mut cmd, "fab", &mut std::io::stdout()),
+        "powershell" | "ps" => generate(shells::PowerShell, &mut cmd, "fab", &mut std::io::stdout()),
+        "elvish" => generate(shells::Elvish, &mut cmd, "fab", &mut std::io::stdout()),
         _ => {
             println!("❌ Unknown shell: {}", shell);
             println!("Supported shells: bash, zsh, fish, powershell, elvish");

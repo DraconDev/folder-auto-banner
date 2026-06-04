@@ -57,7 +57,7 @@ Implement the high and medium priority performance improvements from AUDIT.md.
 
 ## Progress
 - [x] Iteration 1: Optimized `get_git_info()` with pathspec filtering
-  - Added `get_git_info_filtered()` function in cfm-lib
+  - Added `get_git_info_filtered()` function in fab-lib
   - Cold start improved from ~2500ms to ~350ms (7x faster)
   - Warm cache improved from ~1800ms to ~100ms (18x faster)
   - Verified banner output still correct

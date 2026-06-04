@@ -1,6 +1,6 @@
 //! fab-lib — shared library for Folder Auto Banner
 //!
-//! Contains the core modules shared between the `fm` CLI and `cfmd` daemon binaries.
+//! Contains the core modules shared between the `fab` CLI and `fabd` daemon binaries.
 
 pub mod build_status;
 pub mod cache;

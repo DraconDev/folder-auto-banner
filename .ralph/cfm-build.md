@@ -1,4 +1,4 @@
-# cfm — Contextual File Manager
+# fab — Folder Auto Banner
 
 ## ✅ COMPLETE AND READY!
 
@@ -8,7 +8,7 @@ After running the installation script and sourcing your shell config, the auto b
 
 ```bash
 exec zsh            # or: source ~/.bashrc
-cd cfm
+cd fab
 # See rich banner with:
 # - Project type (🦀 Rust)
 # - Git status
@@ -26,7 +26,7 @@ Or after installation:
 
 ```bash
 source ~/.bashrc   # or: exec zsh
-cd cfm
+cd fab
 # Auto banner appears!
 ```
 
@@ -87,7 +87,7 @@ cargo run
 
 ### Auto (after installation)
 ```bash
-cd cfm
+cd fab
 # Banner appears automatically!
 ```
 

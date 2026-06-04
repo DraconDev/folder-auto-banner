@@ -6,7 +6,7 @@ echo "🔧 Installing fab..."
 BIN_DIR="$HOME/.local/bin"
 BIN_PATH="$BIN_DIR/f"
 DAEMON_BIN="$BIN_DIR/fabd"
-SOCKET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/cfm"
+SOCKET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fab"
 SOCKET_PATH="$SOCKET_DIR/fabd.sock"
 
 mkdir -p "$BIN_DIR"
@@ -96,7 +96,7 @@ for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     if [ -f "$rc" ]; then
         # Remove old fab function names and hook registrations
         sed -i '/_fab_hook\|_fab_on_directory_change\|_fab_on_startup/d' "$rc" 2>/dev/null || true
-        sed -i '/add-zsh-hook \(chpwd\|precmd\) _cfm/d' "$rc" 2>/dev/null || true
+        sed -i '/add-zsh-hook \(chpwd\|precmd\) _fab/d' "$rc" 2>/dev/null || true
         sed -i '/^# fab shell integration\|^# fab auto-banner hook/d' "$rc" 2>/dev/null || true
         # Remove orphaned function fragments from partial teardowns
         sed -i '/^    command f banner/d' "$rc" 2>/dev/null || true
