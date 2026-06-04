@@ -137,11 +137,10 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     // Load config
     let config = crate::state::Config::load().unwrap_or_default();
     
-    // Read directory contents
+    // Read directory contents (same as banner default: no gitignore filter)
     let mut entries: Vec<_> = fs::read_dir(cwd)?
         .filter_map(|e| e.ok())
         .filter(|e| !e.file_name().to_string_lossy().starts_with('.')) // skip hidden
-        .filter(|e| !is_git_ignored(&e.path())) // skip gitignored files (matching banner behavior)
         .collect();
     
     // Get git info for sorting (if in git repo)
