@@ -497,6 +497,7 @@ fn build_git_status_indicators(git_info: &GitInfo) -> String {
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &BannerOptions) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
+    eprintln!("DEBUG: inline_preview={}", config.inline_preview);
 
     let path_str = path.to_string_lossy();
     let project_icon = summary.project_type.icon();
