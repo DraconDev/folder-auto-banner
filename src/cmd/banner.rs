@@ -947,9 +947,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     };
 
     println!("{}", header);
-    // Underline divider
-    let header_width = strip_ansi(&header).len();
-    println!("{}", "─".repeat(header_width));
+    // Underline only the second row
+    if let Some(last_line) = header.lines().last() {
+        let last_width = strip_ansi(last_line).len();
+        println!("{}", "─".repeat(last_width));
+    }
 
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
     let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
