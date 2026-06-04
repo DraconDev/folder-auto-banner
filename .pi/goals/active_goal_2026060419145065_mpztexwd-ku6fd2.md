@@ -5,25 +5,27 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 92355,
-    "activeSeconds": 122
+    "tokensUsed": 100452,
+    "activeSeconds": 193
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T18:14:50.653Z",
-  "updatedAt": "2026-06-04T18:17:01.051Z",
+  "updatedAt": "2026-06-04T18:18:13.820Z",
   "activePath": ".pi/goals/active_goal_2026060419145065_mpztexwd-ku6fd2.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Fix colored diff stats in first row",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T18:17:37.851Z",
         "verificationContract": "Run cargo run, make an uncommitted change, verify +N is green and -N is red in the top-right of the first row"
       },
       {
         "id": "task-2",
         "title": "Remove duplicate diff stats from second row",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T18:17:37.853Z",
         "verificationContract": "Run cargo run, make an uncommitted change, verify second row shows no +N -N"
       },
       {
@@ -47,12 +49,12 @@ Fix git diff stats in banner: color the +N/-N in the first row (green/red) and r
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m02s
-- Tokens used: 92K (92,355) tokens
+- Time spent: 3m13s
+- Tokens used: 100K (100,452) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Fix colored diff stats in first row — contract: Run cargo run, make an uncommitted change, verify +N is green and -N is red in the top-right of the first row
-- [ ] task-2: Remove duplicate diff stats from second row — contract: Run cargo run, make an uncommitted change, verify second row shows no +N -N
+- [x] task-1: Fix colored diff stats in first row
+- [x] task-2: Remove duplicate diff stats from second row
 - [ ] task-3: Rebuild and install — contract: cargo build --release && cp target/release/f ~/.local/bin/f && ~/.local/bin/f shows correct colored output
 
