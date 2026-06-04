@@ -1,4 +1,4 @@
-# cfm — Contextual File Manager
+# fab — Folder Auto Banner
 
 A directory listing with instant context.
 
@@ -97,7 +97,7 @@ f daemon status      # Check daemon status
 
 ## Config File
 
-Location: `~/.config/cfm/config.toml`
+Location: `~/.config/fab/config.toml`
 
 Open with: `f config`
 
