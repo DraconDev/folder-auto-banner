@@ -1109,11 +1109,24 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 }
                 "git" => {
                     // Sort by git status: modified > added > untracked > deleted > none
-                    let git_order = |_item: &&crate::fs::DirEntry| -> u8 {
-                        // This would need git status per file - for now sort by name
-                        0
+                    let get_git_order = |item: &&crate::fs::DirEntry| -> u8 {
+                        let rel = item.path.strip_prefix(path).unwrap_or(&item.path);
+                        let rel_str = rel.to_string_lossy();
+                        git_info
+                            .file_statuses
+                            .get(rel_str.as_ref())
+                            .or_else(|| git_info.file_statuses.get(item.name.as_str()))
+                            .map(|fs| match fs {
+                                crate::git::FileStatus::Conflict => 5,
+                                crate::git::FileStatus::Deleted => 4,
+                                crate::git::FileStatus::Modified => 3,
+                                crate::git::FileStatus::Added => 2,
+                                crate::git::FileStatus::Renamed => 1,
+                                crate::git::FileStatus::Untracked => 0,
+                            })
+                            .unwrap_or(0)
                     };
-                    git_order(a).cmp(&git_order(b))
+                    get_git_order(a).cmp(&get_git_order(b))
                 }
                 "version" => {
                     // Natural sort (version numbers)
