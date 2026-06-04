@@ -389,16 +389,6 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions) -
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
     
-    // Check if path argument is a number for navigation
-    if let Some(ref path_arg) = opts.path {
-        if let Some(num_str) = path_arg.to_str() {
-            if let Ok(num) = num_str.parse::<usize>() {
-                // Numeric navigation - look up item by number
-                return navigate_by_number(num, &cwd);
-            }
-        }
-    }
-    
     let path = opts
         .path
         .unwrap_or(cwd.as_path())
@@ -464,6 +454,16 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     }
     if opts.highlight_old.is_none() && !config.highlight_old.is_empty() {
         opts.highlight_old = Some(config.highlight_old);
+    }
+
+    // Check if path argument is a number for navigation (after config is loaded)
+    if let Some(ref path_arg) = opts.path {
+        if let Some(num_str) = path_arg.to_str() {
+            if let Ok(num) = num_str.parse::<usize>() {
+                // Numeric navigation - look up item by number using same display pipeline
+                return navigate_by_number(num, &cwd, &opts);
+            }
+        }
     }
 
     // Tree view mode
@@ -1225,218 +1225,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         println!("{}", "─".repeat(last_width));
     }
 
-    let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
-    let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
-
-    for item in &summary.top_items {
-        if item.name.starts_with('.') {
-            hidden_items.push(item);
-        } else {
-            visible_items.push(item);
-        }
-    }
-
-    let total_visible = visible_items.len();
-    let show_hidden_flag = opts.hidden || total_visible < 30;
-
-    let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden_flag {
-        visible_items
-            .iter()
-            .chain(hidden_items.iter())
-            .copied()
-            .collect()
-    } else {
-        visible_items.to_vec()
-    };
-
-    // Apply filter if specified
-    if let Some(pattern) = opts.filter {
-        let lower_pattern = pattern.to_lowercase();
-        display_items.retain(|item| {
-            let name_lower = item.name.to_lowercase();
-            // Match by extension or name substring
-            name_lower.contains(&lower_pattern)
-                || item
-                    .name
-                    .rsplit('.')
-                    .next()
-                    .map(|ext| ext.to_lowercase().contains(&lower_pattern))
-                    .unwrap_or(false)
-        });
-    }
-
-    // Apply only-dirs / only-files filter
-    if opts.only_dirs {
-        display_items.retain(|item| item.is_dir);
-    }
-    if opts.only_files {
-        display_items.retain(|item| item.is_file);
-    }
-
-    // Apply git-ignore filter
-    if opts.git_ignore {
-        display_items.retain(|item| !is_git_ignored(&item.path));
-    }
-
-    // Apply max limit if specified (smart truncation for big folders)
-    let total_before_truncation = display_items.len();
-    if let Some(max_items) = opts.max {
-        display_items.truncate(max_items);
-    } else if config.smart_truncation && total_before_truncation > config.max_display_items {
-        // Smart truncation: show as many items as fit in the terminal
-        // Sort by git status first, then by recency
-        display_items.sort_by(|a, b| {
-            let a_git = git_info.file_statuses.get(a.name.as_str()).is_some();
-            let b_git = git_info.file_statuses.get(b.name.as_str()).is_some();
-            let git_order = b_git.cmp(&a_git); // git changes first
-            if git_order != std::cmp::Ordering::Equal {
-                return git_order;
-            }
-            // Then by recency
-            let a_time = a.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
-            let b_time = b.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
-            b_time.cmp(&a_time) // most recent first
-        });
-        // Calculate how many items fit: terminal height - banner (4 lines) - hidden summary (1 line) - margin (2)
-        let term_height = get_terminal_height();
-        let max_fit = if term_height > 10 {
-            term_height.saturating_sub(7) // banner lines + hidden summary + margin
-        } else if config.inline_preview {
-            25 // generous default when terminal height unknown but inline_preview on
-        } else {
-            config.max_display_items
-        };
-        display_items.truncate(max_fit.max(config.max_display_items));
-    }
-    let hidden_count = total_before_truncation - display_items.len();
-
-    // Group by type if requested
-    if opts.group {
-        let mut dirs: Vec<&crate::fs::DirEntry> =
-            display_items.iter().filter(|i| i.is_dir).copied().collect();
-        let mut files: Vec<&crate::fs::DirEntry> = display_items
-            .iter()
-            .filter(|i| i.is_file && !i.is_symlink)
-            .copied()
-            .collect();
-        let mut symlinks: Vec<&crate::fs::DirEntry> = display_items
-            .iter()
-            .filter(|i| i.is_symlink)
-            .copied()
-            .collect();
-        dirs.sort_by_key(|i| i.name.to_lowercase());
-        files.sort_by_key(|i| i.name.to_lowercase());
-        symlinks.sort_by_key(|i| i.name.to_lowercase());
-        display_items = dirs.into_iter().chain(files).chain(symlinks).collect();
-    }
-
-    // Sort based on --sort flag or short flags
-    if !opts.no_sort {
-        // Resolve sort mode from flags
-        let sort_mode = if let Some(s) = opts.sort {
-            s.to_string()
-        } else if opts.timesort {
-            "date".to_string()
-        } else if opts.sizesort {
-            "size".to_string()
-        } else if opts.extensionsort {
-            "extension".to_string()
-        } else if opts.gitsort {
-            "git".to_string()
-        } else if opts.versionsort {
-            "version".to_string()
-        } else {
-            "name".to_string()
-        };
-
-        // Group dirs handling
-        let group_dirs_mode = opts.group_dirs.unwrap_or("first");
-
-        display_items.sort_by(|a, b| {
-            // Group directories if requested
-            if group_dirs_mode != "none" && a.is_dir != b.is_dir {
-                return if group_dirs_mode == "last" {
-                    if opts.reverse {
-                        b.is_dir.cmp(&a.is_dir)
-                    } else {
-                        a.is_dir.cmp(&b.is_dir)
-                    }
-                } else {
-                    // first (default)
-                    if opts.reverse {
-                        a.is_dir.cmp(&b.is_dir)
-                    } else {
-                        b.is_dir.cmp(&a.is_dir)
-                    }
-                };
-            }
-
-            let ordering = match sort_mode.as_str() {
-                "size" => a.size.cmp(&b.size),
-                "date" => {
-                    let a_time = a.modified.unwrap_or_else(|| {
-                        chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
-                    });
-                    let b_time = b.modified.unwrap_or_else(|| {
-                        chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
-                    });
-                    a_time.cmp(&b_time)
-                }
-                "type" => {
-                    let a_ext = a.name.rfind('.').map(|i| &a.name[i..]).unwrap_or("");
-                    let b_ext = b.name.rfind('.').map(|i| &b.name[i..]).unwrap_or("");
-                    let ext_cmp = a_ext.cmp(b_ext);
-                    if ext_cmp != std::cmp::Ordering::Equal {
-                        ext_cmp
-                    } else {
-                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
-                    }
-                }
-                "extension" => {
-                    let a_ext = a.name.rfind('.').map(|i| &a.name[i + 1..]).unwrap_or("");
-                    let b_ext = b.name.rfind('.').map(|i| &b.name[i + 1..]).unwrap_or("");
-                    let ext_cmp = a_ext.to_lowercase().cmp(&b_ext.to_lowercase());
-                    if ext_cmp != std::cmp::Ordering::Equal {
-                        ext_cmp
-                    } else {
-                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
-                    }
-                }
-                "git" => {
-                    // Sort by git status: modified > added > untracked > deleted > none
-                    let get_git_order = |item: &&crate::fs::DirEntry| -> u8 {
-                        let rel = item.path.strip_prefix(path).unwrap_or(&item.path);
-                        let rel_str = rel.to_string_lossy();
-                        git_info
-                            .file_statuses
-                            .get(rel_str.as_ref())
-                            .or_else(|| git_info.file_statuses.get(item.name.as_str()))
-                            .map(|fs| match fs {
-                                crate::git::FileStatus::Conflict => 5,
-                                crate::git::FileStatus::Deleted => 4,
-                                crate::git::FileStatus::Modified => 3,
-                                crate::git::FileStatus::Added => 2,
-                                crate::git::FileStatus::Renamed => 1,
-                                crate::git::FileStatus::Untracked => 0,
-                            })
-                            .unwrap_or(0)
-                    };
-                    get_git_order(a).cmp(&get_git_order(b))
-                }
-                "version" => {
-                    // Natural sort (version numbers)
-                    natural_cmp(&a.name, &b.name)
-                }
-                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()), // "name" or default
-            };
-
-            if opts.reverse {
-                ordering.reverse()
-            } else {
-                ordering
-            }
-        });
-    }
+    // Use shared build_display_items for consistent ordering with navigation
+    let (mut display_items, hidden_count) = build_display_items(path, summary, git_info, opts, &config);
 
     // Compute max column widths for alignment
     let mut max_owner = 5; // "OWNER"
