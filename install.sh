@@ -119,8 +119,12 @@ if [ -f "$HOME/.zshrc" ]; then
         echo 'add-zsh-hook chpwd _fab_hook'
         echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
         echo '_fab_hook  # fire on new shell/tab startup'
+        echo ''
+        echo '# fab shell function (enables f N to cd)'
+        echo "source $BIN_DIR/fab-shell.zsh"
     } >> "$HOME/.zshrc"
-    echo "✅ Added chpwd hook to ~/.zshrc"
+    cp fab-shell.zsh "$BIN_DIR/"
+    echo "✅ Added chpwd hook + shell function to ~/.zshrc"
 fi
 
 # --- Install hook for bash ---
@@ -130,8 +134,12 @@ if [ -f "$HOME/.bashrc" ]; then
         echo '# fab auto-banner hook'
         echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
         echo 'PROMPT_COMMAND="_fab_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"'
+        echo ''
+        echo '# fab shell function (enables f N to cd)'
+        echo "source $BIN_DIR/fab-shell.bash"
     } >> "$HOME/.bashrc"
-    echo "✅ Added PROMPT_COMMAND hook to ~/.bashrc"
+    cp fab-shell.bash "$BIN_DIR/"
+    echo "✅ Added PROMPT_COMMAND hook + shell function to ~/.bashrc"
 fi
 
 # --- Start daemon ---
