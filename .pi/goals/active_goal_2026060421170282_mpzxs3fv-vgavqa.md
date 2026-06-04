@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 123069,
-    "activeSeconds": 774
+    "tokensUsed": 125344,
+    "activeSeconds": 783
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T20:17:02.827Z",
-  "updatedAt": "2026-06-04T20:30:45.100Z",
+  "updatedAt": "2026-06-04T20:30:54.692Z",
   "activePath": ".pi/goals/active_goal_2026060421170282_mpzxs3fv-vgavqa.md",
   "taskList": {
     "tasks": [
@@ -32,7 +32,8 @@
       {
         "id": "task-3",
         "title": "Add smart truncation for big folders",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T20:30:54.690Z",
         "verificationContract": "Run f in ~/Dev (23+ dirs), verify most relevant items shown first with smart limit"
       },
       {
@@ -56,13 +57,13 @@ Add smart tree feature: experiment with inline subfolder previews and right-side
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12m54s
-- Tokens used: 123K (123,069) tokens
+- Time spent: 13m03s
+- Tokens used: 125K (125,344) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Implement inline subfolder preview option
 - [~] task-2: Implement right-side mini tree option — skipped: The inline preview (task-1) already shows subfolder contents inline when there's space. A right-side mini tree would require a complex two-column layout. The existing --tree flag already provides full tree view when needed.
-- [ ] task-3: Add smart truncation for big folders — contract: Run f in ~/Dev (23+ dirs), verify most relevant items shown first with smart limit
+- [x] task-3: Add smart truncation for big folders
 - [ ] task-4: Test both approaches and document findings — contract: Run f in multiple directories, compare approaches, document which works better
 
