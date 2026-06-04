@@ -37,9 +37,9 @@ fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response>
     let t3 = std::time::Instant::now();
     let response: Response = serde_json::from_slice(&resp_bytes)?;
     let t4 = std::time::Instant::now();
-    if std::env::var("CFM_PROFILE").is_ok() {
+    if std::env::var("FAB_PROFILE").is_ok() {
         eprintln!(
-            "[CFM_PROFILE] ipc: write={:?} len_read={:?} payload_read={:?} deser={:?} total={:?}",
+            "[FAB_PROFILE] ipc: write={:?} len_read={:?} payload_read={:?} deser={:?} total={:?}",
             t1 - t0,
             t2 - t1,
             t3 - t2,
@@ -84,14 +84,14 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let response = match result {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("[CFM_DEBUG] send_and_recv error: {} (kind: {:?})", e, e);
+            eprintln!("[FAB_DEBUG] send_and_recv error: {} (kind: {:?})", e, e);
             return None;
         }
     };
     let t2 = std::time::Instant::now();
-    if std::env::var("CFM_PROFILE").is_ok() {
+    if std::env::var("FAB_PROFILE").is_ok() {
         eprintln!(
-            "[CFM_PROFILE] ipc: connect={:?} send_recv={:?} total={:?}",
+            "[FAB_PROFILE] ipc: connect={:?} send_recv={:?} total={:?}",
             t1 - t0,
             t2 - t1,
             t2 - t0,

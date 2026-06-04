@@ -7,10 +7,10 @@ license = "MIT"
 repository = "https://github.com/dracon/fab"
 keywords = ["cli", "file-manager", "shell", "productivity"]
 categories = ["command-line-utilities"]
-default-run = "fab"
+default-run = "f"
 
 [[bin]]
-name = "fab"
+name = "f"
 path = "src/main.rs"
 
 [[bin]]
