@@ -1,4 +1,4 @@
-# CFM Daemon Architecture Audit & Optimization Plan
+# fab Daemon Architecture Audit & Optimization Plan
 
 **Date:** 2026-06-01
 **Goal:** Close the gap between current performance (198ms warm, 462ms cold) and audit targets (<10ms warm, <200ms cold).
@@ -6,7 +6,7 @@
 
 ---
 
-## 📊 Baseline Measurements (Profiled with CFM_PROFILE=1)
+## 📊 Baseline Measurements (Profiled with FAB_PROFILE=1)
 
 | Phase | Time | Notes |
 |-------|------|-------|
