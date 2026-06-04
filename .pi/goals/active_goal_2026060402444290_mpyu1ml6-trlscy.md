@@ -1,0 +1,120 @@
+{
+  "version": 3,
+  "id": "mpyu1ml6-trlscy",
+  "objective": "Rename the project from cfm/f to dab (Directory Auto Banner). Update binary name, package name, help text, documentation, and all references.",
+  "status": "paused",
+  "autoContinue": false,
+  "usage": {
+    "tokensUsed": 713,
+    "activeSeconds": 0
+  },
+  "sisyphus": false,
+  "createdAt": "2026-06-04T01:44:42.906Z",
+  "updatedAt": "2026-06-04T01:44:46.678Z",
+  "activePath": ".pi/goals/active_goal_2026060402444290_mpyu1ml6-trlscy.md",
+  "stopReason": "user",
+  "taskList": {
+    "tasks": [
+      {
+        "id": "task-1",
+        "title": "Update Cargo.toml",
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": "task-1a",
+            "title": "Change package name to dab",
+            "status": "pending"
+          },
+          {
+            "id": "task-1b",
+            "title": "Change binary name to dab",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "task-2",
+        "title": "Update source code",
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": "task-2a",
+            "title": "Update help text and descriptions",
+            "status": "pending"
+          },
+          {
+            "id": "task-2b",
+            "title": "Update binary name references",
+            "status": "pending"
+          },
+          {
+            "id": "task-2c",
+            "title": "Update daemon binary name if needed",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "task-3",
+        "title": "Update documentation",
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": "task-3a",
+            "title": "Update README.md",
+            "status": "pending"
+          },
+          {
+            "id": "task-3b",
+            "title": "Update any other docs",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "task-4",
+        "title": "Build and install",
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": "task-4a",
+            "title": "Build release binary",
+            "status": "pending"
+          },
+          {
+            "id": "task-4b",
+            "title": "Install to ~/.local/bin/dab",
+            "status": "pending"
+          },
+          {
+            "id": "task-4c",
+            "title": "Update daemon binary",
+            "status": "pending"
+          }
+        ]
+      }
+    ],
+    "blockCompletion": false,
+    "proposedAt": "2026-06-04T01:44:42.907Z"
+  }
+}
+
+# Goal Prompt
+
+Rename the project from cfm/f to dab (Directory Auto Banner). Update binary name, package name, help text, documentation, and all references.
+
+## Progress
+
+- Status: paused
+- Auto-continue: off
+- Sisyphus mode: no
+- Time spent: 0s
+- Tokens used: 713 tokens
+## Tasks
+
+<!-- blockCompletion: false -->
+- [ ] task-1: Update Cargo.toml
+- [ ] task-2: Update source code
+- [ ] task-3: Update documentation
+- [ ] task-4: Build and install
+

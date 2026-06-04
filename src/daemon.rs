@@ -17,7 +17,7 @@ struct CacheEntry {
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
-const SOCKET_NAME: &str = "cfmd.sock";
+const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 
 struct Daemon {
@@ -29,7 +29,7 @@ struct Daemon {
 
 impl Daemon {
     fn new() -> Result<Self> {
-        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+        let socket_dir = directories::ProjectDirs::from("com", "fab", "fab")
             .ok_or_else(|| anyhow::anyhow!("Cannot determine data directory"))?
             .data_dir()
             .to_path_buf();
@@ -57,11 +57,11 @@ impl Daemon {
         let listener = UnixListener::bind(&self.socket_path)?;
         listener.set_nonblocking(true)?;
 
-        tracing::info!("cfmd listening on {}", self.socket_path.display());
+        tracing::info!("fabd listening on {}", self.socket_path.display());
 
         // Load persisted banner cache from disk
         let socket_dir =
-            directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
+            directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
         if let Some(ref dir) = socket_dir {
             let persisted = load_banner_cache(dir);
             let mut cache = self.cache.lock().unwrap_or_else(|e| {
@@ -90,7 +90,7 @@ impl Daemon {
         let dir_sizes_clone = self.dir_sizes.clone();
         let cache_clone = self.cache.clone();
         let socket_dir =
-            directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
+            directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
         thread::spawn(move || {
             proactive_scan(dir_sizes_clone.clone(), cache_clone.clone());
             // Save to disk when done
@@ -134,7 +134,7 @@ impl Daemon {
 
                     // Periodic save every 5 minutes
                     if last_save.elapsed() > Duration::from_secs(300) {
-                        let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+                        let socket_dir = directories::ProjectDirs::from("com", "fab", "fab")
                             .map(|p| p.data_dir().to_path_buf());
                         if let Some(dir) = socket_dir {
                             let cache = self.cache.lock().unwrap_or_else(|e| {
@@ -157,7 +157,7 @@ impl Daemon {
 
         // Cleanup — save banner cache to disk before exiting
         let socket_dir =
-            directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
+            directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
         if let Some(dir) = socket_dir {
             let cache = self.cache.lock().unwrap_or_else(|e| {
                 tracing::warn!("Mutex poisoned, recovering");
@@ -448,7 +448,7 @@ fn handle_client(
         Request::Shutdown => {
             tracing::info!("Shutdown requested");
             // Save banner cache before exiting
-            let socket_dir = directories::ProjectDirs::from("com", "cfm", "cfm")
+            let socket_dir = directories::ProjectDirs::from("com", "fab", "fab")
                 .map(|p| p.data_dir().to_path_buf());
             if let Some(dir) = socket_dir {
                 let c = cache.lock().unwrap_or_else(|e| {
@@ -830,7 +830,7 @@ fn proactive_scan(
 
     // Save banner cache to disk
     let socket_dir =
-        directories::ProjectDirs::from("com", "cfm", "cfm").map(|p| p.data_dir().to_path_buf());
+        directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
     if let Some(dir) = socket_dir {
         let cache = banner_cache.lock().unwrap_or_else(|e| {
             tracing::warn!("Mutex poisoned, recovering");
@@ -871,7 +871,7 @@ fn main() -> Result<()> {
         }
     }
 
-    tracing::info!("cfmd started with resource limits (nice=10, ionice=idle)");
+    tracing::info!("fabd started with resource limits (nice=10, ionice=idle)");
 
     let daemon = Daemon::new()?;
     daemon.run()
@@ -893,11 +893,11 @@ mod tests {
 
     #[test]
     fn test_socket_path() {
-        let path = directories::ProjectDirs::from("com", "cfm", "cfm")
+        let path = directories::ProjectDirs::from("com", "fab", "fab")
             .unwrap()
             .data_dir()
             .join(SOCKET_NAME);
-        assert!(path.to_string_lossy().contains("cfmd.sock"));
+        assert!(path.to_string_lossy().contains("fabd.sock"));
     }
 
     #[test]

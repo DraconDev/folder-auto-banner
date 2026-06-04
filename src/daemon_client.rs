@@ -5,10 +5,10 @@ use std::time::Duration;
 
 use crate::daemon_types::{BannerData, Request, Response};
 
-const SOCKET_NAME: &str = "cfmd.sock";
+const SOCKET_NAME: &str = "fabd.sock";
 
 fn socket_path() -> Result<std::path::PathBuf> {
-    let path = directories::ProjectDirs::from("com", "cfm", "cfm")
+    let path = directories::ProjectDirs::from("com", "fab", "fab")
         .ok_or_else(|| anyhow::anyhow!("Cannot determine data directory"))?
         .data_dir()
         .join(SOCKET_NAME);
@@ -194,9 +194,9 @@ pub fn ensure_daemon_running() {
         tracing::warn!("Cannot determine parent directory of executable");
         return;
     };
-    let daemon_bin = parent.join("cfmd");
+    let daemon_bin = parent.join("fabd");
     if !daemon_bin.exists() {
-        tracing::warn!("cfmd binary not found at {}", daemon_bin.display());
+        tracing::warn!("fabd binary not found at {}", daemon_bin.display());
         return;
     }
 
@@ -214,7 +214,7 @@ pub fn ensure_daemon_running() {
         .spawn()
     {
         Ok(_) => {
-            tracing::info!("Started cfmd daemon");
+            tracing::info!("Started fabd daemon");
             // Poll for socket to appear (up to 2s, checking every 50ms)
             for _ in 0..40 {
                 if let Ok(socket) = socket_path() {
@@ -226,7 +226,7 @@ pub fn ensure_daemon_running() {
             }
         }
         Err(e) => {
-            tracing::warn!("Failed to start cfmd: {}", e);
+            tracing::warn!("Failed to start fabd: {}", e);
         }
     }
 }
@@ -240,7 +240,7 @@ mod tests {
         let path = socket_path();
         assert!(path.is_ok());
         let path = path.unwrap();
-        assert!(path.to_string_lossy().contains("cfmd.sock"));
+        assert!(path.to_string_lossy().contains("fabd.sock"));
     }
 
     #[test]

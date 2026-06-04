@@ -6,13 +6,13 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueHint};
 use std::path::{Path, PathBuf};
 
-/// cfm — Contextual File Manager
+/// fab — Folder Auto Banner
 ///
 /// A directory listing with instant context.
 #[derive(Parser, Debug)]
 #[command(
     name = "f",
-    about = "cfm — Contextual File Manager\nA directory listing with instant context.",
+    about = "fab — Folder Auto Banner\nA directory listing with instant context.",
     version,
     author
 )]
@@ -262,10 +262,10 @@ impl Cli {
         // Initialize logging if debug mode
         if self.debug {
             tracing_subscriber::fmt()
-                .with_env_filter("cfm=debug,cfm=trace")
+                .with_env_filter("fab=debug,fab=trace")
                 .init();
         } else {
-            tracing_subscriber::fmt().with_env_filter("cfm=warn").init();
+            tracing_subscriber::fmt().with_env_filter("fab=warn").init();
         }
 
         match &self.command {
