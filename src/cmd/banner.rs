@@ -129,37 +129,73 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
     format!("{}{}{}", bg_seq, highlighted, color(RESET))
 }
 
-/// Navigate to item by number - cd if directory, open in editor if file
-/// Uses same DirSummary and sorting as banner to ensure items match exactly
-fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
-    // Load config
-    let config = crate::state::Config::load().unwrap_or_default();
-    
-    // Use same scan as banner for consistent item ordering
-    let summary = match crate::fs::DirSummary::scan_with_options(
-        cwd,
-        false, // build check
-        false, // scan_todos
-        false, // check_ports
-        false, // check_docker
-        false, // check_metrics
-    ) {
-        Ok(s) => s,
-        Err(_) => {
-            eprintln!("Error: could not read directory");
-            std::process::exit(1);
+/// Build the display items list using the exact same pipeline as output_rich.
+/// This ensures navigate_by_number uses the same ordering as the banner display.
+/// Returns (display_items, hidden_count).
+fn build_display_items<'a>(
+    path: &Path,
+    summary: &'a crate::fs::DirSummary,
+    git_info: &crate::git::GitInfo,
+    opts: &BannerOptions,
+    config: &crate::state::Config,
+) -> (Vec<&'a crate::fs::DirEntry>, usize) {
+    let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
+    let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
+
+    for item in &summary.top_items {
+        if item.name.starts_with('.') {
+            hidden_items.push(item);
+        } else {
+            visible_items.push(item);
         }
+    }
+
+    let total_visible = visible_items.len();
+    let show_hidden_flag = opts.hidden || total_visible < 30;
+
+    let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden_flag {
+        visible_items
+            .iter()
+            .chain(hidden_items.iter())
+            .copied()
+            .collect()
+    } else {
+        visible_items.to_vec()
     };
-    
-    // Get git info for smart truncation sorting
-    let git_info = crate::git::get_git_info(cwd).ok().unwrap_or_default();
-    
-    // Apply same filtering as banner
-    let mut display_items: Vec<&crate::fs::DirEntry> = summary.top_items.iter().collect();
-    
-    // Apply smart truncation (matching banner logic)
+
+    // Apply filter if specified
+    if let Some(pattern) = opts.filter {
+        let lower_pattern = pattern.to_lowercase();
+        display_items.retain(|item| {
+            let name_lower = item.name.to_lowercase();
+            name_lower.contains(&lower_pattern)
+                || item
+                    .name
+                    .rsplit('.')
+                    .next()
+                    .map(|ext| ext.to_lowercase().contains(&lower_pattern))
+                    .unwrap_or(false)
+        });
+    }
+
+    // Apply only-dirs / only-files filter
+    if opts.only_dirs {
+        display_items.retain(|item| item.is_dir);
+    }
+    if opts.only_files {
+        display_items.retain(|item| item.is_file);
+    }
+
+    // Apply git-ignore filter
+    if opts.git_ignore {
+        display_items.retain(|item| !is_git_ignored(&item.path));
+    }
+
+    // Apply max limit if specified (smart truncation for big folders)
     let total_before_truncation = display_items.len();
-    if config.smart_truncation && total_before_truncation > config.max_display_items {
+    if let Some(max_items) = opts.max {
+        display_items.truncate(max_items);
+    } else if config.smart_truncation && total_before_truncation > config.max_display_items {
         display_items.sort_by(|a, b| {
             let a_git = git_info.file_statuses.get(a.name.as_str()).is_some();
             let b_git = git_info.file_statuses.get(b.name.as_str()).is_some();
@@ -180,30 +216,173 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
             config.max_display_items
         };
         display_items.truncate(max_fit.max(config.max_display_items));
-    } else {
-        display_items.truncate(config.max_display_items);
     }
-    
+    let hidden_count = total_before_truncation - display_items.len();
+
+    // Group by type if requested
+    if opts.group {
+        let mut dirs: Vec<&crate::fs::DirEntry> =
+            display_items.iter().filter(|i| i.is_dir).copied().collect();
+        let mut files: Vec<&crate::fs::DirEntry> = display_items
+            .iter()
+            .filter(|i| i.is_file && !i.is_symlink)
+            .copied()
+            .collect();
+        let mut symlinks: Vec<&crate::fs::DirEntry> = display_items
+            .iter()
+            .filter(|i| i.is_symlink)
+            .copied()
+            .collect();
+        dirs.sort_by_key(|i| i.name.to_lowercase());
+        files.sort_by_key(|i| i.name.to_lowercase());
+        symlinks.sort_by_key(|i| i.name.to_lowercase());
+        display_items = dirs.into_iter().chain(files).chain(symlinks).collect();
+    }
+
+    // Sort based on --sort flag or short flags
+    if !opts.no_sort {
+        let sort_mode = if let Some(s) = opts.sort {
+            s.to_string()
+        } else if opts.timesort {
+            "date".to_string()
+        } else if opts.sizesort {
+            "size".to_string()
+        } else if opts.extensionsort {
+            "extension".to_string()
+        } else if opts.gitsort {
+            "git".to_string()
+        } else if opts.versionsort {
+            "version".to_string()
+        } else {
+            "name".to_string()
+        };
+
+        let group_dirs_mode = opts.group_dirs.unwrap_or("first");
+
+        display_items.sort_by(|a, b| {
+            if group_dirs_mode != "none" && a.is_dir != b.is_dir {
+                return if group_dirs_mode == "last" {
+                    if opts.reverse {
+                        b.is_dir.cmp(&a.is_dir)
+                    } else {
+                        a.is_dir.cmp(&b.is_dir)
+                    }
+                } else {
+                    if opts.reverse {
+                        a.is_dir.cmp(&b.is_dir)
+                    } else {
+                        b.is_dir.cmp(&a.is_dir)
+                    }
+                };
+            }
+
+            let ordering = match sort_mode.as_str() {
+                "size" => a.size.cmp(&b.size),
+                "date" => {
+                    let a_time = a.modified.unwrap_or_else(|| {
+                        chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
+                    });
+                    let b_time = b.modified.unwrap_or_else(|| {
+                        chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
+                    });
+                    a_time.cmp(&b_time)
+                }
+                "type" => {
+                    let a_ext = a.name.rfind('.').map(|i| &a.name[i..]).unwrap_or("");
+                    let b_ext = b.name.rfind('.').map(|i| &b.name[i..]).unwrap_or("");
+                    let ext_cmp = a_ext.cmp(b_ext);
+                    if ext_cmp != std::cmp::Ordering::Equal {
+                        ext_cmp
+                    } else {
+                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                    }
+                }
+                "extension" => {
+                    let a_ext = a.name.rfind('.').map(|i| &a.name[i + 1..]).unwrap_or("");
+                    let b_ext = b.name.rfind('.').map(|i| &b.name[i + 1..]).unwrap_or("");
+                    let ext_cmp = a_ext.to_lowercase().cmp(&b_ext.to_lowercase());
+                    if ext_cmp != std::cmp::Ordering::Equal {
+                        ext_cmp
+                    } else {
+                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                    }
+                }
+                "git" => {
+                    let get_git_order = |item: &&crate::fs::DirEntry| -> u8 {
+                        let rel = item.path.strip_prefix(path).unwrap_or(&item.path);
+                        let rel_str = rel.to_string_lossy();
+                        git_info
+                            .file_statuses
+                            .get(rel_str.as_ref())
+                            .or_else(|| git_info.file_statuses.get(item.name.as_str()))
+                            .map(|fs| match fs {
+                                crate::git::FileStatus::Conflict => 5,
+                                crate::git::FileStatus::Deleted => 4,
+                                crate::git::FileStatus::Modified => 3,
+                                crate::git::FileStatus::Added => 2,
+                                crate::git::FileStatus::Renamed => 1,
+                                crate::git::FileStatus::Untracked => 0,
+                            })
+                            .unwrap_or(0)
+                    };
+                    get_git_order(a).cmp(&get_git_order(b))
+                }
+                "version" => natural_cmp(&a.name, &b.name),
+                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            };
+
+            if opts.reverse {
+                ordering.reverse()
+            } else {
+                ordering
+            }
+        });
+    }
+
+    (display_items, hidden_count)
+}
+
+/// Navigate to item by number - cd if directory, open in editor if file
+/// Uses build_display_items() to ensure exact same ordering as banner display
+fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions) -> Result<()> {
+    let path = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
+    let config = crate::state::Config::load().unwrap_or_default();
+
+    // Try daemon cache first, then direct scan — same as run_banner
+    let (summary, git_info) = if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
+        (cached.summary, cached.git_info.unwrap_or_default())
+    } else {
+        let summary = crate::fs::DirSummary::scan_with_options(
+            &path,
+            false, false, false, false, false,
+        )?;
+        let git_info = crate::git::get_git_info(&path).ok().unwrap_or_default();
+        (summary, git_info)
+    };
+
+    // Use the EXACT same pipeline as banner display
+    let (display_items, _hidden_count) = build_display_items(&path, &summary, &git_info, opts, &config);
+
     if num == 0 || num > display_items.len() {
         eprintln!("Error: number {} out of range (1-{}). Use 'f' to see available items.", num, display_items.len());
         std::process::exit(1);
     }
-    
+
     let entry = &display_items[num - 1];
-    let path = &entry.path;
-    
+    let target = &entry.path;
+
     if entry.is_dir {
-        println!("{}", path.display());
+        println!("{}", target.display());
     } else {
         let editor = std::env::var("EDITOR").unwrap_or_else(|_| "micro".to_string());
         let status = std::process::Command::new(&editor)
-            .arg(path)
+            .arg(target)
             .status()?;
         if !status.success() {
             eprintln!("Editor '{}' exited with status: {}", editor, status);
         }
     }
-    
+
     Ok(())
 }
 
