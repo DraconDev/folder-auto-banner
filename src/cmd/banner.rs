@@ -130,64 +130,47 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
 }
 
 /// Navigate to item by number - cd if directory, open in editor if file
-/// Uses same sorting as banner display
+/// Uses same DirSummary as banner to ensure items match exactly
 fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
-    use std::fs;
-    
     // Load config
     let config = crate::state::Config::load().unwrap_or_default();
     
-    // Read directory contents
-    let all_entries: Vec<_> = fs::read_dir(cwd)?
-        .filter_map(|e| e.ok())
-        .collect();
-    
-    // Count non-hidden items to decide whether to show hidden (matching banner)
-    let total_visible = all_entries.iter()
-        .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
-        .count();
-    let show_hidden = total_visible < 30;
-    
-    // Filter hidden if needed
-    let entries: Vec<_> = if show_hidden {
-        all_entries.iter().collect()
-    } else {
-        all_entries.iter().filter(|e| !e.file_name().to_string_lossy().starts_with('.')).collect()
-    };
-    
-    // Sort: directories first, then by name (matching banner)
-    let mut sorted: Vec<_> = entries;
-    sorted.sort_by(|a, b| {
-        let a_is_dir = a.path().is_dir();
-        let b_is_dir = b.path().is_dir();
-        if a_is_dir != b_is_dir {
-            return if a_is_dir { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater };
+    // Use same scan as banner for consistent item ordering
+    let summary = match crate::fs::DirSummary::scan_with_options(
+        cwd,
+        false, // build check
+        false, // scan_todos
+        false, // check_ports
+        false, // check_docker
+        false, // check_metrics
+    ) {
+        Ok(s) => s,
+        Err(_) => {
+            eprintln!("Error: could not read directory");
+            std::process::exit(1);
         }
-        let a_name = a.file_name().to_string_lossy().to_lowercase();
-        let b_name = b.file_name().to_string_lossy().to_lowercase();
-        a_name.cmp(&b_name)
-    });
+    };
     
     // Apply max_display_items limit
     let max_items = config.max_display_items;
-    let display_items: Vec<_> = sorted.into_iter().take(max_items).collect();
+    let display_items: Vec<_> = summary.top_items.iter().take(max_items).collect();
     
     if num == 0 || num > display_items.len() {
         eprintln!("Error: number {} out of range (1-{}). Use 'f' to see available items.", num, display_items.len());
         std::process::exit(1);
     }
     
-    let entry = &display_items[num - 1]; // Convert to 0-based
-    let path = entry.path();
+    let entry = &display_items[num - 1];
+    let path = &entry.path;
     
-    if path.is_dir() {
+    if entry.is_dir {
         // For directories: print the path (shell function will cd to it)
         println!("{}", path.display());
     } else {
         // For files: open in editor
         let editor = std::env::var("EDITOR").unwrap_or_else(|_| "micro".to_string());
         let status = std::process::Command::new(&editor)
-            .arg(&path)
+            .arg(path)
             .status()?;
         if !status.success() {
             eprintln!("Editor '{}' exited with status: {}", editor, status);
