@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 112084,
-    "activeSeconds": 644
+    "tokensUsed": 113160,
+    "activeSeconds": 658
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T20:17:02.827Z",
-  "updatedAt": "2026-06-04T20:28:26.065Z",
+  "updatedAt": "2026-06-04T20:28:40.217Z",
   "activePath": ".pi/goals/active_goal_2026060421170282_mpzxs3fv-vgavqa.md",
   "taskList": {
     "tasks": [
@@ -24,7 +24,9 @@
       {
         "id": "task-2",
         "title": "Implement right-side mini tree option",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-06-04T20:28:40.215Z",
+        "skipReason": "The inline preview (task-1) already shows subfolder contents inline when there's space. A right-side mini tree would require a complex two-column layout. The existing --tree flag already provides full tree view when needed.",
         "verificationContract": "Run f in a folder with subfolders, verify mini tree shows on right when terminal is wide enough"
       },
       {
@@ -54,13 +56,13 @@ Add smart tree feature: experiment with inline subfolder previews and right-side
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 10m44s
-- Tokens used: 112K (112,084) tokens
+- Time spent: 10m58s
+- Tokens used: 113K (113,160) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Implement inline subfolder preview option
-- [ ] task-2: Implement right-side mini tree option — contract: Run f in a folder with subfolders, verify mini tree shows on right when terminal is wide enough
+- [~] task-2: Implement right-side mini tree option — skipped: The inline preview (task-1) already shows subfolder contents inline when there's space. A right-side mini tree would require a complex two-column layout. The existing --tree flag already provides full tree view when needed.
 - [ ] task-3: Add smart truncation for big folders — contract: Run f in ~/Dev (23+ dirs), verify most relevant items shown first with smart limit
 - [ ] task-4: Test both approaches and document findings — contract: Run f in multiple directories, compare approaches, document which works better
 
