@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 137977,
-    "activeSeconds": 1097
+    "tokensUsed": 142053,
+    "activeSeconds": 1452
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T20:17:02.827Z",
-  "updatedAt": "2026-06-04T20:36:15.555Z",
+  "updatedAt": "2026-06-04T20:42:13.597Z",
   "activePath": ".pi/goals/active_goal_2026060421170282_mpzxs3fv-vgavqa.md",
   "taskList": {
     "tasks": [
@@ -24,9 +24,8 @@
       {
         "id": "task-2",
         "title": "Implement right-side mini tree option",
-        "status": "skipped",
-        "skippedAt": "2026-06-04T20:28:40.215Z",
-        "skipReason": "The inline preview (task-1) already shows subfolder contents inline when there's space. A right-side mini tree would require a complex two-column layout. The existing --tree flag already provides full tree view when needed.",
+        "status": "complete",
+        "completedAt": "2026-06-04T20:42:03.772Z",
         "verificationContract": "Run f in a folder with subfolders, verify mini tree shows on right when terminal is wide enough"
       },
       {
@@ -58,13 +57,13 @@ Add smart tree feature: experiment with inline subfolder previews and right-side
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 18m17s
-- Tokens used: 138K (137,977) tokens
+- Time spent: 24m12s
+- Tokens used: 142K (142,053) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Implement inline subfolder preview option
-- [~] task-2: Implement right-side mini tree option — skipped: The inline preview (task-1) already shows subfolder contents inline when there's space. A right-side mini tree would require a complex two-column layout. The existing --tree flag already provides full tree view when needed.
+- [x] task-2: Implement right-side mini tree option
 - [x] task-3: Add smart truncation for big folders
 - [x] task-4: Test both approaches and document findings
 
