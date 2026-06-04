@@ -1226,7 +1226,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     }
 
     // Use shared build_display_items for consistent ordering with navigation
-    let (mut display_items, hidden_count) = build_display_items(path, summary, git_info, opts, &config);
+    let (display_items, hidden_count) = build_display_items(path, summary, git_info, opts, &config);
 
     // Compute max column widths for alignment
     let mut max_owner = 5; // "OWNER"
