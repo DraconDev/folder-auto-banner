@@ -582,9 +582,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             if git_info.commits_today > 0 {
                 parts.push(format!("{} today", git_info.commits_today));
             }
-            // Diff stats
-            if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
-                parts.push(format!(
+            let row1_base = parts.join(" │ ");
+
+            // Diff stats - right-aligned at top row
+            let row1 = if git_info.lines_added > 0 || git_info.lines_deleted > 0 {
+                let diff_str = format!(
                     "{}+{}{} {}-{}{}",
                     color(GREEN),
                     git_info.lines_added,
@@ -592,9 +594,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     color(RED),
                     git_info.lines_deleted,
                     color(RESET)
-                ));
-            }
-            let row1 = parts.join(" │ ");
+                );
+                let term_width = get_terminal_width();
+                let base_width = strip_ansi(&row1_base).len();
+                let diff_width = strip_ansi(&diff_str).len();
+                if term_width > 0 && base_width + diff_width + 1 < term_width {
+                    let padding = " ".repeat(term_width - base_width - diff_width);
+                    format!("{}{}{}", row1_base, padding, diff_str)
+                } else {
+                    format!("{} │ {}", row1_base, diff_str)
+                }
+            } else {
+                row1_base
+            };
 
             // Row 2: Stats with labels
             let mut details = Vec::new();
