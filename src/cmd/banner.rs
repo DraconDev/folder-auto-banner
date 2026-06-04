@@ -614,11 +614,15 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
                     details.push(format!("{}📊 {} lines{}", color(GREEN), loc_str, color(RESET)));
-                    // Show top 3 languages
+                    // Show top 3 languages (skip non-language extensions like man pages)
                     if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
                         let mut lang_parts: Vec<String> = metrics
                             .by_extension
                             .iter()
+                            .filter(|(ext, _)| {
+                                // Skip man page extensions (1, 2, 3, etc.) and other non-language files
+                                !ext.chars().all(|c| c.is_numeric()) && !ext.is_empty()
+                            })
                             .take(3)
                             .map(|(ext, loc)| {
                                 let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
@@ -836,11 +840,15 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                         loc_str,
                         color(RESET)
                     ));
-                    // Show top 3 languages with percentages
+                    // Show top 3 languages with percentages (skip non-language extensions like man pages)
                     if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
                         let lang_parts: Vec<String> = metrics
                             .by_extension
                             .iter()
+                            .filter(|(ext, _)| {
+                                // Skip man page extensions (1, 2, 3, etc.) and other non-language files
+                                !ext.chars().all(|c| c.is_numeric()) && !ext.is_empty()
+                            })
                             .take(3)
                             .map(|(ext, loc)| {
                                 let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
