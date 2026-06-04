@@ -164,7 +164,7 @@ Recent files pop out; old files recede into the background.
 ## Testing
 
 ```bash
-cargo test    # 77 tests pass
+cargo test    # 101 tests pass
 cargo clippy  # 0 warnings
 ```
 
