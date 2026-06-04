@@ -23,7 +23,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "cfm"
+          shared-key: "fab"
 
       - name: Check formatting
         run: cargo fmt --all -- --check

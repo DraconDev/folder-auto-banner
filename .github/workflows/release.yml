@@ -33,7 +33,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "cfm-${{ matrix.target }}"
+          shared-key: "fab-${{ matrix.target }}"
 
       - name: Install cross-compilation tools
         if: matrix.target == 'aarch64-unknown-linux-gnu'
@@ -56,7 +56,7 @@ jobs:
           name: f-${{ matrix.target }}
           path: |
             target/${{ matrix.target }}/release/f
-            target/${{ matrix.target }}/release/cfmd
+            target/${{ matrix.target }}/release/fabd
 
   publish:
     name: Create Release
@@ -75,11 +75,11 @@ jobs:
           name: ${{ github.ref_name }}
           files: |
             f-x86_64-unknown-linux-gnu/f
-            f-x86_64-unknown-linux-gnu/cfmd
+            f-x86_64-unknown-linux-gnu/fabd
             f-aarch64-unknown-linux-gnu/f
-            f-aarch64-unknown-linux-gnu/cfmd
+            f-aarch64-unknown-linux-gnu/fabd
             f-x86_64-apple-darwin/f
-            f-x86_64-apple-darwin/cfmd
+            f-x86_64-apple-darwin/fabd
           body: |
             Release ${{ github.ref_name }}
           draft: false
