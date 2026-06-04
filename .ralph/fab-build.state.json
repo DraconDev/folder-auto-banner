@@ -1,6 +1,6 @@
 {
-  "name": "cfm-build",
-  "taskFile": ".ralph/cfm-build.md",
+  "name": "fab-build",
+  "taskFile": ".ralph/fab-build.md",
   "iteration": 8,
   "maxIterations": 50,
   "itemsPerIteration": 3,
