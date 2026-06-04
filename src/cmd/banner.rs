@@ -1029,7 +1029,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             let b_time = b.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
             b_time.cmp(&a_time) // most recent first
         });
-        display_items.truncate(config.max_display_items);
+        // Show more items when inline_preview is enabled (user wants to see subfolders)
+        let limit = if config.inline_preview { 20 } else { config.max_display_items };
+        display_items.truncate(limit);
     }
     let hidden_count = total_before_truncation - display_items.len();
 
@@ -1466,8 +1468,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             let term_width = get_terminal_width();
             let current_row_len = strip_ansi(&row_parts.join(" ")).len();
             let available_for_preview = term_width.saturating_sub(current_row_len + 4); // +4 for spacing
-            eprintln!("[debug] term_width={}, row_len={}, available={}, name={}", term_width, current_row_len, available_for_preview, item.name);
-            if available_for_preview > 10 {
+            if term_width > 0 && available_for_preview > 10 {
                 if let Some(preview) = get_dir_inline_preview(&item, available_for_preview) {
                     row_parts.push(format!("{}│{}", color(DIM), color(RESET)));
                     row_parts.push(preview);
