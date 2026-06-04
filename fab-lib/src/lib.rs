@@ -1,4 +1,4 @@
-//! cfm-lib — shared library for Contextual File Manager
+//! fab-lib — shared library for Folder Auto Banner
 //!
 //! Contains the core modules shared between the `fm` CLI and `cfmd` daemon binaries.
 

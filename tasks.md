@@ -1,4 +1,4 @@
-# cfm tasks
+# fab tasks
 
 ---
 
@@ -90,7 +90,7 @@
 
 ### Configuration (v0.4.0)
 - [x] `f config` command — opens config in $EDITOR
-- [x] Config file at `~/.config/cfm/config.toml`
+- [x] Config file at `~/.config/fab/config.toml`
 - [x] Permission mode (rwx, octal, disable)
 - [x] Size mode (default, short, bytes)
 - [x] Date mode (date, relative)

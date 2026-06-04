@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "🔧 Installing cfm..."
+echo "🔧 Installing fab..."
 
 BIN_DIR="$HOME/.local/bin"
 BIN_PATH="$BIN_DIR/f"
-DAEMON_BIN="$BIN_DIR/cfmd"
+DAEMON_BIN="$BIN_DIR/fabd"
 SOCKET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/cfm"
-SOCKET_PATH="$SOCKET_DIR/cfmd.sock"
+SOCKET_PATH="$SOCKET_DIR/fabd.sock"
 
 mkdir -p "$BIN_DIR"
 
 # --- Kill running daemon and clean up socket ---
-if [ -f "$DAEMON_BIN" ] && pgrep -x cfmd > /dev/null 2>&1; then
+if [ -f "$DAEMON_BIN" ] && pgrep -x fabd > /dev/null 2>&1; then
     echo "   Stopping running daemon..."
     
     # First try to stop via systemd if running as a service
-    if systemctl --user is-active cfmd.service > /dev/null 2>&1; then
+    if systemctl --user is-active fabd.service > /dev/null 2>&1; then
         echo "   Stopping systemd service..."
-        systemctl --user stop cfmd.service 2>/dev/null || true
+        systemctl --user stop fabd.service 2>/dev/null || true
         sleep 1
     fi
     
@@ -27,14 +27,14 @@ if [ -f "$DAEMON_BIN" ] && pgrep -x cfmd > /dev/null 2>&1; then
     sleep 1
     
     # Force kill any remaining processes
-    pkill -9 -x cfmd 2>/dev/null || true
+    pkill -9 -x fabd 2>/dev/null || true
     sleep 1
     
     # Verify daemon is dead
-    if pgrep -x cfmd > /dev/null 2>&1; then
+    if pgrep -x fabd > /dev/null 2>&1; then
         echo "   ⚠️  Warning: daemon still running, waiting..."
         sleep 2
-        pkill -9 -x cfmd 2>/dev/null || true
+        pkill -9 -x fabd 2>/dev/null || true
         sleep 1
     fi
 fi
@@ -52,9 +52,9 @@ for loc in "$BIN_DIR/f" "$HOME/.cargo/bin/f" "$HOME/bin/f" "/usr/local/bin/f"; d
     fi
 done
 
-for loc in "$BIN_DIR/cfmd" "$HOME/.cargo/bin/cfmd" "$HOME/bin/cfmd" "/usr/local/bin/cfmd"; do
+for loc in "$BIN_DIR/fabd" "$HOME/.cargo/bin/fabd" "$HOME/bin/fabd" "/usr/local/bin/fabd"; do
     if [ -f "$loc" ]; then
-        echo "   Removing old cfmd from $loc..."
+        echo "   Removing old fabd from $loc..."
         rm -f "$loc"
     fi
 done
@@ -68,17 +68,17 @@ cp target/release/f "$BIN_PATH"
 chmod +x "$BIN_PATH"
 echo "✅ f installed to $BIN_PATH"
 
-cp target/release/cfmd "$DAEMON_BIN"
+cp target/release/fabd "$DAEMON_BIN"
 chmod +x "$DAEMON_BIN"
-echo "✅ cfmd installed to $DAEMON_BIN"
+echo "✅ fabd installed to $DAEMON_BIN"
 
-# --- Install systemd user service (if cfmd.service exists) ---
-if [ -f "cfmd.service" ]; then
+# --- Install systemd user service (if fabd.service exists) ---
+if [ -f "fabd.service" ]; then
     mkdir -p "$HOME/.config/systemd/user"
-    cp cfmd.service "$HOME/.config/systemd/user/cfmd.service"
+    cp fabd.service "$HOME/.config/systemd/user/fabd.service"
     systemctl --user daemon-reload 2>/dev/null || true
     echo "✅ Systemd user service installed"
-    echo "   Enable with: systemctl --user enable --now cfmd"
+    echo "   Enable with: systemctl --user enable --now fabd"
 fi
 
 # --- Add PATH to shell configs (only if not already there) ---
@@ -94,10 +94,10 @@ done
 # --- Clean up old hooks (all known variants) ---
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     if [ -f "$rc" ]; then
-        # Remove old cfm function names and hook registrations
-        sed -i '/_cfm_hook\|_cfm_on_directory_change\|_cfm_on_startup/d' "$rc" 2>/dev/null || true
+        # Remove old fab function names and hook registrations
+        sed -i '/_fab_hook\|_fab_on_directory_change\|_fab_on_startup/d' "$rc" 2>/dev/null || true
         sed -i '/add-zsh-hook \(chpwd\|precmd\) _cfm/d' "$rc" 2>/dev/null || true
-        sed -i '/^# cfm shell integration\|^# cfm auto-banner hook/d' "$rc" 2>/dev/null || true
+        sed -i '/^# fab shell integration\|^# fab auto-banner hook/d' "$rc" 2>/dev/null || true
         # Remove orphaned function fragments from partial teardowns
         sed -i '/^    command f banner/d' "$rc" 2>/dev/null || true
         sed -i '/command \/home\/.*\/bin\/f banner/d' "$rc" 2>/dev/null || true
@@ -112,13 +112,13 @@ done
 if [ -f "$HOME/.zshrc" ]; then
     {
         echo ''
-        echo '# cfm auto-banner hook'
+        echo '# fab auto-banner hook'
         if ! grep -qF 'autoload -U add-zsh-hook' "$HOME/.zshrc"; then
             echo 'autoload -U add-zsh-hook'
         fi
-        echo 'add-zsh-hook chpwd _cfm_hook'
-        echo "_cfm_hook() { command $BIN_PATH banner \"\$PWD\"; }"
-        echo '_cfm_hook  # fire on new shell/tab startup'
+        echo 'add-zsh-hook chpwd _fab_hook'
+        echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
+        echo '_fab_hook  # fire on new shell/tab startup'
     } >> "$HOME/.zshrc"
     echo "✅ Added chpwd hook to ~/.zshrc"
 fi
@@ -127,9 +127,9 @@ fi
 if [ -f "$HOME/.bashrc" ]; then
     {
         echo ''
-        echo '# cfm auto-banner hook'
-        echo "_cfm_hook() { command $BIN_PATH banner \"\$PWD\"; }"
-        echo 'PROMPT_COMMAND="_cfm_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"'
+        echo '# fab auto-banner hook'
+        echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
+        echo 'PROMPT_COMMAND="_fab_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"'
     } >> "$HOME/.bashrc"
     echo "✅ Added PROMPT_COMMAND hook to ~/.bashrc"
 fi
@@ -138,7 +138,7 @@ fi
 echo "   Starting daemon..."
 "$DAEMON_BIN" &
 sleep 1
-if pgrep -x cfmd > /dev/null 2>&1; then
+if pgrep -x fabd > /dev/null 2>&1; then
     echo "✅ Daemon started"
 else
     echo "⚠️  Daemon failed to start (it will auto-start on first banner)"

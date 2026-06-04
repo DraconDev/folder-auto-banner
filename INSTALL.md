@@ -1,11 +1,11 @@
-# cfm — Installation Guide
+# fab — Installation Guide
 
 ## Quick Start
 
 ### Method 1: Auto Install Script (Recommended)
 
 ```bash
-cd cfm
+cd fab
 ./install.sh
 exec zsh   # or: source ~/.bashrc
 ```
@@ -13,7 +13,7 @@ exec zsh   # or: source ~/.bashrc
 ### Method 2: Build + Install
 
 ```bash
-cd cfm
+cd fab
 cargo build --release
 ./install.sh
 exec zsh   # or: source ~/.bashrc
@@ -35,24 +35,24 @@ Add the appropriate section to your shell config:
 
 ### Zsh (`~/.zshrc`)
 ```bash
-# cfm auto-banner hook
+# fab auto-banner hook
 autoload -U add-zsh-hook
-add-zsh-hook chpwd _cfm_hook
-_cfm_hook() {
+add-zsh-hook chpwd _fab_hook
+_fab_hook() {
     eval "$(command f env "$PWD")"
     command f banner "$PWD"
 }
-_cfm_hook  # fire on new shell/tab startup
+_fab_hook  # fire on new shell/tab startup
 ```
 
 ### Bash (`~/.bashrc`)
 ```bash
-# cfm auto-banner hook
-_cfm_hook() {
+# fab auto-banner hook
+_fab_hook() {
     eval "$(command f env "$PWD")"
     command f banner "$PWD"
 }
-PROMPT_COMMAND="_cfm_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+PROMPT_COMMAND="_fab_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 ```
 
 Then reload: `exec zsh` or `source ~/.bashrc`

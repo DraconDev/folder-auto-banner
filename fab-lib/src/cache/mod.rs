@@ -15,7 +15,7 @@ pub struct Cache {
 impl Cache {
     /// Create a new cache instance
     pub fn new() -> Result<Self> {
-        let dir = std::env::temp_dir().join("cfm-cache");
+        let dir = std::env::temp_dir().join("fab-cache");
         std::fs::create_dir_all(&dir)?;
         Ok(Cache { dir })
     }

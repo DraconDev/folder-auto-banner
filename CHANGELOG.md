@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.4.0] - 2024-05-31
 
 ### Added
-- **Config file** (`~/.config/cfm/config.toml`) with all display preferences
+- **Config file** (`~/.config/fab/config.toml`) with all display preferences
 - `f config` command — opens config in $EDITOR
 - `f daemon stop/status` commands — daemon management
 - Two-row banner layout for better readability
@@ -63,7 +63,7 @@ All notable changes to this project will be documented in this file.
 - `fm root` and `fm uninstall-hook` commands
 - `NO_COLOR` environment variable support
 - Path protection for trash, mv, cp commands
-- Shared library crate (`cfm-lib`)
+- Shared library crate (`fab-lib`)
 - Unit and integration tests
 
 ### Fixed
