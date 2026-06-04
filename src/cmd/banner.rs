@@ -198,10 +198,6 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
     let entry = &display_items[num - 1]; // Convert to 0-based
     let path = entry.path();
     
-    // Debug output
-    eprintln!("[debug] num={}, name={}, is_dir={}, is_file={}", 
-             num, entry.file_name().to_string_lossy(), path.is_dir(), path.is_file());
-    
     if path.is_dir() {
         // For directories: print the path (shell function will cd to it)
         println!("{}", path.display());
