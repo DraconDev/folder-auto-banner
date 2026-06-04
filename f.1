@@ -1,10 +1,10 @@
-.\" Man page for f (cfm)
-.\" Contextual File Manager
+.\" Man page for f (fab)
+.\" Folder Auto Banner
 .\"
-.TH F 1 "2026-05-31" "cfm 0.4.0" "User Commands"
+.TH F 1 "2026-06-04" "fab 0.5.0" "User Commands"
 .\"
 .SH NAME
-f \- contextual file manager with instant context
+f \- fab: folder auto banner
 .\"
 .SH SYNOPSIS
 .B f
@@ -24,8 +24,9 @@ f \- contextual file manager with instant context
 .RI { start | stop | status }
 .\"
 .SH DESCRIPTION
-.B cfm
-is a directory listing tool that shows instant context about your project.
+.B fab
+(folder auto banner) is a directory listing tool that shows instant context
+about your project.
 When you run
 .BR f ,
 you see:
@@ -159,45 +160,48 @@ Check if daemon is running.
 .\"
 .SH CONFIGURATION
 Configuration file is located at
-.IR ~/.config/cfm/config.toml .
+.IR ~/.config/fab/config.toml .
 .PP
 See the README for full configuration options.
 .\"
 .SH ENVIRONMENT
 .TP
-.B CFM_ICONS
+.B FAB_ICONS
 Set to "1" to enable icons.
 .TP
-.B CFM_COLORS
+.B FAB_COLORS
 Set to "1" to enable colors.
 .TP
 .B NO_COLOR
 Disable colors when set.
 .TP
-.B CFM_NO_TODOS
-Set to "1" to disable TODO counting.
+.B FAB_TODOS
+Set to "1" to enable TODO counting.
 .TP
-.B CFM_NO_PORTS
-Set to "1" to disable port detection.
+.B FAB_PORTS
+Set to "1" to enable port detection.
 .TP
-.B CFM_NO_DOCKER
-Set to "1" to disable Docker detection.
+.B FAB_DOCKER
+Set to "1" to enable Docker detection.
 .TP
-.B CFM_NO_METRICS
-Set to "1" to disable code metrics.
+.B FAB_METRICS
+Set to "1" to enable code metrics.
+.TP
+.B FAB_PROFILE
+Set to "1" to enable IPC profiling output.
 .\"
 .SH FILES
 .TP
-.I ~/.config/cfm/config.toml
+.I ~/.config/fab/config.toml
 Configuration file.
 .TP
-.I ~/.local/share/cfm/cfmd.sock
+.I ~/.local/share/fab/fabd.sock
 Daemon socket file.
 .TP
-.I ~/.local/share/cfm/banner_cache.json
+.I ~/.local/share/fab/banner_cache.json
 Cached banner data.
 .TP
-.I ~/.local/share/cfm/dir_sizes.json
+.I ~/.local/share/fab/dir_sizes.json
 Cached directory sizes.
 .\"
 .SH EXIT STATUS
