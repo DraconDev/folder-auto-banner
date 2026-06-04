@@ -139,14 +139,14 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
 
     // Load config and apply env var overrides
     let config = crate::state::Config::load().unwrap_or_default();
-    let icons = std::env::var("CFM_ICONS")
+    let icons = std::env::var("FAB_ICONS")
         .map(|v| v == "1")
         .unwrap_or(config.icons);
     let no_color = std::env::var("NO_COLOR").is_ok();
     let colors = if no_color {
         false
     } else {
-        std::env::var("CFM_COLORS")
+        std::env::var("FAB_COLORS")
             .map(|v| v == "1")
             .unwrap_or(config.colors)
     };
@@ -240,12 +240,12 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     }
 
     // Daemon not available or cache miss - try direct scan.
-    // Todos/ports/docker/metrics are disabled by default for speed; set CFM_*=1 to enable.
+    // Todos/ports/docker/metrics are disabled by default for speed; set FAB_*=1 to enable.
     eprintln!("fab daemon not available, falling back to direct scan");
-    let no_todos = std::env::var("CFM_TODOS").unwrap_or_default() != "1";
-    let no_ports = std::env::var("CFM_PORTS").unwrap_or_default() != "1";
-    let no_docker = std::env::var("CFM_DOCKER").unwrap_or_default() != "1";
-    let no_metrics = std::env::var("CFM_METRICS").unwrap_or_default() != "1";
+    let no_todos = std::env::var("FAB_TODOS").unwrap_or_default() != "1";
+    let no_ports = std::env::var("FAB_PORTS").unwrap_or_default() != "1";
+    let no_docker = std::env::var("FAB_DOCKER").unwrap_or_default() != "1";
+    let no_metrics = std::env::var("FAB_METRICS").unwrap_or_default() != "1";
 
     let summary = DirSummary::scan_with_options(
         &path,

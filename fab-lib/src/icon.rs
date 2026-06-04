@@ -1,12 +1,12 @@
 //! File-type icon system — 3-tier lookup: exact name → extension → type fallback
 //!
-//! Supports two modes controlled by CFM_ICONS env var:
+//! Supports two modes controlled by FAB_ICONS env var:
 //! - "emoji" (default): emoji icons (works everywhere)
 //! - "nerd": Nerd Font glyphs (requires terminal with Nerd Font support)
 
-/// Get icon for a file/directory entry, reading mode from CFM_ICONS env var
+/// Get icon for a file/directory entry, reading mode from FAB_ICONS env var
 pub fn icon_for(name: &str, is_dir: bool, is_exec: bool, is_symlink: bool) -> String {
-    let use_nerd = std::env::var("CFM_ICONS")
+    let use_nerd = std::env::var("FAB_ICONS")
         .map(|v| v == "nerd")
         .unwrap_or(false);
     icon_for_mode(name, is_dir, is_exec, is_symlink, use_nerd)
