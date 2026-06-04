@@ -917,7 +917,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             details.push(format!(
-                "{}│ {} total{}",
+                "{}{} total{}",
                 color(DIM),
                 summary.total_items,
                 color(RESET)
