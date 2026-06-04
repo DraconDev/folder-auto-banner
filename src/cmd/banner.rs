@@ -142,19 +142,22 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
         .filter_map(|e| e.ok())
         .collect();
     
-    // Split into visible and hidden (matching banner logic)
-    let mut visible_entries: Vec<_> = all_entries.iter()
+    // Count non-hidden items to decide whether to show hidden (matching banner)
+    let total_visible = all_entries.iter()
         .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
-        .collect();
-    let mut hidden_entries: Vec<_> = all_entries.iter()
-        .filter(|e| e.file_name().to_string_lossy().starts_with('.'))
-        .collect();
+        .count();
+    let show_hidden = total_visible < 30;
     
-    // Show hidden when total visible < 30 (matching banner)
-    let show_hidden = visible_entries.len() < 30;
+    // Filter hidden if needed
+    let entries: Vec<_> = if show_hidden {
+        all_entries.iter().collect()
+    } else {
+        all_entries.iter().filter(|e| !e.file_name().to_string_lossy().starts_with('.')).collect()
+    };
     
-    // Sort each group: directories first, then by name
-    let sort_fn = |a: &&fs::DirEntry, b: &&fs::DirEntry| -> std::cmp::Ordering {
+    // Sort: directories first, then by name (matching banner)
+    let mut sorted: Vec<_> = entries;
+    sorted.sort_by(|a, b| {
         let a_is_dir = a.path().is_dir();
         let b_is_dir = b.path().is_dir();
         if a_is_dir != b_is_dir {
@@ -163,19 +166,11 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path) -> Result<()> {
         let a_name = a.file_name().to_string_lossy().to_lowercase();
         let b_name = b.file_name().to_string_lossy().to_lowercase();
         a_name.cmp(&b_name)
-    };
-    visible_entries.sort_by(sort_fn);
-    hidden_entries.sort_by(sort_fn);
-    
-    // Combine: visible first, then hidden (matching banner)
-    let mut entries: Vec<&fs::DirEntry> = visible_entries;
-    if show_hidden {
-        entries.extend(hidden_entries);
-    }
+    });
     
     // Apply max_display_items limit
     let max_items = config.max_display_items;
-    let display_items: Vec<_> = entries.into_iter().take(max_items).collect();
+    let display_items: Vec<_> = sorted.into_iter().take(max_items).collect();
     
     if num == 0 || num > display_items.len() {
         eprintln!("Error: number {} out of range (1-{}). Use 'f' to see available items.", num, display_items.len());
