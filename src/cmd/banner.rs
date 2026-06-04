@@ -1771,6 +1771,59 @@ fn get_file_contents_raw(entry: &crate::fs::DirEntry) -> String {
     crate::cmd::file_metadata::get_file_contents(entry)
 }
 
+/// Get inline preview for a directory (top 2-3 items with icons)
+fn get_dir_inline_preview(entry: &crate::fs::DirEntry, max_width: usize) -> Option<String> {
+    if !entry.is_dir {
+        return None;
+    }
+    
+    let dir_path = &entry.path;
+    let items = match std::fs::read_dir(dir_path) {
+        Ok(rd) => rd
+            .filter_map(|e| e.ok())
+            .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
+            .take(3)
+            .collect::<Vec<_>>(),
+        Err(_) => return None,
+    };
+    
+    if items.is_empty() {
+        return None;
+    }
+    
+    let mut preview_parts = Vec::new();
+    let mut total_len = 0;
+    
+    for item in &items {
+        let name = item.file_name().to_string_lossy().to_string();
+        let is_dir = item.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        
+        let icon = if is_dir {
+            format!("{}{}{}", color(BLUE_BOLD), name, color(RESET))
+        } else {
+            format!("{}{}{}", color(DIM), name, color(RESET))
+        };
+        
+        let plain_len = name.len();
+        if total_len + plain_len + 2 > max_width {
+            // Add ellipsis if we ran out of space
+            if !preview_parts.is_empty() {
+                preview_parts.push(format!("{}...{}", color(DIM), color(RESET)));
+            }
+            break;
+        }
+        
+        preview_parts.push(icon);
+        total_len += plain_len + 2; // +2 for ", "
+    }
+    
+    if preview_parts.is_empty() {
+        return None;
+    }
+    
+    Some(format!("{}{}{}", color(DIM), preview_parts.join(" "), color(RESET)))
+}
+
 /// Natural comparison for version sorting (e.g., file1, file2, file10)
 fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     let mut a_chars = a.chars().peekable();

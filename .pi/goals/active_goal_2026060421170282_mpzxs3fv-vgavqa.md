@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 74072,
-    "activeSeconds": 32
+    "tokensUsed": 75941,
+    "activeSeconds": 46
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T20:17:02.827Z",
-  "updatedAt": "2026-06-04T20:17:37.157Z",
+  "updatedAt": "2026-06-04T20:17:52.664Z",
   "activePath": ".pi/goals/active_goal_2026060421170282_mpzxs3fv-vgavqa.md",
   "taskList": {
     "tasks": [
@@ -53,8 +53,8 @@ Add smart tree feature: experiment with inline subfolder previews and right-side
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 32s
-- Tokens used: 74K (74,072) tokens
+- Time spent: 46s
+- Tokens used: 76K (75,941) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
