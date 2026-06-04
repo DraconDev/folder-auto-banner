@@ -1,10 +1,10 @@
 [Unit]
-Description=cfm daemon (Contextual File Manager)
+Description=fab daemon (Folder Auto Banner)
 After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/cfmd
+ExecStart=%h/.local/bin/fabd
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
