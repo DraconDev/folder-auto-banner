@@ -374,7 +374,9 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions) -
     if entry.is_dir {
         println!("{}", target.display());
     } else {
-        let editor = std::env::var("EDITOR").unwrap_or_else(|_| "micro".to_string());
+        // Priority: $EDITOR env var > config open_command > default "micro"
+        let editor = std::env::var("EDITOR")
+            .unwrap_or_else(|_| config.open_command.clone());
         let status = std::process::Command::new(&editor)
             .arg(target)
             .status()?;
