@@ -250,6 +250,9 @@ pub enum Commands {
         format: Option<String>,
     },
 
+    /// Install shell wrappers for cd support (f N → cd)
+    Install,
+
     /// Open configuration file in editor
     Config,
 
@@ -401,6 +404,9 @@ impl Cli {
             Some(Env { path, format }) => {
                 crate::cmd::env::run_env(path.as_ref().map(|p| p.as_path()), format.as_deref())
             }
+
+            // Install
+            Some(Install) => crate::cmd::install::run_install(),
 
             // Config
             Some(Config) => {
