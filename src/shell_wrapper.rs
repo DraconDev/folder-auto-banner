@@ -44,10 +44,15 @@ f() {
             # f N — default: cd for dirs, editor for files
             local target_path
             target_path=$(command f banner "$num")
-            if [[ -n "$target_path" ]]; then
+            if [[ -z "$target_path" ]]; then
+                return
+            elif [[ -d "$target_path" ]]; then
                 cd "$target_path"
+            else
+                # File: open in editor
+                local editor="${EDITOR:-micro}"
+                "$editor" "$target_path"
             fi
-            # If target_path is empty, binary already handled the file (opened editor)
         fi
     else
         # Normal f invocation
@@ -97,10 +102,15 @@ f() {
             # f N — default: cd for dirs, editor for files
             local target_path
             target_path=$(command f banner "$num")
-            if [[ -n "$target_path" ]]; then
+            if [[ -z "$target_path" ]]; then
+                return
+            elif [[ -d "$target_path" ]]; then
                 cd "$target_path"
+            else
+                # File: open in editor
+                local editor="${EDITOR:-micro}"
+                "$editor" "$target_path"
             fi
-            # If target_path is empty, binary already handled the file (opened editor)
         fi
     else
         # Normal f invocation
