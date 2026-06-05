@@ -22,6 +22,9 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub debug: bool,
 
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+
     /// Path (defaults to current directory)
     #[arg(value_hint = ValueHint::DirPath)]
     pub path: Option<PathBuf>,
