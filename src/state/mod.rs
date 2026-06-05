@@ -262,7 +262,7 @@ impl Default for Config {
             colors: true,
             compact: false,
             verbose: false,
-            max_display_items: 8,
+            max_display_items: 0,
             permission: "rwx".to_string(),
             size: "default".to_string(),
             date: "date".to_string(),
@@ -351,7 +351,7 @@ mod tests {
         assert!(config.icons);
         assert!(config.colors);
         assert!(!config.compact);
-        assert_eq!(config.max_display_items, 8);
+        assert_eq!(config.max_display_items, 0);
         assert_eq!(config.permission, "rwx");
         assert_eq!(config.size, "default");
         assert_eq!(config.date, "date");

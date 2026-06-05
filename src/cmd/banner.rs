@@ -199,7 +199,7 @@ fn build_display_items<'a>(
     let total_before_truncation = display_items.len();
     if let Some(max_items) = opts.max {
         display_items.truncate(max_items);
-    } else if config.smart_truncation && total_before_truncation > config.max_display_items {
+    } else if config.smart_truncation && config.max_display_items > 0 && total_before_truncation > config.max_display_items {
         display_items.sort_by(|a, b| {
             let a_git = git_info.file_statuses.contains_key(a.name.as_str());
             let b_git = git_info.file_statuses.contains_key(b.name.as_str());
