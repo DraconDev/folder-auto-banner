@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 /// A directory listing with instant context.
 #[derive(Parser, Debug)]
 #[command(
-    name = "fab",
-    about = "fab — Folder Auto Banner\nA directory listing with instant context.",
+    name = "f",
+    about = "f — Folder Auto Banner\nA directory listing with instant context.",
     version,
     author
 )]
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_banner_default() {
-        let cli = Cli::parse_from(["fab"]);
+        let cli = Cli::parse_from(["f"]);
         match cli.command {
             Some(Commands::Banner { .. }) => {}
             None => {} // No subcommand = banner
