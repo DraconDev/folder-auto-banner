@@ -111,6 +111,7 @@ pub struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
+#[command(allow_external_subcommands = true)]
 pub enum Commands {
     /// Print the contextual directory dashboard
     Banner {
