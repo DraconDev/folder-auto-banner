@@ -743,9 +743,9 @@ fn build_branch_display(git_info: &GitInfo) -> String {
         return String::new();
     }
     if git_info.is_dirty {
-        format!("{}[{}*{}]", color(YELLOW), git_branch, color(RESET))
+        format!("{yellow}[{branch}*{reset}{yellow}]", yellow = color(YELLOW), branch = git_branch, reset = color(RESET))
     } else {
-        format!("{}[{}{}]", color(BLUE_BOLD), git_branch, color(RESET))
+        format!("{blue}[{branch}{reset}{blue}]", blue = color(BLUE_BOLD), branch = git_branch, reset = color(RESET))
     }
 }
 
