@@ -81,6 +81,8 @@ pub struct BannerOptions<'a> {
     pub highlight_recent: Option<String>,
     pub highlight_old: Option<String>,
     pub action: Option<String>,
+    pub force_edit: bool,
+    pub force_run: bool,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -379,6 +381,23 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions, a
             .status()?;
         if !status.success() {
             eprintln!("'{}' exited with status: {}", app, status);
+        }
+    } else if opts.force_edit {
+        // --edit flag: force open in editor
+        let editor = std::env::var("EDITOR")
+            .unwrap_or_else(|_| config.open_command.clone());
+        let status = std::process::Command::new(&editor)
+            .arg(target)
+            .status()?;
+        if !status.success() {
+            eprintln!("Editor '{}' exited with status: {}", editor, status);
+        }
+    } else if opts.force_run {
+        // --run flag: force run the file directly
+        let status = std::process::Command::new(target)
+            .status()?;
+        if !status.success() {
+            eprintln!("'{}' exited with status: {}", target.display(), status);
         }
     } else if entry.is_dir {
         // No action, directory: cd

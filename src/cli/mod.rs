@@ -229,6 +229,14 @@ pub enum Commands {
         /// Open file with this program instead of editor (e.g., "cat", "krita", "ranger")
         #[arg(value_name = "ACTION")]
         action: Option<String>,
+
+        /// Force open in editor (overrides default behavior)
+        #[arg(short = 'e', long = "edit")]
+        edit: bool,
+
+        /// Force run the file directly (overrides default behavior)
+        #[arg(short = 'x', long = "run")]
+        run: bool,
     },
 
     /// Output shell aliases for current project type
@@ -304,6 +312,8 @@ impl Cli {
                 no_symlink,
                 hyperlink,
                 action,
+                edit: force_edit,
+                run: force_run,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
                 crate::cmd::banner::run_banner(crate::cmd::banner::BannerOptions {
@@ -335,6 +345,8 @@ impl Cli {
                     no_symlink: *no_symlink,
                     hyperlink: *hyperlink,
                     action: action.clone(),
+                    force_edit: *force_edit,
+                    force_run: *force_run,
                     ..Default::default()
                 })
             }
@@ -380,6 +392,8 @@ impl Cli {
                     highlight_recent: self.highlight_recent.clone(),
                     highlight_old: self.highlight_old.clone(),
                     action: None,
+                    force_edit: false,
+                    force_run: false,
                 })
             }
 
