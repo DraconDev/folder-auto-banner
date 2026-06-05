@@ -22,57 +22,69 @@ pub fn run_install() -> Result<()> {
 
     // Add source lines to rc files
     let home = dirs_home()?;
-    let mut installed_any = false;
 
     // zsh
     let zshrc = home.join(".zshrc");
-    if zshrc.exists() {
-        let source_line = format!("source {}/fab-shell.zsh", bin_dir.display());
-        if !file_contains(&zshrc, &source_line)? {
-            fs::write(
-                &zshrc,
-                format!(
-                    "{}\n# f shell function (for cd support)\n{}\n",
-                    fs::read_to_string(&zshrc)?,
-                    source_line
-                ),
-            )
-            .context("Failed to append to .zshrc")?;
-            println!("✅ Added source line to ~/.zshrc");
-            installed_any = true;
-        } else {
-            println!("ℹ️  ~/.zshrc already has source line");
-        }
-    }
+    let zsh_relevant = ensure_source_line(&zshrc, &bin_dir, "fab-shell.zsh")?;
 
     // bash
     let bashrc = home.join(".bashrc");
-    if bashrc.exists() {
-        let source_line = format!("source {}/fab-shell.bash", bin_dir.display());
-        if !file_contains(&bashrc, &source_line)? {
-            fs::write(
-                &bashrc,
-                format!(
-                    "{}\n# f shell function (for cd support)\n{}\n",
-                    fs::read_to_string(&bashrc)?,
-                    source_line
-                ),
-            )
-            .context("Failed to append to .bashrc")?;
-            println!("✅ Added source line to ~/.bashrc");
-            installed_any = true;
-        } else {
-            println!("ℹ️  ~/.bashrc already has source line");
-        }
-    }
+    let bash_relevant = ensure_source_line(&bashrc, &bin_dir, "fab-shell.bash")?;
 
-    if installed_any {
-        println!("\n🔄 Run `source ~/.zshrc` or open a new terminal for changes to take effect.");
+    // Always print the reload hint when at least one rc file was processed.
+    // This is critical for users whose current shell was started BEFORE the
+    // install — the source line in the rc file only affects NEW shells, so
+    // the user must paste the source command into their current terminal to
+    // activate folder navigation (`f N` → `cd`).
+    if zsh_relevant || bash_relevant {
+        print_reload_hint(&bin_dir, zsh_relevant, bash_relevant);
     } else {
-        println!("\n✅ Shell wrappers already installed. No changes needed.");
+        println!("\nℹ️  No ~/.zshrc or ~/.bashrc found. To use the shell function, add a source line to your shell config manually.");
     }
 
     Ok(())
+}
+
+/// Ensure `~/.zshrc` (or `~/.bashrc`) contains a `source .../fab-shell.{zsh,bash}`
+/// line. Returns `true` if the rc file exists and was processed (whether or
+/// not we added a new line).
+fn ensure_source_line(rc_path: &Path, bin_dir: &Path, wrapper_name: &str) -> Result<bool> {
+    if !rc_path.exists() {
+        return Ok(false);
+    }
+
+    let source_line = format!("source {}/{}", bin_dir.display(), wrapper_name);
+    if !file_contains(rc_path, &source_line)? {
+        fs::write(
+            rc_path,
+            format!(
+                "{}\n# f shell function (for cd support)\n{}\n",
+                fs::read_to_string(rc_path)?,
+                source_line
+            ),
+        )
+        .with_context(|| format!("Failed to append to {}", rc_path.display()))?;
+        println!("✅ Added source line to {}", rc_path.display());
+    } else {
+        println!("ℹ️  {} already has source line", rc_path.display());
+    }
+    Ok(true)
+}
+
+/// Print a copy-pasteable hint telling the user how to activate the shell
+/// function in their CURRENT terminal. The source line in the rc file only
+/// affects new shells.
+fn print_reload_hint(bin_dir: &Path, include_zsh: bool, include_bash: bool) {
+    println!();
+    println!("🔄 Activate the shell function in your CURRENT terminal:");
+    if include_zsh {
+        println!("    source {}/fab-shell.zsh", bin_dir.display());
+    }
+    if include_bash {
+        println!("    source {}/fab-shell.bash", bin_dir.display());
+    }
+    println!();
+    println!("(The source line in your rc file only affects new shells.)");
 }
 
 /// Get the ~/.local/bin directory.
