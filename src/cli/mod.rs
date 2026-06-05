@@ -225,6 +225,10 @@ pub enum Commands {
         /// Attach terminal hyperlinks to filenames
         #[arg(long)]
         hyperlink: bool,
+
+        /// Open file with this program instead of editor (e.g., "cat", "krita", "ranger")
+        #[arg(value_name = "ACTION")]
+        action: Option<String>,
     },
 
     /// Output shell aliases for current project type
