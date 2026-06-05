@@ -15,8 +15,7 @@ use std::path::{Path, PathBuf};
     bin_name = "f",
     about = "f — Folder Auto Banner\nA directory listing with instant context.",
     version,
-    author,
-    args_conflicts_with_subcommands = true
+    author
 )]
 pub struct Cli {
     /// Enable debug output
