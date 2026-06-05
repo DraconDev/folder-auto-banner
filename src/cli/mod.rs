@@ -112,9 +112,6 @@ pub struct Cli {
     /// Background highlight for old files (e.g., "236", "gray", "none")
     #[arg(long = "highlight-old")]
     pub highlight_old: Option<String>,
-
-    #[command(subcommand)]
-    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand, Debug)]
