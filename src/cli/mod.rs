@@ -303,6 +303,7 @@ impl Cli {
                 ignore_glob,
                 no_symlink,
                 hyperlink,
+                action,
             }) => {
                 let p: Option<&Path> = path.as_ref().map(|p| p.as_path());
                 crate::cmd::banner::run_banner(crate::cmd::banner::BannerOptions {
@@ -333,6 +334,7 @@ impl Cli {
                     ignore_glob: ignore_glob.clone(),
                     no_symlink: *no_symlink,
                     hyperlink: *hyperlink,
+                    action: action.clone(),
                     ..Default::default()
                 })
             }
@@ -377,6 +379,7 @@ impl Cli {
                     level: self.level,
                     highlight_recent: self.highlight_recent.clone(),
                     highlight_old: self.highlight_old.clone(),
+                    action: None,
                 })
             }
 
