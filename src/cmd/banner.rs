@@ -400,20 +400,10 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions, a
         if !status.success() {
             eprintln!("'{}' exited with status: {}", target.display(), status);
         }
-    } else if entry.is_dir {
-        // No action, directory: cd
-        println!("{}", target.display());
     } else {
-        // No action, file: open in editor
-        // Priority: $EDITOR env var > config open_command > default "micro"
-        let editor = std::env::var("EDITOR")
-            .unwrap_or_else(|_| config.open_command.clone());
-        let status = std::process::Command::new(&editor)
-            .arg(target)
-            .status()?;
-        if !status.success() {
-            eprintln!("Editor '{}' exited with status: {}", editor, status);
-        }
+        // Print path for shell wrapper to handle
+        // Shell wrapper checks if target is dir (cd) or file (open editor)
+        println!("{}", target.display());
     }
 
     Ok(())
