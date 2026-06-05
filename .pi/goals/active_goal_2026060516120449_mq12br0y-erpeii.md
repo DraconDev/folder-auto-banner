@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 132847,
-    "activeSeconds": 97
+    "tokensUsed": 133996,
+    "activeSeconds": 188
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T15:12:04.498Z",
-  "updatedAt": "2026-06-05T15:13:43.452Z",
+  "updatedAt": "2026-06-05T15:15:15.379Z",
   "activePath": ".pi/goals/active_goal_2026060516120449_mq12br0y-erpeii.md",
   "taskList": {
     "tasks": [
@@ -44,8 +44,8 @@ Fix `f N` numbered navigation which broke after adding the `f install` subcomman
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m37s
-- Tokens used: 133K (132,847) tokens
+- Time spent: 3m08s
+- Tokens used: 134K (133,996) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
