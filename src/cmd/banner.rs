@@ -80,6 +80,7 @@ pub struct BannerOptions<'a> {
     pub level: Option<usize>,
     pub highlight_recent: Option<String>,
     pub highlight_old: Option<String>,
+    pub action: Option<String>,
 }
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
@@ -344,7 +345,7 @@ fn build_display_items<'a>(
 
 /// Navigate to item by number - cd if directory, open in editor if file
 /// Uses build_display_items() to ensure exact same ordering as banner display
-fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions) -> Result<()> {
+fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions, action: Option<&str>) -> Result<()> {
     let path = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
     let config = crate::state::Config::load().unwrap_or_default();
 
@@ -371,9 +372,19 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions) -
     let entry = &display_items[num - 1];
     let target = &entry.path;
 
-    if entry.is_dir {
+    if let Some(app) = action {
+        // Explicit action: run the app with the target path
+        let status = std::process::Command::new(app)
+            .arg(target)
+            .status()?;
+        if !status.success() {
+            eprintln!("'{}' exited with status: {}", app, status);
+        }
+    } else if entry.is_dir {
+        // No action, directory: cd
         println!("{}", target.display());
     } else {
+        // No action, file: open in editor
         // Priority: $EDITOR env var > config open_command > default "micro"
         let editor = std::env::var("EDITOR")
             .unwrap_or_else(|_| config.open_command.clone());
@@ -463,7 +474,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         if let Some(num_str) = path_arg.to_str() {
             if let Ok(num) = num_str.parse::<usize>() {
                 // Numeric navigation - look up item by number using same display pipeline
-                return navigate_by_number(num, &cwd, &opts);
+                return navigate_by_number(num, &cwd, &opts, opts.action.as_deref());
             }
         }
     }
