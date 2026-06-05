@@ -1,4 +1,4 @@
-# fab shell function - enables `f N` to cd into directories
+# f shell function - enables `f N` to cd into directories
 # Add this to your .bashrc: source /path/to/fab-shell.bash
 
 f() {
@@ -19,22 +19,30 @@ f() {
     
     # Check if first argument is a number
     if [[ "${args[0]}" =~ ^[0-9]+$ ]]; then
-        # Numeric navigation - binary handles:
-        # - directories: prints path (for cd below)
-        # - files: opens editor directly (no output)
-        local target_path
-        target_path=$(command f "${args[0]}")
+        local num="${args[0]}"
+        local action="${args[1]:-}"
         
-        if [[ "$edit_mode" == true ]] && [[ -n "$target_path" ]]; then
-            # Force edit mode on a directory path
-            ${EDITOR:-micro} "$target_path"
-        elif [[ -n "$target_path" ]]; then
-            # Directory - cd into it
-            cd "$target_path"
+        if [[ -n "$action" ]]; then
+            # f N ACTION — open item N with ACTION (e.g., f 4 krita, f 4 cat)
+            command f banner "$num" "$action"
+        elif [[ "$edit_mode" == true ]]; then
+            # f N -e — force edit mode (even for directories)
+            local target_path
+            target_path=$(command f banner "$num")
+            if [[ -n "$target_path" ]]; then
+                ${EDITOR:-micro} "$target_path"
+            fi
+        else
+            # f N — default: cd for dirs, editor for files
+            local target_path
+            target_path=$(command f banner "$num")
+            if [[ -n "$target_path" ]]; then
+                cd "$target_path"
+            fi
+            # If target_path is empty, binary already handled the file (opened editor)
         fi
-        # If target_path is empty, binary already handled the file (opened editor)
     else
-        # Normal fab invocation
+        # Normal f invocation
         command f "$@"
     fi
 }
