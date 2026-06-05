@@ -2,15 +2,18 @@
 # Add this to your .zshrc: source /path/to/fab-shell.zsh
 
 f() {
-    # Check for --edit flag
+    # Check for --edit/-e and --run/-x flags
     local edit_mode=false
+    local run_mode=false
     local args=("$@")
     
-    # Parse --edit or -e flag
+    # Parse flags
     local new_args=()
     for arg in "${args[@]}"; do
         if [[ "$arg" == "--edit" || "$arg" == "-e" ]]; then
             edit_mode=true
+        elif [[ "$arg" == "--run" || "$arg" == "-x" ]]; then
+            run_mode=true
         else
             new_args+=("$arg")
         fi
@@ -26,12 +29,11 @@ f() {
             # f N ACTION — open item N with ACTION (e.g., f 4 krita, f 4 cat)
             command f banner "$num" "$action"
         elif [[ "$edit_mode" == true ]]; then
-            # f N -e — force edit mode (even for directories)
-            local target_path
-            target_path=$(command f banner "$num")
-            if [[ -n "$target_path" ]]; then
-                ${EDITOR:-micro} "$target_path"
-            fi
+            # f N -e — force open in editor
+            command f banner --edit "$num"
+        elif [[ "$run_mode" == true ]]; then
+            # f N -x — force run the file directly
+            command f banner --run "$num"
         else
             # f N — default: cd for dirs, editor for files
             local target_path
