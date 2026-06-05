@@ -11,7 +11,7 @@ f() {
     local edit_mode=false
     local run_mode=false
     local args=("$@")
-    
+
     # Parse flags
     local new_args=()
     for arg in "${args[@]}"; do
@@ -24,11 +24,12 @@ f() {
         fi
     done
     args=("${new_args[@]}")
-    
+
     # Check if first argument is a number
-    if [[ "${args[0]}" =~ ^[0-9]+$ ]]; then
-        local num="${args[0]}"
-        local action="${args[1]:-}"
+    # NOTE: zsh arrays are 1-indexed — first element is args[1], second is args[2].
+    if [[ "${args[1]}" =~ ^[0-9]+$ ]]; then
+        local num="${args[1]}"
+        local action="${args[2]:-}"
         
         if [[ -n "$action" ]]; then
             # f N ACTION — open item N with ACTION (e.g., f 4 krita, f 4 cat)
@@ -63,7 +64,7 @@ f() {
     local edit_mode=false
     local run_mode=false
     local args=("$@")
-    
+
     # Parse flags
     local new_args=()
     for arg in "${args[@]}"; do
@@ -76,8 +77,9 @@ f() {
         fi
     done
     args=("${new_args[@]}")
-    
+
     # Check if first argument is a number
+    # bash arrays are 0-indexed.
     if [[ "${args[0]}" =~ ^[0-9]+$ ]]; then
         local num="${args[0]}"
         local action="${args[1]:-}"
