@@ -36,7 +36,7 @@ const YELLOW: &str = "\x1b[33m";
 const MAGENTA: &str = "\x1b[35m";
 const RED: &str = "\x1b[31m";
 const CYAN: &str = "\x1b[36m";
-const TEAL: &str = "\x1b[38;2;0;200;200m";
+const BRIGHT_GREEN: &str = "\x1b[92m";
 const ORANGE: &str = "\x1b[38;5;214m";
 const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating rows
 
@@ -1563,7 +1563,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         if config.numbered {
             let num = idx + 1; // 1-based numbering
             let num_padded = format!("{:>width$}", num, width = num_width);
-            let num_str = format!("{bold}{teal}[{num}{reset}{teal}]", bold = color(BOLD), teal = color(TEAL), num = num_padded, reset = color(RESET));
+            let num_str = format!("{bold}{green}[{num}{reset}{green}]", bold = color(BOLD), green = color(BRIGHT_GREEN), num = num_padded, reset = color(RESET));
             row_parts.push(num_str);
         }
         row_parts.push(icon_str);
