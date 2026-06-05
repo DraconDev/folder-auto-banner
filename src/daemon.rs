@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::daemon_types::{BannerData, Request, Response};
-use crate::fs::DirSummary;
+use folder_auto_banner::daemon_types::{BannerData, Request, Response};
+use folder_auto_banner::fs::DirSummary;
 
 // Cache entry with TTL
 struct CacheEntry {
