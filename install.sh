@@ -108,7 +108,9 @@ for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     fi
 done
 
-# --- Install hook for zsh ---
+# --- Install hook for zsh (auto-banner only) ---
+# The shell function (`f N` → `cd`) is installed separately below via
+# `f install`, which reads the single source of truth in src/shell_wrapper.rs.
 if [ -f "$HOME/.zshrc" ]; then
     {
         echo ''
@@ -119,28 +121,29 @@ if [ -f "$HOME/.zshrc" ]; then
         echo 'add-zsh-hook chpwd _fab_hook'
         echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
         echo '_fab_hook  # fire on new shell/tab startup'
-        echo ''
-        echo '# fab shell function (enables f N to cd)'
-        echo "source $BIN_DIR/fab-shell.zsh"
     } >> "$HOME/.zshrc"
-    cp fab-shell.zsh "$BIN_DIR/"
-    echo "✅ Added chpwd hook + shell function to ~/.zshrc"
+    echo "✅ Added chpwd hook to ~/.zshrc"
 fi
 
-# --- Install hook for bash ---
+# --- Install hook for bash (auto-banner only) ---
 if [ -f "$HOME/.bashrc" ]; then
     {
         echo ''
         echo '# fab auto-banner hook'
         echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
         echo 'PROMPT_COMMAND="_fab_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"'
-        echo ''
-        echo '# fab shell function (enables f N to cd)'
-        echo "source $BIN_DIR/fab-shell.bash"
     } >> "$HOME/.bashrc"
-    cp fab-shell.bash "$BIN_DIR/"
-    echo "✅ Added PROMPT_COMMAND hook + shell function to ~/.bashrc"
+    echo "✅ Added PROMPT_COMMAND hook to ~/.bashrc"
 fi
+
+# --- Install shell function (delegated to `f install`) ---
+# `f install` reads the embedded ZSH_WRAPPER / BASH_WRAPPER from
+# src/shell_wrapper.rs (the single source of truth), writes them to
+# $BIN_DIR, and adds the source line to ~/.zshrc and ~/.bashrc with
+# idempotency. This avoids drift with the standalone fab-shell.{zsh,bash}
+# files in the repo root.
+echo "   Installing shell function via f install..."
+"$BIN_PATH" install
 
 # --- Start daemon ---
 echo "   Starting daemon..."
