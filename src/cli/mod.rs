@@ -25,10 +25,6 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 
-    /// Path (defaults to current directory)
-    #[arg(value_hint = ValueHint::DirPath)]
-    pub path: Option<PathBuf>,
-
     /// Sort by time modified
     #[arg(short = 't', long = "timesort")]
     pub timesort: bool,
@@ -355,7 +351,6 @@ impl Cli {
             }
             None => {
                 // `f` with no args = `f banner` — use top-level flags
-                let p: Option<&Path> = self.path.as_deref();
                 crate::cmd::banner::run_banner(crate::cmd::banner::BannerOptions {
                     path: p,
                     raw: self.raw,
