@@ -2,16 +2,17 @@
   "version": 3,
   "id": "mq12br0y-erpeii",
   "objective": "Fix `f N` numbered navigation which broke after adding the `f install` subcommand — numeric arguments now fail with \"unrecognized subcommand\".",
-  "status": "active",
-  "autoContinue": true,
+  "status": "paused",
+  "autoContinue": false,
   "usage": {
-    "tokensUsed": 135395,
-    "activeSeconds": 345
+    "tokensUsed": 152368,
+    "activeSeconds": 3334
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T15:12:04.498Z",
-  "updatedAt": "2026-06-05T15:17:54.303Z",
+  "updatedAt": "2026-06-05T16:07:49.286Z",
   "activePath": ".pi/goals/active_goal_2026060516120449_mq12br0y-erpeii.md",
+  "stopReason": "user",
   "taskList": {
     "tasks": [
       {
@@ -47,11 +48,11 @@ Fix `f N` numbered navigation which broke after adding the `f install` subcomman
 
 ## Progress
 
-- Status: running
-- Auto-continue: on
+- Status: paused
+- Auto-continue: off
 - Sisyphus mode: no
-- Time spent: 5m45s
-- Tokens used: 135K (135,395) tokens
+- Time spent: 55m34s
+- Tokens used: 152K (152,368) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
