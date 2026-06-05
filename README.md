@@ -1,4 +1,8 @@
-# fab — Folder Auto Banner
+# f — Folder Auto Banner
+
+<p align="center">
+  <img src="public/fab_thumb.png" alt="f — Folder Auto Banner" width="800">
+</p>
 
 A directory listing with instant context.
 
