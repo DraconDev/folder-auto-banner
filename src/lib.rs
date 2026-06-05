@@ -1,6 +1,9 @@
 pub mod build_status;
 pub mod cache;
+pub mod cli;
+pub mod cmd;
 pub mod code_metrics;
+pub mod daemon_client;
 pub mod daemon_types;
 pub mod docker;
 pub mod fs;
