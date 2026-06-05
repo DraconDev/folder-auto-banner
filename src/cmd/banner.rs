@@ -201,8 +201,8 @@ fn build_display_items<'a>(
         display_items.truncate(max_items);
     } else if config.smart_truncation && total_before_truncation > config.max_display_items {
         display_items.sort_by(|a, b| {
-            let a_git = git_info.file_statuses.get(a.name.as_str()).is_some();
-            let b_git = git_info.file_statuses.get(b.name.as_str()).is_some();
+            let a_git = git_info.file_statuses.contains_key(a.name.as_str());
+            let b_git = git_info.file_statuses.contains_key(b.name.as_str());
             let git_order = b_git.cmp(&a_git);
             if git_order != std::cmp::Ordering::Equal {
                 return git_order;
@@ -490,7 +490,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     }
 
     // Check if path argument is a number for navigation (after config is loaded)
-    if let Some(ref path_arg) = opts.path {
+    if let Some(path_arg) = &opts.path {
         if let Some(num_str) = path_arg.to_str() {
             if let Ok(num) = num_str.parse::<usize>() {
                 // Numeric navigation - look up item by number using same display pipeline
@@ -1575,7 +1575,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             let current_row_len = strip_ansi(&row_parts.join(" ")).len();
             let available_for_preview = term_width.saturating_sub(current_row_len + 4); // +4 for spacing
             if term_width > 0 && available_for_preview > 10 {
-                if let Some(preview) = get_dir_inline_preview(&item, available_for_preview) {
+                if let Some(preview) = get_dir_inline_preview(item, available_for_preview) {
                     row_parts.push(format!("{}│{}", color(DIM), color(RESET)));
                     row_parts.push(preview);
                 }
