@@ -352,7 +352,7 @@ impl Cli {
             None => {
                 // `f` with no args = `f banner` — use top-level flags
                 crate::cmd::banner::run_banner(crate::cmd::banner::BannerOptions {
-                    path: p,
+                    path: None,
                     raw: self.raw,
                     json: self.json,
                     compact: self.compact,
