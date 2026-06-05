@@ -38,6 +38,7 @@ rag_index.json
 repo-runtime/
 repo-scanner/
 state/
+!src/state/
 target/
 tasks*.json
 test_banner/
