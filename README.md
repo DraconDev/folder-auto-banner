@@ -44,7 +44,21 @@ See [COMPETITORS.md](COMPETITORS.md) for the full comparison.
 ## Quick Start
 
 ```bash
+# Build + install everything (binary, shell function, daemon, auto-banner hook)
 ./install.sh
+exec zsh   # or: source ~/.bashrc
+```
+
+This sets up:
+- The `f` binary in `~/.local/bin/`
+- The shell function (enables `f N` → `cd` navigation)
+- The auto-banner hook (shows a banner on every `cd`)
+- The background daemon
+
+If you only need the shell function (e.g., after a manual build):
+
+```bash
+f install
 exec zsh   # or: source ~/.bashrc
 ```
 
@@ -63,10 +77,28 @@ f --tree             # Tree view
 f --json             # JSON output
 f -R, --recursive    # Recurse into subdirectories
 f --filter rs        # Filter by pattern
+f install            # Install shell function for f N → cd
 f config             # Open config file
 f daemon stop        # Stop daemon
 f daemon status      # Check daemon status
 ```
+
+## Shell Function (`f install`)
+
+The `f install` subcommand sets up the shell function that enables `f N` → `cd` navigation:
+
+- Writes the shell wrapper (`fab-shell.zsh` / `fab-shell.bash`) to `~/.local/bin/`
+- Adds a `source` line to `~/.zshrc` and/or `~/.bashrc`
+- Is idempotent — safe to run multiple times
+
+This is called automatically by `./install.sh`. You can also run it standalone:
+
+```bash
+f install              # Install shell function
+f install --debug      # Install with debug output
+```
+
+The shell function is the single source of truth — it reads from the compiled-in `src/shell_wrapper.rs` constants, not from the standalone files in the repo root.
 
 ## Numbered Navigation
 
@@ -88,6 +120,13 @@ f 3 krita    # open item 3 with krita
 f 3 -e       # force open in editor
 f 3 -x       # force run the file directly
 ```
+
+> **Note:** `f N` requires the shell function to be installed. Running `./install.sh` or `f install` sets it up automatically. To activate it in your current terminal without restarting your shell:
+>
+> ```bash
+> source ~/.local/bin/fab-shell.zsh   # for zsh
+> source ~/.local/bin/fab-shell.bash  # for bash
+> ```
 
 ## CLI Flags (Actions)
 
@@ -198,7 +237,7 @@ Recent files pop out; old files recede into the background.
 ## Testing
 
 ```bash
-cargo test    # 93 tests pass
+cargo test    # 65 tests pass
 cargo clippy  # 0 warnings
 ```
 
