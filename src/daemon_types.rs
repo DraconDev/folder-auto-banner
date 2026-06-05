@@ -132,8 +132,8 @@ mod tests {
 
     #[test]
     fn test_banner_data_creation() {
-        let data = fab_lib::daemon_types::BannerData {
-            summary: fab_lib::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
+        let data = crate::daemon_types::BannerData {
+            summary: crate::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
             git_info: None,
         };
 
@@ -142,13 +142,13 @@ mod tests {
 
     #[test]
     fn test_banner_data_serialization() {
-        let data = fab_lib::daemon_types::BannerData {
-            summary: fab_lib::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
+        let data = crate::daemon_types::BannerData {
+            summary: crate::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
             git_info: None,
         };
 
         let json = serde_json::to_string(&data).unwrap();
-        let deserialized: fab_lib::daemon_types::BannerData = serde_json::from_str(&json).unwrap();
+        let deserialized: crate::daemon_types::BannerData = serde_json::from_str(&json).unwrap();
         assert!(deserialized.git_info.is_none());
     }
 }

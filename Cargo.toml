@@ -1,5 +1,5 @@
 [package]
-name = "f"
+name = "folder-auto-banner"
 version = "0.6.0"
 edition = "2021"
 description = "Folder Auto Banner — A directory listing with instant context"
@@ -18,9 +18,6 @@ name = "fabd"
 path = "src/daemon.rs"
 
 [dependencies]
-# Shared library
-fab-lib = { path = "fab-lib" }
-
 # CLI parsing
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"

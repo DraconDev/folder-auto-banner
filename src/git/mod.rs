@@ -75,6 +75,11 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
     get_git_info_inner(path, true, &[])
 }
 
+/// Get Git info with optional path filtering for performance.
+pub fn get_git_info_filtered(path: &Path, filter_paths: &[String]) -> Result<GitInfo> {
+    get_git_info_inner(path, true, filter_paths)
+}
+
 fn get_git_info_inner(
     path: &Path,
     collect_file_statuses: bool,
