@@ -511,7 +511,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
         .collect();
 
     // Use filtered git info — only collects statuses for top_items (much faster for large repos)
-    let mut git_info = crate::git::get_git_info_filtered(path, &filter_paths).ok();
+    let mut git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
 
     // For directories, we need to also collect statuses for their immediate children
     // because git pathspec "src" matches src/*, but we display src/daemon.rs etc.
