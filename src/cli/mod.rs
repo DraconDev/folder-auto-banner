@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueHint};
 use std::path::{Path, PathBuf};
 
-/// fab — Folder Auto Banner
+/// f — Folder Auto Banner
 ///
 /// A directory listing with instant context.
 #[derive(Parser, Debug)]
@@ -263,10 +263,10 @@ impl Cli {
         // Initialize logging if debug mode
         if self.debug {
             tracing_subscriber::fmt()
-                .with_env_filter("fab=debug,fab=trace")
+                .with_env_filter("f=debug,f=trace")
                 .init();
         } else {
-            tracing_subscriber::fmt().with_env_filter("fab=warn").init();
+            tracing_subscriber::fmt().with_env_filter("f=warn").init();
         }
 
         match &self.command {

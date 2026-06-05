@@ -11,15 +11,15 @@ pub fn run_uninstall_hook() -> Result<()> {
     }
 
     let content = std::fs::read_to_string(&config_path)?;
-    let hook_start = "# fab auto-banner hook";
+    let hook_start = "# f auto-banner hook";
     let hook_end = match shell.as_str() {
-        "zsh" => "_fab_hook  # fire on new shell/tab startup",
-        "bash" => "PROMPT_COMMAND=\"_fab_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}\"",
-        _ => "_fab_hook  # fire on new shell/tab startup",
+        "zsh" => "_f_hook  # fire on new shell/tab startup",
+        "bash" => "PROMPT_COMMAND=\"_f_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}\"",
+        _ => "_f_hook  # fire on new shell/tab startup",
     };
 
     if !content.contains(hook_start) {
-        println!("ℹ️  No fab hook found in {}", config_path.display());
+        println!("ℹ️  No f hook found in {}", config_path.display());
         return Ok(());
     }
 
@@ -55,10 +55,10 @@ pub fn run_uninstall_hook() -> Result<()> {
         }
         let new_content = new_lines.join("\n") + "\n";
         std::fs::write(&config_path, new_content)?;
-        println!("✅ Removed fab hook from {}", config_path.display());
+        println!("✅ Removed f hook from {}", config_path.display());
         println!("💡 Reload your shell: exec {} or source {}", shell, config_path.display());
     } else {
-        println!("ℹ️  No fab hook found in {}", config_path.display());
+        println!("ℹ️  No f hook found in {}", config_path.display());
     }
 
     Ok(())

@@ -1,7 +1,7 @@
 //! Banner command - the crown jewel
 //!
 //! Prints a rich, context-aware directory dashboard and exits.
-//! This is the main feature that makes fab magical.
+//! This is the main feature that makes f magical.
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -511,7 +511,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
 
     // Daemon not available or cache miss - try direct scan.
     // Todos/ports/docker/metrics are disabled by default for speed; set FAB_*=1 to enable.
-    eprintln!("fab daemon not available, falling back to direct scan");
+    eprintln!("f daemon not available, falling back to direct scan");
     let no_todos = std::env::var("FAB_TODOS").unwrap_or_default() != "1";
     let no_ports = std::env::var("FAB_PORTS").unwrap_or_default() != "1";
     let no_docker = std::env::var("FAB_DOCKER").unwrap_or_default() != "1";
