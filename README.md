@@ -22,9 +22,9 @@ When you run `f`, you see:
 
 ## vs lsd / eza
 
-fab is **not a drop-in `ls` replacement** — it's a **contextual directory dashboard**. While lsd and eza focus on making `ls` pretty, fab adds **project context** (git, TODOs, ports, docker, build status, code metrics) and **daemon caching** for instant repeated access.
+fab is **not a drop-in `ls` replacement** — it's a **contextual directory dashboard**. While lsd and eza focus on making `ls` pretty, f adds **project context** (git, TODOs, ports, docker, build status, code metrics) and **daemon caching** for instant repeated access.
 
-| Feature | fab | lsd | eza |
+| Feature | f | lsd | eza |
 |---------|-----|-----|-----|
 | Pretty listing | ✅ | ✅ | ✅ |
 | Icons | ✅ | ✅ | ✅ |
@@ -66,6 +66,27 @@ f --filter rs        # Filter by pattern
 f config             # Open config file
 f daemon stop        # Stop daemon
 f daemon status      # Check daemon status
+```
+
+## Numbered Navigation
+
+When `numbered = true` in config (or enabled by default), each item gets a number:
+
+```
+[ 1] 📁 .github
+[ 2] 📁 src
+[ 3] 📄 README.md
+```
+
+Navigate with `f N`:
+
+```bash
+f 2          # cd into item 2 (if directory)
+f 3          # open item 3 in editor (if file)
+f 3 cat      # open item 3 with `cat`
+f 3 krita    # open item 3 with krita
+f 3 -e       # force open in editor
+f 3 -x       # force run the file directly
 ```
 
 ## CLI Flags (Actions)
@@ -136,6 +157,13 @@ ports = true
 docker = true
 ```
 
+### Navigation
+```toml
+[features]
+numbered = true          # Show item numbers for f N navigation
+open_command = "micro"   # Default editor for f N (overridden by $EDITOR)
+```
+
 ### Sorting
 ```toml
 [sort]
@@ -170,7 +198,7 @@ Recent files pop out; old files recede into the background.
 ## Testing
 
 ```bash
-cargo test    # 101 tests pass
+cargo test    # 93 tests pass
 cargo clippy  # 0 warnings
 ```
 
