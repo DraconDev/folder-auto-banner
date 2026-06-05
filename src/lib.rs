@@ -11,5 +11,6 @@ pub mod git;
 pub mod icon;
 pub mod port_usage;
 pub mod state;
+pub mod test_cache;
 pub mod todo_scanner;
 pub mod utils;
