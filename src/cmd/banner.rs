@@ -1563,7 +1563,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         if config.numbered {
             let num = idx + 1; // 1-based numbering
             let num_padded = format!("{:>width$}", num, width = num_width);
-            let num_str = format!("{}[{}{}{}]{}", color(BOLD), color(TEAL), num_padded, color(RESET), color(TEAL));
+            let num_str = format!("{}{}[{}{}{}]{}", color(BOLD), color(TEAL), num_padded, color(RESET), color(TEAL));
             row_parts.push(num_str);
         }
         row_parts.push(icon_str);
