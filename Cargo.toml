@@ -29,14 +29,6 @@ include = [
     "install.sh",
     "public/**/*",
 ]
-exclude = [
-    "Cargo.toml.orig",
-    "RELEASE_NOTES_*.md",
-    ".dracon/**",
-    ".pi/**",
-    ".ralph/**",
-    "target/**",
-]
 
 [[bin]]
 name = "f"
