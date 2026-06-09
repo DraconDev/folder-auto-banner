@@ -98,27 +98,6 @@ impl Daemon {
 
         tracing::info!("fabd listening on {}", self.socket_path.display());
 
-        // Load persisted banner cache from disk
-        let socket_dir =
-            directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
-        if let Some(ref dir) = socket_dir {
-            let persisted = load_banner_cache(dir);
-            let mut cache = self.cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Cache mutex poisoned, recovering: {}", e);
-                e.into_inner()
-            });
-            for (path, data) in persisted {
-                cache.insert(
-                    path,
-                    CacheEntry {
-                        data,
-                        computed_at: Instant::now(),
-                    },
-                );
-            }
-            tracing::info!("Loaded {} banner caches from disk", cache.len());
-        }
-
         // Start inotify watcher thread for active folders only.
         let cache_clone = self.cache.clone();
         let active_roots = Arc::new(Mutex::new(HashSet::new()));
@@ -148,10 +127,11 @@ impl Daemon {
                     })
                     .insert(path.clone());
                 cache.insert(
-                    path,
+                    path.clone(),
                     CacheEntry {
                         data,
-                        computed_at: Instant::now(),
+                        computed_at: Instant::now() - CACHE_TTL,
+                        root_mtime: current_dir_mtime(&path),
                     },
                 );
             }
