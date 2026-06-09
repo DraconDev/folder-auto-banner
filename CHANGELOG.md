@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2026-06-09
+
+### Fixed
+- **Fresh folder information** — `f` now consistently shows the latest folder contents and sizes:
+  - Daemon cache hits validate the cached folder snapshot against a fresh shallow scan before returning, so out-of-band edits are no longer masked by the TTL.
+  - Displayed directory sizes are refreshed when their mtime changes, so nested folder content edits immediately update parent folder size information.
+  - Directory size cache tracks mtimes, so persisted sizes from a previous daemon run can no longer shadow fresh data.
+- **Daemon clear-cache** now also clears `banner_cache.json` and `dir_sizes.json` (previously only the cache directory), with no spurious shutdown warning.
+- Bench harness `benches/performance.rs` now references the real crate name (`folder_auto_banner`) instead of the old `fab_lib`.
+- rustdoc HTML warning in `port_usage` for `<pid>` token.
+
+### Notes
+- No user-visible behavior changes beyond the freshness fix and the expanded `f daemon clear-cache`.
+- No new dependencies.
+
 ## [0.4.0] - 2024-05-31
 
 ### Added
