@@ -1,6 +1,6 @@
 use anyhow::Result;
 use inotify::{Inotify, WatchMask};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -8,7 +8,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
 use folder_auto_banner::daemon_types::{BannerData, Request, Response};
-use folder_auto_banner::fs::{DirEntry, DirSummary};
+use folder_auto_banner::fs::{DirEntry, DirSummary, ProjectType};
 
 // Cache entry with TTL
 #[derive(Clone)]
@@ -21,6 +21,37 @@ const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
 const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(1000);
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
+const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
+const ACTIVE_WATCH_DEPTH: usize = 3;
+const MAX_ACTIVE_WATCH_DIRS: usize = 512;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ShallowSnapshot {
+    total_items: usize,
+    total_size: u64,
+    files: usize,
+    dirs: usize,
+    project_type: ProjectType,
+    last_modified: Option<SystemTime>,
+    top_items: Vec<ShallowItem>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ShallowItem {
+    name: String,
+    is_dir: bool,
+    is_file: bool,
+    is_symlink: bool,
+    size: u64,
+    modified: Option<SystemTime>,
+    symlink_valid: bool,
+}
+
+#[derive(Clone, Debug)]
+struct WatchRegistration {
+    owner: PathBuf,
+    watched_path: PathBuf,
+}
 
 struct Daemon {
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
@@ -85,33 +116,41 @@ impl Daemon {
             tracing::info!("Loaded {} banner caches from disk", cache.len());
         }
 
-        // Start inotify watcher thread
+        // Start inotify watcher thread for active folders only.
         let cache_clone = self.cache.clone();
+        let active_roots = Arc::new(Mutex::new(HashSet::new()));
+        let active_roots_clone = active_roots.clone();
         let _watcher_handle = thread::spawn(move || {
-            watch_loop(cache_clone);
+            watch_loop(cache_clone, active_roots_clone);
         });
 
-        // Start proactive scan of home directory in background
-        let dir_sizes_clone = self.dir_sizes.clone();
-        let dir_size_mtimes_clone = self.dir_size_mtimes.clone();
-        let cache_clone = self.cache.clone();
+        // Load persisted banner cache after the watcher is ready so watched paths become
+        // active immediately. Persisted entries are intentionally left in the cache for
+        // fast startup, but active-folder watchers and cheap snapshot validation catch
+        // changes without forcing a full shallow scan on every cache hit.
         let socket_dir =
             directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
-        thread::spawn(move || {
-            proactive_scan(
-                dir_sizes_clone.clone(),
-                dir_size_mtimes_clone,
-                cache_clone.clone(),
-            );
-            // Save to disk when done
-            if let Some(dir) = socket_dir {
-                let sizes = dir_sizes_clone.lock().unwrap_or_else(|e| {
-                    tracing::warn!("Mutex poisoned, recovering");
-                    e.into_inner()
-                });
-                save_size_cache(&dir, &sizes);
+        if let Some(ref dir) = socket_dir {
+            let persisted = load_banner_cache(dir);
+            let mut cache = self.cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Cache mutex poisoned, recovering: {}", e);
+                e.into_inner()
+            });
+            for (path, data) in persisted {
+                active_roots.insert(path.clone());
+                cache.insert(
+                    path,
+                    CacheEntry {
+                        data,
+                        computed_at: Instant::now(),
+                    },
+                );
             }
-        });
+            tracing::info!("Loaded {} banner caches from disk", cache.len());
+        }
+
+        let dir_sizes_clone = self.dir_sizes.clone();
+        let dir_size_mtimes_clone = self.dir_size_mtimes.clone();
 
         let mut last_activity = Instant::now();
         let mut last_save = Instant::now();
@@ -123,8 +162,9 @@ impl Daemon {
                     let cache = self.cache.clone();
                     let dir_sizes = self.dir_sizes.clone();
                     let dir_size_mtimes = self.dir_size_mtimes.clone();
+                    let active_roots = active_roots.clone();
                     thread::spawn(move || {
-                        if let Err(e) = handle_client(stream, cache, dir_sizes, dir_size_mtimes) {
+                        if let Err(e) = handle_client(stream, cache, dir_sizes, dir_size_mtimes, active_roots) {
                             tracing::error!("Client error: {}", e);
                         }
                     });
@@ -181,8 +221,19 @@ impl Daemon {
     }
 }
 
-/// inotify watcher loop — monitors cached directories for changes
-fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
+/// inotify watcher loop — watches active folders and their shallow descendants.
+///
+/// The old daemon only watched cached root directories, which caught top-level
+/// create/delete/move events but missed nested edits that change displayed
+/// directory sizes. The freshness fix validated every cache hit with a shallow
+/// scan, which made the daemon feel slow. This keeps cache hits fast by watching
+/// active folders more aggressively: once a folder is requested, the daemon watches
+/// the folder and a bounded set of descendant directories so nested changes
+/// invalidate the cached banner without a full scan on every request.
+fn watch_loop(
+    cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+    active_roots: Arc<Mutex<HashSet<PathBuf>>>,
+) {
     let mut inotify = match Inotify::init() {
         Ok(i) => i,
         Err(e) => {
@@ -191,73 +242,40 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
         }
     };
 
-    let mut watched: HashMap<PathBuf, inotify::WatchDescriptor> = HashMap::new();
-    let mut failed_watches: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    let mut watched: HashMap<inotify::WatchDescriptor, WatchRegistration> = HashMap::new();
+    let mut failed_watches: HashSet<PathBuf> = HashSet::new();
+    let mut last_refresh = Instant::now() - WATCH_REFRESH_INTERVAL;
 
     loop {
-        // Check for new directories to watch
-        {
-            let cache = cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            for path in cache.keys() {
-                if !watched.contains_key(path) && !failed_watches.contains(path) {
-                    // Skip non-existent directories and dead symlinks
-                    if !path.exists() {
-                        failed_watches.insert(path.clone());
-                        continue;
-                    }
-                    // For symlinks, check if target exists
-                    if let Ok(meta) = std::fs::symlink_metadata(path) {
-                        if meta.is_symlink() && std::fs::metadata(path).is_err() {
-                            failed_watches.insert(path.clone());
-                            continue; // Dead symlink, skip
-                        }
-                    }
-                    match inotify.watches().add(
-                        path,
-                        WatchMask::CREATE
-                            | WatchMask::DELETE
-                            | WatchMask::MODIFY
-                            | WatchMask::MOVE
-                            | WatchMask::CLOSE_WRITE,
-                    ) {
-                        Ok(wd) => {
-                            tracing::info!("Watching: {}", path.display());
-                            watched.insert(path.clone(), wd);
-                        }
-                        Err(e) => {
-                            tracing::warn!("Failed to watch {}: {}", path.display(), e);
-                            failed_watches.insert(path.clone());
-                        }
-                    }
-                }
-            }
+        if last_refresh.elapsed() >= WATCH_REFRESH_INTERVAL {
+            refresh_active_watchers(
+                &mut inotify,
+                &active_roots,
+                &mut watched,
+                &mut failed_watches,
+            );
+            last_refresh = Instant::now();
         }
 
         // Read inotify events (non-blocking)
-        let mut buffer = [0u8; 4096];
+        let mut buffer = [0u8; 8192];
         match inotify.read_events(&mut buffer) {
             Ok(events) => {
                 for event in events {
-                    // Find which cached directory this event belongs to
                     let mut invalidated = Vec::new();
-                    for (path, wd) in &watched {
-                        if event.wd == *wd {
-                            invalidated.push(path.clone());
-                        }
+                    if let Some(reg) = watched.get(&event.wd) {
+                        invalidated.push(reg.owner.clone());
                     }
 
-                    // Invalidate affected cache entries
                     if !invalidated.is_empty() {
                         let mut cache_guard = cache.lock().unwrap_or_else(|e| {
                             tracing::warn!("Mutex poisoned, recovering");
                             e.into_inner()
                         });
                         for path in &invalidated {
-                            cache_guard.remove(path);
-                            tracing::info!("Cache invalidated: {}", path.display());
+                            if cache_guard.remove(path).is_some() {
+                                tracing::info!("Cache invalidated: {}", path.display());
+                            }
                         }
                     }
                 }
@@ -270,29 +288,180 @@ fn watch_loop(cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>) {
             }
         }
 
-        // Remove stale watchers for directories no longer in cache or no longer exist
-        {
-            let cache = cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            let to_remove: Vec<PathBuf> = watched
-                .keys()
-                .filter(|p| !cache.contains_key(*p) || !p.exists())
-                .cloned()
-                .collect();
-            for path in to_remove {
-                if let Some(wd) = watched.remove(&path) {
-                    inotify.watches().remove(wd).ok();
-                    tracing::info!("Stopped watching: {}", path.display());
-                }
-            }
-            // Also clear failed watches for paths no longer in cache
-            failed_watches.retain(|p| cache.contains_key(p));
-        }
-
+        remove_inactive_watchers(&active_roots, &mut inotify, &mut watched, &mut failed_watches);
         thread::sleep(Duration::from_millis(100));
     }
+}
+
+fn refresh_active_watchers(
+    inotify: &mut Inotify,
+    active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
+    watched: &mut HashMap<inotify::WatchDescriptor, WatchRegistration>,
+    failed_watches: &mut HashSet<PathBuf>,
+) {
+    let roots = active_roots
+        .lock()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Active roots mutex poisoned, recovering");
+            e.into_inner()
+        })
+        .clone();
+
+    let mut targets = Vec::new();
+    for root in roots {
+        if targets.len() >= MAX_ACTIVE_WATCH_DIRS {
+            tracing::warn!(
+                "Reached active watcher cap ({} dirs); skipping remaining active folders",
+                MAX_ACTIVE_WATCH_DIRS
+            );
+            break;
+        }
+        collect_watch_targets(&root, 0, &mut targets, MAX_ACTIVE_WATCH_DIRS - targets.len());
+    }
+
+    for target in targets {
+        if watched.values().any(|reg| reg.watched_path == target) || failed_watches.contains(&target) {
+            continue;
+        }
+
+        if !can_watch_path(&target) {
+            failed_watches.insert(target);
+            continue;
+        }
+
+        match inotify.watches().add(
+            &target,
+            WatchMask::CREATE
+                | WatchMask::DELETE
+                | WatchMask::MODIFY
+                | WatchMask::MOVE
+                | WatchMask::CLOSE_WRITE
+                | WatchMask::ATTRIB
+                | WatchMask::DELETE_SELF
+                | WatchMask::MOVE_SELF,
+        ) {
+            Ok(wd) => {
+                let owner = find_owner_for_watch(&target, active_roots);
+                watched.insert(
+                    wd,
+                    WatchRegistration {
+                        owner,
+                        watched_path: target.clone(),
+                    },
+                );
+                tracing::debug!("Watching active path: {}", target.display());
+            }
+            Err(e) => {
+                tracing::debug!("Failed to watch {}: {}", target.display(), e);
+                failed_watches.insert(target);
+            }
+        }
+    }
+}
+
+fn collect_watch_targets(path: &Path, depth: usize, targets: &mut Vec<PathBuf>, remaining: usize) {
+    if targets.len() >= remaining || depth > ACTIVE_WATCH_DEPTH {
+        return;
+    }
+
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(_) => return,
+    };
+
+    let is_dir = if meta.is_symlink() {
+        std::fs::metadata(path)
+            .map(|m| m.is_dir())
+            .unwrap_or(false)
+    } else {
+        meta.is_dir()
+    };
+
+    if !is_dir {
+        return;
+    }
+
+    targets.push(path.to_path_buf());
+
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        if targets.len() >= remaining {
+            return;
+        }
+        collect_watch_targets(&entry.path(), depth + 1, targets, remaining);
+    }
+}
+
+fn can_watch_path(path: &Path) -> bool {
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(_) => return false,
+    };
+
+    if meta.is_symlink() {
+        return std::fs::metadata(path)
+            .map(|m| m.is_dir())
+            .unwrap_or(false);
+    }
+
+    meta.is_dir()
+}
+
+fn find_owner_for_watch(path: &Path, active_roots: &Arc<Mutex<HashSet<PathBuf>>>) -> PathBuf {
+    let roots = active_roots
+        .lock()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Active roots mutex poisoned, recovering");
+            e.into_inner()
+        })
+        .clone();
+
+    roots
+        .into_iter()
+        .filter(|root| path == root || path.starts_with(root))
+        .min_by_key(|root| root.components().count())
+        .unwrap_or_else(|| path.to_path_buf())
+}
+
+fn remove_inactive_watchers(
+    active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
+    inotify: &mut Inotify,
+    watched: &mut HashMap<inotify::WatchDescriptor, WatchRegistration>,
+    failed_watches: &mut HashSet<PathBuf>,
+) {
+    let roots = active_roots
+        .lock()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Active roots mutex poisoned, recovering");
+            e.into_inner()
+        })
+        .clone();
+
+    let to_remove: Vec<_> = watched
+        .iter()
+        .filter_map(|(wd, reg)| {
+            if !roots.contains(&reg.owner)
+                || !reg.owner.exists()
+                || (!reg.watched_path.exists() && !reg.watched_path == reg.owner)
+            {
+                Some(wd.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for wd in to_remove {
+        if let Some(reg) = watched.remove(&wd) {
+            inotify.watches().remove(wd).ok();
+            tracing::debug!("Stopped watching: {}", reg.watched_path.display());
+        }
+    }
+
+    failed_watches.retain(|path| roots.contains(path));
 }
 
 fn handle_client(
@@ -300,6 +469,7 @@ fn handle_client(
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    active_roots: Arc<Mutex<HashSet<PathBuf>>>,
 ) -> Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
@@ -327,7 +497,8 @@ fn handle_client(
         Request::Banner { path } => {
             let path = path.canonicalize().unwrap_or(path);
 
-            // Check cache — if hit, validate the shallow folder snapshot and refresh sizes.
+            // Check cache — if hit, do a cheap snapshot validation and refresh displayed
+            // directory sizes only when their mtime changed.
             let cached_entry = {
                 let cache = cache.lock().unwrap_or_else(|e| {
                     tracing::warn!("Mutex poisoned, recovering");
@@ -344,7 +515,7 @@ fn handle_client(
                 let t0 = std::time::Instant::now();
                 let mut data = entry.data;
                 let t1 = std::time::Instant::now();
-                if !cached_summary_is_fresh(&data.summary, &path) {
+                if !cached_snapshot_is_fresh(&data.summary, &path) {
                     data = compute_banner_data(&path)?;
                     let mut cache = cache.lock().unwrap_or_else(|e| {
                         tracing::warn!("Mutex poisoned, recovering");
@@ -357,6 +528,7 @@ fn handle_client(
                             computed_at: Instant::now(),
                         },
                     );
+                    active_roots.insert(path.clone());
                 }
                 refresh_displayed_dir_sizes(
                     &mut data.summary.top_items,
@@ -369,7 +541,7 @@ fn handle_client(
                 send_response(&mut stream, &Response::Banner(Box::new(data)))?;
                 let t4 = std::time::Instant::now();
                 tracing::debug!(
-                    "Cache hit: clone={:?} refresh={:?} send={:?}",
+                    "Cache hit: clone={:?} validation={:?} send={:?}",
                     t1 - t0,
                     t2 - t1,
                     t4 - t3
@@ -405,6 +577,7 @@ fn handle_client(
                         computed_at: Instant::now(),
                     },
                 );
+                active_roots.insert(path.clone());
             }
 
             Response::Banner(Box::new(data))
@@ -430,12 +603,13 @@ fn handle_client(
                             e.into_inner()
                         });
                         c.insert(
-                            path,
+                            path.clone(),
                             CacheEntry {
                                 data,
                                 computed_at: Instant::now(),
                             },
                         );
+                        active_roots.insert(path);
                     }
                 }
             });
