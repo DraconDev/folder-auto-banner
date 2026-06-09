@@ -528,6 +528,7 @@ fn handle_client(
     let response = match request {
         Request::Banner { path } => {
             let path = path.canonicalize().unwrap_or(path);
+            touch_active_root(&active_roots, &active_order, path.clone());
 
             // Check cache — if hit, do a cheap root-mtime check and refresh displayed
             // directory sizes only when their mtime changed.
