@@ -47,8 +47,10 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
             }
         }
         DaemonAction::ClearCache => {
-            daemon_client::send_shutdown();
-            std::thread::sleep(std::time::Duration::from_millis(200));
+            if daemon_client::is_daemon_running() {
+                daemon_client::send_shutdown();
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
 
             let project_dir = directories::ProjectDirs::from("com", "fab", "fab")
                 .ok_or_else(|| anyhow::anyhow!("Cannot determine data directory"))?;
