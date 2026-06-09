@@ -1,7 +1,7 @@
 //! Port usage detection — finds listening ports for a project
 //!
 //! Uses `ss` to get listening ports with PIDs, then checks if those processes
-//! have their working directory in the project folder via /proc/<pid>/cwd.
+//! have their working directory in the project folder via `/proc/<pid>/cwd`.
 //! Timeout: 500ms, Cache: 10 seconds
 
 use anyhow::Result;
