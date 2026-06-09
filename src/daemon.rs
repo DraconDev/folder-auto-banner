@@ -564,13 +564,7 @@ fn handle_client(
                             root_mtime: current_dir_mtime(&path),
                         },
                     );
-                    active_roots
-                        .lock()
-                        .unwrap_or_else(|e| {
-                            tracing::warn!("Active roots mutex poisoned, recovering");
-                            e.into_inner()
-                        })
-                        .insert(path.clone());
+                    touch_active_root(&active_roots, &active_order, path.clone());
                 }
                 refresh_displayed_dir_sizes(
                     &mut data.summary.top_items,
@@ -620,13 +614,7 @@ fn handle_client(
                         root_mtime: current_dir_mtime(&path),
                     },
                 );
-                active_roots
-                    .lock()
-                    .unwrap_or_else(|e| {
-                        tracing::warn!("Active roots mutex poisoned, recovering");
-                        e.into_inner()
-                    })
-                    .insert(path.clone());
+                touch_active_root(&active_roots, &active_order, path.clone());
             }
 
             Response::Banner(Box::new(data))
@@ -634,6 +622,7 @@ fn handle_client(
         Request::Warm { path } => {
             let path = path.canonicalize().unwrap_or(path);
             let cache = cache.clone();
+            let active_order = active_order.clone();
             // Pre-compute in background — don't block the client
             thread::spawn(move || {
                 let cache_hit = {
@@ -659,13 +648,7 @@ fn handle_client(
                                 root_mtime: current_dir_mtime(&path),
                             },
                         );
-                        active_roots
-                            .lock()
-                            .unwrap_or_else(|e| {
-                                tracing::warn!("Active roots mutex poisoned, recovering");
-                                e.into_inner()
-                            })
-                            .insert(path);
+                        touch_active_root(&active_roots, &active_order, path);
                     }
                 }
             });
