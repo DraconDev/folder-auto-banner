@@ -8,7 +8,9 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
 use folder_auto_banner::daemon_types::{BannerData, Request, Response};
-use folder_auto_banner::fs::{DirEntry, DirSummary, ProjectType};
+#[cfg(test)]
+use folder_auto_banner::fs::ProjectType;
+use folder_auto_banner::fs::{DirEntry, DirSummary};
 
 // Cache entry with TTL
 #[derive(Clone)]
@@ -523,9 +525,11 @@ fn handle_client(
 
             if let Some(entry) = cached_entry {
                 let t0 = std::time::Instant::now();
+                let root_fresh = cache_entry_root_is_fresh(&entry, &path);
+                let expired = entry.computed_at.elapsed() >= CACHE_TTL;
                 let mut data = entry.data;
                 let t1 = std::time::Instant::now();
-                if entry.computed_at.elapsed() >= CACHE_TTL || !cache_entry_root_is_fresh(&entry, &path) {
+                if expired || !root_fresh {
                     data = compute_banner_data(&path)?;
                     let mut cache = cache.lock().unwrap_or_else(|e| {
                         tracing::warn!("Mutex poisoned, recovering");
