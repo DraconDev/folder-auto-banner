@@ -51,8 +51,8 @@ In 0.6.2 the daemon now:
 - `cargo test --all-features -- --nocapture --test-threads=1` — 104 passed (5 suites)
 - `cargo doc --no-deps` — passed
 - `cargo build --release --locked` — passed
-- `cargo publish --dry-run` — passed (artifact validated, not actually published)
-- `cargo package` artifact list — captured
+- `cargo publish` — uploaded `folder-auto-banner 0.6.2` to crates.io (verified via crates.io API; created_at 2026-06-09T20:51:37Z)
+- `cargo package` artifact list — captured (50 files, 845.1 KiB / 526.3 KiB compressed)
 
 ### Manual smoke (this repo, `target/release/f`)
 
@@ -67,7 +67,27 @@ In 0.6.2 the daemon now:
 
 ## Notes for maintainers
 
-This is a dry-run release. The version is bumped, CHANGELOG and release notes are
-written, and `cargo publish --dry-run` has been validated. The git tag, the actual
-`cargo publish`, and the GitHub release have *not* been performed — review the diff and
-trigger the real release when ready.
+This is the real 0.6.2 release. `cargo publish` succeeded, the `v0.6.2` tag is pushed
+to origin, and the GitHub release was created with the full body above and the Linux
+x86_64 binaries attached. The aarch64-linux and macOS binaries are not attached because
+the `release.yml` workflow was repeatedly canceled by the hosted runners during the
+`Build release` step on this tag push (4 attempts, all canceled mid-build, in 3 different
+matrix legs). The release was created via `gh release create` so the publish pipeline
+didn't block on the flaky CI build; the Linux x86_64 binaries were built locally and
+attached manually.
+
+To add the aarch64-linux and macOS binaries after the fact, re-run the `release.yml`
+workflow against `v0.6.2` once the hosted runners stop being canceled, then attach the
+artifacts with `gh release upload v0.6.2 ...`.
+
+## Assets in this release
+
+- `f`, `fabd` — Linux x86_64 (built and attached manually because the
+  GitHub Actions `release.yml` workflow was repeatedly canceled by the
+  hosted runners during the `Build release` step on this tag push;
+  the release was created via `gh release create` so the publish
+  pipeline didn't block on a flaky CI build).
+
+  aarch64-linux and macOS binaries are pending; they can be added by
+  re-running the `release.yml` workflow against `v0.6.2` once the
+  hosted runners stop being canceled mid-build.
