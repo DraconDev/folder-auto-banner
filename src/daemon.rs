@@ -108,7 +108,7 @@ impl Daemon {
 
         // Load persisted banner cache after the watcher is ready so watched paths become
         // active immediately. Persisted entries are intentionally left in the cache for
-        // fast startup, but active-folder watchers and cheap snapshot validation catch
+        // fast startup, but active-folder watchers and a cheap root-mtime check catch
         // changes without forcing a full shallow scan on every cache hit.
         let socket_dir =
             directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
@@ -507,7 +507,7 @@ fn handle_client(
         Request::Banner { path } => {
             let path = path.canonicalize().unwrap_or(path);
 
-            // Check cache — if hit, do a cheap snapshot validation and refresh displayed
+            // Check cache — if hit, do a cheap root-mtime check and refresh displayed
             // directory sizes only when their mtime changed.
             let cached_entry = {
                 let cache = cache.lock().unwrap_or_else(|e| {
@@ -799,6 +799,7 @@ fn cached_snapshot_is_fresh(cached: &DirSummary, path: &Path) -> bool {
             })
 }
 
+#[cfg(test)]
 fn datetime_to_system_time(dt: chrono::DateTime<chrono::Utc>) -> SystemTime {
     let secs = dt.timestamp();
     if secs < 0 {
@@ -814,6 +815,7 @@ fn datetime_to_system_time(dt: chrono::DateTime<chrono::Utc>) -> SystemTime {
         .unwrap_or(SystemTime::UNIX_EPOCH)
 }
 
+#[cfg(test)]
 fn shallow_snapshot(path: &Path) -> Result<ShallowSnapshot> {
     let mut top_items = Vec::new();
     let mut total_size = 0;
