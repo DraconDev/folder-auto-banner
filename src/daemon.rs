@@ -25,7 +25,7 @@ const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 const ACTIVE_WATCH_DEPTH: usize = 3;
 const MAX_ACTIVE_WATCH_DIRS: usize = 512;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 struct ShallowSnapshot {
     total_items: usize,
     total_size: u64,
@@ -36,7 +36,7 @@ struct ShallowSnapshot {
     top_items: Vec<ShallowItem>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 struct ShallowItem {
     name: String,
     is_dir: bool,
@@ -137,7 +137,13 @@ impl Daemon {
                 e.into_inner()
             });
             for (path, data) in persisted {
-                active_roots.insert(path.clone());
+                active_roots
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Active roots mutex poisoned, recovering");
+                        e.into_inner()
+                    })
+                    .insert(path.clone());
                 cache.insert(
                     path,
                     CacheEntry {
@@ -542,7 +548,13 @@ fn handle_client(
                             computed_at: Instant::now(),
                         },
                     );
-                    active_roots.insert(path.clone());
+                    active_roots
+                        .lock()
+                        .unwrap_or_else(|e| {
+                            tracing::warn!("Active roots mutex poisoned, recovering");
+                            e.into_inner()
+                        })
+                        .insert(path.clone());
                 }
                 refresh_displayed_dir_sizes(
                     &mut data.summary.top_items,
@@ -591,7 +603,13 @@ fn handle_client(
                         computed_at: Instant::now(),
                     },
                 );
-                active_roots.insert(path.clone());
+                active_roots
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Active roots mutex poisoned, recovering");
+                        e.into_inner()
+                    })
+                    .insert(path.clone());
             }
 
             Response::Banner(Box::new(data))
@@ -757,7 +775,7 @@ fn cached_snapshot_is_fresh(cached: &DirSummary, path: &Path) -> bool {
 
     let cached_last_modified = cached
         .last_modified
-        .map(|dt| chrono::DateTime::<Utc>::from(dt));
+        .map(|dt| chrono::DateTime::<chrono::Utc>::from(dt));
 
     cached.total_items == fresh.total_items
         && cached.total_size == fresh.total_size
@@ -771,7 +789,7 @@ fn cached_snapshot_is_fresh(cached: &DirSummary, path: &Path) -> bool {
             .iter()
             .zip(fresh.top_items.iter())
             .all(|(a, b)| {
-                let cached_modified = a.modified.map(|dt| chrono::DateTime::<Utc>::from(dt));
+                let cached_modified = a.modified.map(|dt| chrono::DateTime::<chrono::Utc>::from(dt));
                 a.name == b.name
                     && a.is_dir == b.is_dir
                     && a.is_file == b.is_file
