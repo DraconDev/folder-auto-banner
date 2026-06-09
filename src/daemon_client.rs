@@ -167,16 +167,30 @@ pub fn warm_paths(paths: &[PathBuf]) {
 
 /// Send shutdown signal to daemon
 pub fn send_shutdown() {
+    use std::io::Write;
+
     let Ok(socket) = socket_path() else {
         return;
     };
-    if let Ok(mut stream) = UnixStream::connect(&socket) {
-        stream.set_read_timeout(Some(Duration::from_secs(1))).ok();
-        stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
-        let request = Request::Shutdown;
-        if let Err(e) = send_and_recv(&mut stream, &request) {
-            tracing::warn!("Failed to send shutdown request: {}", e);
+    let Ok(mut stream) = UnixStream::connect(&socket) else {
+        return;
+    };
+    stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
+
+    let request = Request::Shutdown;
+    let req_bytes = match serde_json::to_vec(&request) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            tracing::warn!("Failed to serialize shutdown request: {}", e);
+            return;
         }
+    };
+    let req_len = req_bytes.len() as u32;
+    let mut combined = Vec::with_capacity(4 + req_bytes.len());
+    combined.extend_from_slice(&req_len.to_le_bytes());
+    combined.extend_from_slice(&req_bytes);
+    if let Err(e) = stream.write_all(&combined) {
+        tracing::warn!("Failed to send shutdown request: {}", e);
     }
 }
 
