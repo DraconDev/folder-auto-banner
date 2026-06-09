@@ -1,6 +1,16 @@
-# Changelog
+## [0.6.3] - 2026-06-09
 
-All notable changes to this project will be documented in this file.
+### Fixed
+- **Snappy fresh daemon** — replaced the expensive shallow validation scan on every daemon cache hit with active-folder inotify watching:
+  - Requested folders become active and are watched, with bounded recursive coverage for descendant files and directories.
+  - Nested create/delete/modify/move events invalidate the banner cache, so folder contents and displayed directory sizes refresh without waiting for the TTL.
+  - A cheap root-mtime guard remains as a fallback for changes that do not emit an actionable inotify event.
+  - Newly active folders are prioritized so hot folders get watched promptly even when many folders are cached.
+- Persisted daemon caches are treated as expired on daemon restart, so the first request after restart recomputes the banner and refreshes size data.
+
+### Notes
+- Preserves the 0.6.2 freshness guarantees while restoring fast cache-hit latency.
+- No new dependencies.
 
 ## [0.6.2] - 2026-06-09
 
