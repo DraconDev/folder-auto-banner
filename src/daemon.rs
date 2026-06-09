@@ -776,50 +776,6 @@ fn cache_entry_root_is_fresh(entry: &CacheEntry, path: &Path) -> bool {
 }
 
 #[cfg(test)]
-fn cached_snapshot_is_fresh(cached: &DirSummary, path: &Path) -> bool {
-    let Ok(fresh) = shallow_snapshot(path) else {
-        return false;
-    };
-
-    cached.total_items == fresh.total_items
-        && cached.total_size == fresh.total_size
-        && cached.files == fresh.files
-        && cached.dirs == fresh.dirs
-        && cached.project_type == fresh.project_type
-        && cached.last_modified.map(datetime_to_system_time) == fresh.last_modified
-        && cached.top_items.len() == fresh.top_items.len()
-        && cached
-            .top_items
-            .iter()
-            .zip(fresh.top_items.iter())
-            .all(|(a, b)| {
-                a.name == b.name
-                    && a.is_dir == b.is_dir
-                    && a.is_file == b.is_file
-                    && a.is_symlink == b.is_symlink
-                    && a.size == b.size
-                    && a.modified.map(datetime_to_system_time) == b.modified
-                    && a.symlink_valid == b.symlink_valid
-            })
-}
-
-#[cfg(test)]
-fn datetime_to_system_time(dt: chrono::DateTime<chrono::Utc>) -> SystemTime {
-    let secs = dt.timestamp();
-    if secs < 0 {
-        return SystemTime::UNIX_EPOCH
-            .checked_sub(Duration::new(
-                secs.unsigned_abs(),
-                dt.timestamp_subsec_nanos(),
-            ))
-            .unwrap_or(SystemTime::UNIX_EPOCH);
-    }
-    SystemTime::UNIX_EPOCH
-        .checked_add(Duration::new(secs as u64, dt.timestamp_subsec_nanos()))
-        .unwrap_or(SystemTime::UNIX_EPOCH)
-}
-
-#[cfg(test)]
 fn shallow_snapshot(path: &Path) -> Result<ShallowSnapshot> {
     let mut top_items = Vec::new();
     let mut total_size = 0;
