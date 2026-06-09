@@ -1,12 +1,10 @@
-use folder_auto_banner::cli;
 use anyhow::Result;
 use clap::Parser;
+use folder_auto_banner::cli;
 use std::env;
 
 /// Known subcommands that clap should parse.
-const KNOWN_SUBCOMMANDS: &[&str] = &[
-    "banner", "env", "install", "config", "daemon", "help",
-];
+const KNOWN_SUBCOMMANDS: &[&str] = &["banner", "env", "install", "config", "daemon", "help"];
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();

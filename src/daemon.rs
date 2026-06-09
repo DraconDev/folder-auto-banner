@@ -98,7 +98,11 @@ impl Daemon {
         let socket_dir =
             directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
         thread::spawn(move || {
-            proactive_scan(dir_sizes_clone.clone(), dir_size_mtimes_clone, cache_clone.clone());
+            proactive_scan(
+                dir_sizes_clone.clone(),
+                dir_size_mtimes_clone,
+                cache_clone.clone(),
+            );
             // Save to disk when done
             if let Some(dir) = socket_dir {
                 let sizes = dir_sizes_clone.lock().unwrap_or_else(|e| {
@@ -323,12 +327,7 @@ fn handle_client(
         Request::Banner { path } => {
             let path = path.canonicalize().unwrap_or(path);
 
-            // Check cache — if hit, inject sizes and refresh git status
-            {
-                let cache = cache.lock().unwrap_or_else(|e| {
-                    tracing::warn!("Mutex poisoned, recovering");
-                    e.into_inner()
-                });
+            // Check cache — if hit, validate the shallow folder snapshot and refresh sizes.
             let cached_entry = {
                 let cache = cache.lock().unwrap_or_else(|e| {
                     tracing::warn!("Mutex poisoned, recovering");
@@ -359,7 +358,11 @@ fn handle_client(
                         },
                     );
                 }
-                refresh_displayed_dir_sizes(&mut data.summary.top_items, &dir_sizes, &dir_size_mtimes);
+                refresh_displayed_dir_sizes(
+                    &mut data.summary.top_items,
+                    &dir_sizes,
+                    &dir_size_mtimes,
+                );
                 data.summary.total_size = data.summary.top_items.iter().map(|item| item.size).sum();
                 let t2 = std::time::Instant::now();
                 let t3 = std::time::Instant::now();
@@ -448,7 +451,9 @@ fn handle_client(
                 e.into_inner()
             });
             let size = match sizes.get(&path).copied() {
-                Some(size) if mtimes.get(&path).copied().flatten() == current_dir_mtime(&path) => size,
+                Some(size) if mtimes.get(&path).copied().flatten() == current_dir_mtime(&path) => {
+                    size
+                }
                 _ => {
                     let size = compute_dir_size(&path);
                     sizes.insert(path.clone(), size);
@@ -648,19 +653,20 @@ fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
 }
 
 fn compute_dir_size(path: &Path) -> u64 {
-    // Use `du -s` which is much faster than recursive Rust
-    if let Ok(output) = std::process::Command::new("du")
-        .args(["-s", "--bytes"])
-        .arg(path)
-        .output()
-    {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if stdout.is_empty() {
-            return 0;
-        }
-        let size_str = stdout.split_whitespace().next().unwrap_or("0");
-        if let Ok(size) = size_str.parse::<u64>() {
-            return size;
+    // Use `du -s` which is much faster than recursive Rust, but keep it
+    // bounded so a pathological directory cannot hang banner responses.
+    let path_arg = path.to_string_lossy();
+    if let Ok(stdout) = folder_auto_banner::utils::run_with_timeout_stdout(
+        "du",
+        &["-s", "--bytes", path_arg.as_ref()],
+        SIZE_CACHE_REFRESH_TIMEOUT,
+    ) {
+        let stdout = stdout.trim();
+        if !stdout.is_empty() {
+            let size_str = stdout.split_whitespace().next().unwrap_or("0");
+            if let Ok(size) = size_str.parse::<u64>() {
+                return size;
+            }
         }
     }
     // Fallback: just the directory inode size
@@ -1077,7 +1083,74 @@ mod tests {
 
     #[test]
     fn test_compute_dir_size() {
-        let _size = compute_dir_size(Path::new("/tmp"));
-        // Just verify it doesn't panic
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("sample.txt"), "hello").unwrap();
+        let size = compute_dir_size(tmp.path());
+        assert!(size > 0);
+    }
+
+    #[test]
+    fn test_cached_summary_is_fresh_detects_new_item() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("a.txt"), "a").unwrap();
+        let summary =
+            DirSummary::scan_with_options(tmp.path(), false, false, false, false, false).unwrap();
+
+        assert!(cached_summary_is_fresh(&summary, tmp.path()));
+
+        std::fs::write(tmp.path().join("b.txt"), "b").unwrap();
+        assert!(!cached_summary_is_fresh(&summary, tmp.path()));
+    }
+
+    #[test]
+    fn test_cached_summary_is_fresh_detects_nested_change() {
+        let tmp = tempfile::tempdir().unwrap();
+        let child = tmp.path().join("child");
+        std::fs::create_dir(&child).unwrap();
+        std::fs::write(child.join("nested.txt"), "before").unwrap();
+        let summary =
+            DirSummary::scan_with_options(tmp.path(), false, false, false, false, false).unwrap();
+
+        assert!(cached_summary_is_fresh(&summary, tmp.path()));
+
+        std::thread::sleep(Duration::from_millis(20));
+        std::fs::write(child.join("nested.txt"), "after").unwrap();
+        assert!(!cached_summary_is_fresh(&summary, tmp.path()));
+    }
+
+    #[test]
+    fn test_refresh_displayed_dir_sizes_updates_changed_directory_size() {
+        let tmp = tempfile::tempdir().unwrap();
+        let child = tmp.path().join("child");
+        std::fs::create_dir(&child).unwrap();
+        std::fs::write(child.join("one.txt"), "one").unwrap();
+
+        let mut items = vec![DirEntry {
+            name: "child".to_string(),
+            path: child.clone(),
+            is_dir: true,
+            is_file: false,
+            is_symlink: false,
+            is_exec: true,
+            size: 0,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+            symlink_valid: true,
+        }];
+        let dir_sizes = Arc::new(Mutex::new(HashMap::new()));
+        let dir_size_mtimes = Arc::new(Mutex::new(HashMap::new()));
+
+        refresh_displayed_dir_sizes(&mut items, &dir_sizes, &dir_size_mtimes);
+        let first_size = items[0].size;
+        assert!(first_size > 0);
+
+        std::thread::sleep(Duration::from_millis(20));
+        std::fs::write(child.join("two.txt"), "two").unwrap();
+        refresh_displayed_dir_sizes(&mut items, &dir_sizes, &dir_size_mtimes);
+
+        assert!(items[0].size > first_size);
     }
 }

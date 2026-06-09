@@ -199,7 +199,10 @@ fn build_display_items<'a>(
     let total_before_truncation = display_items.len();
     if let Some(max_items) = opts.max {
         display_items.truncate(max_items);
-    } else if config.smart_truncation && config.max_display_items > 0 && total_before_truncation > config.max_display_items {
+    } else if config.smart_truncation
+        && config.max_display_items > 0
+        && total_before_truncation > config.max_display_items
+    {
         display_items.sort_by(|a, b| {
             let a_git = git_info.file_statuses.contains_key(a.name.as_str());
             let b_git = git_info.file_statuses.contains_key(b.name.as_str());
@@ -207,8 +210,12 @@ fn build_display_items<'a>(
             if git_order != std::cmp::Ordering::Equal {
                 return git_order;
             }
-            let a_time = a.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
-            let b_time = b.modified.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
+            let a_time = a
+                .modified
+                .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
+            let b_time = b
+                .modified
+                .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
             b_time.cmp(&a_time)
         });
         let term_height = get_terminal_height();
@@ -348,7 +355,12 @@ fn build_display_items<'a>(
 
 /// Navigate to item by number - cd if directory, open in editor if file
 /// Uses build_display_items() to ensure exact same ordering as banner display
-fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions, action: Option<&str>) -> Result<()> {
+fn navigate_by_number(
+    num: usize,
+    cwd: &std::path::Path,
+    opts: &BannerOptions,
+    action: Option<&str>,
+) -> Result<()> {
     let path = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
     let config = crate::state::Config::load().unwrap_or_default();
 
@@ -356,19 +368,22 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions, a
     let (summary, git_info) = if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
         (cached.summary, cached.git_info.unwrap_or_default())
     } else {
-        let summary = crate::fs::DirSummary::scan_with_options(
-            &path,
-            false, false, false, false, false,
-        )?;
+        let summary =
+            crate::fs::DirSummary::scan_with_options(&path, false, false, false, false, false)?;
         let git_info = crate::git::get_git_info(&path).ok().unwrap_or_default();
         (summary, git_info)
     };
 
     // Use the EXACT same pipeline as banner display
-    let (display_items, _hidden_count) = build_display_items(&path, &summary, &git_info, opts, &config);
+    let (display_items, _hidden_count) =
+        build_display_items(&path, &summary, &git_info, opts, &config);
 
     if num == 0 || num > display_items.len() {
-        eprintln!("Error: number {} out of range (1-{}). Use 'f' to see available items.", num, display_items.len());
+        eprintln!(
+            "Error: number {} out of range (1-{}). Use 'f' to see available items.",
+            num,
+            display_items.len()
+        );
         std::process::exit(1);
     }
 
@@ -377,26 +392,20 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions, a
 
     if let Some(app) = action {
         // Explicit action: run the app with the target path
-        let status = std::process::Command::new(app)
-            .arg(target)
-            .status()?;
+        let status = std::process::Command::new(app).arg(target).status()?;
         if !status.success() {
             eprintln!("'{}' exited with status: {}", app, status);
         }
     } else if opts.force_edit {
         // --edit flag: force open in editor
-        let editor = std::env::var("EDITOR")
-            .unwrap_or_else(|_| config.open_command.clone());
-        let status = std::process::Command::new(&editor)
-            .arg(target)
-            .status()?;
+        let editor = std::env::var("EDITOR").unwrap_or_else(|_| config.open_command.clone());
+        let status = std::process::Command::new(&editor).arg(target).status()?;
         if !status.success() {
             eprintln!("Editor '{}' exited with status: {}", editor, status);
         }
     } else if opts.force_run {
         // --run flag: force run the file directly
-        let status = std::process::Command::new(target)
-            .status()?;
+        let status = std::process::Command::new(target).status()?;
         if !status.success() {
             eprintln!("'{}' exited with status: {}", target.display(), status);
         }
@@ -411,7 +420,7 @@ fn navigate_by_number(num: usize, cwd: &std::path::Path, opts: &BannerOptions, a
 
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    
+
     let path = opts
         .path
         .unwrap_or(cwd.as_path())
@@ -733,9 +742,19 @@ fn build_branch_display(git_info: &GitInfo) -> String {
         return String::new();
     }
     if git_info.is_dirty {
-        format!("{yellow}[{branch}*{reset}{yellow}]", yellow = color(YELLOW), branch = git_branch, reset = color(RESET))
+        format!(
+            "{yellow}[{branch}*{reset}{yellow}]",
+            yellow = color(YELLOW),
+            branch = git_branch,
+            reset = color(RESET)
+        )
     } else {
-        format!("{blue}[{branch}{reset}{blue}]", blue = color(BLUE_BOLD), branch = git_branch, reset = color(RESET))
+        format!(
+            "{blue}[{branch}{reset}{blue}]",
+            blue = color(BLUE_BOLD),
+            branch = git_branch,
+            reset = color(RESET)
+        )
     }
 }
 
@@ -836,7 +855,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             git_status.push(format!("{}{}{}", color(RED), state, color(RESET)));
         }
         // Clean indicator
-        if !git_info.is_dirty && git_info.modified == 0 && git_info.staged == 0 && git_info.untracked == 0 {
+        if !git_info.is_dirty
+            && git_info.modified == 0
+            && git_info.staged == 0
+            && git_info.untracked == 0
+        {
             git_status.push(format!("{}✓ clean{}", color(GREEN), color(RESET)));
         }
         let git_status_str = git_status.join(" ");
@@ -889,22 +912,47 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 
             // Row 2: Stats with labels
             let mut details = Vec::new();
-            
+
             // File stats
-            details.push(format!("{}💾 {} total{}", color(CYAN), size_str, color(RESET)));
-            details.push(format!("{}📄 {} files{}", color(DIM), summary.files, color(RESET)));
-            details.push(format!("{}📂 {} dirs{}", color(DIM), summary.dirs, color(RESET)));
-            
+            details.push(format!(
+                "{}💾 {} total{}",
+                color(CYAN),
+                size_str,
+                color(RESET)
+            ));
+            details.push(format!(
+                "{}📄 {} files{}",
+                color(DIM),
+                summary.files,
+                color(RESET)
+            ));
+            details.push(format!(
+                "{}📂 {} dirs{}",
+                color(DIM),
+                summary.dirs,
+                color(RESET)
+            ));
+
             // Code metrics
             if let Some(ref todos) = summary.todo_info {
                 if todos.count > 0 {
-                    details.push(format!("{}📝 {} TODOs{}", color(YELLOW), todos.count, color(RESET)));
+                    details.push(format!(
+                        "{}📝 {} TODOs{}",
+                        color(YELLOW),
+                        todos.count,
+                        color(RESET)
+                    ));
                 }
             }
             if let Some(ref metrics) = summary.code_metrics {
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
-                    details.push(format!("{}📊 {} lines{}", color(GREEN), loc_str, color(RESET)));
+                    details.push(format!(
+                        "{}📊 {} lines{}",
+                        color(GREEN),
+                        loc_str,
+                        color(RESET)
+                    ));
                     // Show top 3 languages (skip non-language extensions like man pages and no-ext)
                     if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
                         let mut lang_parts: Vec<String> = metrics
@@ -912,7 +960,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                             .iter()
                             .filter(|(ext, _)| {
                                 // Skip man page extensions (1, 2, 3, etc.), no-ext, and empty
-                                !ext.chars().all(|c| c.is_numeric()) && ext != "no-ext" && !ext.is_empty()
+                                !ext.chars().all(|c| c.is_numeric())
+                                    && ext != "no-ext"
+                                    && !ext.is_empty()
                             })
                             .take(3)
                             .map(|(ext, loc)| {
@@ -1019,7 +1069,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     ));
                 }
             }
-
 
             // Cached test results
             if let Some(test_results) = crate::test_cache::TestResults::load() {
@@ -1138,7 +1187,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                             .iter()
                             .filter(|(ext, _)| {
                                 // Skip man page extensions (1, 2, 3, etc.), no-ext, and empty
-                                !ext.chars().all(|c| c.is_numeric()) && ext != "no-ext" && !ext.is_empty()
+                                !ext.chars().all(|c| c.is_numeric())
+                                    && ext != "no-ext"
+                                    && !ext.is_empty()
                             })
                             .take(3)
                             .map(|(ext, loc)| {
@@ -1553,7 +1604,13 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         if config.numbered {
             let num = idx + 1; // 1-based numbering
             let num_padded = format!("{:>width$}", num, width = num_width);
-            let num_str = format!("{bold}{white}[{num}{reset}{white}]", bold = color(BOLD), white = color(BRIGHT_WHITE), num = num_padded, reset = color(RESET));
+            let num_str = format!(
+                "{bold}{white}[{num}{reset}{white}]",
+                bold = color(BOLD),
+                white = color(BRIGHT_WHITE),
+                num = num_padded,
+                reset = color(RESET)
+            );
             row_parts.push(num_str);
         }
         row_parts.push(icon_str);
@@ -1610,17 +1667,36 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 
     // Show smart truncation summary for big folders
     if hidden_count > 0 && config.smart_truncation {
-        let hidden_dirs = summary.top_items.iter().filter(|i| i.is_dir && !display_items.iter().any(|d| d.path == i.path)).count();
-        let hidden_files = summary.top_items.iter().filter(|i| i.is_file && !display_items.iter().any(|d| d.path == i.path)).count();
+        let hidden_dirs = summary
+            .top_items
+            .iter()
+            .filter(|i| i.is_dir && !display_items.iter().any(|d| d.path == i.path))
+            .count();
+        let hidden_files = summary
+            .top_items
+            .iter()
+            .filter(|i| i.is_file && !display_items.iter().any(|d| d.path == i.path))
+            .count();
         if hidden_dirs > 0 || hidden_files > 0 {
             let mut parts = Vec::new();
             if hidden_dirs > 0 {
-                parts.push(format!("{}{} dirs{}", color(DIM), hidden_dirs, color(RESET)));
+                parts.push(format!(
+                    "{}{} dirs{}",
+                    color(DIM),
+                    hidden_dirs,
+                    color(RESET)
+                ));
             }
             if hidden_files > 0 {
-                parts.push(format!("{}{} files{}", color(DIM), hidden_files, color(RESET)));
+                parts.push(format!(
+                    "{}{} files{}",
+                    color(DIM),
+                    hidden_files,
+                    color(RESET)
+                ));
             }
-            println!("  {} {} hidden (sorted by git status & recency){}",
+            println!(
+                "  {} {} hidden (sorted by git status & recency){}",
                 color(DIM),
                 parts.join(", "),
                 color(RESET)
@@ -1633,13 +1709,22 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         let term_width = get_terminal_width();
         if term_width > 120 {
             let tree_width = (term_width / 3).min(40); // Use 1/3 of terminal, max 40 chars
-            let dirs: Vec<&crate::fs::DirEntry> = summary.top_items.iter()
+            let dirs: Vec<&crate::fs::DirEntry> = summary
+                .top_items
+                .iter()
                 .filter(|i| i.is_dir && !i.name.starts_with('.'))
                 .take(5)
                 .collect();
             if !dirs.is_empty() {
                 let mut tree_lines = Vec::new();
-                tree_lines.push(format!("{}{}{}", color(BOLD), path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.display().to_string()), color(RESET)));
+                tree_lines.push(format!(
+                    "{}{}{}",
+                    color(BOLD),
+                    path.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| path.display().to_string()),
+                    color(RESET)
+                ));
                 for (i, dir) in dirs.iter().enumerate() {
                     let is_last = i == dirs.len() - 1;
                     let connector = if is_last { "└── " } else { "├── " };
@@ -1648,11 +1733,22 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     } else {
                         dir.name.clone()
                     };
-                    tree_lines.push(format!("{}{}{}{}{}", color(DIM), connector, color(BLUE_BOLD), name, color(RESET)));
+                    tree_lines.push(format!(
+                        "{}{}{}{}{}",
+                        color(DIM),
+                        connector,
+                        color(BLUE_BOLD),
+                        name,
+                        color(RESET)
+                    ));
                 }
                 // Print tree aligned to the right
                 let tree_str = tree_lines.join("\n");
-                let tree_display_width = strip_ansi(&tree_str).lines().next().map(|l| l.len()).unwrap_or(0);
+                let tree_display_width = strip_ansi(&tree_str)
+                    .lines()
+                    .next()
+                    .map(|l| l.len())
+                    .unwrap_or(0);
                 let padding = " ".repeat(term_width.saturating_sub(tree_display_width + 5));
                 for (i, line) in tree_str.lines().enumerate() {
                     if i == 0 {
@@ -1967,7 +2063,7 @@ fn get_dir_inline_preview(entry: &crate::fs::DirEntry, max_width: usize) -> Opti
     if !entry.is_dir {
         return None;
     }
-    
+
     let dir_path = &entry.path;
     let items = match std::fs::read_dir(dir_path) {
         Ok(rd) => rd
@@ -1977,24 +2073,24 @@ fn get_dir_inline_preview(entry: &crate::fs::DirEntry, max_width: usize) -> Opti
             .collect::<Vec<_>>(),
         Err(_) => return None,
     };
-    
+
     if items.is_empty() {
         return None;
     }
-    
+
     let mut preview_parts = Vec::new();
     let mut total_len = 0;
-    
+
     for item in &items {
         let name = item.file_name().to_string_lossy().to_string();
         let is_dir = item.file_type().map(|t| t.is_dir()).unwrap_or(false);
-        
+
         let icon = if is_dir {
             format!("{}{}{}", color(BLUE_BOLD), name, color(RESET))
         } else {
             format!("{}{}{}", color(DIM), name, color(RESET))
         };
-        
+
         let plain_len = name.len();
         if total_len + plain_len + 2 > max_width {
             // Add ellipsis if we ran out of space
@@ -2003,16 +2099,21 @@ fn get_dir_inline_preview(entry: &crate::fs::DirEntry, max_width: usize) -> Opti
             }
             break;
         }
-        
+
         preview_parts.push(icon);
         total_len += plain_len + 2; // +2 for ", "
     }
-    
+
     if preview_parts.is_empty() {
         return None;
     }
-    
-    Some(format!("{}{}{}", color(DIM), preview_parts.join(" "), color(RESET)))
+
+    Some(format!(
+        "{}{}{}",
+        color(DIM),
+        preview_parts.join(" "),
+        color(RESET)
+    ))
 }
 
 /// Natural comparison for version sorting (e.g., file1, file2, file10)
@@ -2270,4 +2371,3 @@ mod tests {
         assert!(width <= 1000); // Reasonable upper bound
     }
 }
-

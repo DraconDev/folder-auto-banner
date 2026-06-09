@@ -101,9 +101,6 @@ fn dirs_home() -> Result<PathBuf> {
 
 /// Check if a file contains a given line.
 fn file_contains(path: &Path, needle: &str) -> Result<bool> {
-    let content = fs::read_to_string(path).context(format!(
-        "Failed to read {}",
-        path.display()
-    ))?;
+    let content = fs::read_to_string(path).context(format!("Failed to read {}", path.display()))?;
     Ok(content.lines().any(|l| l.trim() == needle.trim()))
 }

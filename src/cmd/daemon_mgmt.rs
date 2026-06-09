@@ -48,14 +48,32 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
         }
         DaemonAction::ClearCache => {
             daemon_client::send_shutdown();
-            let cache_dir = directories::ProjectDirs::from("com", "fab", "fab")
-                .map(|p| p.cache_dir().to_path_buf());
-            if let Some(dir) = cache_dir {
-                if dir.exists() {
-                    std::fs::remove_dir_all(&dir)?;
-                    println!("Cache cleared: {}", dir.display());
-                } else {
-                    println!("No cache directory found");
+            std::thread::sleep(std::time::Duration::from_millis(200));
+
+            let project_dir = directories::ProjectDirs::from("com", "fab", "fab")
+                .ok_or_else(|| anyhow::anyhow!("Cannot determine data directory"))?;
+            let data_dir = project_dir.data_dir();
+            let mut cleared = Vec::new();
+
+            for file_name in ["banner_cache.json", "dir_sizes.json", "fabd.sock"] {
+                let path = data_dir.join(file_name);
+                if path.exists() && std::fs::remove_file(&path).is_ok() {
+                    cleared.push(path);
+                }
+            }
+
+            let cache_dir = project_dir.cache_dir().to_path_buf();
+            if cache_dir.exists() {
+                std::fs::remove_dir_all(&cache_dir)?;
+                cleared.push(cache_dir);
+            }
+
+            if cleared.is_empty() {
+                println!("No cache files found");
+            } else {
+                println!("Cache cleared: {}", cleared.len());
+                for path in cleared {
+                    println!("  {}", path.display());
                 }
             }
         }
