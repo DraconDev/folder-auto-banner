@@ -261,6 +261,12 @@ pub enum Commands {
 
 #[derive(Subcommand, Debug)]
 pub enum DaemonAction {
+    /// Start the daemon
+    Start,
+    /// Restart the daemon
+    Restart,
+    /// Clear daemon caches
+    ClearCache,
     /// Stop the daemon
     Stop,
     /// Show daemon status
@@ -441,26 +447,7 @@ impl Cli {
                 Ok(())
             }
 
-            // Daemon
-            Some(Daemon { action }) => match action {
-                DaemonAction::Stop => {
-                    if crate::daemon_client::is_daemon_running() {
-                        crate::daemon_client::send_shutdown();
-                        println!("✅ Daemon stopped");
-                    } else {
-                        println!("ℹ️  Daemon is not running");
-                    }
-                    Ok(())
-                }
-                DaemonAction::Status => {
-                    if crate::daemon_client::is_daemon_running() {
-                        println!("✅ Daemon is running");
-                    } else {
-                        println!("ℹ️  Daemon is not running");
-                    }
-                    Ok(())
-                }
-            },
+            Some(Daemon { action }) => crate::cmd::daemon_mgmt::run_daemon(action),
         }
     }
 }
