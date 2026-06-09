@@ -102,12 +102,20 @@ impl Daemon {
 
         // Start inotify watcher thread for active folders only.
         let cache_clone = self.cache.clone();
+        let dir_sizes_clone = self.dir_sizes.clone();
+        let dir_size_mtimes_clone = self.dir_size_mtimes.clone();
         let active_roots = Arc::new(Mutex::new(HashSet::new()));
         let active_order = Arc::new(Mutex::new(Vec::new()));
         let active_roots_clone = active_roots.clone();
         let active_order_clone = active_order.clone();
         let _watcher_handle = thread::spawn(move || {
-            watch_loop(cache_clone, active_roots_clone, active_order_clone);
+            watch_loop(
+                cache_clone,
+                dir_sizes_clone,
+                dir_size_mtimes_clone,
+                active_roots_clone,
+                active_order_clone,
+            );
         });
 
         // Load persisted banner cache after the watcher is ready so watched paths become
@@ -237,6 +245,8 @@ impl Daemon {
 /// invalidate the cached banner without a full scan on every request.
 fn watch_loop(
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+    dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
     active_roots: Arc<Mutex<HashSet<PathBuf>>>,
     active_order: Arc<Mutex<Vec<PathBuf>>>,
 ) {
@@ -283,6 +293,7 @@ fn watch_loop(
                         });
                         for path in &invalidated {
                             if cache_guard.remove(path).is_some() {
+                                prune_size_cache_for_root(&dir_sizes, &dir_size_mtimes, path);
                                 tracing::info!("Cache invalidated: {}", path.display());
                             }
                         }
@@ -878,6 +889,28 @@ fn shallow_snapshot(path: &Path) -> Result<ShallowSnapshot> {
         last_modified,
         top_items,
     })
+}
+
+fn prune_size_cache_for_root(
+    dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    root: &Path,
+) {
+    dir_sizes
+        .lock()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        })
+        .retain(|path, _| path != root && !path.starts_with(root));
+
+    dir_size_mtimes
+        .lock()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        })
+        .retain(|path, _| path != root && !path.starts_with(root));
 }
 
 fn refresh_displayed_dir_sizes(
