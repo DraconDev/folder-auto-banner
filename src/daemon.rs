@@ -238,6 +238,7 @@ impl Daemon {
 fn watch_loop(
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     active_roots: Arc<Mutex<HashSet<PathBuf>>>,
+    active_order: Arc<Mutex<Vec<PathBuf>>>,
 ) {
     let mut inotify = match Inotify::init() {
         Ok(i) => i,
@@ -256,6 +257,7 @@ fn watch_loop(
             refresh_active_watchers(
                 &mut inotify,
                 &active_roots,
+                &active_order,
                 &mut watched,
                 &mut failed_watches,
             );
@@ -297,6 +299,7 @@ fn watch_loop(
 
         remove_inactive_watchers(
             &active_roots,
+            &active_order,
             &mut inotify,
             &mut watched,
             &mut failed_watches,
@@ -308,13 +311,14 @@ fn watch_loop(
 fn refresh_active_watchers(
     inotify: &mut Inotify,
     active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
+    active_order: &Arc<Mutex<Vec<PathBuf>>>,
     watched: &mut HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>>,
     failed_watches: &mut HashSet<PathBuf>,
 ) {
-    let roots = active_roots
+    let roots = active_order
         .lock()
         .unwrap_or_else(|e| {
-            tracing::warn!("Active roots mutex poisoned, recovering");
+            tracing::warn!("Active order mutex poisoned, recovering");
             e.into_inner()
         })
         .clone();
@@ -449,6 +453,7 @@ fn find_owner_for_watch(path: &Path, active_roots: &Arc<Mutex<HashSet<PathBuf>>>
 
 fn remove_inactive_watchers(
     active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
+    active_order: &Arc<Mutex<Vec<PathBuf>>>,
     inotify: &mut Inotify,
     watched: &mut HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>>,
     failed_watches: &mut HashSet<PathBuf>,
@@ -460,6 +465,14 @@ fn remove_inactive_watchers(
             e.into_inner()
         })
         .clone();
+
+    active_order
+        .lock()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Active order mutex poisoned, recovering");
+            e.into_inner()
+        })
+        .retain(|path| roots.contains(path));
 
     let to_remove: Vec<_> = watched
         .iter_mut()
@@ -493,6 +506,29 @@ fn is_path_under_any_root(path: &Path, roots: &HashSet<PathBuf>) -> bool {
     roots
         .iter()
         .any(|root| path == root || path.starts_with(root))
+}
+
+fn touch_active_root(
+    active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
+    active_order: &Arc<Mutex<Vec<PathBuf>>>,
+    path: PathBuf,
+) {
+    active_roots
+        .lock()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Active roots mutex poisoned, recovering");
+            e.into_inner()
+        })
+        .insert(path.clone());
+
+    let mut order = active_order.lock().unwrap_or_else(|e| {
+        tracing::warn!("Active order mutex poisoned, recovering");
+        e.into_inner()
+    });
+    if let Some(pos) = order.iter().position(|p| p == &path) {
+        order.remove(pos);
+    }
+    order.insert(0, path);
 }
 
 fn handle_client(
