@@ -155,9 +155,6 @@ impl Daemon {
             tracing::info!("Loaded {} banner caches from disk", cache.len());
         }
 
-        let dir_sizes_clone = self.dir_sizes.clone();
-        let dir_size_mtimes_clone = self.dir_size_mtimes.clone();
-
         let mut last_activity = Instant::now();
         let mut last_save = Instant::now();
 
@@ -170,7 +167,9 @@ impl Daemon {
                     let dir_size_mtimes = self.dir_size_mtimes.clone();
                     let active_roots = active_roots.clone();
                     thread::spawn(move || {
-                        if let Err(e) = handle_client(stream, cache, dir_sizes, dir_size_mtimes, active_roots) {
+                        if let Err(e) =
+                            handle_client(stream, cache, dir_sizes, dir_size_mtimes, active_roots)
+                        {
                             tracing::error!("Client error: {}", e);
                         }
                     });
@@ -296,7 +295,12 @@ fn watch_loop(
             }
         }
 
-        remove_inactive_watchers(&active_roots, &mut inotify, &mut watched, &mut failed_watches);
+        remove_inactive_watchers(
+            &active_roots,
+            &mut inotify,
+            &mut watched,
+            &mut failed_watches,
+        );
         thread::sleep(Duration::from_millis(100));
     }
 }
@@ -371,7 +375,12 @@ fn refresh_active_watchers(
     }
 }
 
-fn collect_watch_targets(path: &Path, depth: usize, targets: &mut Vec<PathBuf>, max_targets: usize) {
+fn collect_watch_targets(
+    path: &Path,
+    depth: usize,
+    targets: &mut Vec<PathBuf>,
+    max_targets: usize,
+) {
     if targets.len() >= max_targets || depth > ACTIVE_WATCH_DEPTH {
         return;
     }
@@ -382,9 +391,7 @@ fn collect_watch_targets(path: &Path, depth: usize, targets: &mut Vec<PathBuf>, 
     };
 
     let is_dir = if meta.is_symlink() {
-        std::fs::metadata(path)
-            .map(|m| m.is_dir())
-            .unwrap_or(false)
+        std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
     } else {
         meta.is_dir()
     };
@@ -414,9 +421,7 @@ fn can_watch_path(path: &Path) -> bool {
     };
 
     if meta.is_symlink() {
-        return std::fs::metadata(path)
-            .map(|m| m.is_dir())
-            .unwrap_or(false);
+        return std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false);
     }
 
     meta.is_dir()
@@ -481,7 +486,9 @@ fn remove_inactive_watchers(
 }
 
 fn is_path_under_any_root(path: &Path, roots: &HashSet<PathBuf>) -> bool {
-    roots.iter().any(|root| path == root || path.starts_with(root))
+    roots
+        .iter()
+        .any(|root| path == root || path.starts_with(root))
 }
 
 fn handle_client(
@@ -788,20 +795,27 @@ fn cached_snapshot_is_fresh(cached: &DirSummary, path: &Path) -> bool {
         && cached.files == fresh.files
         && cached.dirs == fresh.dirs
         && cached.project_type == fresh.project_type
-        && cached_last_modified == fresh.last_modified
+        && cached_last_modified
+            == fresh
+                .last_modified
+                .map(|dt| chrono::DateTime::<chrono::Utc>::from(dt))
         && cached.top_items.len() == fresh.top_items.len()
         && cached
             .top_items
             .iter()
             .zip(fresh.top_items.iter())
             .all(|(a, b)| {
-                let cached_modified = a.modified.map(|dt| chrono::DateTime::<chrono::Utc>::from(dt));
+                let cached_modified = a
+                    .modified
+                    .map(|dt| chrono::DateTime::<chrono::Utc>::from(dt));
                 a.name == b.name
                     && a.is_dir == b.is_dir
                     && a.is_file == b.is_file
                     && a.is_symlink == b.is_symlink
                     && a.size == b.size
-                    && cached_modified == b.modified
+                    && cached_modified
+                        == b.modified
+                            .map(|dt| chrono::DateTime::<chrono::Utc>::from(dt))
                     && a.symlink_valid == b.symlink_valid
             })
 }
@@ -980,19 +994,6 @@ fn load_size_cache(socket_dir: &Path) -> HashMap<PathBuf, u64> {
     HashMap::new()
 }
 
-fn save_size_cache(socket_dir: &Path, sizes: &HashMap<PathBuf, u64>) {
-    let path = size_cache_path(socket_dir);
-    let map: HashMap<String, u64> = sizes
-        .iter()
-        .map(|(k, v)| (k.to_string_lossy().to_string(), *v))
-        .collect();
-    if let Ok(data) = serde_json::to_string(&map) {
-        if std::fs::write(&path, data).is_ok() {
-            tracing::info!("Saved {} directory sizes to disk", sizes.len());
-        }
-    }
-}
-
 fn load_banner_cache(socket_dir: &Path) -> HashMap<PathBuf, BannerData> {
     let path = banner_cache_path(socket_dir);
     if let Ok(data) = std::fs::read_to_string(&path) {
@@ -1159,7 +1160,10 @@ mod tests {
         assert!(cached_snapshot_is_fresh_from_snapshot(&summary, tmp.path()));
 
         std::fs::write(tmp.path().join("b.txt"), "b").unwrap();
-        assert!(!cached_snapshot_is_fresh_from_snapshot(&summary, tmp.path()));
+        assert!(!cached_snapshot_is_fresh_from_snapshot(
+            &summary,
+            tmp.path()
+        ));
     }
 
     #[test]
@@ -1174,7 +1178,10 @@ mod tests {
 
         std::thread::sleep(Duration::from_millis(20));
         std::fs::write(child.join("nested-new.txt"), "after").unwrap();
-        assert!(!cached_snapshot_is_fresh_from_snapshot(&summary, tmp.path()));
+        assert!(!cached_snapshot_is_fresh_from_snapshot(
+            &summary,
+            tmp.path()
+        ));
     }
 
     fn cached_snapshot_is_fresh_from_snapshot(cached: &ShallowSnapshot, path: &Path) -> bool {
