@@ -736,8 +736,8 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     Ok(BannerData { summary, git_info })
 }
 
-fn cached_summary_is_fresh(cached: &DirSummary, path: &Path) -> bool {
-    let Ok(fresh) = DirSummary::scan_with_options(path, false, false, false, false, false) else {
+fn cached_snapshot_is_fresh(cached: &DirSummary, path: &Path) -> bool {
+    let Ok(fresh) = shallow_snapshot(path) else {
         return false;
     };
 
@@ -761,6 +761,70 @@ fn cached_summary_is_fresh(cached: &DirSummary, path: &Path) -> bool {
                     && a.modified == b.modified
                     && a.symlink_valid == b.symlink_valid
             })
+}
+
+fn shallow_snapshot(path: &Path) -> Result<ShallowSnapshot> {
+    let mut top_items = Vec::new();
+    let mut total_size = 0;
+    let mut files = 0;
+    let mut dirs = 0;
+    let mut last_modified: Option<SystemTime> = None;
+
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        let symlink_meta = std::fs::symlink_metadata(entry.path()).ok();
+        let Some(metadata) = symlink_meta else {
+            continue;
+        };
+
+        let is_symlink = metadata.file_type().is_symlink();
+        let is_dir = if is_symlink {
+            std::fs::metadata(entry.path())
+                .map(|m| m.is_dir())
+                .unwrap_or(false)
+        } else {
+            metadata.is_dir()
+        };
+        let is_file = !is_symlink && metadata.is_file();
+
+        if is_dir {
+            dirs += 1;
+        } else if is_file {
+            files += 1;
+        }
+
+        let size = metadata.len();
+        total_size += size;
+
+        let modified = metadata.modified().ok();
+        if let Some(mod_time) = modified {
+            if last_modified.is_none() || mod_time > last_modified.unwrap() {
+                last_modified = Some(mod_time);
+            }
+        }
+
+        top_items.push(ShallowItem {
+            name: entry.file_name().to_string_lossy().to_string(),
+            is_dir,
+            is_file,
+            is_symlink,
+            size,
+            modified,
+            symlink_valid: !is_symlink || std::fs::metadata(entry.path()).is_ok(),
+        });
+    }
+
+    top_items.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(ShallowSnapshot {
+        total_items: top_items.len(),
+        total_size,
+        files,
+        dirs,
+        project_type: ProjectType::detect(path),
+        last_modified,
+        top_items,
+    })
 }
 
 fn refresh_displayed_dir_sizes(
