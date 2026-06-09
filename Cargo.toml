@@ -8,6 +8,35 @@ repository = "https://github.com/dracon/fab"
 keywords = ["cli", "file-manager", "shell", "productivity"]
 categories = ["command-line-utilities"]
 default-run = "f"
+include = [
+    "src/**/*.rs",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "CHANGELOG.md",
+    "INSTALL.md",
+    "LICENSE",
+    "COMPETITORS.md",
+    "VISION.md",
+    "AUDIT.md",
+    "AUDIT-DAEMON.md",
+    "SMART_TREE_FINDINGS.md",
+    "benches/**/*.rs",
+    "tests/**/*.rs",
+    "fab-shell.bash",
+    "fab-shell.zsh",
+    "fabd.service",
+    "install.sh",
+    "public/**/*",
+]
+exclude = [
+    "Cargo.toml.orig",
+    "RELEASE_NOTES_*.md",
+    ".dracon/**",
+    ".pi/**",
+    ".ralph/**",
+    "target/**",
+]
 
 [[bin]]
 name = "f"
