@@ -5,18 +5,20 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use folder_auto_banner::daemon_types::{BannerData, Request, Response};
-use folder_auto_banner::fs::DirSummary;
+use folder_auto_banner::fs::{DirEntry, DirSummary};
 
 // Cache entry with TTL
+#[derive(Clone)]
 struct CacheEntry {
     data: BannerData,
     computed_at: Instant,
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
+const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(1000);
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 
@@ -24,6 +26,8 @@ struct Daemon {
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     /// Global directory size cache — populated by proactive scan
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
+    /// Last observed mtime for each cached directory size
+    dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
     socket_path: PathBuf,
 }
 
@@ -49,6 +53,7 @@ impl Daemon {
         Ok(Self {
             cache: Arc::new(Mutex::new(HashMap::new())),
             dir_sizes: Arc::new(Mutex::new(dir_sizes)),
+            dir_size_mtimes: Arc::new(Mutex::new(HashMap::new())),
             socket_path,
         })
     }
@@ -88,11 +93,12 @@ impl Daemon {
 
         // Start proactive scan of home directory in background
         let dir_sizes_clone = self.dir_sizes.clone();
+        let dir_size_mtimes_clone = self.dir_size_mtimes.clone();
         let cache_clone = self.cache.clone();
         let socket_dir =
             directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
         thread::spawn(move || {
-            proactive_scan(dir_sizes_clone.clone(), cache_clone.clone());
+            proactive_scan(dir_sizes_clone.clone(), dir_size_mtimes_clone, cache_clone.clone());
             // Save to disk when done
             if let Some(dir) = socket_dir {
                 let sizes = dir_sizes_clone.lock().unwrap_or_else(|e| {
@@ -112,8 +118,9 @@ impl Daemon {
                     last_activity = Instant::now();
                     let cache = self.cache.clone();
                     let dir_sizes = self.dir_sizes.clone();
+                    let dir_size_mtimes = self.dir_size_mtimes.clone();
                     thread::spawn(move || {
-                        if let Err(e) = handle_client(stream, cache, dir_sizes) {
+                        if let Err(e) = handle_client(stream, cache, dir_sizes, dir_size_mtimes) {
                             tracing::error!("Client error: {}", e);
                         }
                     });
@@ -288,6 +295,7 @@ fn handle_client(
     stream: UnixStream,
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
 ) -> Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
@@ -321,68 +329,65 @@ fn handle_client(
                     tracing::warn!("Mutex poisoned, recovering");
                     e.into_inner()
                 });
+            let cached_entry = {
+                let cache = cache.lock().unwrap_or_else(|e| {
+                    tracing::warn!("Mutex poisoned, recovering");
+                    e.into_inner()
+                });
                 tracing::debug!("Cache lookup: path={:?}, entries={}", path, cache.len());
-                if let Some(entry) = cache.get(&path) {
-                    let age = entry.computed_at.elapsed();
-                    tracing::debug!("Cache hit: age={:?}, ttl={:?}", age, CACHE_TTL);
-                    if age < CACHE_TTL {
-                        let t0 = std::time::Instant::now();
-                        let mut data = entry.data.clone();
-                        let t1 = std::time::Instant::now();
-                        drop(cache);
-                        // Inject sizes from global cache
-                        let global_sizes = dir_sizes.lock().unwrap_or_else(|e| {
-                            tracing::warn!("Mutex poisoned, recovering");
-                            e.into_inner()
-                        });
-                        for item in &mut data.summary.top_items {
-                            if item.is_dir {
-                                if let Some(&size) = global_sizes.get(&item.path) {
-                                    item.size = size;
-                                }
-                            }
-                        }
-                        drop(global_sizes);
-                        let t2 = std::time::Instant::now();
-                        let t3 = std::time::Instant::now();
-                        send_response(&mut stream, &Response::Banner(Box::new(data)))?;
-                        let t4 = std::time::Instant::now();
-                        tracing::debug!(
-                            "Cache hit: clone={:?} inject={:?} send={:?}",
-                            t1 - t0,
-                            t2 - t1,
-                            t4 - t3
-                        );
-                        // Keep stream alive while client reads
-                        let mut discard = [0u8; 256];
-                        loop {
-                            match stream.read(&mut discard) {
-                                Ok(0) => break,
-                                Ok(_) => continue,
-                                Err(_) => break,
-                            }
-                        }
-                        return Ok(());
+                cache
+                    .get(&path)
+                    .filter(|entry| entry.computed_at.elapsed() < CACHE_TTL)
+                    .cloned()
+            };
+
+            if let Some(entry) = cached_entry {
+                let t0 = std::time::Instant::now();
+                let mut data = entry.data;
+                let t1 = std::time::Instant::now();
+                if !cached_summary_is_fresh(&data.summary, &path) {
+                    data = compute_banner_data(&path)?;
+                    let mut cache = cache.lock().unwrap_or_else(|e| {
+                        tracing::warn!("Mutex poisoned, recovering");
+                        e.into_inner()
+                    });
+                    cache.insert(
+                        path.clone(),
+                        CacheEntry {
+                            data: data.clone(),
+                            computed_at: Instant::now(),
+                        },
+                    );
+                }
+                refresh_displayed_dir_sizes(&mut data.summary.top_items, &dir_sizes, &dir_size_mtimes);
+                data.summary.total_size = data.summary.top_items.iter().map(|item| item.size).sum();
+                let t2 = std::time::Instant::now();
+                let t3 = std::time::Instant::now();
+                send_response(&mut stream, &Response::Banner(Box::new(data)))?;
+                let t4 = std::time::Instant::now();
+                tracing::debug!(
+                    "Cache hit: clone={:?} refresh={:?} send={:?}",
+                    t1 - t0,
+                    t2 - t1,
+                    t4 - t3
+                );
+                // Keep stream alive while client reads
+                let mut discard = [0u8; 256];
+                loop {
+                    match stream.read(&mut discard) {
+                        Ok(0) => break,
+                        Ok(_) => continue,
+                        Err(_) => break,
                     }
                 }
+                return Ok(());
             }
 
-            // Cache miss — do full scan
+            // Cache miss or stale shallow snapshot — do full scan
             let mut data = compute_banner_data(&path)?;
 
-            // Inject sizes from global cache
-            let global_sizes = dir_sizes.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            for item in &mut data.summary.top_items {
-                if item.is_dir {
-                    if let Some(&size) = global_sizes.get(&item.path) {
-                        item.size = size;
-                    }
-                }
-            }
-            drop(global_sizes);
+            refresh_displayed_dir_sizes(&mut data.summary.top_items, &dir_sizes, &dir_size_mtimes);
+            data.summary.total_size = data.summary.top_items.iter().map(|item| item.size).sum();
 
             // Store in cache
             {
@@ -434,14 +439,23 @@ fn handle_client(
             return Ok(()); // No response needed — fire and forget
         }
         Request::DirSize { path } => {
-            let sizes = dir_sizes.lock().unwrap_or_else(|e| {
+            let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
                 tracing::warn!("Mutex poisoned, recovering");
                 e.into_inner()
             });
-            let size = sizes
-                .get(&path)
-                .copied()
-                .unwrap_or_else(|| compute_dir_size(&path));
+            let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
+            let size = match sizes.get(&path).copied() {
+                Some(size) if mtimes.get(&path).copied().flatten() == current_dir_mtime(&path) => size,
+                _ => {
+                    let size = compute_dir_size(&path);
+                    sizes.insert(path.clone(), size);
+                    mtimes.insert(path.clone(), current_dir_mtime(&path));
+                    size
+                }
+            };
             Response::DirSize { path, size }
         }
         Request::Ping => Response::Pong,
@@ -633,6 +647,7 @@ fn save_banner_cache(socket_dir: &Path, cache: &HashMap<PathBuf, CacheEntry>) {
 /// Proactively scan home directory and populate global size cache + banner cache
 fn proactive_scan(
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
     banner_cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
 ) {
     let home = match std::env::var("HOME") {
@@ -774,10 +789,19 @@ fn proactive_scan(
                 tracing::warn!("Mutex poisoned, recovering");
                 e.into_inner()
             });
-            for (path, size) in batch_sizes {
-                sizes.insert(path, size);
+            for (path, size) in &batch_sizes {
+                sizes.insert(path.clone(), *size);
             }
             drop(sizes);
+
+            let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
+            for (path, _) in &batch_sizes {
+                mtimes.insert(path.clone(), current_dir_mtime(path));
+            }
+            drop(mtimes);
         }
     }
 
