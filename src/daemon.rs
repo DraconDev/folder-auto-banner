@@ -557,6 +557,96 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     Ok(BannerData { summary, git_info })
 }
 
+fn cached_summary_is_fresh(cached: &DirSummary, path: &Path) -> bool {
+    let Ok(fresh) = DirSummary::scan_with_options(path, false, false, false, false, false) else {
+        return false;
+    };
+
+    cached.total_items == fresh.total_items
+        && cached.total_size == fresh.total_size
+        && cached.files == fresh.files
+        && cached.dirs == fresh.dirs
+        && cached.project_type == fresh.project_type
+        && cached.last_modified == fresh.last_modified
+        && cached.top_items.len() == fresh.top_items.len()
+        && cached
+            .top_items
+            .iter()
+            .zip(fresh.top_items.iter())
+            .all(|(a, b)| {
+                a.name == b.name
+                    && a.is_dir == b.is_dir
+                    && a.is_file == b.is_file
+                    && a.is_symlink == b.is_symlink
+                    && a.size == b.size
+                    && a.modified == b.modified
+                    && a.symlink_valid == b.symlink_valid
+            })
+}
+
+fn refresh_displayed_dir_sizes(
+    items: &mut [DirEntry],
+    dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+) {
+    let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+
+    let mut to_compute = Vec::new();
+    for item in items.iter_mut().filter(|item| item.is_dir) {
+        let current_mtime = current_dir_mtime(&item.path);
+        let cached_mtime = mtimes.get(&item.path).copied().flatten();
+        let cached_size = sizes.get(&item.path).copied();
+
+        if cached_size.is_none() || cached_mtime != current_mtime {
+            to_compute.push((item.path.clone(), current_mtime));
+        } else if let Some(size) = cached_size {
+            item.size = size;
+        }
+    }
+
+    drop(mtimes);
+    drop(sizes);
+
+    for (path, mtime) in to_compute {
+        let size = compute_dir_size(&path);
+        let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        });
+        sizes.insert(path.clone(), size);
+        drop(sizes);
+
+        let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        });
+        mtimes.insert(path, mtime);
+    }
+
+    let sizes = dir_sizes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    for item in items.iter_mut().filter(|item| item.is_dir) {
+        if let Some(size) = sizes.get(&item.path) {
+            item.size = *size;
+        }
+    }
+}
+
+fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path)
+        .ok()
+        .and_then(|metadata| metadata.modified().ok())
+}
+
 fn compute_dir_size(path: &Path) -> u64 {
     // Use `du -s` which is much faster than recursive Rust
     if let Ok(output) = std::process::Command::new("du")
