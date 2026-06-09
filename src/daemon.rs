@@ -978,226 +978,6 @@ fn save_banner_cache(socket_dir: &Path, cache: &HashMap<PathBuf, CacheEntry>) {
     }
 }
 
-/// Proactively scan home directory and populate global size cache + banner cache
-fn proactive_scan(
-    dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
-    dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
-    banner_cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
-) {
-    let home = match std::env::var("HOME") {
-        Ok(h) => PathBuf::from(h),
-        Err(_) => return,
-    };
-
-    tracing::info!("Starting proactive scan of {}", home.display());
-
-    // Find all directories in home (up to 2 levels deep for speed)
-    let mut dirs_to_scan: Vec<PathBuf> = Vec::new();
-
-    // Level 1: direct children of home
-    if let Ok(entries) = std::fs::read_dir(&home) {
-        for entry in entries.flatten() {
-            // Use symlink_metadata to detect symlinks without following them
-            let meta = match std::fs::symlink_metadata(entry.path()) {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-
-            if meta.is_symlink() {
-                // For symlinks, try to resolve the target
-                if let Ok(target_meta) = std::fs::metadata(entry.path()) {
-                    if target_meta.is_dir() && !entry.file_name().to_string_lossy().starts_with('.')
-                    {
-                        dirs_to_scan.push(entry.path());
-                    }
-                }
-                // Skip dead symlinks (target doesn't exist)
-            } else if meta.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
-                dirs_to_scan.push(entry.path());
-            }
-        }
-    }
-
-    // Level 2: subdirectories of visible dirs (for projects like ~/Dev/project)
-    let level1: Vec<PathBuf> = dirs_to_scan.clone();
-    for dir in &level1 {
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten().take(50) {
-                let meta = match std::fs::symlink_metadata(entry.path()) {
-                    Ok(m) => m,
-                    Err(_) => continue,
-                };
-
-                if meta.is_symlink() {
-                    if let Ok(target_meta) = std::fs::metadata(entry.path()) {
-                        if target_meta.is_dir() {
-                            dirs_to_scan.push(entry.path());
-                        }
-                    }
-                } else if meta.is_dir() {
-                    dirs_to_scan.push(entry.path());
-                }
-            }
-        }
-    }
-
-    // Track where level 1+2 end (most likely navigation targets)
-    let level2_end = dirs_to_scan.len();
-
-    // Level 3: subdirectories of level 2 dirs (for projects like ~/Dev/project/src)
-    let level2: Vec<PathBuf> = dirs_to_scan[level1.len()..].to_vec();
-    for dir in &level2 {
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten().take(20) {
-                let meta = match std::fs::symlink_metadata(entry.path()) {
-                    Ok(m) => m,
-                    Err(_) => continue,
-                };
-
-                if meta.is_symlink() {
-                    if let Ok(target_meta) = std::fs::metadata(entry.path()) {
-                        if target_meta.is_dir() {
-                            dirs_to_scan.push(entry.path());
-                        }
-                    }
-                } else if meta.is_dir() {
-                    dirs_to_scan.push(entry.path());
-                }
-            }
-        }
-    }
-
-    // Also scan ALL hidden dirs in home
-    if let Ok(entries) = std::fs::read_dir(&home) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with('.') {
-                let meta = match std::fs::symlink_metadata(entry.path()) {
-                    Ok(m) => m,
-                    Err(_) => continue,
-                };
-
-                let is_dir = if meta.is_symlink() {
-                    std::fs::metadata(entry.path())
-                        .map(|m| m.is_dir())
-                        .unwrap_or(false)
-                } else {
-                    meta.is_dir()
-                };
-
-                if is_dir {
-                    dirs_to_scan.push(entry.path());
-                }
-            }
-        }
-    }
-
-    tracing::info!("Scanning {} directories", dirs_to_scan.len());
-
-    // Run du in batches to avoid ARG_MAX limits
-    // Lock per-batch to avoid blocking banner requests for the entire scan
-    let batch_size = 50;
-    let mut count = 0;
-
-    for chunk in dirs_to_scan.chunks(batch_size) {
-        let mut du_args: Vec<String> = vec!["-s".to_string(), "--bytes".to_string()];
-        for dir in chunk {
-            du_args.push(dir.to_string_lossy().to_string());
-        }
-
-        if let Ok(output) = std::process::Command::new("du").args(&du_args).output() {
-            let mut batch_sizes = Vec::new();
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines() {
-                let parts: Vec<&str> = line.splitn(2, '\t').collect();
-                if parts.len() >= 2 {
-                    if let Ok(size) = parts[0].parse::<u64>() {
-                        let dir_path = PathBuf::from(parts[1]);
-                        batch_sizes.push((dir_path, size));
-                        count += 1;
-                    }
-                }
-            }
-            // Brief lock to insert batch, then release
-            let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            for (path, size) in &batch_sizes {
-                sizes.insert(path.clone(), *size);
-            }
-            drop(sizes);
-
-            let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            for (path, _) in &batch_sizes {
-                mtimes.insert(path.clone(), current_dir_mtime(path));
-            }
-            drop(mtimes);
-        }
-    }
-
-    tracing::info!("Proactive scan complete: {} directory sizes cached", count);
-
-    // Pre-compute banner data for level 1 + level 2 dirs (most likely navigation targets)
-    let banner_targets: Vec<PathBuf> = dirs_to_scan[..level2_end.min(dirs_to_scan.len())].to_vec();
-    tracing::info!(
-        "Pre-computing banners for {} directories",
-        banner_targets.len()
-    );
-
-    let mut banner_count = 0;
-    for path in &banner_targets {
-        // Check cache with brief lock, compute outside lock
-        let should_compute = {
-            let cache = banner_cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            !cache
-                .get(path)
-                .map(|e| e.computed_at.elapsed() < CACHE_TTL)
-                .unwrap_or(false)
-        };
-
-        if !should_compute {
-            continue;
-        }
-
-        // Compute banner data outside the lock (expensive operation)
-        if let Ok(data) = compute_banner_data(path) {
-            // Brief lock to insert
-            let mut cache = banner_cache.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            cache.insert(
-                path.clone(),
-                CacheEntry {
-                    data,
-                    computed_at: Instant::now(),
-                },
-            );
-            banner_count += 1;
-        }
-    }
-
-    tracing::info!("Pre-computed {} banner caches", banner_count);
-
-    // Save banner cache to disk
-    let socket_dir =
-        directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
-    if let Some(dir) = socket_dir {
-        let cache = banner_cache.lock().unwrap_or_else(|e| {
-            tracing::warn!("Mutex poisoned, recovering");
-            e.into_inner()
-        });
-        save_banner_cache(&dir, &cache);
-    }
-}
-
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -1328,32 +1108,37 @@ mod tests {
     }
 
     #[test]
-    fn test_cached_summary_is_fresh_detects_new_item() {
+    fn test_cached_snapshot_is_fresh_detects_new_item() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("a.txt"), "a").unwrap();
-        let summary =
-            DirSummary::scan_with_options(tmp.path(), false, false, false, false, false).unwrap();
+        let summary = shallow_snapshot(tmp.path()).unwrap();
 
-        assert!(cached_summary_is_fresh(&summary, tmp.path()));
+        assert!(cached_snapshot_is_fresh_from_snapshot(&summary, tmp.path()));
 
         std::fs::write(tmp.path().join("b.txt"), "b").unwrap();
-        assert!(!cached_summary_is_fresh(&summary, tmp.path()));
+        assert!(!cached_snapshot_is_fresh_from_snapshot(&summary, tmp.path()));
     }
 
     #[test]
-    fn test_cached_summary_is_fresh_detects_nested_change() {
+    fn test_cached_snapshot_is_fresh_detects_nested_change() {
         let tmp = tempfile::tempdir().unwrap();
         let child = tmp.path().join("child");
         std::fs::create_dir(&child).unwrap();
         std::fs::write(child.join("nested.txt"), "before").unwrap();
-        let summary =
-            DirSummary::scan_with_options(tmp.path(), false, false, false, false, false).unwrap();
+        let summary = shallow_snapshot(tmp.path()).unwrap();
 
-        assert!(cached_summary_is_fresh(&summary, tmp.path()));
+        assert!(cached_snapshot_is_fresh_from_snapshot(&summary, tmp.path()));
 
         std::thread::sleep(Duration::from_millis(20));
         std::fs::write(child.join("nested-new.txt"), "after").unwrap();
-        assert!(!cached_summary_is_fresh(&summary, tmp.path()));
+        assert!(!cached_snapshot_is_fresh_from_snapshot(&summary, tmp.path()));
+    }
+
+    fn cached_snapshot_is_fresh_from_snapshot(cached: &ShallowSnapshot, path: &Path) -> bool {
+        let Ok(fresh) = shallow_snapshot(path) else {
+            return false;
+        };
+        *cached == fresh
     }
 
     #[test]
