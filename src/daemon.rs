@@ -26,7 +26,7 @@ const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 const ACTIVE_WATCH_DEPTH: usize = 3;
-const MAX_ACTIVE_WATCH_DIRS: usize = 512;
+const MAX_ACTIVE_WATCH_DIRS: usize = 2048;
 
 #[cfg(test)]
 #[derive(Clone, Debug, PartialEq)]
@@ -308,7 +308,7 @@ fn refresh_active_watchers(
     for root in roots {
         if targets.len() >= MAX_ACTIVE_WATCH_DIRS {
             tracing::warn!(
-                "Reached active watcher cap ({} dirs); skipping remaining active folders",
+                "Reached active watcher cap ({} entries); skipping remaining active folders",
                 MAX_ACTIVE_WATCH_DIRS
             );
             break;
@@ -381,11 +381,15 @@ fn collect_watch_targets(
         meta.is_dir()
     };
 
-    if !is_dir {
+    if meta.is_symlink() && !is_dir {
         return;
     }
 
     targets.push(path.to_path_buf());
+
+    if !is_dir {
+        return;
+    }
 
     let Ok(entries) = std::fs::read_dir(path) else {
         return;
@@ -406,10 +410,10 @@ fn can_watch_path(path: &Path) -> bool {
     };
 
     if meta.is_symlink() {
-        return std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false);
+        return std::fs::metadata(path).is_ok();
     }
 
-    meta.is_dir()
+    meta.is_file() || meta.is_dir()
 }
 
 fn find_owner_for_watch(path: &Path, active_roots: &Arc<Mutex<HashSet<PathBuf>>>) -> PathBuf {
