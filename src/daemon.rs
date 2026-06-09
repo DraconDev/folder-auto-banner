@@ -594,11 +594,11 @@ fn refresh_displayed_dir_sizes(
     dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
 ) {
-    let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
+    let sizes = dir_sizes.lock().unwrap_or_else(|e| {
         tracing::warn!("Mutex poisoned, recovering");
         e.into_inner()
     });
-    let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+    let mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
         tracing::warn!("Mutex poisoned, recovering");
         e.into_inner()
     });
@@ -1114,7 +1114,7 @@ mod tests {
         assert!(cached_summary_is_fresh(&summary, tmp.path()));
 
         std::thread::sleep(Duration::from_millis(20));
-        std::fs::write(child.join("nested.txt"), "after").unwrap();
+        std::fs::write(child.join("nested-new.txt"), "after").unwrap();
         assert!(!cached_summary_is_fresh(&summary, tmp.path()));
     }
 
