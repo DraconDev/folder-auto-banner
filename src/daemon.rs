@@ -103,9 +103,11 @@ impl Daemon {
         // Start inotify watcher thread for active folders only.
         let cache_clone = self.cache.clone();
         let active_roots = Arc::new(Mutex::new(HashSet::new()));
+        let active_order = Arc::new(Mutex::new(Vec::new()));
         let active_roots_clone = active_roots.clone();
+        let active_order_clone = active_order.clone();
         let _watcher_handle = thread::spawn(move || {
-            watch_loop(cache_clone, active_roots_clone);
+            watch_loop(cache_clone, active_roots_clone, active_order_clone);
         });
 
         // Load persisted banner cache after the watcher is ready so watched paths become
@@ -128,6 +130,13 @@ impl Daemon {
                         e.into_inner()
                     })
                     .insert(path.clone());
+                active_order
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Active order mutex poisoned, recovering");
+                        e.into_inner()
+                    })
+                    .insert(0, path.clone());
                 cache.insert(
                     path.clone(),
                     CacheEntry {
@@ -151,10 +160,16 @@ impl Daemon {
                     let dir_sizes = self.dir_sizes.clone();
                     let dir_size_mtimes = self.dir_size_mtimes.clone();
                     let active_roots = active_roots.clone();
+                    let active_order = active_order.clone();
                     thread::spawn(move || {
-                        if let Err(e) =
-                            handle_client(stream, cache, dir_sizes, dir_size_mtimes, active_roots)
-                        {
+                        if let Err(e) = handle_client(
+                            stream,
+                            cache,
+                            dir_sizes,
+                            dir_size_mtimes,
+                            active_roots,
+                            active_order,
+                        ) {
                             tracing::error!("Client error: {}", e);
                         }
                     });
@@ -486,6 +501,7 @@ fn handle_client(
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
     active_roots: Arc<Mutex<HashSet<PathBuf>>>,
+    active_order: Arc<Mutex<Vec<PathBuf>>>,
 ) -> Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
