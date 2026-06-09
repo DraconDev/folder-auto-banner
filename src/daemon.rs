@@ -241,7 +241,7 @@ impl Daemon {
 /// directory sizes. The freshness fix validated every cache hit with a shallow
 /// scan, which made the daemon feel slow. This keeps cache hits fast by watching
 /// active folders more aggressively: once a folder is requested, the daemon watches
-/// the folder and a bounded set of descendant directories so nested changes
+/// the folder and a bounded set of descendant files/directories so nested changes
 /// invalidate the cached banner without a full scan on every request.
 fn watch_loop(
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
