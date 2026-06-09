@@ -242,7 +242,7 @@ fn watch_loop(
         }
     };
 
-    let mut watched: HashMap<inotify::WatchDescriptor, WatchRegistration> = HashMap::new();
+    let mut watched: HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>> = HashMap::new();
     let mut failed_watches: HashSet<PathBuf> = HashSet::new();
     let mut last_refresh = Instant::now() - WATCH_REFRESH_INTERVAL;
 
@@ -263,8 +263,10 @@ fn watch_loop(
             Ok(events) => {
                 for event in events {
                     let mut invalidated = Vec::new();
-                    if let Some(reg) = watched.get(&event.wd) {
-                        invalidated.push(reg.owner.clone());
+                    if let Some(registrations) = watched.get(&event.wd) {
+                        for reg in registrations {
+                            invalidated.push(reg.owner.clone());
+                        }
                     }
 
                     if !invalidated.is_empty() {
@@ -296,7 +298,7 @@ fn watch_loop(
 fn refresh_active_watchers(
     inotify: &mut Inotify,
     active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
-    watched: &mut HashMap<inotify::WatchDescriptor, WatchRegistration>,
+    watched: &mut HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>>,
     failed_watches: &mut HashSet<PathBuf>,
 ) {
     let roots = active_roots
@@ -316,11 +318,15 @@ fn refresh_active_watchers(
             );
             break;
         }
-        collect_watch_targets(&root, 0, &mut targets, MAX_ACTIVE_WATCH_DIRS - targets.len());
+        collect_watch_targets(&root, 0, &mut targets, MAX_ACTIVE_WATCH_DIRS);
     }
 
     for target in targets {
-        if watched.values().any(|reg| reg.watched_path == target) || failed_watches.contains(&target) {
+        if watched
+            .values()
+            .any(|regs| regs.iter().any(|reg| reg.watched_path == target))
+            || failed_watches.contains(&target)
+        {
             continue;
         }
 
@@ -342,14 +348,14 @@ fn refresh_active_watchers(
         ) {
             Ok(wd) => {
                 let owner = find_owner_for_watch(&target, active_roots);
-                watched.insert(
-                    wd,
-                    WatchRegistration {
+                let regs = watched.entry(wd).or_default();
+                if !regs.iter().any(|reg| reg.owner == owner) {
+                    regs.push(WatchRegistration {
                         owner,
                         watched_path: target.clone(),
-                    },
-                );
-                tracing::debug!("Watching active path: {}", target.display());
+                    });
+                    tracing::debug!("Watching active path: {}", target.display());
+                }
             }
             Err(e) => {
                 tracing::debug!("Failed to watch {}: {}", target.display(), e);
@@ -359,8 +365,8 @@ fn refresh_active_watchers(
     }
 }
 
-fn collect_watch_targets(path: &Path, depth: usize, targets: &mut Vec<PathBuf>, remaining: usize) {
-    if targets.len() >= remaining || depth > ACTIVE_WATCH_DEPTH {
+fn collect_watch_targets(path: &Path, depth: usize, targets: &mut Vec<PathBuf>, max_targets: usize) {
+    if targets.len() >= max_targets || depth > ACTIVE_WATCH_DEPTH {
         return;
     }
 
@@ -388,10 +394,10 @@ fn collect_watch_targets(path: &Path, depth: usize, targets: &mut Vec<PathBuf>, 
     };
 
     for entry in entries.flatten() {
-        if targets.len() >= remaining {
+        if targets.len() >= max_targets {
             return;
         }
-        collect_watch_targets(&entry.path(), depth + 1, targets, remaining);
+        collect_watch_targets(&entry.path(), depth + 1, targets, max_targets);
     }
 }
 
@@ -422,14 +428,14 @@ fn find_owner_for_watch(path: &Path, active_roots: &Arc<Mutex<HashSet<PathBuf>>>
     roots
         .into_iter()
         .filter(|root| path == root || path.starts_with(root))
-        .min_by_key(|root| root.components().count())
+        .max_by_key(|root| root.components().count())
         .unwrap_or_else(|| path.to_path_buf())
 }
 
 fn remove_inactive_watchers(
     active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
     inotify: &mut Inotify,
-    watched: &mut HashMap<inotify::WatchDescriptor, WatchRegistration>,
+    watched: &mut HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>>,
     failed_watches: &mut HashSet<PathBuf>,
 ) {
     let roots = active_roots
@@ -441,12 +447,14 @@ fn remove_inactive_watchers(
         .clone();
 
     let to_remove: Vec<_> = watched
-        .iter()
-        .filter_map(|(wd, reg)| {
-            if !roots.contains(&reg.owner)
-                || !reg.owner.exists()
-                || (!reg.watched_path.exists() && !reg.watched_path == reg.owner)
-            {
+        .iter_mut()
+        .filter_map(|(wd, regs)| {
+            regs.retain(|reg| {
+                roots.contains(&reg.owner)
+                    && reg.owner.exists()
+                    && (reg.watched_path.exists() || reg.watched_path == reg.owner)
+            });
+            if regs.is_empty() {
                 Some(wd.clone())
             } else {
                 None
@@ -455,13 +463,19 @@ fn remove_inactive_watchers(
         .collect();
 
     for wd in to_remove {
-        if let Some(reg) = watched.remove(&wd) {
-            inotify.watches().remove(wd).ok();
-            tracing::debug!("Stopped watching: {}", reg.watched_path.display());
+        if let Some(regs) = watched.remove(&wd) {
+            if let Some(reg) = regs.first() {
+                inotify.watches().remove(wd).ok();
+                tracing::debug!("Stopped watching: {}", reg.watched_path.display());
+            }
         }
     }
 
-    failed_watches.retain(|path| roots.contains(path));
+    failed_watches.retain(|path| is_path_under_any_root(path, &roots));
+}
+
+fn is_path_under_any_root(path: &Path, roots: &HashSet<PathBuf>) -> bool {
+    roots.iter().any(|root| path == root || path.starts_with(root))
 }
 
 fn handle_client(
@@ -741,24 +755,29 @@ fn cached_snapshot_is_fresh(cached: &DirSummary, path: &Path) -> bool {
         return false;
     };
 
+    let cached_last_modified = cached
+        .last_modified
+        .map(|dt| chrono::DateTime::<Utc>::from(dt));
+
     cached.total_items == fresh.total_items
         && cached.total_size == fresh.total_size
         && cached.files == fresh.files
         && cached.dirs == fresh.dirs
         && cached.project_type == fresh.project_type
-        && cached.last_modified == fresh.last_modified
+        && cached_last_modified == fresh.last_modified
         && cached.top_items.len() == fresh.top_items.len()
         && cached
             .top_items
             .iter()
             .zip(fresh.top_items.iter())
             .all(|(a, b)| {
+                let cached_modified = a.modified.map(|dt| chrono::DateTime::<Utc>::from(dt));
                 a.name == b.name
                     && a.is_dir == b.is_dir
                     && a.is_file == b.is_file
                     && a.is_symlink == b.is_symlink
                     && a.size == b.size
-                    && a.modified == b.modified
+                    && cached_modified == b.modified
                     && a.symlink_valid == b.symlink_valid
             })
 }
