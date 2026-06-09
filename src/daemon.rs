@@ -641,7 +641,13 @@ fn handle_client(
                                 computed_at: Instant::now(),
                             },
                         );
-                        active_roots.insert(path);
+                        active_roots
+                            .lock()
+                            .unwrap_or_else(|e| {
+                                tracing::warn!("Active roots mutex poisoned, recovering");
+                                e.into_inner()
+                            })
+                            .insert(path);
                     }
                 }
             });
