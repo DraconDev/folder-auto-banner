@@ -15,6 +15,7 @@ use folder_auto_banner::fs::{DirEntry, DirSummary, ProjectType};
 struct CacheEntry {
     data: BannerData,
     computed_at: Instant,
+    root_mtime: Option<SystemTime>,
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
@@ -25,6 +26,7 @@ const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 const ACTIVE_WATCH_DEPTH: usize = 3;
 const MAX_ACTIVE_WATCH_DIRS: usize = 512;
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq)]
 struct ShallowSnapshot {
     total_items: usize,
@@ -36,6 +38,7 @@ struct ShallowSnapshot {
     top_items: Vec<ShallowItem>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq)]
 struct ShallowItem {
     name: String,
