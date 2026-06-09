@@ -525,7 +525,7 @@ fn handle_client(
                 let t0 = std::time::Instant::now();
                 let mut data = entry.data;
                 let t1 = std::time::Instant::now();
-                if !cached_snapshot_is_fresh(&data.summary, &path) {
+                if entry.computed_at.elapsed() >= CACHE_TTL || !cache_entry_root_is_fresh(&entry, &path) {
                     data = compute_banner_data(&path)?;
                     let mut cache = cache.lock().unwrap_or_else(|e| {
                         tracing::warn!("Mutex poisoned, recovering");
@@ -536,6 +536,7 @@ fn handle_client(
                         CacheEntry {
                             data: data.clone(),
                             computed_at: Instant::now(),
+                            root_mtime: current_dir_mtime(&path),
                         },
                     );
                     active_roots
@@ -557,7 +558,7 @@ fn handle_client(
                 send_response(&mut stream, &Response::Banner(Box::new(data)))?;
                 let t4 = std::time::Instant::now();
                 tracing::debug!(
-                    "Cache hit: clone={:?} validation={:?} send={:?}",
+                    "Cache hit: clone={:?} root_check={:?} send={:?}",
                     t1 - t0,
                     t2 - t1,
                     t4 - t3
@@ -591,6 +592,7 @@ fn handle_client(
                     CacheEntry {
                         data: data.clone(),
                         computed_at: Instant::now(),
+                        root_mtime: current_dir_mtime(&path),
                     },
                 );
                 active_roots
@@ -629,6 +631,7 @@ fn handle_client(
                             CacheEntry {
                                 data,
                                 computed_at: Instant::now(),
+                                root_mtime: current_dir_mtime(&path),
                             },
                         );
                         active_roots
@@ -764,6 +767,11 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     Ok(BannerData { summary, git_info })
 }
 
+fn cache_entry_root_is_fresh(entry: &CacheEntry, path: &Path) -> bool {
+    entry.root_mtime == current_dir_mtime(path)
+}
+
+#[cfg(test)]
 fn cached_snapshot_is_fresh(cached: &DirSummary, path: &Path) -> bool {
     let Ok(fresh) = shallow_snapshot(path) else {
         return false;
@@ -1078,6 +1086,7 @@ mod tests {
         let entry = CacheEntry {
             data,
             computed_at: Instant::now(),
+            root_mtime: None,
         };
         assert!(entry.computed_at.elapsed() < Duration::from_secs(1));
     }
@@ -1091,6 +1100,7 @@ mod tests {
                 git_info: None,
             },
             computed_at: Instant::now() - Duration::from_secs(600), // 10 minutes ago
+            root_mtime: None,
         };
         assert!(entry.computed_at.elapsed() > CACHE_TTL);
     }
