@@ -10,6 +10,7 @@ pub mod fs;
 pub mod git;
 pub mod icon;
 pub mod port_usage;
+pub mod project_insights;
 pub mod shell_wrapper;
 pub mod state;
 pub mod test_cache;

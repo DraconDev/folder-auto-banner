@@ -381,21 +381,19 @@ impl DirSummary {
             30,
             crate::build_status::check_build(path, &project_type)
         );
-        let todo_info = cached_check!(
-            scan_todos,
-            cache,
-            "todos",
-            60,
-            crate::todo_scanner::scan_todos(path).ok()
-        );
-        let code_metrics = cached_check!(
-            check_metrics,
-            cache,
-            "metrics",
-            60,
-            crate::code_metrics::scan_metrics(path).ok()
-        );
-        let port_info = cached_check!(
+        let (todo_info, code_metrics) = if scan_todos || check_metrics {
+            match crate::project_insights::scan_insights(path).ok() {
+                Some(insights) => (
+                    scan_todos.then_some(insights.todos),
+                    check_metrics.then_some(insights.metrics),
+                ),
+                None => (None, None),
+            }
+        } else {
+            (None, None)
+        };
+
+        Ok(DirSummary {
             check_ports,
             cache,
             "ports",
