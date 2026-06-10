@@ -409,8 +409,6 @@ impl DirSummary {
         );
 
         Ok(DirSummary {
-
-        Ok(DirSummary {
             total_items: files + dirs,
             total_size,
             files,
