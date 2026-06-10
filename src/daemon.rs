@@ -299,7 +299,6 @@ fn watch_loop(
         match inotify.read_events(&mut buffer) {
             Ok(events) => {
                 for event in events {
-                    tracing::debug!("inotify event: wd={:?} mask={:?} name={:?}", event.wd, event.mask, event.name);
                     let mut invalidated = Vec::new();
                     if let Some(registrations) = watched.get(&event.wd) {
                         for reg in registrations {
@@ -442,6 +441,10 @@ fn collect_watch_targets(
         return;
     }
 
+    if should_skip_dir(path) {
+        return;
+    }
+
     let Ok(entries) = std::fs::read_dir(path) else {
         return;
     };
@@ -452,6 +455,34 @@ fn collect_watch_targets(
         }
         collect_watch_targets(&entry.path(), depth + 1, targets, max_targets);
     }
+}
+
+/// Directories whose internal file churn should not invalidate the banner cache.
+///
+/// VCS internals (`.git`, `.hg`, `.svn`) and build/dependency caches (`target`,
+/// `node_modules`, `.next`, `dist`, `build`) constantly create and delete
+/// temporary files. If the watcher observed them, the cache would be invalidated
+/// every time the daemon or any tool performed a git operation, a build, or
+/// installed a dependency — even though none of those events change what the
+/// banner should display.
+fn should_skip_dir(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    matches!(
+        name,
+        ".git"
+            | ".hg"
+            | ".svn"
+            | "target"
+            | "node_modules"
+            | ".next"
+            | "dist"
+            | "build"
+            | ".cache"
+            | ".parcel-cache"
+            | ".turbo"
+    )
 }
 
 fn can_watch_path(path: &Path) -> bool {
