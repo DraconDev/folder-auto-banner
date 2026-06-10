@@ -5,7 +5,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use folder_auto_banner::daemon_types::{BannerData, Request, Response};
 #[cfg(test)]
@@ -84,13 +84,14 @@ impl Daemon {
             std::fs::remove_file(&socket_path)?;
         }
 
-        // Load persistent size cache from disk
-        let dir_sizes = load_size_cache(&socket_dir);
+        // Load persistent size cache from disk, including mtimes so cached sizes can be
+        // validated without recomputing every directory on daemon restart.
+        let (dir_sizes, dir_size_mtimes) = load_size_cache(&socket_dir);
 
         Ok(Self {
             cache: Arc::new(Mutex::new(HashMap::new())),
             dir_sizes: Arc::new(Mutex::new(dir_sizes)),
-            dir_size_mtimes: Arc::new(Mutex::new(HashMap::new())),
+            dir_size_mtimes: Arc::new(Mutex::new(dir_size_mtimes)),
             socket_path,
         })
     }
@@ -206,7 +207,16 @@ impl Daemon {
                                 tracing::warn!("Mutex poisoned, recovering");
                                 e.into_inner()
                             });
+                            let dir_sizes = self.dir_sizes.lock().unwrap_or_else(|e| {
+                                tracing::warn!("Mutex poisoned, recovering");
+                                e.into_inner()
+                            });
+                            let dir_size_mtimes = self.dir_size_mtimes.lock().unwrap_or_else(|e| {
+                                tracing::warn!("Mutex poisoned, recovering");
+                                e.into_inner()
+                            });
                             save_banner_cache(&dir, &cache);
+                            save_size_cache(&dir, &dir_sizes, &dir_size_mtimes);
                         }
                         last_save = Instant::now();
                     }
@@ -220,7 +230,7 @@ impl Daemon {
             }
         }
 
-        // Cleanup — save banner cache to disk before exiting
+        // Cleanup — save caches to disk before exiting
         let socket_dir =
             directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
         if let Some(dir) = socket_dir {
@@ -228,7 +238,16 @@ impl Daemon {
                 tracing::warn!("Mutex poisoned, recovering");
                 e.into_inner()
             });
+            let dir_sizes = self.dir_sizes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
+            let dir_size_mtimes = self.dir_size_mtimes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
             save_banner_cache(&dir, &cache);
+            save_size_cache(&dir, &dir_sizes, &dir_size_mtimes);
         }
         std::fs::remove_file(&self.socket_path).ok();
         Ok(())
@@ -986,17 +1005,15 @@ fn compute_sizes_parallel(
     let next = AtomicUsize::new(0);
     std::thread::scope(|s| {
         for _ in 0..worker_count {
-            s.spawn(|| {
-                loop {
-                    let idx = next.fetch_add(1, Ordering::SeqCst);
-                    if idx >= jobs.len() {
-                        break;
-                    }
-                    let (orig_idx, path, mtime) = &jobs[idx];
-                    let size = compute_dir_size(path);
-                    if let Ok(mut r) = results.lock() {
-                        r.push((*orig_idx, size, *mtime));
-                    }
+            s.spawn(|| loop {
+                let idx = next.fetch_add(1, Ordering::SeqCst);
+                if idx >= jobs.len() {
+                    break;
+                }
+                let (orig_idx, path, mtime) = &jobs[idx];
+                let size = compute_dir_size(path);
+                if let Ok(mut r) = results.lock() {
+                    r.push((*orig_idx, size, *mtime));
                 }
             });
         }
@@ -1031,6 +1048,12 @@ fn compute_dir_size(path: &Path) -> u64 {
     std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PersistedSizeCache {
+    sizes: HashMap<String, u64>,
+    mtimes: HashMap<String, Option<u128>>,
+}
+
 const SIZE_CACHE_FILE: &str = "dir_sizes.json";
 const BANNER_CACHE_FILE: &str = "banner_cache.json";
 
@@ -1042,19 +1065,73 @@ fn banner_cache_path(socket_dir: &Path) -> PathBuf {
     socket_dir.join(BANNER_CACHE_FILE)
 }
 
-fn load_size_cache(socket_dir: &Path) -> HashMap<PathBuf, u64> {
+fn system_time_to_nanos(time: Option<SystemTime>) -> Option<u128> {
+    time.and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos())
+}
+
+fn nanos_to_system_time(nanos: u128) -> Option<SystemTime> {
+    let secs = nanos / 1_000_000_000;
+    let subsec_nanos = nanos % 1_000_000_000;
+    if secs > u64::MAX as u128 {
+        return None;
+    }
+    UNIX_EPOCH.checked_add(Duration::new(secs as u64, subsec_nanos as u32))
+}
+
+fn load_size_cache(
+    socket_dir: &Path,
+) -> (HashMap<PathBuf, u64>, HashMap<PathBuf, Option<SystemTime>>) {
     let path = size_cache_path(socket_dir);
     if let Ok(data) = std::fs::read_to_string(&path) {
-        if let Ok(map) = serde_json::from_str::<HashMap<String, u64>>(&data) {
-            let result: HashMap<PathBuf, u64> = map
+        if let Ok(persisted) = serde_json::from_str::<PersistedSizeCache>(&data) {
+            let sizes: HashMap<PathBuf, u64> = persisted
+                .sizes
                 .into_iter()
                 .map(|(k, v)| (PathBuf::from(k), v))
                 .collect();
-            tracing::info!("Loaded {} cached directory sizes from disk", result.len());
-            return result;
+            let mtimes: HashMap<PathBuf, Option<SystemTime>> = persisted
+                .mtimes
+                .into_iter()
+                .map(|(k, v)| (PathBuf::from(k), v.and_then(nanos_to_system_time)))
+                .collect();
+            tracing::info!("Loaded {} cached directory sizes from disk", sizes.len());
+            return (sizes, mtimes);
+        }
+
+        if let Ok(map) = serde_json::from_str::<HashMap<String, u64>>(&data) {
+            let sizes: HashMap<PathBuf, u64> = map
+                .into_iter()
+                .map(|(k, v)| (PathBuf::from(k), v))
+                .collect();
+            tracing::info!("Loaded {} cached directory sizes from disk", sizes.len());
+            return (sizes, HashMap::new());
         }
     }
-    HashMap::new()
+    (HashMap::new(), HashMap::new())
+}
+
+fn save_size_cache(
+    socket_dir: &Path,
+    sizes: &HashMap<PathBuf, u64>,
+    mtimes: &HashMap<PathBuf, Option<SystemTime>>,
+) {
+    let path = size_cache_path(socket_dir);
+    let persisted = PersistedSizeCache {
+        sizes: sizes
+            .iter()
+            .map(|(k, v)| (k.to_string_lossy().to_string(), *v))
+            .collect(),
+        mtimes: mtimes
+            .iter()
+            .map(|(k, v)| (k.to_string_lossy().to_string(), system_time_to_nanos(*v)))
+            .collect(),
+    };
+    if let Ok(data) = serde_json::to_string(&persisted) {
+        if std::fs::write(&path, data).is_ok() {
+            tracing::info!("Saved {} directory sizes to disk", sizes.len());
+        }
+    }
 }
 
 fn load_banner_cache(socket_dir: &Path) -> HashMap<PathBuf, BannerData> {
