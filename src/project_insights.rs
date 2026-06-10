@@ -10,9 +10,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::{
-    code_metrics::CodeMetrics, todo_scanner::TodoInfo, utils,
-};
+use crate::{code_metrics::CodeMetrics, todo_scanner::TodoInfo, utils};
 
 const INSIGHT_TIMEOUT: Duration = Duration::from_secs(1);
 const MAX_FILES: usize = 1000;
@@ -131,7 +129,11 @@ mod tests {
     #[test]
     fn test_scan_insights_counts_todos_and_loc() {
         let tmp = tempfile::tempdir().unwrap();
-        fs::write(tmp.path().join("main.rs"), "fn main() {}\n// TODO: finish\n").unwrap();
+        fs::write(
+            tmp.path().join("main.rs"),
+            "fn main() {}\n// TODO: finish\n",
+        )
+        .unwrap();
         fs::write(tmp.path().join("note.md"), "# Title\n- [ ] task\n").unwrap();
         fs::create_dir(tmp.path().join("target")).unwrap();
         fs::write(tmp.path().join("target/skip.rs"), "TODO: skipped\n").unwrap();

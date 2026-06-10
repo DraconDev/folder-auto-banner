@@ -67,7 +67,10 @@ impl ProjectType {
             Some(ProjectType::Rust)
         } else if has("package.json") {
             Some(ProjectType::Node)
-        } else if has("pyproject.toml") || has("setup.py") || has("requirements.txt") || has("pipfile")
+        } else if has("pyproject.toml")
+            || has("setup.py")
+            || has("requirements.txt")
+            || has("pipfile")
         {
             Some(ProjectType::Python)
         } else if has("go.mod") {
@@ -191,7 +194,10 @@ impl DirSummary {
             let file_type = entry.file_type();
             let is_dir = file_type.as_ref().map(|ft| ft.is_dir()).unwrap_or(false);
             let is_file = file_type.as_ref().map(|ft| ft.is_file()).unwrap_or(false);
-            let is_symlink = file_type.as_ref().map(|ft| ft.is_symlink()).unwrap_or(false);
+            let is_symlink = file_type
+                .as_ref()
+                .map(|ft| ft.is_symlink())
+                .unwrap_or(false);
 
             if is_dir {
                 dirs += 1;
