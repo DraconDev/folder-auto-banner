@@ -355,28 +355,32 @@ fn build_display_items<'a>(
 
 /// Navigate to item by number - cd if directory, open in editor if file
 /// Uses build_display_items() to ensure exact same ordering as banner display
+/// Look up the Nth display item and return its path (or run an action on it).
+///
+/// Uses the exact same `build_display_items` pipeline and the same `config`
+/// that the banner display uses, so the index-to-path mapping is guaranteed
+/// to match the numbers shown in the banner.
 fn navigate_by_number(
     num: usize,
-    cwd: &std::path::Path,
+    path: &std::path::Path,
     opts: &BannerOptions,
+    config: &crate::state::Config,
     action: Option<&str>,
 ) -> Result<()> {
-    let path = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
-    let config = crate::state::Config::load().unwrap_or_default();
-
+    // Path is already canonicalized by the caller — no need to redo it.
     // Try daemon cache first, then direct scan — same as run_banner
-    let (summary, git_info) = if let Some(cached) = crate::daemon_client::get_banner_cached(&path) {
+    let (summary, git_info) = if let Some(cached) = crate::daemon_client::get_banner_cached(path) {
         (cached.summary, cached.git_info.unwrap_or_default())
     } else {
         let summary =
-            crate::fs::DirSummary::scan_with_options(&path, false, false, false, false, false)?;
-        let git_info = crate::git::get_git_info(&path).ok().unwrap_or_default();
+            crate::fs::DirSummary::scan_with_options(path, false, false, false, false, false)?;
+        let git_info = crate::git::get_git_info(path).ok().unwrap_or_default();
         (summary, git_info)
     };
 
-    // Use the EXACT same pipeline as banner display
+    // Use the EXACT same pipeline as banner display, with the same config
     let (display_items, _hidden_count) =
-        build_display_items(&path, &summary, &git_info, opts, &config);
+        build_display_items(path, &summary, &git_info, opts, config);
 
     if num == 0 || num > display_items.len() {
         eprintln!(
@@ -492,8 +496,10 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     if let Some(path_arg) = &opts.path {
         if let Some(num_str) = path_arg.to_str() {
             if let Ok(num) = num_str.parse::<usize>() {
-                // Numeric navigation - look up item by number using same display pipeline
-                return navigate_by_number(num, &cwd, &opts, opts.action.as_deref());
+                // Numeric navigation - look up item by number using same display pipeline.
+                // Pass the resolved `path` (not `cwd`) so the item ordering matches
+                // the banner display exactly.
+                return navigate_by_number(num, &path, &opts, opts.action.as_deref());
             }
         }
     }
