@@ -313,14 +313,37 @@ fn watch_loop(
                     }
 
                     if !invalidated.is_empty() {
-                        let mut cache_guard = cache.lock().unwrap_or_else(|e| {
-                            tracing::warn!("Mutex poisoned, recovering");
-                            e.into_inner()
-                        });
-                        for path in &invalidated {
-                            if cache_guard.remove(path).is_some() {
+                        // Determine if this event is for the root directory
+                        // itself or for a descendant. A root event
+                        // (create/delete/rename of a direct child) means the
+                        // item listing may have changed, so the banner cache
+                        // must be invalidated. A descendant event only
+                        // affects a child's displayed size, so the banner
+                        // cache stays valid and we only prune the size cache.
+                        let is_root_event = watched
+                            .get(&event.wd)
+                            .and_then(|regs| regs.first())
+                            .map(|r| r.watched_path == r.owner)
+                            .unwrap_or(false);
+
+                        if is_root_event {
+                            let mut cache_guard = cache.lock().unwrap_or_else(|e| {
+                                tracing::warn!("Mutex poisoned, recovering");
+                                e.into_inner()
+                            });
+                            for path in &invalidated {
+                                if cache_guard.remove(path).is_some() {
+                                    prune_size_cache_for_root(&dir_sizes, &dir_size_mtimes, path);
+                                    tracing::info!("Cache invalidated: {}", path.display());
+                                }
+                            }
+                        } else {
+                            for path in &invalidated {
                                 prune_size_cache_for_root(&dir_sizes, &dir_size_mtimes, path);
-                                tracing::info!("Cache invalidated: {}", path.display());
+                                tracing::debug!(
+                                    "Size cache pruned for descendant event under: {}",
+                                    path.display()
+                                );
                             }
                         }
                     }
