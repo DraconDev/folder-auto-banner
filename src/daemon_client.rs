@@ -152,7 +152,9 @@ fn warm_path(path: &Path) {
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
-    let request = Request::Warm { path: path.to_path_buf() };
+    let request = Request::Warm {
+        path: path.to_path_buf(),
+    };
     let req_bytes = match serde_json::to_vec(&request) {
         Ok(b) => b,
         Err(e) => {
@@ -166,6 +168,10 @@ fn warm_path(path: &Path) {
     combined.extend_from_slice(&req_bytes);
     if let Err(e) = stream.write_all(&combined) {
         tracing::warn!("Failed to send warm request: {}", e);
+        return;
+    }
+    if let Err(e) = stream.flush() {
+        tracing::warn!("Failed to flush warm request: {}", e);
     }
 }
 
