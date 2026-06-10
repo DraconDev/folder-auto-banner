@@ -22,6 +22,7 @@ struct CacheEntry {
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
 const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(1000);
+const MAX_SIZE_COMPUTE_THREADS: usize = 16;
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
@@ -918,56 +919,89 @@ fn refresh_displayed_dir_sizes(
     dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
 ) {
-    let sizes = dir_sizes.lock().unwrap_or_else(|e| {
-        tracing::warn!("Mutex poisoned, recovering");
-        e.into_inner()
-    });
-    let mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
-        tracing::warn!("Mutex poisoned, recovering");
-        e.into_inner()
-    });
-
-    let mut to_compute = Vec::new();
-    for item in items.iter_mut().filter(|item| item.is_dir) {
-        let current_mtime = current_dir_mtime(&item.path);
-        let cached_mtime = mtimes.get(&item.path).copied().flatten();
-        let cached_size = sizes.get(&item.path).copied();
-
-        if cached_size.is_none() || cached_mtime != current_mtime {
-            to_compute.push((item.path.clone(), current_mtime));
-        } else if let Some(size) = cached_size {
-            item.size = size;
-        }
-    }
-
-    drop(mtimes);
-    drop(sizes);
-
-    for (path, mtime) in to_compute {
-        let size = compute_dir_size(&path);
-        let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
+    // First, set sizes from cache where valid, and collect jobs for stale/missing ones.
+    let mut jobs: Vec<(usize, PathBuf, Option<SystemTime>)> = Vec::new();
+    {
+        let sizes = dir_sizes.lock().unwrap_or_else(|e| {
             tracing::warn!("Mutex poisoned, recovering");
             e.into_inner()
         });
+        let mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        });
+        for (idx, item) in items.iter_mut().enumerate() {
+            if !item.is_dir {
+                continue;
+            }
+            let current_mtime = current_dir_mtime(&item.path);
+            let cached_mtime = mtimes.get(&item.path).copied().flatten();
+            let cached_size = sizes.get(&item.path).copied();
+            if let Some(size) = cached_size {
+                if cached_mtime == current_mtime {
+                    item.size = size;
+                    continue;
+                }
+            }
+            jobs.push((idx, item.path.clone(), current_mtime));
+        }
+    } // drop locks
+
+    if jobs.is_empty() {
+        return;
+    }
+
+    // Compute sizes in parallel to keep banner latency bounded on large trees.
+    let results = compute_sizes_parallel(jobs);
+
+    // Update cache and items.
+    let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    for (idx, size, mtime_opt) in results {
+        let path = items[idx].path.clone();
         sizes.insert(path.clone(), size);
-        drop(sizes);
-
-        let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
-            tracing::warn!("Mutex poisoned, recovering");
-            e.into_inner()
-        });
-        mtimes.insert(path, mtime);
-    }
-
-    let sizes = dir_sizes.lock().unwrap_or_else(|e| {
-        tracing::warn!("Mutex poisoned, recovering");
-        e.into_inner()
-    });
-    for item in items.iter_mut().filter(|item| item.is_dir) {
-        if let Some(size) = sizes.get(&item.path) {
-            item.size = *size;
+        if let Some(mt) = mtime_opt {
+            mtimes.insert(path, Some(mt));
         }
+        items[idx].size = size;
     }
+}
+
+fn compute_sizes_parallel(
+    jobs: Vec<(usize, PathBuf, Option<SystemTime>)>,
+) -> Vec<(usize, u64, Option<SystemTime>)> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    if jobs.is_empty() {
+        return Vec::new();
+    }
+    let worker_count = jobs.len().min(MAX_SIZE_COMPUTE_THREADS);
+    let results: std::sync::Mutex<Vec<(usize, u64, Option<SystemTime>)>> =
+        std::sync::Mutex::new(Vec::with_capacity(jobs.len()));
+    let next = AtomicUsize::new(0);
+    std::thread::scope(|s| {
+        for _ in 0..worker_count {
+            s.spawn(|| {
+                loop {
+                    let idx = next.fetch_add(1, Ordering::SeqCst);
+                    if idx >= jobs.len() {
+                        break;
+                    }
+                    let (orig_idx, path, mtime) = &jobs[idx];
+                    let size = compute_dir_size(path);
+                    if let Ok(mut r) = results.lock() {
+                        r.push((*orig_idx, size, *mtime));
+                    }
+                }
+            });
+        }
+    });
+    results.into_inner().unwrap_or_default()
 }
 
 fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
