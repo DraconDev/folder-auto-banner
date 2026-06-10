@@ -34,4 +34,11 @@ Fixes the warm-cache path so large trees like `~/Dev` pre-warm the directories y
 
 ### Timing evidence
 
-- Cold first view of `/home/dracon/Dev` stayed around `0.7–0.8 s` after the bounded size refresh.\n- Warm cached view of `/home/dracon/Dev` stayed around `4–9 ms`.\n- After pre-warming `~/Dev`, a later jump into `~/Dev/dracon-platform` dropped from a cold `~1.2 s` to about `0.4 s`, and a second hit was `~7–9 ms`.\n- `f Dev` from inside `folder-auto-banner` now reports a direct missing-path error and no longer emits the daemon `failed to fill whole buffer` IPC error.\n\n## Notes for maintainers\n\nThis release keeps the latest local binary active and makes large-tree navigation much more cache-friendly.
+- Cold first view of `/home/dracon/Dev` stayed around `0.7–0.8 s` after the bounded size refresh.
+- Warm cached view of `/home/dracon/Dev` stayed around `4–9 ms`.
+- After pre-warming `~/Dev`, a later jump into `~/Dev/dracon-platform` dropped from a cold `~1.2 s` to about `0.4 s`, and a second hit was `~7–9 ms`.
+- `f Dev` from inside `folder-auto-banner` now reports a direct missing-path error and no longer emits the daemon `failed to fill whole buffer` IPC error.
+
+## Notes for maintainers
+
+This release keeps the latest local binary active and makes large-tree navigation much more cache-friendly.
