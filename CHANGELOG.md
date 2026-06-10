@@ -1,4 +1,13 @@
-## [0.6.10] - 2026-06-10
+## [0.6.11] - 2026-06-10
+
+### Performance
+- **Smarter pre-warming of nearby directories** — after a banner is rendered, the client now warms the parent, the grandparent, and the first few immediate children of the current directory, so moving up or stepping into a sibling/child is served from the daemon cache instead of recomputing.
+
+### Notes
+- The total number of background warm requests is bounded to a small set of paths to avoid expensive background scans.
+- Preserves banner output, JSON output, and numeric navigation behavior.
+
+
 
 ### Packaging
 - **Corrected crates.io repository metadata** — package metadata now points to `https://github.com/DraconDev/folder-auto-banner` and includes homepage/documentation links.
