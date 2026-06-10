@@ -749,11 +749,11 @@ fn warm_nearby_dirs(path: &Path) {
         }
     }
 
-    // Warm immediate children of the current directory so `cd <child>` is
-    // served from the daemon cache. Bounded to a small number of children to
-    // avoid expensive background scans.
+    // Warm immediate children of the current directory so `cd <child>` or fuzzy
+    // jump into a child is served from the daemon cache. Bounded to a modest
+    // number of children to avoid excessive background scans in very large dirs.
     if let Ok(entries) = std::fs::read_dir(path) {
-        for entry in entries.flatten().take(5) {
+        for entry in entries.flatten().take(30) {
             let child = entry.path();
             if child.is_dir() {
                 paths_to_warm.push(child);
