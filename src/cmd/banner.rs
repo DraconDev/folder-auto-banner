@@ -737,22 +737,32 @@ fn print_tree_recursive(
     }
 }
 
-/// Pre-compute banners for parent and sibling directories
+/// Pre-compute banners for the parent directory and the immediate children of
+/// the current directory, so moving up to the parent or into a sibling
+/// directory is served from the daemon cache.
 fn warm_nearby_dirs(path: &Path) {
-    let Some(parent) = path.parent() else { return };
-    if !parent.is_dir() {
-        return;
+    // Warm the parent so `cd ..` is fast.
+    let mut paths_to_warm = Vec::new();
+    if let Some(parent) = path.parent() {
+        if parent.is_dir() {
+            paths_to_warm.push(parent.to_path_buf());
+        }
     }
 
-    // Collect paths to warm, then spawn background thread to avoid blocking
-    let mut paths_to_warm = vec![parent.to_path_buf()];
-
-    if let Ok(entries) = std::fs::read_dir(parent) {
-        for entry in entries.flatten().take(3) {
-            if entry.path().is_dir() && entry.path() != path {
-                paths_to_warm.push(entry.path());
+    // Warm immediate children of the current directory so `cd <child>` is
+    // served from the daemon cache. Bounded to a small number of children to
+    // avoid expensive background scans.
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten().take(5) {
+            let child = entry.path();
+            if child.is_dir() {
+                paths_to_warm.push(child);
             }
         }
+    }
+
+    if paths_to_warm.is_empty() {
+        return;
     }
 
     // Fire-and-forget in background thread - don't block the banner
