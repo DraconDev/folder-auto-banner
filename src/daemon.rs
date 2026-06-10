@@ -21,7 +21,7 @@ struct CacheEntry {
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
-const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(400);
+const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(500);
 const MAX_SIZE_COMPUTE_THREADS: usize = 16;
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
