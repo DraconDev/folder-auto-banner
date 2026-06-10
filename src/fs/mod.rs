@@ -4,7 +4,6 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -32,6 +31,11 @@ impl ProjectType {
                 break;
             } // Limit ancestor traversal
             depth += 1;
+
+            if let Some(project_type) = Self::detect_from_direct_markers(dir) {
+                return project_type;
+            }
+
             if let Ok(d) = std::fs::read_dir(dir) {
                 for entry in d.flatten() {
                     let name = entry.file_name();
@@ -55,6 +59,28 @@ impl ProjectType {
         }
 
         ProjectType::Generic
+    }
+
+    fn detect_from_direct_markers(path: &Path) -> Option<Self> {
+        let has = |name: &str| path.join(name).exists();
+        if has("Cargo.toml") {
+            Some(ProjectType::Rust)
+        } else if has("package.json") {
+            Some(ProjectType::Node)
+        } else if has("pyproject.toml") || has("setup.py") || has("requirements.txt") || has("pipfile")
+        {
+            Some(ProjectType::Python)
+        } else if has("go.mod") {
+            Some(ProjectType::Go)
+        } else if has("gemfile") {
+            Some(ProjectType::Ruby)
+        } else if has("pom.xml") || has("build.gradle") {
+            Some(ProjectType::Java)
+        } else if has("CMakeLists.txt") {
+            Some(ProjectType::CMake)
+        } else {
+            None
+        }
     }
 
     /// Get icon for project type
@@ -156,18 +182,12 @@ impl DirSummary {
         let mut top_items = Vec::new();
         let mut last_modified: Option<DateTime<Utc>> = None;
 
-        let walker = WalkBuilder::new(path)
-            .max_depth(Some(1)) // Only immediate directory
-            .hidden(false)
-            .ignore(false)
-            .build();
+        let entries = match std::fs::read_dir(path) {
+            Ok(entries) => entries,
+            Err(e) => return Err(e.into()),
+        };
 
-        for entry in walker.flatten() {
-            // Skip the root path itself
-            if entry.path() == path {
-                continue;
-            }
-
+        for entry in entries.flatten() {
             let file_type = entry.file_type();
             let is_dir = file_type.map(|ft| ft.is_dir()).unwrap_or(false);
             let is_file = file_type.map(|ft| ft.is_file()).unwrap_or(false);
@@ -320,12 +340,10 @@ impl DirSummary {
             });
         }
 
-        // Sort: directories first, then by name
-        top_items.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+        // Sort: directories first, then by name.
+        // `to_lowercase` allocates; cache the key once per item instead of
+        // lowercasing on every comparison.
+        top_items.sort_by_cached_key(|item| (!item.is_dir, item.name.to_lowercase()));
 
         // Run optional checks with caching
         let cache = crate::cache::Cache::new().ok();
