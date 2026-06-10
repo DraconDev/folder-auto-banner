@@ -754,7 +754,16 @@ fn handle_client(
                     tracing::warn!("Mutex poisoned, recovering");
                     e.into_inner()
                 });
+                let sizes = dir_sizes.lock().unwrap_or_else(|e| {
+                    tracing::warn!("Mutex poisoned, recovering");
+                    e.into_inner()
+                });
+                let mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+                    tracing::warn!("Mutex poisoned, recovering");
+                    e.into_inner()
+                });
                 save_banner_cache(&dir, &c);
+                save_size_cache(&dir, &sizes, &mtimes);
             }
             std::process::exit(0);
         }
