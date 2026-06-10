@@ -133,7 +133,7 @@ pub fn is_daemon_running() -> bool {
     }
 }
 
-/// Fire-and-forget: warm multiple paths.
+/// Send warm requests before the CLI exits.
 /// Each warm request uses its own short-lived connection because daemon request
 /// handlers process one request per accepted stream.
 pub fn warm_paths(paths: &[PathBuf]) {
