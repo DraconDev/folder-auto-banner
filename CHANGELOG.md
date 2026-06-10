@@ -1,4 +1,13 @@
-## [0.6.9] - 2026-06-10
+## [0.6.10] - 2026-06-10
+
+### Packaging
+- **Corrected crates.io repository metadata** — package metadata now points to `https://github.com/DraconDev/folder-auto-banner` and includes homepage/documentation links.
+
+### Notes
+- crates.io does not allow repository metadata to be changed for already-published versions, so older published versions may still show the previous incorrect repository URL. New installs via `cargo install folder-auto-banner` use the corrected latest release.
+- No runtime behavior changes.
+
+
 
 ### Performance
 - **Global uid/gid name caches** — `/etc/passwd` and `/etc/group` are loaded once per process instead of reparsing them for every directory scan.

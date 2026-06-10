@@ -1,10 +1,12 @@
 [package]
 name = "folder-auto-banner"
-version = "0.6.9"
+version = "0.6.10"
 edition = "2021"
 description = "Folder Auto Banner — A directory listing with instant context"
 license = "MIT"
-repository = "https://github.com/dracon/fab"
+homepage = "https://github.com/DraconDev/folder-auto-banner"
+repository = "https://github.com/DraconDev/folder-auto-banner"
+documentation = "https://docs.rs/folder-auto-banner"
 keywords = ["cli", "file-manager", "shell", "productivity"]
 categories = ["command-line-utilities"]
 default-run = "f"
