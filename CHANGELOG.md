@@ -1,4 +1,17 @@
-## [0.6.14] - 2026-06-10
+## [0.6.15] - 2026-06-10
+
+### Performance
+- **Reliable child pre-warming** — warm requests now use one short-lived daemon connection per path and are sent before the CLI exits, so the pre-warmed child directories actually get cached.
+- **Wider pre-warm coverage** — the client now warms the parent, grandparent, and up to 30 immediate children of the current directory, which covers large `~/Dev` trees much better than the previous 5-child limit.
+- **Bounded cold-size refresh** — directory size refresh uses a bounded `du` timeout to reduce first-hit latency on very large trees while keeping normal directory sizes accurate.
+- **Cleaner daemon IPC failures** — daemon-side compute errors now return structured IPC errors instead of leaving the client to read a half-closed stream.
+- **Clearer missing-path errors** — relative paths that do not exist now fail directly with `No such file or directory: Dev` instead of producing a confusing `send_and_recv` error.
+
+### Notes
+- Warm cache hits remain single-digit milliseconds.
+- The first cold view of a large directory still has to compute directory sizes, git status, TODOs, ports, and metrics, but the worst-case size refresh is now bounded.
+
+
 
 ### Performance
 - **Reliable child pre-warming** — warm requests now use one short-lived daemon connection per path and are sent before the CLI exits, so the pre-warmed child directories actually get cached.
