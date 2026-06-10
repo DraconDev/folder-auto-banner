@@ -539,14 +539,8 @@ fn can_watch_path(path: &Path) -> bool {
     meta.is_file() || meta.is_dir()
 }
 
-fn find_owner_for_watch(path: &Path, active_roots: &Arc<Mutex<HashSet<PathBuf>>>) -> PathBuf {
-    let roots = active_roots
-        .lock()
-        .unwrap_or_else(|e| {
-            tracing::warn!("Active roots mutex poisoned, recovering");
-            e.into_inner()
-        })
-        .clone();
+fn find_owner_for_watch(path: &Path, active_roots: &HashSet<PathBuf>) -> PathBuf {
+    let roots = active_roots;
 
     roots
         .into_iter()
