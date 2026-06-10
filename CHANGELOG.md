@@ -1,4 +1,16 @@
-## [0.6.7] - 2026-06-10
+## [0.6.8] - 2026-06-10
+
+### Performance
+- **Tighter git status pathspecs** — filtered git status collection now limits directory status walks to immediate children (`dir/*`) instead of asking libgit2 to scan every nested file under displayed directories.
+- **Leaner daemon watcher refreshes** — the active-folder watcher now refreshes watched paths only when the active root set or priority order changes, avoiding repeated recursive directory scans while idle.
+- **Skip git work for raw/oneline fallback** — when the daemon is unavailable and output does not need git metadata, direct fallback avoids collecting git status entirely.
+- **Expanded benchmarks** — added a manifest-repository git-info benchmark so large-repo status collection regressions are visible.
+
+### Notes
+- Preserves rich banner, JSON, and navigation behavior.
+- No new dependencies.
+
+
 
 ### Performance
 - **Avoid duplicate project-insight scans** — TODO counts and code metrics now share one bounded tree walk when both are enabled, reducing cold daemon scans and file reads.
