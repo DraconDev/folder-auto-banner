@@ -315,37 +315,35 @@ fn watch_loop(
         };
 
         if last_refresh.elapsed() >= WATCH_REFRESH_INTERVAL {
-            roots_snapshot = Some(
+            let roots = roots_snapshot.take().unwrap_or_else(|| {
                 active_roots
                     .lock()
                     .unwrap_or_else(|e| {
                         tracing::warn!("Active roots mutex poisoned, recovering");
                         e.into_inner()
                     })
-                    .clone(),
-            );
-            order_snapshot = Some(
+                    .clone()
+            });
+            let order = order_snapshot.take().unwrap_or_else(|| {
                 active_order
                     .lock()
                     .unwrap_or_else(|e| {
                         tracing::warn!("Active order mutex poisoned, recovering");
                         e.into_inner()
                     })
-                    .clone(),
-            );
+                    .clone()
+            });
 
-            if roots_snapshot.as_ref() != Some(&last_roots)
-                || order_snapshot.as_ref() != Some(&last_order)
-            {
+            if roots != last_roots || order != last_order {
                 refresh_active_watchers(
                     &mut inotify,
-                    roots_snapshot.as_ref().unwrap(),
-                    order_snapshot.as_ref().unwrap(),
+                    &roots,
+                    &order,
                     &mut watched,
                     &mut failed_watches,
                 );
-                last_roots = roots_snapshot.as_ref().unwrap().clone();
-                last_order = order_snapshot.as_ref().unwrap().clone();
+                last_roots = roots;
+                last_order = order;
             }
 
             last_refresh = now;
