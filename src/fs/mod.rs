@@ -393,7 +393,7 @@ impl DirSummary {
             (None, None)
         };
 
-        Ok(DirSummary {
+        let port_info = cached_check!(
             check_ports,
             cache,
             "ports",
@@ -407,6 +407,8 @@ impl DirSummary {
             10,
             crate::docker::detect_docker(path).ok()
         );
+
+        Ok(DirSummary {
 
         Ok(DirSummary {
             total_items: files + dirs,
