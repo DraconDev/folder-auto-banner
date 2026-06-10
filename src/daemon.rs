@@ -299,6 +299,7 @@ fn watch_loop(
         match inotify.read_events(&mut buffer) {
             Ok(events) => {
                 for event in events {
+                    tracing::debug!("inotify event: wd={:?} mask={:?} name={:?}", event.wd, event.mask, event.name);
                     let mut invalidated = Vec::new();
                     if let Some(registrations) = watched.get(&event.wd) {
                         for reg in registrations {
