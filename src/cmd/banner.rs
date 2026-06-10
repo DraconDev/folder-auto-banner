@@ -357,17 +357,17 @@ fn build_display_items<'a>(
 /// Uses build_display_items() to ensure exact same ordering as banner display
 /// Look up the Nth display item and return its path (or run an action on it).
 ///
-/// Uses the exact same `build_display_items` pipeline and the same `config`
-/// that the banner display uses, so the index-to-path mapping is guaranteed
-/// to match the numbers shown in the banner.
+/// Uses the exact same `build_display_items` pipeline as the banner display,
+/// so the index-to-path mapping is guaranteed to match the numbers shown in
+/// the banner.
 fn navigate_by_number(
     num: usize,
     path: &std::path::Path,
     opts: &BannerOptions,
-    config: &crate::state::Config,
     action: Option<&str>,
 ) -> Result<()> {
-    // Path is already canonicalized by the caller — no need to redo it.
+    let config = crate::state::Config::load().unwrap_or_default();
+
     // Try daemon cache first, then direct scan — same as run_banner
     let (summary, git_info) = if let Some(cached) = crate::daemon_client::get_banner_cached(path) {
         (cached.summary, cached.git_info.unwrap_or_default())
@@ -378,9 +378,9 @@ fn navigate_by_number(
         (summary, git_info)
     };
 
-    // Use the EXACT same pipeline as banner display, with the same config
+    // Use the EXACT same pipeline as banner display
     let (display_items, _hidden_count) =
-        build_display_items(path, &summary, &git_info, opts, config);
+        build_display_items(path, &summary, &git_info, opts, &config);
 
     if num == 0 || num > display_items.len() {
         eprintln!(
