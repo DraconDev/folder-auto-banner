@@ -833,13 +833,7 @@ fn build_git_status_indicators(git_info: &GitInfo) -> String {
     indicators.join(" ")
 }
 
-fn output_rich(
-    path: &Path,
-    summary: &DirSummary,
-    git_info: &GitInfo,
-    opts: &BannerOptions,
-    config: &crate::state::Config,
-) {
+fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &BannerOptions) {
     let path_str = path.to_string_lossy();
     let project_icon = summary.project_type.icon();
     let project_label = summary.project_type.label();
