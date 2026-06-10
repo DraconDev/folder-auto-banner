@@ -778,11 +778,9 @@ fn warm_nearby_dirs(path: &Path) {
     paths_to_warm.sort();
     paths_to_warm.dedup();
 
-    // Fire-and-forget in background thread - don't block the banner
-    std::thread::spawn(move || {
-        // Use a single connection for all warm requests (faster)
-        crate::daemon_client::warm_paths(&paths_to_warm);
-    });
+    // Send bounded warm requests before exiting. The daemon handles Warm
+    // requests asynchronously, so this should not block on full scans.
+    crate::daemon_client::warm_paths(&paths_to_warm);
 }
 
 /// Output rich formatted banner - compact lsd-style layout
