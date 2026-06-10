@@ -1,4 +1,15 @@
-## [0.6.6] - 2026-06-10
+## [0.6.7] - 2026-06-10
+
+### Performance
+- **Avoid duplicate project-insight scans** — TODO counts and code metrics now share one bounded tree walk when both are enabled, reducing cold daemon scans and file reads.
+- **Reuse rendered item contents** — rich banner rendering now computes directory counts and file content previews once per item, then reuses those values for column sizing and row output.
+- **Leaner project-type detection** — marker-file checks use direct path probes before reading directory entries, making repeated project detection faster.
+
+### Notes
+- Preserves existing banner output and daemon freshness behavior.
+- No new dependencies.
+
+
 
 ### Fixed
 - **`f N` navigation bug** — when running `f N` (e.g. `f 40`), the daemon was being asked for the banner of the path `"40"` (the number string) instead of the current directory. This caused `f N` to return an empty path or open the wrong file when the number didn't match a real directory. The path is now resolved correctly: numeric navigation always uses the current directory, matching how the shell function invokes `f banner N`.
