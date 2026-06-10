@@ -1,4 +1,15 @@
-## [0.6.8] - 2026-06-10
+## [0.6.9] - 2026-06-10
+
+### Performance
+- **Global uid/gid name caches** — `/etc/passwd` and `/etc/group` are loaded once per process instead of reparsing them for every directory scan.
+- **Lower-allocation permission formatting** — file mode rendering now builds the 10-character mode string directly instead of using `format!` per row.
+- **Leaner active watcher maintenance** — inactive watcher cleanup now reuses the active-root snapshot from the periodic refresh when available and avoids extra mutex work.
+
+### Notes
+- Preserves banner output, JSON output, and numeric navigation behavior.
+- No new dependencies.
+
+
 
 ### Performance
 - **Tighter git status pathspecs** — filtered git status collection now limits directory status walks to immediate children (`dir/*`) instead of asking libgit2 to scan every nested file under displayed directories.
