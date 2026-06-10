@@ -281,16 +281,38 @@ fn watch_loop(
     let mut watched: HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>> = HashMap::new();
     let mut failed_watches: HashSet<PathBuf> = HashSet::new();
     let mut last_refresh = Instant::now() - WATCH_REFRESH_INTERVAL;
+    let mut last_roots: HashSet<PathBuf> = HashSet::new();
+    let mut last_order: Vec<PathBuf> = Vec::new();
 
     loop {
         if last_refresh.elapsed() >= WATCH_REFRESH_INTERVAL {
-            refresh_active_watchers(
-                &mut inotify,
-                &active_roots,
-                &active_order,
-                &mut watched,
-                &mut failed_watches,
-            );
+            let roots = active_roots
+                .lock()
+                .unwrap_or_else(|e| {
+                    tracing::warn!("Active roots mutex poisoned, recovering");
+                    e.into_inner()
+                })
+                .clone();
+            let order = active_order
+                .lock()
+                .unwrap_or_else(|e| {
+                    tracing::warn!("Active order mutex poisoned, recovering");
+                    e.into_inner()
+                })
+                .clone();
+
+            if roots != last_roots || order != last_order {
+                refresh_active_watchers(
+                    &mut inotify,
+                    &roots,
+                    &order,
+                    &mut watched,
+                    &mut failed_watches,
+                );
+                last_roots = roots;
+                last_order = order;
+            }
+
             last_refresh = Instant::now();
         }
 
@@ -364,21 +386,13 @@ fn watch_loop(
 
 fn refresh_active_watchers(
     inotify: &mut Inotify,
-    active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
-    active_order: &Arc<Mutex<Vec<PathBuf>>>,
+    roots: &HashSet<PathBuf>,
+    active_order: &[PathBuf],
     watched: &mut HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>>,
     failed_watches: &mut HashSet<PathBuf>,
 ) {
-    let roots = active_order
-        .lock()
-        .unwrap_or_else(|e| {
-            tracing::warn!("Active order mutex poisoned, recovering");
-            e.into_inner()
-        })
-        .clone();
-
     let mut targets = Vec::new();
-    for root in roots {
+    for root in active_order {
         if targets.len() >= MAX_ACTIVE_WATCH_DIRS {
             tracing::warn!(
                 "Reached active watcher cap ({} entries); skipping remaining active folders",
@@ -415,7 +429,7 @@ fn refresh_active_watchers(
                 | WatchMask::MOVE_SELF,
         ) {
             Ok(wd) => {
-                let owner = find_owner_for_watch(&target, active_roots);
+                let owner = find_owner_for_watch(&target, roots);
                 let regs = watched.entry(wd).or_default();
                 if !regs.iter().any(|reg| reg.owner == owner) {
                     regs.push(WatchRegistration {
