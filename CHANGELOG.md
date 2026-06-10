@@ -1,4 +1,13 @@
-## [0.6.4] - 2026-06-10
+## [0.6.5] - 2026-06-10
+
+### Fixed
+- **No spurious cache invalidations from VCS or build internals** — the inotify watcher now skips `.git`, `.hg`, `.svn`, `target`, `node_modules`, `.next`, `dist`, `build`, `.cache`, `.parcel-cache`, and `.turbo` directories. Previously, the daemon's own git operations (creating `.git/index.lock` and `.git/objects/tmp_object_*` files) would trigger the watcher and invalidate the cached banner within seconds of a request, preventing the size cache from ever persisting.
+- **Descendant changes no longer invalidate the parent banner** — the watcher now only invalidates the banner cache when the event is on the root directory itself. Events in descendants (e.g. a test runner cleaning up directories deep inside a child project) only prune the size cache for the affected root, keeping the banner's item listing valid.
+
+### Notes
+- Preserves 0.6.4 persistence and active-folder watcher behavior.
+- No new dependencies.
+
 
 ### Fixed
 - **Fast persisted directory sizes** — directory size data is now persisted with mtimes and reloaded on daemon restart, so large parent folders such as `~/Dev` do not need to recompute every child size after the daemon restarts.
