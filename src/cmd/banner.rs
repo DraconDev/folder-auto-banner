@@ -253,7 +253,7 @@ fn build_display_items<'a>(
     // Sort based on --sort flag or short flags
     if !opts.no_sort {
         let sort_mode = if let Some(s) = opts.sort {
-            s.as_str()
+            s.as_ref()
         } else if opts.timesort {
             "date"
         } else if opts.sizesort {
