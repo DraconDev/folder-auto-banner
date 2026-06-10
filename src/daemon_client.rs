@@ -133,8 +133,16 @@ pub fn is_daemon_running() -> bool {
     }
 }
 
-/// Fire-and-forget: warm multiple paths using a single connection (faster)
+/// Fire-and-forget: warm multiple paths.
+/// Each warm request uses its own short-lived connection because daemon request
+/// handlers process one request per accepted stream.
 pub fn warm_paths(paths: &[PathBuf]) {
+    for path in paths {
+        warm_path(path);
+    }
+}
+
+fn warm_path(path: &Path) {
     use std::io::Write;
     let Ok(socket) = socket_path() else {
         return;
@@ -144,24 +152,20 @@ pub fn warm_paths(paths: &[PathBuf]) {
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
-    // Send all warm requests over the same connection using length-prefixed protocol
-    for path in paths {
-        let request = Request::Warm { path: path.clone() };
-        let req_bytes = match serde_json::to_vec(&request) {
-            Ok(b) => b,
-            Err(e) => {
-                tracing::warn!("Failed to serialize warm request: {}", e);
-                break;
-            }
-        };
-        let req_len = req_bytes.len() as u32;
-        let mut combined = Vec::with_capacity(4 + req_bytes.len());
-        combined.extend_from_slice(&req_len.to_le_bytes());
-        combined.extend_from_slice(&req_bytes);
-        if let Err(e) = stream.write_all(&combined) {
-            tracing::warn!("Failed to send warm request: {}", e);
-            break;
+    let request = Request::Warm { path: path.clone() };
+    let req_bytes = match serde_json::to_vec(&request) {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::warn!("Failed to serialize warm request: {}", e);
+            return;
         }
+    };
+    let req_len = req_bytes.len() as u32;
+    let mut combined = Vec::with_capacity(4 + req_bytes.len());
+    combined.extend_from_slice(&req_len.to_le_bytes());
+    combined.extend_from_slice(&req_bytes);
+    if let Err(e) = stream.write_all(&combined) {
+        tracing::warn!("Failed to send warm request: {}", e);
     }
 }
 
