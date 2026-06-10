@@ -152,7 +152,7 @@ fn warm_path(path: &Path) {
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
-    let request = Request::Warm { path: path.clone() };
+    let request = Request::Warm { path: path.to_path_buf() };
     let req_bytes = match serde_json::to_vec(&request) {
         Ok(b) => b,
         Err(e) => {
