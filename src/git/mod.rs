@@ -393,4 +393,55 @@ mod tests {
         let info = get_git_info(Path::new("/tmp")).unwrap();
         assert!(!info.is_repo);
     }
+
+    #[test]
+    fn test_status_filter_paths_for_items() {
+        let items = vec![
+            crate::fs::DirEntry {
+                name: "src".to_string(),
+                path: Path::new("src").to_path_buf(),
+                is_dir: true,
+                is_file: false,
+                is_symlink: false,
+                is_exec: false,
+                size: 0,
+                modified: None,
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                symlink_target: None,
+                symlink_valid: true,
+            },
+            crate::fs::DirEntry {
+                name: "Cargo.toml".to_string(),
+                path: Path::new("Cargo.toml").to_path_buf(),
+                is_dir: false,
+                is_file: true,
+                is_symlink: false,
+                is_exec: false,
+                size: 0,
+                modified: None,
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                symlink_target: None,
+                symlink_valid: true,
+            },
+        ];
+
+        let paths = status_filter_paths_for_items(&items);
+        assert_eq!(paths, vec!["src/*".to_string(), "Cargo.toml".to_string()]);
+    }
+
+    #[test]
+    fn test_is_displayed_git_status_path() {
+        let keep: HashSet<_> = ["src", "Cargo.toml"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        assert!(is_displayed_git_status_path("src/lib.rs", &keep));
+        assert!(is_displayed_git_status_path("Cargo.toml", &keep));
+        assert!(!is_displayed_git_status_path("src/deep/lib.rs", &keep));
+        assert!(!is_displayed_git_status_path("tests/lib.rs", &keep));
+    }
 }

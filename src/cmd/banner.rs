@@ -579,7 +579,8 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         !no_docker,
         !no_metrics,
     )?;
-    let git_info = crate::git::get_git_info(&path)?;
+    let git_filter_paths = crate::git::status_filter_paths_for_items(&summary.top_items);
+    let git_info = crate::git::get_git_info_filtered(&path, &git_filter_paths)?;
 
     // Display the banner
     if opts.oneline {

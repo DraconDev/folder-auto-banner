@@ -875,9 +875,14 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
 
     if let Some(ref mut gi) = git_info {
         if !gi.file_statuses.is_empty() {
-            let keep: HashSet<_> = summary.top_items.iter().map(|item| item.name.clone()).collect();
-            gi.file_statuses
-                .retain(|path_str, _| folder_auto_banner::git::is_displayed_git_status_path(path_str, &keep));
+            let keep: HashSet<_> = summary
+                .top_items
+                .iter()
+                .map(|item| item.name.clone())
+                .collect();
+            gi.file_statuses.retain(|path_str, _| {
+                folder_auto_banner::git::is_displayed_git_status_path(path_str, &keep)
+            });
         }
     }
 
