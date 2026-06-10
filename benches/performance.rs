@@ -45,6 +45,13 @@ fn benchmark_git_info(c: &mut Criterion) {
     });
 }
 
+fn benchmark_git_info_manifest(c: &mut Criterion) {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    c.bench_function("get_git_info manifest", |b| {
+        b.iter(|| folder_auto_banner::git::get_git_info(black_box(manifest)).ok())
+    });
+}
+
 fn benchmark_format_size(c: &mut Criterion) {
     c.bench_function("format_size_compact", |b| {
         b.iter(|| folder_auto_banner::fs::format_size_compact(black_box(1234567)))
@@ -70,6 +77,7 @@ criterion_group!(
     benchmark_project_detect,
     benchmark_dir_summary,
     benchmark_git_info,
+    benchmark_git_info_manifest,
     benchmark_format_size,
     benchmark_format_exact_time,
     benchmark_format_relative_time,
