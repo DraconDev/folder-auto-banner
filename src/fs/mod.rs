@@ -189,9 +189,9 @@ impl DirSummary {
 
         for entry in entries.flatten() {
             let file_type = entry.file_type();
-            let is_dir = file_type.map(|ft| ft.is_dir()).unwrap_or(false);
-            let is_file = file_type.map(|ft| ft.is_file()).unwrap_or(false);
-            let is_symlink = file_type.map(|ft| ft.is_symlink()).unwrap_or(false);
+            let is_dir = file_type.as_ref().map(|ft| ft.is_dir()).unwrap_or(false);
+            let is_file = file_type.as_ref().map(|ft| ft.is_file()).unwrap_or(false);
+            let is_symlink = file_type.as_ref().map(|ft| ft.is_symlink()).unwrap_or(false);
 
             if is_dir {
                 dirs += 1;
