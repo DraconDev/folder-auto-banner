@@ -5,6 +5,7 @@
 use anyhow::Result;
 use git2::Repository;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::Path;
 
 /// Git status for a directory
@@ -30,6 +31,37 @@ pub struct GitInfo {
     pub is_dirty: bool,
     #[serde(skip_serializing_if = "std::collections::HashMap::is_empty", default)]
     pub file_statuses: std::collections::HashMap<String, FileStatus>,
+}
+
+/// Build git status pathspecs for the banner rows.
+///
+/// Files use their exact top-level name. Directories use `dir/*` so libgit2
+/// only walks the immediate children that the banner can display or aggregate,
+/// instead of scanning every nested file under large trees.
+pub fn status_filter_paths_for_items(items: &[crate::fs::DirEntry]) -> Vec<String> {
+    items
+        .iter()
+        .map(|item| {
+            if item.is_dir {
+                format!("{}/*", item.name)
+            } else {
+                item.name.clone()
+            }
+        })
+        .collect()
+}
+
+/// Keep only git status entries that the banner can display or aggregate.
+pub fn is_displayed_git_status_path(path_str: &str, keep: &HashSet<String>) -> bool {
+    let mut components = Path::new(path_str).components();
+    let Some(first) = components.next() else {
+        return false;
+    };
+    let first = first.as_os_str().to_string_lossy();
+    if !keep.contains(first.as_ref()) {
+        return false;
+    }
+    components.next().is_none() || components.next().is_none()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -113,11 +145,12 @@ fn get_git_info_inner(
     let mut file_statuses = std::collections::HashMap::new();
 
     let statuses = if !filter_paths.is_empty() {
-        // Use pathspec filtering to only collect statuses for specific paths
+        // Use pathspec filtering to only collect statuses for paths the banner
+        // displays or aggregates. Directories use `dir/*` to limit the walk to
+        // immediate children while preserving the existing depth-0/depth-1
+        // aggregation behavior.
         let mut opts = git2::StatusOptions::new();
-        opts.include_untracked(true)
-            .recurse_untracked_dirs(false)
-            .disable_pathspec_match(true); // Use literal paths, not patterns
+        opts.include_untracked(true).recurse_untracked_dirs(false);
         for path in filter_paths {
             opts.pathspec(path);
         }

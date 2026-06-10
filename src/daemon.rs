@@ -867,42 +867,17 @@ fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
 
-    // Build filter list for git status collection:
-    // - For files at root: just the filename (e.g., "Cargo.toml")
-    // - For directories: the directory name (e.g., "src") to match all children
-    // This tells git2 to only collect statuses for files we'll actually display
-    let filter_paths: Vec<String> = summary
-        .top_items
-        .iter()
-        .map(|item| item.name.clone())
-        .collect();
-
-    // Use filtered git info — only collects statuses for top_items (much faster for large repos)
+    // Build pathspecs for git status collection. Files use their exact
+    // top-level name; directories use `dir/*` so libgit2 only walks immediate
+    // children that the banner displays or aggregates.
+    let filter_paths = folder_auto_banner::git::status_filter_paths_for_items(&summary.top_items);
     let mut git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
 
-    // For directories, we need to also collect statuses for their immediate children
-    // because git pathspec "src" matches src/*, but we display src/daemon.rs etc.
-    // The filter already handles this via pathspec matching.
-    // Additionally, filter file_statuses to only keep depth 0 or 1 entries.
     if let Some(ref mut gi) = git_info {
         if !gi.file_statuses.is_empty() {
-            let keep: std::collections::HashSet<_> = summary
-                .top_items
-                .iter()
-                .map(|item| item.name.clone())
-                .collect();
-            gi.file_statuses.retain(|path_str, _| {
-                let components: Vec<_> = std::path::Path::new(path_str)
-                    .components()
-                    .map(|c| c.as_os_str().to_string_lossy().to_string())
-                    .collect();
-                match components.len() {
-                    0 => false,
-                    1 => keep.contains(&components[0]),
-                    2 => keep.contains(&components[0]), // "src/daemon.rs"
-                    _ => false,                         // "target/debug/build/..." — exclude
-                }
-            });
+            let keep: HashSet<_> = summary.top_items.iter().map(|item| item.name.clone()).collect();
+            gi.file_statuses
+                .retain(|path_str, _| folder_auto_banner::git::is_displayed_git_status_path(path_str, &keep));
         }
     }
 
