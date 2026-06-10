@@ -1,4 +1,15 @@
-## [0.6.11] - 2026-06-10
+## [0.6.12] - 2026-06-10
+
+### Performance
+- **Faster first-size refresh** — directory size refresh now uses a tighter `du` timeout, reducing cold banner latency for large trees while preserving cached sizes on subsequent visits.
+- **Cleaner daemon IPC failures** — daemon compute errors now return structured IPC errors instead of leaving the client to read a half-closed stream.
+- **Clearer missing-path errors** — relative paths that do not exist now fail before daemon IPC, avoiding confusing `send_and_recv` errors.
+
+### Notes
+- Warm cache hits remain single-digit milliseconds.
+- The first cold view of a large directory still has to compute directory sizes, git status, TODOs, ports, and metrics, but the worst-case size refresh is now bounded more tightly.
+
+
 
 ### Performance
 - **Smarter pre-warming of nearby directories** — after a banner is rendered, the client now warms the parent, the grandparent, and the first few immediate children of the current directory, so moving up or stepping into a sibling/child is served from the daemon cache instead of recomputing.
