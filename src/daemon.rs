@@ -400,7 +400,7 @@ fn refresh_active_watchers(
             );
             break;
         }
-        collect_watch_targets(&root, 0, &mut targets, MAX_ACTIVE_WATCH_DIRS);
+        collect_watch_targets(root, 0, &mut targets, MAX_ACTIVE_WATCH_DIRS);
     }
 
     for target in targets {
@@ -543,9 +543,10 @@ fn find_owner_for_watch(path: &Path, active_roots: &HashSet<PathBuf>) -> PathBuf
     let roots = active_roots;
 
     roots
-        .into_iter()
-        .filter(|root| path == root || path.starts_with(root))
+        .iter()
+        .filter(|root| path == root.as_path() || path.starts_with(root.as_path()))
         .max_by_key(|root| root.components().count())
+        .cloned()
         .unwrap_or_else(|| path.to_path_buf())
 }
 
