@@ -307,7 +307,8 @@ impl DirSummary {
                         p.to_string_lossy().to_string()
                     } else {
                         // Resolve relative path from parent directory
-                        let parent = entry.path().parent().unwrap_or_else(|| Path::new("."));
+                        let parent = entry.path();
+                        let parent = parent.parent().unwrap_or_else(|| Path::new("."));
                         let absolute = parent.join(&p);
                         if let Ok(canonical) = absolute.canonicalize() {
                             canonical.to_string_lossy().to_string()

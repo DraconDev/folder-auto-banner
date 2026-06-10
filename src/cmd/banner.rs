@@ -287,7 +287,7 @@ fn build_display_items<'a>(
                 };
             }
 
-            let ordering = match sort_mode.as_str() {
+            let ordering = match sort_mode {
                 "size" => a.size.cmp(&b.size),
                 "date" => {
                     let a_time = a.modified.unwrap_or_else(|| {
