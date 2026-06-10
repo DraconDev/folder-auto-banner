@@ -1,4 +1,13 @@
-## [0.6.3] - 2026-06-09
+## [0.6.4] - 2026-06-10
+
+### Fixed
+- **Fast persisted directory sizes** — directory size data is now persisted with mtimes and reloaded on daemon restart, so large parent folders such as `~/Dev` do not need to recompute every child size after the daemon restarts.
+- **Bounded large-folder latency** — displayed directory sizes are computed with a bounded worker pool, so the first cold request for a large folder is kept to a low-seconds worst case instead of serially waiting up to one second per child directory.
+
+### Notes
+- Preserves 0.6.3 freshness and active-folder watcher behavior.
+- No new dependencies.
+
 
 ### Fixed
 - **Snappy fresh daemon** — replaced the expensive shallow validation scan on every daemon cache hit with active-folder inotify watching:
