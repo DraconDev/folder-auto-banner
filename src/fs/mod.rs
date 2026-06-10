@@ -1,6 +1,6 @@
 //! Filesystem utilities — directory metadata, file types, project detection
 //!
-//! Fast, parallel directory walking using ignore crate.
+//! Fast immediate-directory scanning without recursing beyond the banner row.
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
