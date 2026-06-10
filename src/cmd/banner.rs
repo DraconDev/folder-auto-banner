@@ -761,9 +761,22 @@ fn warm_nearby_dirs(path: &Path) {
         }
     }
 
+    // Warm the grandparent so `cd ../..` is also fast.
+    if let Some(parent) = path.parent() {
+        if let Some(grandparent) = parent.parent() {
+            if grandparent.is_dir() {
+                paths_to_warm.push(grandparent.to_path_buf());
+            }
+        }
+    }
+
     if paths_to_warm.is_empty() {
         return;
     }
+
+    // Deduplicate (paths_to_warm may contain parent and grandparent).
+    paths_to_warm.sort();
+    paths_to_warm.dedup();
 
     // Fire-and-forget in background thread - don't block the banner
     std::thread::spawn(move || {
