@@ -1326,6 +1326,20 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // Use shared build_display_items for consistent ordering with navigation
     let (display_items, hidden_count) = build_display_items(path, summary, git_info, opts, &config);
 
+    // Precompute expensive contents metadata once so directory counts and file
+    // content probes are not repeated during width calculation and row rendering.
+    let display_meta: Vec<_> = display_items
+        .iter()
+        .map(|item| {
+            let contents_raw = if item.is_dir {
+                count_items_in_dir(item).to_string()
+            } else {
+                get_file_contents_raw(item)
+            };
+            (*item, contents_raw)
+        })
+        .collect();
+
     // Compute max column widths for alignment
     let mut max_owner = 5; // "OWNER"
     let mut max_group = 5; // "GROUP"
@@ -1333,24 +1347,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     let mut max_contents = 4; // dynamic
     let mut max_git = 1; // git status icon (always 1 char)
 
-    for item in &display_items {
+    for (item, contents_raw) in &display_meta {
         max_owner = max_owner.max(item.owner.len());
         max_group = max_group.max(item.group.len());
         let size_str = format_size_compact(item.size);
         max_size = max_size.max(size_str.len());
-        let contents_len = if item.is_dir {
-            count_items_in_dir(item).to_string().len()
-        } else {
-            get_file_contents_raw(item).len()
-        };
-        max_contents = max_contents.max(contents_len.max(4));
+        max_contents = max_contents.max(contents_raw.len().max(4));
         // Git status is always 1 char, but we need a column for it
         max_git = 1;
     }
 
     // Print each row - PERM OWNER GROUP CONTENTS SIZE DATE NAME
     let num_width = display_items.len().to_string().len(); // for right-aligned numbering
-    for (idx, item) in display_items.iter().enumerate() {
+    for (idx, (item, contents_raw)) in display_meta.iter().enumerate() {
         let row_tint = if idx % 2 == 0 { ROW_TINT } else { "" };
         let tint_reset = if idx % 2 == 0 { color(RESET) } else { "" };
         let icon_str = if opts.icons {
@@ -1499,11 +1508,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             format_size_compact(item.size)
         };
         let size_padded = format!("{:>width$}", size_str, width = max_size);
-        let contents_raw = if item.is_dir {
-            count_items_in_dir(item).to_string()
-        } else {
-            get_file_contents_raw(item)
-        };
         let contents_padded = format!("{:>width$}", contents_raw, width = max_contents);
 
         // Colorize permissions based on config
