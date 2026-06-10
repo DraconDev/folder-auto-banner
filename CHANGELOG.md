@@ -1,4 +1,12 @@
-## [0.6.5] - 2026-06-10
+## [0.6.6] - 2026-06-10
+
+### Fixed
+- **`f N` navigation bug** — when running `f N` (e.g. `f 40`), the daemon was being asked for the banner of the path `"40"` (the number string) instead of the current directory. This caused `f N` to return an empty path or open the wrong file when the number didn't match a real directory. The path is now resolved correctly: numeric navigation always uses the current directory, matching how the shell function invokes `f banner N`.
+
+### Notes
+- Preserves 0.6.5 behavior in all other respects.
+- No new dependencies.
+
 
 ### Fixed
 - **No spurious cache invalidations from VCS or build internals** — the inotify watcher now skips `.git`, `.hg`, `.svn`, `target`, `node_modules`, `.next`, `dist`, `build`, `.cache`, `.parcel-cache`, and `.turbo` directories. Previously, the daemon's own git operations (creating `.git/index.lock` and `.git/objects/tmp_object_*` files) would trigger the watcher and invalidate the cached banner within seconds of a request, preventing the size cache from ever persisting.

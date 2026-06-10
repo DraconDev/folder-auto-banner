@@ -425,11 +425,29 @@ fn navigate_by_number(
 pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
 
-    let path = opts
+    // Check if the path argument is a number for navigation BEFORE resolving it.
+    // If it is, the directory to scan is the current directory (or the explicitly
+    // passed non-numeric path), not the number string itself.
+    let is_numeric_nav = opts
         .path
-        .unwrap_or(cwd.as_path())
-        .canonicalize()
-        .unwrap_or_else(|_| opts.path.unwrap_or(cwd.as_path()).to_path_buf());
+        .as_ref()
+        .and_then(|p| p.to_str())
+        .and_then(|s| s.parse::<usize>().ok())
+        .is_some();
+
+    // For navigation, the directory path is cwd (or the original path if it was
+    // a number — the number is the item index, not the path).
+    // For non-numeric paths, resolve the canonical path for scanning.
+    let path = if is_numeric_nav {
+        // Use cwd for navigation — the number is the item index, not a path
+        cwd.canonicalize()
+            .unwrap_or_else(|_| cwd.as_path().to_path_buf())
+    } else {
+        opts.path
+            .unwrap_or(cwd.as_path())
+            .canonicalize()
+            .unwrap_or_else(|_| opts.path.unwrap_or(cwd.as_path()).to_path_buf())
+    };
 
     // Load config and apply env var overrides
     let config = crate::state::Config::load().unwrap_or_default();
