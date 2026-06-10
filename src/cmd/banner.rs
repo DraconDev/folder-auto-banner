@@ -253,19 +253,19 @@ fn build_display_items<'a>(
     // Sort based on --sort flag or short flags
     if !opts.no_sort {
         let sort_mode = if let Some(s) = opts.sort {
-            s.to_string()
+            s.as_str()
         } else if opts.timesort {
-            "date".to_string()
+            "date"
         } else if opts.sizesort {
-            "size".to_string()
+            "size"
         } else if opts.extensionsort {
-            "extension".to_string()
+            "extension"
         } else if opts.gitsort {
-            "git".to_string()
+            "git"
         } else if opts.versionsort {
-            "version".to_string()
+            "version"
         } else {
-            "name".to_string()
+            "name"
         };
 
         let group_dirs_mode = opts.group_dirs.unwrap_or("first");
