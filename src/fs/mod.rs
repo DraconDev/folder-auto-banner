@@ -76,7 +76,7 @@ impl ProjectType {
             Some(ProjectType::Ruby)
         } else if has("pom.xml") || has("build.gradle") {
             Some(ProjectType::Java)
-        } else if has("CMakeLists.txt") {
+        } else if has("CMakeLists.txt") || has("cmakelists.txt") {
             Some(ProjectType::CMake)
         } else {
             None
