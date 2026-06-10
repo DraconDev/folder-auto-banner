@@ -299,6 +299,12 @@ fn watch_loop(
         match inotify.read_events(&mut buffer) {
             Ok(events) => {
                 for event in events {
+                    tracing::debug!(
+                        "inotify event: wd={:?} mask={:?} name={:?}",
+                        event.wd,
+                        event.mask,
+                        event.name
+                    );
                     let mut invalidated = Vec::new();
                     if let Some(registrations) = watched.get(&event.wd) {
                         for reg in registrations {
@@ -435,13 +441,17 @@ fn collect_watch_targets(
         return;
     }
 
-    targets.push(path.to_path_buf());
-
-    if !is_dir {
+    // Skip directories whose internal churn should not invalidate the cache.
+    // This must be checked before pushing to targets, otherwise the skipped
+    // directory itself is still watched and its child events invalidate the
+    // cache.
+    if is_dir && should_skip_dir(path) {
         return;
     }
 
-    if should_skip_dir(path) {
+    targets.push(path.to_path_buf());
+
+    if !is_dir {
         return;
     }
 
