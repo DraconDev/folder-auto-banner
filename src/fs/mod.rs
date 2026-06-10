@@ -6,6 +6,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 /// Project type detection
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -552,15 +553,30 @@ fn format_mode(mode: u32) -> String {
     let other_r = if mode & 0o004 != 0 { 'r' } else { '-' };
     let other_w = if mode & 0o002 != 0 { 'w' } else { '-' };
     let other_x = if mode & 0o001 != 0 { 'x' } else { '-' };
-    format!(
-        "{}{}{}{}{}{}{}{}{}{}",
-        ft, user_r, user_w, user_x, group_r, group_w, group_x, other_r, other_w, other_x
-    )
+
+    let mut perms = String::with_capacity(10);
+    perms.push(ft);
+    perms.push(user_r);
+    perms.push(user_w);
+    perms.push(user_x);
+    perms.push(group_r);
+    perms.push(group_w);
+    perms.push(group_x);
+    perms.push(other_r);
+    perms.push(other_w);
+    perms.push(other_x);
+    perms
 }
 
 /// Load uid→username cache from /etc/passwd
 #[cfg(unix)]
-fn load_uid_cache() -> std::collections::HashMap<u32, String> {
+fn load_uid_cache() -> &'static std::collections::HashMap<u32, String> {
+    static CACHE: OnceLock<std::collections::HashMap<u32, String>> = OnceLock::new();
+    CACHE.get_or_init(load_uid_cache_inner)
+}
+
+#[cfg(unix)]
+fn load_uid_cache_inner() -> std::collections::HashMap<u32, String> {
     let mut cache = std::collections::HashMap::new();
     if let Ok(content) = std::fs::read_to_string("/etc/passwd") {
         for line in content.lines() {
@@ -577,7 +593,13 @@ fn load_uid_cache() -> std::collections::HashMap<u32, String> {
 
 /// Load gid→groupname cache from /etc/group
 #[cfg(unix)]
-fn load_gid_cache() -> std::collections::HashMap<u32, String> {
+fn load_gid_cache() -> &'static std::collections::HashMap<u32, String> {
+    static CACHE: OnceLock<std::collections::HashMap<u32, String>> = OnceLock::new();
+    CACHE.get_or_init(load_gid_cache_inner)
+}
+
+#[cfg(unix)]
+fn load_gid_cache_inner() -> std::collections::HashMap<u32, String> {
     let mut cache = std::collections::HashMap::new();
     if let Ok(content) = std::fs::read_to_string("/etc/group") {
         for line in content.lines() {

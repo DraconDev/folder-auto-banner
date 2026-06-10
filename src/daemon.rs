@@ -281,39 +281,105 @@ fn watch_loop(
     let mut watched: HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>> = HashMap::new();
     let mut failed_watches: HashSet<PathBuf> = HashSet::new();
     let mut last_refresh = Instant::now() - WATCH_REFRESH_INTERVAL;
+    let mut last_cleanup = Instant::now() - WATCH_REFRESH_INTERVAL;
     let mut last_roots: HashSet<PathBuf> = HashSet::new();
     let mut last_order: Vec<PathBuf> = Vec::new();
 
     loop {
+        let now = Instant::now();
+        let mut roots_snapshot = if last_refresh.elapsed() >= WATCH_REFRESH_INTERVAL {
+            Some(
+                active_roots
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Active roots mutex poisoned, recovering");
+                        e.into_inner()
+                    })
+                    .clone(),
+            )
+        } else {
+            None
+        };
+        let mut order_snapshot = if last_refresh.elapsed() >= WATCH_REFRESH_INTERVAL {
+            Some(
+                active_order
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Active order mutex poisoned, recovering");
+                        e.into_inner()
+                    })
+                    .clone(),
+            )
+        } else {
+            None
+        };
+
         if last_refresh.elapsed() >= WATCH_REFRESH_INTERVAL {
-            let roots = active_roots
-                .lock()
-                .unwrap_or_else(|e| {
-                    tracing::warn!("Active roots mutex poisoned, recovering");
-                    e.into_inner()
-                })
-                .clone();
-            let order = active_order
+            roots_snapshot = Some(
+                active_roots
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Active roots mutex poisoned, recovering");
+                        e.into_inner()
+                    })
+                    .clone(),
+            );
+            order_snapshot = Some(
+                active_order
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Active order mutex poisoned, recovering");
+                        e.into_inner()
+                    })
+                    .clone(),
+            );
+
+            if roots_snapshot.as_ref() != Some(&last_roots)
+                || order_snapshot.as_ref() != Some(&last_order)
+            {
+                refresh_active_watchers(
+                    &mut inotify,
+                    roots_snapshot.as_ref().unwrap(),
+                    order_snapshot.as_ref().unwrap(),
+                    &mut watched,
+                    &mut failed_watches,
+                );
+                last_roots = roots_snapshot.as_ref().unwrap().clone();
+                last_order = order_snapshot.as_ref().unwrap().clone();
+            }
+
+            last_refresh = now;
+        }
+
+        if last_cleanup.elapsed() >= WATCH_REFRESH_INTERVAL {
+            let roots = if let Some(roots) = roots_snapshot.take() {
+                roots
+            } else {
+                active_roots
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Active roots mutex poisoned, recovering");
+                        e.into_inner()
+                    })
+                    .clone()
+            };
+
+            active_order
                 .lock()
                 .unwrap_or_else(|e| {
                     tracing::warn!("Active order mutex poisoned, recovering");
                     e.into_inner()
                 })
-                .clone();
+                .retain(|path| roots.contains(path));
 
-            if roots != last_roots || order != last_order {
-                refresh_active_watchers(
-                    &mut inotify,
-                    &roots,
-                    &order,
-                    &mut watched,
-                    &mut failed_watches,
-                );
-                last_roots = roots;
-                last_order = order;
-            }
-
-            last_refresh = Instant::now();
+            remove_inactive_watchers(
+                &roots,
+                &active_order,
+                &mut inotify,
+                &mut watched,
+                &mut failed_watches,
+            );
+            last_cleanup = now;
         }
 
         // Read inotify events (non-blocking)
@@ -373,13 +439,6 @@ fn watch_loop(
             }
         }
 
-        remove_inactive_watchers(
-            &active_roots,
-            &active_order,
-            &mut inotify,
-            &mut watched,
-            &mut failed_watches,
-        );
         thread::sleep(Duration::from_millis(100));
     }
 }
@@ -551,20 +610,12 @@ fn find_owner_for_watch(path: &Path, active_roots: &HashSet<PathBuf>) -> PathBuf
 }
 
 fn remove_inactive_watchers(
-    active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
+    roots: &HashSet<PathBuf>,
     active_order: &Arc<Mutex<Vec<PathBuf>>>,
     inotify: &mut Inotify,
     watched: &mut HashMap<inotify::WatchDescriptor, Vec<WatchRegistration>>,
     failed_watches: &mut HashSet<PathBuf>,
 ) {
-    let roots = active_roots
-        .lock()
-        .unwrap_or_else(|e| {
-            tracing::warn!("Active roots mutex poisoned, recovering");
-            e.into_inner()
-        })
-        .clone();
-
     active_order
         .lock()
         .unwrap_or_else(|e| {
@@ -598,7 +649,7 @@ fn remove_inactive_watchers(
         }
     }
 
-    failed_watches.retain(|path| is_path_under_any_root(path, &roots));
+    failed_watches.retain(|path| is_path_under_any_root(path, roots));
 }
 
 fn is_path_under_any_root(path: &Path, roots: &HashSet<PathBuf>) -> bool {
