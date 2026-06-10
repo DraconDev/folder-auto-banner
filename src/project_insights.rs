@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use crate::{code_metrics::CodeMetrics, todo_scanner::TodoInfo, utils};
 
-const INSIGHT_TIMEOUT: Duration = Duration::from_secs(1);
-const MAX_FILES: usize = 1000;
+const INSIGHT_TIMEOUT: Duration = Duration::from_millis(500);
+const MAX_FILES: usize = 500;
 
 const TODO_PATTERNS: &[&str] = &[
     "- [ ]", "TODO:", "TODO ", "FIXME:", "FIXME ", "HACK:", "HACK ", "XXX:", "XXX ",

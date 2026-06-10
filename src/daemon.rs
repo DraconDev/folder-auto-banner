@@ -21,7 +21,7 @@ struct CacheEntry {
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
-const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(1000);
+const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(300);
 const MAX_SIZE_COMPUTE_THREADS: usize = 16;
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
@@ -735,7 +735,18 @@ fn handle_client(
                 let mut data = entry.data;
                 let t1 = std::time::Instant::now();
                 if expired || !root_fresh {
-                    data = compute_banner_data(&path)?;
+                    let data = match compute_banner_data(&path) {
+                        Ok(data) => data,
+                        Err(e) => {
+                            send_response(
+                                &mut stream,
+                                &Response::Error {
+                                    message: e.to_string(),
+                                },
+                            )?;
+                            return Ok(());
+                        }
+                    };
                     let mut cache = cache.lock().unwrap_or_else(|e| {
                         tracing::warn!("Mutex poisoned, recovering");
                         e.into_inner()
@@ -779,7 +790,18 @@ fn handle_client(
             }
 
             // Cache miss or stale shallow snapshot — do full scan
-            let mut data = compute_banner_data(&path)?;
+            let mut data = match compute_banner_data(&path) {
+                Ok(data) => data,
+                Err(e) => {
+                    send_response(
+                        &mut stream,
+                        &Response::Error {
+                            message: e.to_string(),
+                        },
+                    )?;
+                    return Ok(());
+                }
+            };
 
             refresh_displayed_dir_sizes(&mut data.summary.top_items, &dir_sizes, &dir_size_mtimes);
             data.summary.total_size = data.summary.top_items.iter().map(|item| item.size).sum();
@@ -819,20 +841,25 @@ fn handle_client(
                         .unwrap_or(false)
                 };
                 if !cache_hit {
-                    if let Ok(data) = compute_banner_data(&path) {
-                        let mut c = cache.lock().unwrap_or_else(|e| {
-                            tracing::warn!("Mutex poisoned, recovering");
-                            e.into_inner()
-                        });
-                        c.insert(
-                            path.clone(),
-                            CacheEntry {
-                                data,
-                                computed_at: Instant::now(),
-                                root_mtime: current_dir_mtime(&path),
-                            },
-                        );
-                        touch_active_root(&active_roots, &active_order, path);
+                    match compute_banner_data(&path) {
+                        Ok(data) => {
+                            let mut c = cache.lock().unwrap_or_else(|e| {
+                                tracing::warn!("Mutex poisoned, recovering");
+                                e.into_inner()
+                            });
+                            c.insert(
+                                path.clone(),
+                                CacheEntry {
+                                    data,
+                                    computed_at: Instant::now(),
+                                    root_mtime: current_dir_mtime(&path),
+                                },
+                            );
+                            touch_active_root(&active_roots, &active_order, path);
+                        }
+                        Err(e) => {
+                            tracing::debug!("Warm request failed for {}: {}", path.display(), e);
+                        }
                     }
                 }
             });

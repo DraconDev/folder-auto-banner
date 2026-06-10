@@ -3,7 +3,7 @@
 //! Prints a rich, context-aware directory dashboard and exits.
 //! This is the main feature that makes f magical.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use std::path::Path;
 
@@ -443,10 +443,10 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         cwd.canonicalize()
             .unwrap_or_else(|_| cwd.as_path().to_path_buf())
     } else {
-        opts.path
-            .unwrap_or(cwd.as_path())
+        let requested_path = opts.path.unwrap_or(cwd.as_path());
+        requested_path
             .canonicalize()
-            .unwrap_or_else(|_| opts.path.unwrap_or(cwd.as_path()).to_path_buf())
+            .with_context(|| format!("No such file or directory: {}", requested_path.display()))?
     };
 
     // Load config and apply env var overrides
