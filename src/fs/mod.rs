@@ -185,10 +185,7 @@ impl DirSummary {
         let mut top_items = Vec::new();
         let mut last_modified: Option<DateTime<Utc>> = None;
 
-        let entries = match std::fs::read_dir(path) {
-            Ok(entries) => entries,
-            Err(e) => return Err(e.into()),
-        };
+        let entries = std::fs::read_dir(path)?;
 
         for entry in entries.flatten() {
             let file_type = entry.file_type();
