@@ -831,6 +831,7 @@ fn handle_client(
                     &dir_sizes,
                     &dir_size_mtimes,
                 ) {
+                    enqueue_size_refresh(&size_refresh_ctx, path.clone());
                     schedule_size_refresh(
                         size_refresh_ctx.clone(),
                         path.clone(),
@@ -1249,12 +1250,7 @@ fn active_size_refresh_loop(ctx: Arc<SizeRefreshContext>) {
                     &ctx.dir_sizes,
                     &ctx.dir_size_mtimes,
                 ) {
-                    schedule_size_refresh(
-                        ctx.clone(),
-                        path,
-                        data,
-                        ACTIVE_SIZE_REFRESH_TIMEOUT,
-                    );
+                    schedule_size_refresh(ctx.clone(), path, data, ACTIVE_SIZE_REFRESH_TIMEOUT);
                 }
             }
         }

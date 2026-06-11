@@ -1,3 +1,9 @@
+## [0.6.20] - 2026-06-11
+
+### Fixes
+- **Stale active-root size refresh queue** — stale or placeholder sizes now go through a bounded pending-refresh queue, so active roots are refreshed even when they are not among the first five recently watched folders.
+- **Deduplicated background refreshes** — concurrent background size refreshes for the same root are coalesced, preventing repeated `du` work while preserving fast foreground responses.
+
 ## [0.6.19] - 2026-06-11
 
 ### Fixes
