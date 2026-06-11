@@ -22,6 +22,7 @@ struct CacheEntry {
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
 const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(750);
+const BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_SIZE_COMPUTE_THREADS: usize = 16;
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
@@ -894,7 +895,7 @@ fn handle_client(
                     size
                 }
                 _ => {
-                    let size = compute_dir_size(path);
+                    let size = compute_dir_size(path, SIZE_CACHE_REFRESH_TIMEOUT);
                     sizes.insert(path.clone(), size);
                     mtimes.insert(path.clone(), current_dir_mtime(path));
                     size
@@ -1088,10 +1089,75 @@ fn prune_size_cache_for_root(
         .retain(|path, _| path != root && !path.starts_with(root));
 }
 
+fn displayed_dir_sizes_need_refresh(
+    items: &[DirEntry],
+    sizes: &HashMap<PathBuf, u64>,
+    mtimes: &HashMap<PathBuf, Option<SystemTime>>,
+) -> bool {
+    items.iter().any(|item| {
+        if !item.is_dir {
+            return false;
+        }
+        let current_mtime = current_dir_mtime(&item.path);
+        match sizes.get(&item.path).copied() {
+            Some(size) => mtimes.get(&item.path).copied().flatten() != current_mtime || size == 0,
+            None => true,
+        }
+    })
+}
+
+fn schedule_size_refresh(
+    path: PathBuf,
+    data: BannerData,
+    cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+    dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    active_roots: Arc<Mutex<HashSet<PathBuf>>>,
+    active_order: Arc<Mutex<Vec<PathBuf>>>,
+    timeout: Duration,
+) {
+    thread::spawn(move || {
+        let mut refreshed = data;
+        refresh_displayed_dir_sizes(
+            &mut refreshed.summary.top_items,
+            &dir_sizes,
+            &dir_size_mtimes,
+            timeout,
+        );
+        refreshed.summary.total_size = refreshed
+            .summary
+            .top_items
+            .iter()
+            .map(|item| item.size)
+            .sum();
+
+        let mut c = cache.lock().unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        });
+        let should_replace = c
+            .get(&path)
+            .map(|entry| entry.computed_at <= Instant::now())
+            .unwrap_or(true);
+        if should_replace {
+            c.insert(
+                path.clone(),
+                CacheEntry {
+                    data: refreshed,
+                    computed_at: Instant::now(),
+                    root_mtime: current_dir_mtime(&path),
+                },
+            );
+            touch_active_root(&active_roots, &active_order, path);
+        }
+    });
+}
+
 fn refresh_displayed_dir_sizes(
     items: &mut [DirEntry],
     dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    timeout: Duration,
 ) {
     // First, set sizes from cache where valid, and collect jobs for stale/missing ones.
     let mut jobs: Vec<(usize, PathBuf, Option<SystemTime>)> = Vec::new();
@@ -1168,7 +1234,7 @@ fn compute_sizes_parallel(
                     break;
                 }
                 let (orig_idx, path, mtime) = &jobs[idx];
-                let size = compute_dir_size(path);
+                let size = compute_dir_size(path, timeout);
                 if let Ok(mut r) = results.lock() {
                     r.push((*orig_idx, size, *mtime));
                 }
@@ -1184,7 +1250,7 @@ fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
         .and_then(|metadata| metadata.modified().ok())
 }
 
-fn compute_dir_size(path: &Path) -> u64 {
+fn compute_dir_size(path: &Path, timeout: Duration) -> u64 {
     // Use `du -s -b` for logical byte sizes. It is much faster than
     // `du --bytes -x` on large workspace trees while producing the same logical
     // sizes for normal files, so displayed sizes can be populated from cache
@@ -1448,7 +1514,7 @@ mod tests {
     fn test_compute_dir_size() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("sample.txt"), "hello").unwrap();
-        let size = compute_dir_size(tmp.path());
+        let size = compute_dir_size(tmp.path(), Duration::from_secs(5));
         assert!(size > 0);
     }
 
