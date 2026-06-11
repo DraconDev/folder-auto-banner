@@ -1148,39 +1148,6 @@ fn apply_cached_displayed_dir_sizes(
     needs_refresh
 }
 
-fn displayed_dir_sizes_need_refresh(
-    items: &[DirEntry],
-    sizes: &HashMap<PathBuf, u64>,
-    mtimes: &HashMap<PathBuf, Option<SystemTime>>,
-) -> bool {
-    items.iter().any(|item| {
-        if !item.is_dir {
-            return false;
-        }
-        let current_mtime = current_dir_mtime(&item.path);
-        match sizes.get(&item.path).copied() {
-            Some(size) => mtimes.get(&item.path).copied().flatten() != current_mtime || size == 0,
-            None => true,
-        }
-    })
-}
-
-fn displayed_dir_sizes_need_refresh_cached(
-    items: &[DirEntry],
-    dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
-    dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
-) -> bool {
-    let sizes = dir_sizes.lock().unwrap_or_else(|e| {
-        tracing::warn!("Mutex poisoned, recovering");
-        e.into_inner()
-    });
-    let mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
-        tracing::warn!("Mutex poisoned, recovering");
-        e.into_inner()
-    });
-    displayed_dir_sizes_need_refresh(items, &sizes, &mtimes)
-}
-
 fn schedule_size_refresh(
     path: PathBuf,
     data: BannerData,
