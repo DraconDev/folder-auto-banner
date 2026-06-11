@@ -810,7 +810,7 @@ fn handle_client(
             }
 
             // Cache miss or stale shallow snapshot — do full scan
-            let mut data = match compute_banner_data(&path) {
+            let data = match compute_banner_data(&path) {
                 Ok(data) => data,
                 Err(e) => {
                     send_response(
@@ -1299,7 +1299,7 @@ fn compute_dir_size(path: &Path, timeout: Duration) -> u64 {
     if let Ok(stdout) = folder_auto_banner::utils::run_with_timeout_stdout(
         "du",
         &["-s", "-b", path_arg.as_ref()],
-        SIZE_CACHE_REFRESH_TIMEOUT,
+        timeout,
     ) {
         let stdout = stdout.trim();
         if !stdout.is_empty() {
