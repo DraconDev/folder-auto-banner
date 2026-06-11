@@ -709,9 +709,9 @@ fn handle_client(
         t_parse - t_read
     );
 
-    let response = match request {
+    let response = match &request {
         Request::Banner { path } => {
-            let path = path.canonicalize().unwrap_or(path);
+            let path = path.canonicalize().unwrap_or_else(|| path.clone());
             touch_active_root(&active_roots, &active_order, path.clone());
 
             // Check cache — if hit, do a cheap root-mtime check and refresh displayed
@@ -834,7 +834,7 @@ fn handle_client(
             Response::Banner(Box::new(data))
         }
         Request::Warm { path } => {
-            let path = path.canonicalize().unwrap_or(path);
+            let path = path.canonicalize().unwrap_or_else(|| path.clone());
             let cache = cache.clone();
             let active_order = active_order.clone();
             // Pre-compute in background — don't block the client
@@ -871,7 +871,7 @@ fn handle_client(
                     }
                 }
             });
-            return Ok(()); // No response needed — fire and forget
+            continue; // No response needed — fire and forget; read the next request on this stream.
         }
         Request::DirSize { path } => {
             let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
@@ -882,8 +882,8 @@ fn handle_client(
                 tracing::warn!("Mutex poisoned, recovering");
                 e.into_inner()
             });
-            let size = match sizes.get(&path).copied() {
-                Some(size) if mtimes.get(&path).copied().flatten() == current_dir_mtime(&path) => {
+            let size = match sizes.get(path).copied() {
+                Some(size) if mtimes.get(path).copied().flatten() == current_dir_mtime(path) => {
                     size
                 }
                 _ => {
@@ -893,7 +893,10 @@ fn handle_client(
                     size
                 }
             };
-            Response::DirSize { path, size }
+            Response::DirSize {
+                path: path.clone(),
+                size,
+            }
         }
         Request::Ping => Response::Pong,
         Request::Shutdown => {
@@ -920,6 +923,10 @@ fn handle_client(
             std::process::exit(0);
         }
     };
+
+    if matches!(request, Request::Warm { .. }) {
+        continue;
+    }
 
     send_response(&mut stream, &response)?;
     tracing::trace!("Sent response successfully");

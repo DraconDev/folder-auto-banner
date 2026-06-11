@@ -134,15 +134,9 @@ pub fn is_daemon_running() -> bool {
 }
 
 /// Send warm requests before the CLI exits.
-/// Each warm request uses its own short-lived connection because daemon request
-/// handlers process one request per accepted stream.
+/// The daemon processes multiple warm requests per accepted stream, so this
+/// batches them on a single short-lived connection.
 pub fn warm_paths(paths: &[PathBuf]) {
-    for path in paths {
-        warm_path(path);
-    }
-}
-
-fn warm_path(path: &Path) {
     use std::io::Write;
     let Ok(socket) = socket_path() else {
         return;
@@ -152,26 +146,26 @@ fn warm_path(path: &Path) {
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
-    let request = Request::Warm {
-        path: path.to_path_buf(),
-    };
-    let req_bytes = match serde_json::to_vec(&request) {
-        Ok(b) => b,
-        Err(e) => {
-            tracing::warn!("Failed to serialize warm request: {}", e);
+    for path in paths {
+        let request = Request::Warm { path: path.clone() };
+        let req_bytes = match serde_json::to_vec(&request) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!("Failed to serialize warm request: {}", e);
+                return;
+            }
+        };
+        let req_len = req_bytes.len() as u32;
+        let mut combined = Vec::with_capacity(4 + req_bytes.len());
+        combined.extend_from_slice(&req_len.to_le_bytes());
+        combined.extend_from_slice(&req_bytes);
+        if let Err(e) = stream.write_all(&combined) {
+            tracing::warn!("Failed to send warm request: {}", e);
             return;
         }
-    };
-    let req_len = req_bytes.len() as u32;
-    let mut combined = Vec::with_capacity(4 + req_bytes.len());
-    combined.extend_from_slice(&req_len.to_le_bytes());
-    combined.extend_from_slice(&req_bytes);
-    if let Err(e) = stream.write_all(&combined) {
-        tracing::warn!("Failed to send warm request: {}", e);
-        return;
     }
     if let Err(e) = stream.flush() {
-        tracing::warn!("Failed to flush warm request: {}", e);
+        tracing::warn!("Failed to flush warm requests: {}", e);
     }
 }
 
