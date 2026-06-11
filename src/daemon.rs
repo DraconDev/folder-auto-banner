@@ -60,6 +60,15 @@ struct WatchRegistration {
     watched_path: PathBuf,
 }
 
+#[derive(Clone)]
+struct SizeRefreshContext {
+    cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+    dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    active_roots: Arc<Mutex<HashSet<PathBuf>>>,
+    active_order: Arc<Mutex<Vec<PathBuf>>>,
+}
+
 struct Daemon {
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     /// Global directory size cache — populated by proactive scan
