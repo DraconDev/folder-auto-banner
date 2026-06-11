@@ -20,7 +20,7 @@ When you run `f`, you see:
 - Docker status
 - Cached test results
 
-**All instantly, no extra commands needed.**
+**Fast context without extra commands.**
 
 ## vs lsd / eza
 
