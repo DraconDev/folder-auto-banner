@@ -1160,8 +1160,9 @@ fn apply_cached_displayed_dir_sizes(
     let mut needs_refresh = false;
     for item in items.iter_mut().filter(|item| item.is_dir) {
         let current_mtime = current_dir_mtime(&item.path);
+        let cached_mtime = mtimes.get(&item.path).copied().flatten();
         match sizes.get(&item.path).copied() {
-            Some(size) if mtimes.get(&item.path).copied().flatten() == current_mtime => {
+            Some(size) if cached_dir_size_is_fresh(&item.path, size, cached_mtime) => {
                 item.size = size;
             }
             _ => needs_refresh = true,
@@ -1398,7 +1399,11 @@ fn compute_dir_size_with_status(path: &Path, timeout: Duration) -> SizeComputati
     }
 }
 
-fn cached_dir_size_is_fresh(path: &Path, cached_size: u64, cached_mtime: Option<SystemTime>) -> bool {
+fn cached_dir_size_is_fresh(
+    path: &Path,
+    cached_size: u64,
+    cached_mtime: Option<SystemTime>,
+) -> bool {
     if cached_mtime != current_dir_mtime(path) {
         return false;
     }
@@ -1407,7 +1412,9 @@ fn cached_dir_size_is_fresh(path: &Path, cached_size: u64, cached_mtime: Option<
     // value. This catches old cache entries and short `du` timeouts that stored
     // `4096` with a matching mtime, which made stale entries look fresh forever.
     std::fs::metadata(path)
-        .map(|metadata| !(metadata.is_dir() && cached_size == metadata.len() && cached_size <= 4096))
+        .map(|metadata| {
+            !(metadata.is_dir() && cached_size == metadata.len() && cached_size <= 4096)
+        })
         .unwrap_or(false)
 }
 
@@ -1694,6 +1701,60 @@ mod tests {
             return false;
         };
         *cached == fresh
+    }
+
+    #[test]
+    fn test_cached_placeholder_dir_size_is_retried() {
+        let tmp = tempfile::tempdir().unwrap();
+        let child = tmp.path().join("child");
+        std::fs::create_dir(&child).unwrap();
+        std::fs::write(child.join("payload.bin"), vec![7; 100_000]).unwrap();
+
+        let mut items = vec![DirEntry {
+            name: "child".to_string(),
+            path: child.clone(),
+            is_dir: true,
+            is_file: false,
+            is_symlink: false,
+            is_exec: true,
+            size: 4096,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+            symlink_valid: true,
+        }];
+        let dir_sizes = Arc::new(Mutex::new(HashMap::new()));
+        let dir_size_mtimes = Arc::new(Mutex::new(HashMap::new()));
+        let placeholder_size = std::fs::metadata(&child).unwrap().len();
+        dir_sizes
+            .lock()
+            .unwrap()
+            .insert(child.clone(), placeholder_size);
+        dir_size_mtimes
+            .lock()
+            .unwrap()
+            .insert(child.clone(), current_dir_mtime(&child));
+
+        refresh_displayed_dir_sizes(
+            &mut items,
+            &dir_sizes,
+            &dir_size_mtimes,
+            Duration::from_secs(5),
+        );
+
+        assert!(items[0].size > placeholder_size);
+    }
+
+    #[test]
+    fn test_compute_dir_size_reports_fallback_as_unmeasured() {
+        let computed = compute_dir_size_with_status(
+            Path::new("/tmp/definitely-missing-folder-auto-banner-dir"),
+            Duration::from_millis(1),
+        );
+        assert_eq!(computed.size, 0);
+        assert!(!computed.measured);
     }
 
     #[test]
