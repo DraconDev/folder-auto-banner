@@ -7,7 +7,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-use std::time::Instant;
 
 /// Project type detection
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -176,7 +175,6 @@ impl DirSummary {
         check_docker: bool,
         check_metrics: bool,
     ) -> Result<Self> {
-        let _t_total = Instant::now();
         let project_type = ProjectType::detect(path);
         let mut total_size: u64 = 0;
         let mut files = 0;
@@ -190,7 +188,6 @@ impl DirSummary {
 
         let entries = std::fs::read_dir(path)?;
 
-        let _t_entries = Instant::now();
         for entry in entries.flatten() {
             let file_type = entry.file_type();
             let is_dir = file_type.as_ref().map(|ft| ft.is_dir()).unwrap_or(false);
@@ -348,20 +345,10 @@ impl DirSummary {
             });
         }
 
-        if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
-            tracing::info!(
-                "[FAB_PROFILE_COMPONENTS] readdir_loop={:?}",
-                _t_entries.elapsed()
-            );
-        }
         // Sort: directories first, then by name.
         // `to_lowercase` allocates; cache the key once per item instead of
         // lowercasing on every comparison.
-        let _t_sort = Instant::now();
         top_items.sort_by_cached_key(|item| (!item.is_dir, item.name.to_lowercase()));
-        if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
-            tracing::info!("[FAB_PROFILE_COMPONENTS] sort={:?}", _t_sort.elapsed());
-        }
 
         // Run optional checks with caching
         let cache = crate::cache::Cache::new().ok();
@@ -391,7 +378,6 @@ impl DirSummary {
             };
         }
 
-        let _t_build = Instant::now();
         let build_status = cached_check!(
             check_build,
             cache,
@@ -399,13 +385,6 @@ impl DirSummary {
             30,
             crate::build_status::check_build(path, &project_type)
         );
-        if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
-            tracing::info!(
-                "[FAB_PROFILE_COMPONENTS] build_status={:?}",
-                _t_build.elapsed()
-            );
-        }
-        let _t_insights = Instant::now();
         let (todo_info, code_metrics) = if scan_todos || check_metrics {
             match crate::project_insights::scan_insights(path).ok() {
                 Some(insights) => (
@@ -417,14 +396,7 @@ impl DirSummary {
         } else {
             (None, None)
         };
-        if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
-            tracing::info!(
-                "[FAB_PROFILE_COMPONENTS] insights={:?}",
-                _t_insights.elapsed()
-            );
-        }
 
-        let _t_ports = Instant::now();
         let port_info = cached_check!(
             check_ports,
             cache,
@@ -432,10 +404,6 @@ impl DirSummary {
             10,
             crate::port_usage::detect_ports(path).ok()
         );
-        if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
-            tracing::info!("[FAB_PROFILE_COMPONENTS] ports={:?}", _t_ports.elapsed());
-        }
-        let _t_docker = Instant::now();
         let docker_info = cached_check!(
             check_docker,
             cache,
@@ -443,18 +411,6 @@ impl DirSummary {
             10,
             crate::docker::detect_docker(path).ok()
         );
-        if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
-            tracing::info!("[FAB_PROFILE_COMPONENTS] docker={:?}", _t_docker.elapsed());
-        }
-
-        if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
-            tracing::info!(
-                "[FAB_PROFILE_COMPONENTS] scan_inner: path={} project_type={:?} top_items={}",
-                path.display(),
-                project_type,
-                top_items.len(),
-            );
-        }
 
         Ok(DirSummary {
             total_items: files + dirs,
@@ -469,14 +425,6 @@ impl DirSummary {
             code_metrics,
             port_info,
             docker_info,
-        })
-        .inspect(|_| {
-            if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
-                tracing::info!(
-                    "[FAB_PROFILE_COMPONENTS] scan_with_options total={:?}",
-                    _t_total.elapsed()
-                );
-            }
         })
     }
 
