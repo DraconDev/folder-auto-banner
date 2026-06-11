@@ -1,3 +1,8 @@
+## [0.6.21] - 2026-06-11
+
+### Docs
+- **Cleaner user-facing documentation** — README, INSTALL, and the `f(1)` man page now describe the current install flow, daemon management, shell-wrapper behavior, and placeholder-size refresh behavior more consistently.
+
 ## [0.6.20] - 2026-06-11
 
 ### Fixes
