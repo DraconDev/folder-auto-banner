@@ -1,3 +1,8 @@
+## [0.6.22] - 2026-06-11
+
+### Docs
+- **Documentation version cleanup** — README and `f(1)` man page now consistently describe the current install flow, daemon management, shell-wrapper behavior, and background size-refresh behavior.
+
 ## [0.6.21] - 2026-06-11
 
 ### Docs
