@@ -871,7 +871,7 @@ fn handle_client(
                     }
                 }
             });
-            continue; // No response needed — fire and forget; read the next request on this stream.
+            return Ok(()); // No response needed — fire and forget
         }
         Request::DirSize { path } => {
             let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
@@ -925,7 +925,7 @@ fn handle_client(
     };
 
     if matches!(request, Request::Warm { .. }) {
-        continue;
+        return Ok(());
     }
 
     send_response(&mut stream, &response)?;
