@@ -1253,12 +1253,30 @@ fn active_size_refresh_loop(ctx: Arc<SizeRefreshContext>) {
                         ctx.clone(),
                         path,
                         data,
-                        BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
+                        ACTIVE_SIZE_REFRESH_TIMEOUT,
                     );
                 }
             }
         }
     }
+}
+
+fn enqueue_size_refresh(ctx: &Arc<SizeRefreshContext>, path: PathBuf) {
+    let mut pending = ctx.pending_size_refreshes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Pending size-refresh mutex poisoned, recovering");
+        e.into_inner()
+    });
+    if !pending.contains(&path) {
+        pending.push(path);
+    }
+}
+
+fn mark_size_refresh_in_flight(ctx: &Arc<SizeRefreshContext>, path: &Path) -> bool {
+    let mut in_flight = ctx.size_refresh_in_flight.lock().unwrap_or_else(|e| {
+        tracing::warn!("In-flight size-refresh mutex poisoned, recovering");
+        e.into_inner()
+    });
+    in_flight.insert(path.to_path_buf())
 }
 
 fn schedule_size_refresh(
@@ -1267,8 +1285,16 @@ fn schedule_size_refresh(
     data: BannerData,
     timeout: Duration,
 ) {
+    if !mark_size_refresh_in_flight(&ctx, &path) {
+        return;
+    }
+
     let computed_at = Instant::now();
     thread::spawn(move || {
+        let _guard = SizeRefreshGuard {
+            in_flight: ctx.size_refresh_in_flight.clone(),
+            path: path.clone(),
+        };
         let mut refreshed = data;
         refresh_displayed_dir_sizes(
             &mut refreshed.summary.top_items,
