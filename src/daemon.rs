@@ -1166,6 +1166,52 @@ fn apply_cached_displayed_dir_sizes(
     needs_refresh
 }
 
+fn active_size_refresh_loop(ctx: Arc<SizeRefreshContext>) {
+    loop {
+        thread::sleep(ACTIVE_SIZE_REFRESH_INTERVAL);
+
+        let roots: Vec<PathBuf> = {
+            let order = ctx.active_order.lock().unwrap_or_else(|e| {
+                tracing::warn!("Active order mutex poisoned, recovering");
+                e.into_inner()
+            });
+            order
+                .iter()
+                .take(ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK)
+                .cloned()
+                .collect()
+        };
+
+        for path in roots {
+            let data = {
+                let cache = ctx.cache.lock().unwrap_or_else(|e| {
+                    tracing::warn!("Cache mutex poisoned, recovering");
+                    e.into_inner()
+                });
+                cache
+                    .get(&path)
+                    .filter(|entry| entry.computed_at.elapsed() < CACHE_TTL)
+                    .map(|entry| entry.data.clone())
+            };
+
+            if let Some(mut data) = data {
+                if apply_cached_displayed_dir_sizes(
+                    &mut data.summary.top_items,
+                    &ctx.dir_sizes,
+                    &ctx.dir_size_mtimes,
+                ) {
+                    schedule_size_refresh(
+                        ctx.clone(),
+                        path,
+                        data,
+                        BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
+                    );
+                }
+            }
+        }
+    }
+}
+
 fn schedule_size_refresh(
     ctx: Arc<SizeRefreshContext>,
     path: PathBuf,
