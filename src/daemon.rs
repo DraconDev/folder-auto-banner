@@ -711,7 +711,7 @@ fn handle_client(
 
     let response = match &request {
         Request::Banner { path } => {
-            let path = path.canonicalize().unwrap_or_else(|| path.clone());
+            let path = path.canonicalize().unwrap_or_else(|_| path.clone());
             touch_active_root(&active_roots, &active_order, path.clone());
 
             // Check cache — if hit, do a cheap root-mtime check and refresh displayed
@@ -834,7 +834,7 @@ fn handle_client(
             Response::Banner(Box::new(data))
         }
         Request::Warm { path } => {
-            let path = path.canonicalize().unwrap_or_else(|| path.clone());
+            let path = path.canonicalize().unwrap_or_else(|_| path.clone());
             let cache = cache.clone();
             let active_order = active_order.clone();
             // Pre-compute in background — don't block the client
@@ -889,7 +889,7 @@ fn handle_client(
                 _ => {
                     let size = compute_dir_size(&path);
                     sizes.insert(path.clone(), size);
-                    mtimes.insert(path.clone(), current_dir_mtime(&path));
+                    mtimes.insert(path.clone(), current_dir_mtime(path));
                     size
                 }
             };
