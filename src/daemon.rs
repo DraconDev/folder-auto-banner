@@ -711,6 +711,13 @@ fn handle_client(
     let mut req_buf = vec![0u8; req_len];
     stream.read_exact(&mut req_buf)?;
     let request: Request = serde_json::from_slice(&req_buf)?;
+    let size_refresh_ctx = Arc::new(SizeRefreshContext {
+        cache: cache.clone(),
+        dir_sizes: dir_sizes.clone(),
+        dir_size_mtimes: dir_size_mtimes.clone(),
+        active_roots: active_roots.clone(),
+        active_order: active_order.clone(),
+    });
     let t_parse = std::time::Instant::now();
     tracing::debug!(
         "Received request: {:?} (read={:?}, parse={:?})",
@@ -785,13 +792,9 @@ fn handle_client(
                     &dir_size_mtimes,
                 ) {
                     schedule_size_refresh(
+                        size_refresh_ctx.clone(),
                         path.clone(),
                         data.clone(),
-                        cache,
-                        dir_sizes,
-                        dir_size_mtimes,
-                        active_roots,
-                        active_order,
                         BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
                     );
                 }
@@ -856,13 +859,9 @@ fn handle_client(
                 touch_active_root(&active_roots, &active_order, path.clone());
             }
             schedule_size_refresh(
+                size_refresh_ctx,
                 path.clone(),
                 data.clone(),
-                cache,
-                dir_sizes,
-                dir_size_mtimes,
-                active_roots,
-                active_order,
                 BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
             );
             Response::Banner(Box::new(data))
@@ -905,13 +904,9 @@ fn handle_client(
                             touch_active_root(&active_roots, &active_order, path.clone());
                             drop(c);
                             schedule_size_refresh(
+                                size_refresh_ctx,
                                 path,
                                 data,
-                                cache,
-                                dir_sizes,
-                                dir_size_mtimes,
-                                active_roots,
-                                active_order,
                                 BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
                             );
                         }
@@ -1158,13 +1153,9 @@ fn apply_cached_displayed_dir_sizes(
 }
 
 fn schedule_size_refresh(
+    ctx: Arc<SizeRefreshContext>,
     path: PathBuf,
     data: BannerData,
-    cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
-    dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
-    dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
-    active_roots: Arc<Mutex<HashSet<PathBuf>>>,
-    active_order: Arc<Mutex<Vec<PathBuf>>>,
     timeout: Duration,
 ) {
     let computed_at = Instant::now();
@@ -1172,8 +1163,8 @@ fn schedule_size_refresh(
         let mut refreshed = data;
         refresh_displayed_dir_sizes(
             &mut refreshed.summary.top_items,
-            &dir_sizes,
-            &dir_size_mtimes,
+            &ctx.dir_sizes,
+            &ctx.dir_size_mtimes,
             timeout,
         );
         refreshed.summary.total_size = refreshed
@@ -1183,7 +1174,7 @@ fn schedule_size_refresh(
             .map(|item| item.size)
             .sum();
 
-        let mut c = cache.lock().unwrap_or_else(|e| {
+        let mut c = ctx.cache.lock().unwrap_or_else(|e| {
             tracing::warn!("Mutex poisoned, recovering");
             e.into_inner()
         });
@@ -1200,7 +1191,7 @@ fn schedule_size_refresh(
                     root_mtime: current_dir_mtime(&path),
                 },
             );
-            touch_active_root(&active_roots, &active_order, path);
+            touch_active_root(&ctx.active_roots, &ctx.active_order, path);
         }
     });
 }
