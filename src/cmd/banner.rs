@@ -785,7 +785,9 @@ fn warm_nearby_dirs(path: &Path) {
 
 /// Output rich formatted banner - compact lsd-style layout
 #[allow(clippy::too_many_arguments)]
-/// Build git branch display with color (blue if clean, yellow if dirty)
+/// Build git branch display with color (blue if clean, yellow if dirty).
+/// The closing bracket is intentionally kept inside the same color/bold span
+/// as the branch name so it never renders in a darker shade.
 fn build_branch_display(git_info: &GitInfo) -> String {
     let git_branch = git_info.branch.as_deref().unwrap_or("");
     if git_branch.is_empty() {
@@ -793,14 +795,14 @@ fn build_branch_display(git_info: &GitInfo) -> String {
     }
     if git_info.is_dirty {
         format!(
-            "{yellow}[{branch}*{reset}{yellow}]",
+            "{yellow}[{branch}*]{reset}",
             yellow = color(YELLOW),
             branch = git_branch,
             reset = color(RESET)
         )
     } else {
         format!(
-            "{blue}[{branch}{reset}{blue}]",
+            "{blue}[{branch}]{reset}",
             blue = color(BLUE_BOLD),
             branch = git_branch,
             reset = color(RESET)
@@ -2361,6 +2363,33 @@ fn truncate_details(details: &[String], available: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_build_branch_display_keeps_closing_bracket_in_same_style() {
+        set_colors_enabled(true);
+
+        let dirty = GitInfo {
+            branch: Some("main".to_string()),
+            is_dirty: true,
+            ..GitInfo::default()
+        };
+        assert_eq!(build_branch_display(&dirty), "\x1b[33m[main*]\x1b[0m");
+
+        let clean = GitInfo {
+            branch: Some("main".to_string()),
+            is_dirty: false,
+            ..GitInfo::default()
+        };
+        assert_eq!(build_branch_display(&clean), "\x1b[1;34m[main]\x1b[0m");
+    }
+
+    #[test]
+    fn test_build_branch_display_empty_branch() {
+        set_colors_enabled(true);
+
+        let no_branch = GitInfo::default();
+        assert_eq!(build_branch_display(&no_branch), "");
+    }
 
     #[test]
     fn test_format_loc() {

@@ -1,3 +1,8 @@
+## [0.6.18] - 2026-06-11
+
+### Fixes
+- **Uniform git branch bracket styling** — the closing `]` in dirty/clean branch badges now stays inside the same color/bold span as the branch name, preventing the right edge of badges like `[main*]` from rendering in a darker shade.
+
 ## [0.6.17] - 2026-06-11
 
 ### Performance
@@ -9,6 +14,8 @@
 - The first cold view of a very large directory returns quickly and may show cached placeholders until the background size refresh completes; subsequent warm calls use populated single-digit-millisecond cache entries.
 - Warm cache hits remain single-digit milliseconds after pre-warm.
 
+
+## [0.6.16] - 2026-06-11
 
 ### Performance
 - **Heavier project-insight pruning** — project-insight scans now skip known heavy directories before descent, so `target`, `.git`, `node_modules`, and similar directories do not slow TODO/code-metric collection in large workspace trees.
