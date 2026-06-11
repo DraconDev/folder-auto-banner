@@ -950,13 +950,18 @@ fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
 }
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
+    let profile_components = std::env::var("FAB_PROFILE_COMPONENTS").is_ok();
+    let t_scan_start = Instant::now();
     let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
+    let t_scan = Instant::now();
 
     // Build pathspecs for git status collection. Files use their exact
     // top-level name; directories use `dir/*` so libgit2 only walks immediate
     // children that the banner displays or aggregates.
     let filter_paths = folder_auto_banner::git::status_filter_paths_for_items(&summary.top_items);
+    let t_paths = Instant::now();
     let mut git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
+    let t_git = Instant::now();
 
     if let Some(ref mut gi) = git_info {
         if !gi.file_statuses.is_empty() {
@@ -969,6 +974,19 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
                 folder_auto_banner::git::is_displayed_git_status_path(path_str, &keep)
             });
         }
+    }
+    let t_filter = Instant::now();
+
+    if profile_components {
+        tracing::info!(
+            "[FAB_PROFILE_COMPONENTS] path={} scan={:?} pathspec_build={:?} git={:?} git_filter={:?} total={:?}",
+            path.display(),
+            t_scan - t_scan_start,
+            t_paths - t_scan,
+            t_git - t_paths,
+            t_filter - t_git,
+            t_filter - t_scan_start,
+        );
     }
 
     // Return immediately — sizes come from global cache
@@ -1071,6 +1089,8 @@ fn refresh_displayed_dir_sizes(
     dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
 ) {
+    let profile_components = std::env::var("FAB_PROFILE_COMPONENTS").is_ok();
+    let t_start = Instant::now();
     // First, set sizes from cache where valid, and collect jobs for stale/missing ones.
     let mut jobs: Vec<(usize, PathBuf, Option<SystemTime>)> = Vec::new();
     {
@@ -1100,10 +1120,18 @@ fn refresh_displayed_dir_sizes(
     } // drop locks
 
     if jobs.is_empty() {
+        if profile_components {
+            tracing::info!(
+                "[FAB_PROFILE_COMPONENTS] refresh_displayed_dir_sizes: cache_hits={} jobs=0 total={:?}",
+                items.iter().filter(|i| i.is_dir).count(),
+                Instant::now() - t_start,
+            );
+        }
         return;
     }
 
     // Compute sizes in parallel to keep banner latency bounded on large trees.
+    let t_compute_start = Instant::now();
     let results = compute_sizes_parallel(jobs);
 
     // Update cache and items.
@@ -1122,6 +1150,17 @@ fn refresh_displayed_dir_sizes(
             mtimes.insert(path, Some(mt));
         }
         items[idx].size = size;
+    }
+    drop(sizes);
+    drop(mtimes);
+    if profile_components {
+        let computed_count = items.iter().filter(|i| i.is_dir).count();
+        tracing::info!(
+            "[FAB_PROFILE_COMPONENTS] refresh_displayed_dir_sizes: dirs={} compute={:?} total={:?}",
+            computed_count,
+            Instant::now() - t_compute_start,
+            Instant::now() - t_start,
+        );
     }
 }
 
