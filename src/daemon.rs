@@ -1331,13 +1331,13 @@ fn refresh_displayed_dir_sizes(
 fn compute_sizes_parallel(
     jobs: Vec<(usize, PathBuf, Option<SystemTime>)>,
     timeout: Duration,
-) -> Vec<(usize, u64, Option<SystemTime>, bool)> {
+) -> Vec<SizeComputeResult> {
     use std::sync::atomic::{AtomicUsize, Ordering};
     if jobs.is_empty() {
         return Vec::new();
     }
     let worker_count = jobs.len().min(MAX_SIZE_COMPUTE_THREADS);
-    let results: std::sync::Mutex<Vec<(usize, u64, Option<SystemTime>, bool)>> =
+    let results: std::sync::Mutex<Vec<SizeComputeResult>> =
         std::sync::Mutex::new(Vec::with_capacity(jobs.len()));
     let next = AtomicUsize::new(0);
     std::thread::scope(|s| {
