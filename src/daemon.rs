@@ -946,10 +946,14 @@ fn handle_client(
                     size
                 }
                 _ => {
-                    let size = compute_dir_size(path, SIZE_CACHE_REFRESH_TIMEOUT);
-                    sizes.insert(path.clone(), size);
-                    mtimes.insert(path.clone(), current_dir_mtime(path));
-                    size
+                    let computed = compute_dir_size_with_status(path, SIZE_CACHE_REFRESH_TIMEOUT);
+                    sizes.insert(path.clone(), computed.size);
+                    if computed.measured {
+                        mtimes.insert(path.clone(), current_dir_mtime(path));
+                    } else {
+                        mtimes.insert(path.clone(), None);
+                    }
+                    computed.size
                 }
             };
             Response::DirSize {
@@ -1281,7 +1285,7 @@ fn refresh_displayed_dir_sizes(
             let cached_mtime = mtimes.get(&item.path).copied().flatten();
             let cached_size = sizes.get(&item.path).copied();
             if let Some(size) = cached_size {
-                if cached_mtime == current_mtime {
+                if cached_dir_size_is_fresh(&item.path, size, cached_mtime) {
                     item.size = size;
                     continue;
                 }
@@ -1306,11 +1310,15 @@ fn refresh_displayed_dir_sizes(
         tracing::warn!("Mutex poisoned, recovering");
         e.into_inner()
     });
-    for (idx, size, mtime_opt) in results {
+    for (idx, size, mtime_opt, measured) in results {
         let path = items[idx].path.clone();
         sizes.insert(path.clone(), size);
-        if let Some(mt) = mtime_opt {
-            mtimes.insert(path, Some(mt));
+        if measured {
+            if let Some(mt) = mtime_opt {
+                mtimes.insert(path, Some(mt));
+            }
+        } else {
+            mtimes.insert(path, None);
         }
         items[idx].size = size;
     }
@@ -1327,7 +1335,7 @@ fn compute_sizes_parallel(
         return Vec::new();
     }
     let worker_count = jobs.len().min(MAX_SIZE_COMPUTE_THREADS);
-    let results: std::sync::Mutex<Vec<(usize, u64, Option<SystemTime>)>> =
+    let results: std::sync::Mutex<Vec<(usize, u64, Option<SystemTime>, bool)>> =
         std::sync::Mutex::new(Vec::with_capacity(jobs.len()));
     let next = AtomicUsize::new(0);
     std::thread::scope(|s| {
@@ -1338,9 +1346,9 @@ fn compute_sizes_parallel(
                     break;
                 }
                 let (orig_idx, path, mtime) = &jobs[idx];
-                let size = compute_dir_size(path, timeout);
+                let computed = compute_dir_size_with_status(path, timeout);
                 if let Ok(mut r) = results.lock() {
-                    r.push((*orig_idx, size, *mtime));
+                    r.push((*orig_idx, computed.size, *mtime, computed.measured));
                 }
             });
         }
@@ -1355,6 +1363,10 @@ fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
 }
 
 fn compute_dir_size(path: &Path, timeout: Duration) -> u64 {
+    compute_dir_size_with_status(path, timeout).size
+}
+
+fn compute_dir_size_with_status(path: &Path, timeout: Duration) -> SizeComputation {
     // Use `du -s -b` for logical byte sizes. It is much faster than
     // `du --bytes -x` on large workspace trees while producing the same logical
     // sizes for normal files, so displayed sizes can be populated from cache
@@ -1369,12 +1381,34 @@ fn compute_dir_size(path: &Path, timeout: Duration) -> u64 {
         if !stdout.is_empty() {
             let size_str = stdout.split_whitespace().next().unwrap_or("0");
             if let Ok(size) = size_str.parse::<u64>() {
-                return size;
+                return SizeComputation {
+                    size,
+                    measured: true,
+                };
             }
         }
     }
-    // Fallback: just the directory inode size
-    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+    // Fallback: just the directory inode size. Do not mark the mtime as
+    // authoritative, because a timeout should not prevent a later background
+    // refresh from retrying once the daemon is idle.
+    let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    SizeComputation {
+        size,
+        measured: false,
+    }
+}
+
+fn cached_dir_size_is_fresh(path: &Path, cached_size: u64, cached_mtime: Option<SystemTime>) -> bool {
+    if cached_mtime != current_dir_mtime(path) {
+        return false;
+    }
+
+    // Treat the directory inode size as a placeholder rather than a measured
+    // value. This catches old cache entries and short `du` timeouts that stored
+    // `4096` with a matching mtime, which made stale entries look fresh forever.
+    std::fs::metadata(path)
+        .map(|metadata| !(metadata.is_dir() && cached_size == metadata.len() && cached_size <= 4096))
+        .unwrap_or(false)
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
