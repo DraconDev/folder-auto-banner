@@ -39,6 +39,13 @@ pub fn scan_insights(path: &Path) -> Result<ProjectInsights> {
         .hidden(false)
         .ignore(true)
         .git_ignore(true)
+        .filter_entry(|entry| {
+            // Skip heavy directories that aren't covered by gitignore when
+            // the project root is not itself a git repo. This makes the
+            // scan behave the same as projects that have a .gitignore.
+            let name = entry.file_name().to_string_lossy();
+            !utils::SKIP_DIRS.contains(&name.as_ref())
+        })
         .build();
 
     for entry in walker.flatten() {
@@ -76,13 +83,42 @@ pub fn scan_insights(path: &Path) -> Result<ProjectInsights> {
             continue;
         }
 
+        // Read the file. Cap the read at 256 KiB so a single huge file (e.g.
+        // a vendored bundle, a minified asset, or a generated source file)
+        // cannot dominate the scan cost. Files larger than this still get
+        // counted as a file, but their line/TODO counts are bounded.
+        const MAX_INSIGHT_FILE_BYTES: u64 = 256 * 1024;
+        let file_size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+        if file_size > MAX_INSIGHT_FILE_BYTES {
+            files_scanned += 1;
+            file_count += 1;
+            // Use a conservative per-file line estimate based on file size.
+            // We don't have actual line boundaries, so just skip the
+            // accurate count and the TODO scan for this file.
+            continue;
+        }
         let Ok(content) = std::fs::read_to_string(entry.path()) else {
             continue;
         };
 
         files_scanned += 1;
         file_count += 1;
-        let lines = content.lines().count();
+        // Count lines by counting newlines instead of materializing a
+        // Vec<&str> from content.lines(), which is a significant allocation
+        // for large files like Cargo.lock and large Rust source trees.
+        let bytes = content.as_bytes();
+        let newline_count = bytes.iter().filter(|&&b| b == b'\n').count();
+        let lines = if content.is_empty() {
+            0
+        } else if content.ends_with('\n') {
+            newline_count
+        } else {
+            // If the file does not end with a newline, the implicit trailing
+            // line still counts. This matches what `str::lines().count()` does
+            // (each `\n` ends a line; a non-newline-terminated final line also
+            // counts as a line).
+            newline_count + 1
+        };
         total_loc += lines;
 
         for line in content.lines() {

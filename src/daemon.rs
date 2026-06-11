@@ -1202,10 +1202,12 @@ fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
 fn compute_dir_size(path: &Path) -> u64 {
     // Use `du -s` which is much faster than recursive Rust, but keep it
     // bounded so a pathological directory cannot hang banner responses.
+    // `-x` stays on a single filesystem, which avoids counting through
+    // bind mounts and is significantly faster on trees with many subdirs.
     let path_arg = path.to_string_lossy();
     if let Ok(stdout) = folder_auto_banner::utils::run_with_timeout_stdout(
         "du",
-        &["-s", "--bytes", path_arg.as_ref()],
+        &["-s", "--bytes", "-x", path_arg.as_ref()],
         SIZE_CACHE_REFRESH_TIMEOUT,
     ) {
         let stdout = stdout.trim();

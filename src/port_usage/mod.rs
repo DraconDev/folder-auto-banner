@@ -7,11 +7,23 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::time::Duration;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use crate::utils;
 
 const PORT_TIMEOUT: Duration = Duration::from_millis(500);
+
+// Cache of the latest `ss -tlnp` output for a short window so that a burst
+// of warm requests (or banner recomputes) does not all shell out to `ss`
+// independently. The cache lives for at most 2 seconds, which is short
+// enough to keep port changes reflected in banners within the existing
+// `cached_check!` 10s window.
+static SS_OUTPUT_CACHE: OnceLock<Mutex<Option<(Instant, String)>>> = OnceLock::new();
+fn ss_output_cache() -> &'static Mutex<Option<(Instant, String)>> {
+    SS_OUTPUT_CACHE.get_or_init(|| Mutex::new(None))
+}
+const SS_OUTPUT_TTL: Duration = Duration::from_secs(2);
 
 /// Port scan result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,8 +50,7 @@ pub fn detect_ports(path: &Path) -> Result<PortInfo> {
 
 /// Use `ss -tlnp` to get listening ports, then check if PID's cwd matches project dir
 fn try_ss_with_cwd_check(project_path: &Path) -> Result<Vec<u16>> {
-    let output = utils::run_with_timeout_stdout("ss", &["-tlnp"], PORT_TIMEOUT)?;
-
+    let output = ss_output_cached()?;
     let mut ports = Vec::new();
 
     for line in output.lines() {
@@ -74,6 +85,28 @@ fn try_ss_with_cwd_check(project_path: &Path) -> Result<Vec<u16>> {
 
     ports.sort();
     Ok(ports)
+}
+
+/// Get the latest `ss -tlnp` output, refreshing it at most every
+/// `SS_OUTPUT_TTL`. This dedupes shell-outs when many banner recomputes
+/// happen in a short window (e.g. the warm-burst of child prewarm requests
+/// after opening a large parent directory).
+fn ss_output_cached() -> Result<String> {
+    {
+        let cache = ss_output_cache()
+            .lock()
+            .map_err(|e| anyhow::anyhow!("ss output cache poisoned: {}", e))?;
+        if let Some((at, ref out)) = *cache {
+            if at.elapsed() < SS_OUTPUT_TTL {
+                return Ok(out.clone());
+            }
+        }
+    }
+    let fresh = utils::run_with_timeout_stdout("ss", &["-tlnp"], PORT_TIMEOUT)?;
+    if let Ok(mut cache) = ss_output_cache().lock() {
+        *cache = Some((Instant::now(), fresh.clone()));
+    }
+    Ok(fresh)
 }
 
 /// Extract PID from ss process info string like `users:(\"node\",pid=12345,fd=10)`

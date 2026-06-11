@@ -117,10 +117,12 @@ fn get_git_info_inner(
     collect_file_statuses: bool,
     filter_paths: &[String],
 ) -> Result<GitInfo> {
+    let _t_total = std::time::Instant::now();
     let mut repo = match Repository::discover(path) {
         Ok(r) => r,
         Err(_) => return Ok(GitInfo::default()),
     };
+    let _t_discover = std::time::Instant::now();
 
     // Get stash count first (needs mutable borrow)
     let stash_count = {
@@ -131,6 +133,7 @@ fn get_git_info_inner(
         });
         count
     };
+    let _t_stash = std::time::Instant::now();
 
     let head = repo.head().ok();
 
@@ -360,6 +363,17 @@ fn get_git_info_inner(
     };
 
     let is_dirty = staged > 0 || modified > 0 || untracked > 0;
+
+    if std::env::var("FAB_PROFILE_COMPONENTS").is_ok() {
+        let total = _t_total.elapsed();
+        tracing::info!(
+            "[FAB_PROFILE_COMPONENTS] git_inner: path={} discover={:?} stash={:?} total={:?}",
+            path.display(),
+            _t_discover - _t_total,
+            _t_stash - _t_discover,
+            total
+        );
+    }
 
     Ok(GitInfo {
         is_repo: true,
