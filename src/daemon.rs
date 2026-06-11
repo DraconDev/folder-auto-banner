@@ -985,7 +985,6 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
             });
         }
     }
-    let t_filter = Instant::now();
 
     // Return immediately — sizes come from global cache
     Ok(BannerData { summary, git_info })

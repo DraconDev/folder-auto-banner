@@ -1,7 +1,20 @@
+## [0.6.16] - 2026-06-11
+
+### Performance
+- **Heavier project-insight pruning** — project-insight scans now skip known heavy directories before descent, so `target`, `.git`, `node_modules`, and similar directories do not slow TODO/code-metric collection in large workspace trees.
+- **Leaner large-file insight parsing** — very large files are counted without full TODO/LOC parsing, and newline counts are computed without materializing every line.
+- **Port-detection shell cache** — `ss -tlnp` output is cached briefly to avoid repeated shell-outs during warm pre-warming bursts.
+- **Filesystem-local size refresh** — displayed directory sizes use `du -s --bytes -x` so size refresh stays on the same filesystem.
+
+### Notes
+- Warm cache hits remain single-digit milliseconds after pre-warm.
+- Cold scans for very large directories are still bounded by accurate directory-size refresh work, but project-insight and port-detection overhead is lower.
+
+
 ## [0.6.15] - 2026-06-10
 
 ### Performance
-- **Reliable child pre-warming** — warm requests now use one short-lived daemon connection per path and are sent before the CLI exits, so the pre-warmed child directories actually get cached.
+- **Reliable child pre-warming** — warm requests now use one short-lived daemon connection per path and are sent before the CLI exits, so pre-warmed child directories actually get cached.
 - **Wider pre-warm coverage** — the client now warms the parent, grandparent, and up to 30 immediate children of the current directory, which covers large `~/Dev` trees much better than the previous 5-child limit.
 - **Bounded cold-size refresh** — directory size refresh uses a bounded `du` timeout to reduce first-hit latency on very large trees while keeping normal directory sizes accurate.
 - **Cleaner daemon IPC failures** — daemon-side compute errors now return structured IPC errors instead of leaving the client to read a half-closed stream.
@@ -12,25 +25,31 @@
 - The first cold view of a large directory still has to compute directory sizes, git status, TODOs, ports, and metrics, but the worst-case size refresh is now bounded.
 
 
+## [0.6.14] - 2026-06-10
 
 ### Performance
-- **Reliable child pre-warming** — warm requests now use one short-lived daemon connection per path and are sent before the CLI exits, so the pre-warmed child directories actually get cached.
-- **Wider pre-warm coverage** — the client now warms the parent, grandparent, and up to 30 immediate children of the current directory, which covers large `~/Dev` trees much better than the previous 5-child limit.
-- **Bounded cold-size refresh** — directory size refresh uses a bounded `du` timeout to reduce first-hit latency on very large trees while keeping normal directory sizes accurate.
-- **Cleaner daemon IPC failures** — daemon-side compute errors now return structured IPC errors instead of leaving the client to read a half-closed stream.
-- **Clearer missing-path errors** — relative paths that do not exist now fail directly with `No such file or directory: Dev` instead of producing a confusing `send_and_recv` error.
+- **More accurate bounded size refresh** — directory-size refresh keeps its timeout bounded while preserving normal directory-size accuracy better than the tighter 0.6.12 refresh window.
 
 ### Notes
 - Warm cache hits remain single-digit milliseconds.
-- The first cold view of a large directory still has to compute directory sizes, git status, TODOs, ports, and metrics, but the worst-case size refresh is now bounded.
+- No banner, JSON, or navigation behavior changes.
 
 
+## [0.6.13] - 2026-06-10
 
 ### Performance
-- **Reliable child pre-warming** — warm requests now use one short-lived daemon connection per path and are sent before the CLI exits, so the pre-warmed child directories actually get cached.
-- **Wider pre-warm coverage** — the client now warms the parent, grandparent, and up to 30 immediate children of the current directory, which covers large `~/Dev` trees much better than the previous 5-child limit.
+- **Expanded pre-warm coverage** — the client now warms the parent, grandparent, and up to 30 immediate children of the current directory.
+- **Reliable warm-request delivery** — warm requests are sent on short-lived daemon connections before the CLI exits.
+
+### Notes
+- Preserves banner output, JSON output, and numeric navigation behavior.
+
+
+## [0.6.12] - 2026-06-10
+
+### Performance
 - **Tighter cold-size refresh** — directory size refresh keeps a bounded `du` timeout to reduce first-hit latency on very large trees.
-- **Cleaner daemon IPC failures** — daemon-side compute errors now return structured IPC errors instead of leaving the client to read a half-closed stream.
+- **Cleaner daemon IPC failures** — daemon compute errors now return structured IPC errors instead of leaving the client to read a half-closed stream.
 - **Clearer missing-path errors** — relative paths that do not exist now fail directly with `No such file or directory: Dev` instead of producing a confusing `send_and_recv` error.
 
 ### Notes
@@ -38,17 +57,7 @@
 - The first cold view of a large directory still has to compute directory sizes, git status, TODOs, ports, and metrics, but the worst-case size refresh is now bounded more tightly.
 
 
-
-### Performance
-- **Faster first-size refresh** — directory size refresh now uses a tighter `du` timeout, reducing cold banner latency for large trees while preserving cached sizes on subsequent visits.
-- **Cleaner daemon IPC failures** — daemon compute errors now return structured IPC errors instead of leaving the client to read a half-closed stream.
-- **Clearer missing-path errors** — relative paths that do not exist now fail before daemon IPC, avoiding confusing `send_and_recv` errors.
-
-### Notes
-- Warm cache hits remain single-digit milliseconds.
-- The first cold view of a large directory still has to compute directory sizes, git status, TODOs, ports, and metrics, but the worst-case size refresh is now bounded more tightly.
-
-
+## [0.6.11] - 2026-06-10
 
 ### Performance
 - **Smarter pre-warming of nearby directories** — after a banner is rendered, the client now warms the parent, the grandparent, and the first few immediate children of the current directory, so moving up or stepping into a sibling/child is served from the daemon cache instead of recomputing.
@@ -58,6 +67,7 @@
 - Preserves banner output, JSON output, and numeric navigation behavior.
 
 
+## [0.6.10] - 2026-06-10
 
 ### Packaging
 - **Corrected crates.io repository metadata** — package metadata now points to `https://github.com/DraconDev/folder-auto-banner` and includes homepage/documentation links.
@@ -67,6 +77,7 @@
 - No runtime behavior changes.
 
 
+## [0.6.9] - 2026-06-10
 
 ### Performance
 - **Global uid/gid name caches** — `/etc/passwd` and `/etc/group` are loaded once per process instead of reparsing them for every directory scan.
@@ -78,6 +89,7 @@
 - No new dependencies.
 
 
+## [0.6.8] - 2026-06-10
 
 ### Performance
 - **Tighter git status pathspecs** — filtered git status collection now limits directory status walks to immediate children (`dir/*`) instead of asking libgit2 to scan every nested file under displayed directories.
@@ -90,6 +102,7 @@
 - No new dependencies.
 
 
+## [0.6.7] - 2026-06-10
 
 ### Performance
 - **Avoid duplicate project-insight scans** — TODO counts and code metrics now share one bounded tree walk when both are enabled, reducing cold daemon scans and file reads.
@@ -101,6 +114,7 @@
 - No new dependencies.
 
 
+## [0.6.6] - 2026-06-10
 
 ### Fixed
 - **`f N` navigation bug** — when running `f N` (e.g. `f 40`), the daemon was being asked for the banner of the path `"40"` (the number string) instead of the current directory. This caused `f N` to return an empty path or open the wrong file when the number didn't match a real directory. The path is now resolved correctly: numeric navigation always uses the current directory, matching how the shell function invokes `f banner N`.
@@ -109,36 +123,6 @@
 - Preserves 0.6.5 behavior in all other respects.
 - No new dependencies.
 
-
-### Fixed
-- **No spurious cache invalidations from VCS or build internals** — the inotify watcher now skips `.git`, `.hg`, `.svn`, `target`, `node_modules`, `.next`, `dist`, `build`, `.cache`, `.parcel-cache`, and `.turbo` directories. Previously, the daemon's own git operations (creating `.git/index.lock` and `.git/objects/tmp_object_*` files) would trigger the watcher and invalidate the cached banner within seconds of a request, preventing the size cache from ever persisting.
-- **Descendant changes no longer invalidate the parent banner** — the watcher now only invalidates the banner cache when the event is on the root directory itself. Events in descendants (e.g. a test runner cleaning up directories deep inside a child project) only prune the size cache for the affected root, keeping the banner's item listing valid.
-
-### Notes
-- Preserves 0.6.4 persistence and active-folder watcher behavior.
-- No new dependencies.
-
-
-### Fixed
-- **Fast persisted directory sizes** — directory size data is now persisted with mtimes and reloaded on daemon restart, so large parent folders such as `~/Dev` do not need to recompute every child size after the daemon restarts.
-- **Bounded large-folder latency** — displayed directory sizes are computed with a bounded worker pool, so the first cold request for a large folder is kept to a low-seconds worst case instead of serially waiting up to one second per child directory.
-
-### Notes
-- Preserves 0.6.3 freshness and active-folder watcher behavior.
-- No new dependencies.
-
-
-### Fixed
-- **Snappy fresh daemon** — replaced the expensive shallow validation scan on every daemon cache hit with active-folder inotify watching:
-  - Requested folders become active and are watched, with bounded recursive coverage for descendant files and directories.
-  - Nested create/delete/modify/move events invalidate the banner cache, so folder contents and displayed directory sizes refresh without waiting for the TTL.
-  - A cheap root-mtime guard remains as a fallback for changes that do not emit an actionable inotify event.
-  - Newly active folders are prioritized so hot folders get watched promptly even when many folders are cached.
-- Persisted daemon caches are treated as expired on daemon restart, so the first request after restart recomputes the banner and refreshes size data.
-
-### Notes
-- Preserves the 0.6.2 freshness guarantees while restoring fast cache-hit latency.
-- No new dependencies.
 
 ## [0.6.2] - 2026-06-09
 
