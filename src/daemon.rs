@@ -770,8 +770,8 @@ fn handle_client(
                     );
                     touch_active_root(&active_roots, &active_order, path.clone());
                 }
-                if displayed_dir_sizes_need_refresh_cached(
-                    &data.summary.top_items,
+                if apply_cached_displayed_dir_sizes(
+                    &mut data.summary.top_items,
                     &dir_sizes,
                     &dir_size_mtimes,
                 ) {
@@ -826,6 +826,11 @@ fn handle_client(
             // Store in cache immediately so follow-up navigation is fast. Size
             // refresh for large directories continues in the background and
             // replaces the cache entry when accurate sizes are ready.
+            apply_cached_displayed_dir_sizes(
+                &mut data.summary.top_items,
+                &dir_sizes,
+                &dir_size_mtimes,
+            );
             {
                 let mut cache = cache.lock().unwrap_or_else(|e| {
                     tracing::warn!("Mutex poisoned, recovering");
@@ -870,7 +875,12 @@ fn handle_client(
                 };
                 if !cache_hit {
                     match compute_banner_data(&path) {
-                        Ok(data) => {
+                        Ok(mut data) => {
+                            apply_cached_displayed_dir_sizes(
+                                &mut data.summary.top_items,
+                                &dir_sizes,
+                                &dir_size_mtimes,
+                            );
                             let mut c = cache.lock().unwrap_or_else(|e| {
                                 tracing::warn!("Mutex poisoned, recovering");
                                 e.into_inner()
@@ -1112,6 +1122,32 @@ fn prune_size_cache_for_root(
         .retain(|path, _| path != root && !path.starts_with(root));
 }
 
+fn apply_cached_displayed_dir_sizes(
+    items: &mut [DirEntry],
+    dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+) -> bool {
+    let sizes = dir_sizes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    let mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    let mut needs_refresh = false;
+    for item in items.iter_mut().filter(|item| item.is_dir) {
+        let current_mtime = current_dir_mtime(&item.path);
+        match sizes.get(&item.path).copied() {
+            Some(size) if mtimes.get(&item.path).copied().flatten() == current_mtime => {
+                item.size = size;
+            }
+            _ => needs_refresh = true,
+        }
+    }
+    needs_refresh
+}
+
 fn displayed_dir_sizes_need_refresh(
     items: &[DirEntry],
     sizes: &HashMap<PathBuf, u64>,
@@ -1155,6 +1191,7 @@ fn schedule_size_refresh(
     active_order: Arc<Mutex<Vec<PathBuf>>>,
     timeout: Duration,
 ) {
+    let computed_at = Instant::now();
     thread::spawn(move || {
         let mut refreshed = data;
         refresh_displayed_dir_sizes(
@@ -1176,14 +1213,14 @@ fn schedule_size_refresh(
         });
         let should_replace = c
             .get(&path)
-            .map(|entry| entry.computed_at <= Instant::now())
+            .map(|entry| entry.computed_at <= computed_at)
             .unwrap_or(true);
         if should_replace {
             c.insert(
                 path.clone(),
                 CacheEntry {
                     data: refreshed,
-                    computed_at: Instant::now(),
+                    computed_at,
                     root_mtime: current_dir_mtime(&path),
                 },
             );
