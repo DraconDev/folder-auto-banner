@@ -23,6 +23,7 @@ struct CacheEntry {
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
 const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(750);
 const BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_secs(5);
+const ACTIVE_SIZE_REFRESH_TIMEOUT: Duration = Duration::from_secs(10);
 const ACTIVE_SIZE_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
 const ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK: usize = 5;
 const MAX_SIZE_COMPUTE_THREADS: usize = 16;
@@ -70,11 +71,28 @@ struct SizeComputation {
 
 type SizeComputeResult = (usize, u64, Option<SystemTime>, bool);
 
+struct SizeRefreshGuard {
+    in_flight: Arc<Mutex<HashSet<PathBuf>>>,
+    path: PathBuf,
+}
+
+impl Drop for SizeRefreshGuard {
+    fn drop(&mut self) {
+        let mut in_flight = self.in_flight.lock().unwrap_or_else(|e| {
+            tracing::warn!("In-flight size-refresh mutex poisoned, recovering");
+            e.into_inner()
+        });
+        in_flight.remove(&self.path);
+    }
+}
+
 #[derive(Clone)]
 struct SizeRefreshContext {
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    pending_size_refreshes: Arc<Mutex<Vec<PathBuf>>>,
+    size_refresh_in_flight: Arc<Mutex<HashSet<PathBuf>>>,
     active_roots: Arc<Mutex<HashSet<PathBuf>>>,
     active_order: Arc<Mutex<Vec<PathBuf>>>,
 }
@@ -85,6 +103,8 @@ struct Daemon {
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     /// Last observed mtime for each cached directory size
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    pending_size_refreshes: Arc<Mutex<Vec<PathBuf>>>,
+    size_refresh_in_flight: Arc<Mutex<HashSet<PathBuf>>>,
     socket_path: PathBuf,
 }
 
@@ -112,6 +132,8 @@ impl Daemon {
             cache: Arc::new(Mutex::new(HashMap::new())),
             dir_sizes: Arc::new(Mutex::new(dir_sizes)),
             dir_size_mtimes: Arc::new(Mutex::new(dir_size_mtimes)),
+            pending_size_refreshes: Arc::new(Mutex::new(Vec::new())),
+            size_refresh_in_flight: Arc::new(Mutex::new(HashSet::new())),
             socket_path,
         })
     }
@@ -183,6 +205,8 @@ impl Daemon {
             cache: self.cache.clone(),
             dir_sizes: self.dir_sizes.clone(),
             dir_size_mtimes: self.dir_size_mtimes.clone(),
+            pending_size_refreshes: self.pending_size_refreshes.clone(),
+            size_refresh_in_flight: self.size_refresh_in_flight.clone(),
             active_roots: active_roots.clone(),
             active_order: active_order.clone(),
         });
@@ -1177,15 +1201,34 @@ fn active_size_refresh_loop(ctx: Arc<SizeRefreshContext>) {
         thread::sleep(ACTIVE_SIZE_REFRESH_INTERVAL);
 
         let roots: Vec<PathBuf> = {
-            let order = ctx.active_order.lock().unwrap_or_else(|e| {
-                tracing::warn!("Active order mutex poisoned, recovering");
+            let mut pending = ctx.pending_size_refreshes.lock().unwrap_or_else(|e| {
+                tracing::warn!("Pending size-refresh mutex poisoned, recovering");
                 e.into_inner()
             });
-            order
-                .iter()
-                .take(ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK)
-                .cloned()
-                .collect()
+            let mut out = Vec::with_capacity(ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK);
+            let mut remaining = Vec::new();
+            for path in pending.drain(..) {
+                if out.len() < ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK && !out.contains(&path) {
+                    out.push(path);
+                } else if !remaining.contains(&path) {
+                    remaining.push(path);
+                }
+            }
+            *pending = remaining;
+            drop(pending);
+            if out.is_empty() {
+                let order = ctx.active_order.lock().unwrap_or_else(|e| {
+                    tracing::warn!("Active order mutex poisoned, recovering");
+                    e.into_inner()
+                });
+                order
+                    .iter()
+                    .take(ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK)
+                    .cloned()
+                    .collect()
+            } else {
+                out
+            }
         };
 
         for path in roots {
