@@ -4,7 +4,9 @@
   <img src="public/fab_thumb.png" alt="f — Folder Auto Banner" width="800">
 </p>
 
-A directory listing with instant context.
+A contextual directory dashboard that combines a file listing with project signals such as git status, TODOs, code metrics, build status, ports, Docker state, and cached directory sizes.
+
+Repeated views are served from the background daemon. The first cold view of a very large directory returns quickly and may show temporary `4.0k` placeholders while directory sizes refresh in the background; subsequent warm views use populated cached sizes.
 
 ## What It Does
 
@@ -79,26 +81,36 @@ f -R, --recursive    # Recurse into subdirectories
 f --filter rs        # Filter by pattern
 f install            # Install shell function for f N → cd
 f config             # Open config file
-f daemon stop        # Stop daemon
-f daemon status      # Check daemon status
+f daemon restart   # Restart daemon
+f daemon status    # Check daemon status
+f daemon stop      # Stop daemon
+f install          # Install shell function for f N → cd
+f config           # Open config file
 ```
 
 ## Shell Function (`f install`)
 
-The `f install` subcommand sets up the shell function that enables `f N` → `cd` navigation:
+The `f install` subcommand writes shell wrappers that enable `f N` → `cd` navigation:
 
-- Writes the shell wrapper (`fab-shell.zsh` / `fab-shell.bash`) to `~/.local/bin/`
-- Adds a `source` line to `~/.zshrc` and/or `~/.bashrc`
+- Writes `~/.local/bin/fab-shell.zsh` and `~/.local/bin/fab-shell.bash`
+- Adds source lines to `~/.zshrc` and/or `~/.bashrc`
 - Is idempotent — safe to run multiple times
 
 This is called automatically by `./install.sh`. You can also run it standalone:
 
 ```bash
-f install              # Install shell function
+f install              # Install shell wrappers
 f install --debug      # Install with debug output
 ```
 
-The shell function is the single source of truth — it reads from the compiled-in `src/shell_wrapper.rs` constants, not from the standalone files in the repo root.
+Start a new shell, or activate the wrappers immediately:
+
+```bash
+source ~/.local/bin/fab-shell.zsh   # for zsh
+source ~/.local/bin/fab-shell.bash  # for bash
+```
+
+The shell wrapper is the source of truth for `f N` navigation. It calls the installed `f` binary; the checked-in `fab-shell.zsh` and `fab-shell.bash` files are generated from the compiled-in `src/shell_wrapper.rs` constants.
 
 ## Numbered Navigation
 
@@ -121,7 +133,7 @@ f 3 -e       # force open in editor
 f 3 -x       # force run the file directly
 ```
 
-> **Note:** `f N` requires the shell function to be installed. Running `./install.sh` or `f install` sets it up automatically. To activate it in your current terminal without restarting your shell:
+> **Note:** `f N` requires the shell wrappers installed by `./install.sh` or `f install`. To activate them in your current terminal without restarting your shell:
 >
 > ```bash
 > source ~/.local/bin/fab-shell.zsh   # for zsh
@@ -237,8 +249,8 @@ Recent files pop out; old files recede into the background.
 ## Testing
 
 ```bash
-cargo test    # 65 tests pass
-cargo clippy  # 0 warnings
+cargo test    # full test suite
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 ## License

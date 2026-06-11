@@ -1,83 +1,76 @@
-# fab — Installation Guide
+# f — Installation Guide
 
-## Quick Start
+## Recommended install
 
-### Method 1: Auto Install Script (Recommended)
+Build and install the binary, shell wrappers, and daemon hooks from the repository:
 
 ```bash
-cd fab
 ./install.sh
-exec zsh   # or: source ~/.bashrc
 ```
 
-### Method 2: Build + Install
+The script installs:
+
+- `f` and `fabd` into `~/.local/bin`
+- shell wrappers for `f N` navigation into `~/.local/bin`
+- source lines in `~/.zshrc` and/or `~/.bashrc`
+- the user systemd service for the background daemon, if available
+
+Start a new shell, or activate the shell wrappers immediately:
 
 ```bash
-cd fab
+source ~/.local/bin/fab-shell.zsh   # zsh
+source ~/.local/bin/fab-shell.bash  # bash
+```
+
+## Cargo install
+
+Install the latest released version from crates.io:
+
+```bash
+cargo install folder-auto-banner
+```
+
+Then install the shell wrappers for `f N` navigation:
+
+```bash
+f install
+```
+
+Start a new shell, or source the wrappers immediately as shown above.
+
+## Manual build from this checkout
+
+```bash
 cargo build --release
 ./install.sh
-exec zsh   # or: source ~/.bashrc
+f install
 ```
 
-### Method 3: Cargo Install
+## Daemon management
+
+The background daemon is managed through `f daemon`:
 
 ```bash
-cargo install --path .
+f daemon status   # show daemon state
+f daemon restart  # restart daemon
+f daemon stop     # stop daemon
+f daemon start    # start daemon
 ```
 
-Then add the hook to your shell config manually — see the section below.
-
----
-
-## Shell Hook Setup
-
-Add the appropriate section to your shell config:
-
-### Zsh (`~/.zshrc`)
-```bash
-# fab auto-banner hook
-autoload -U add-zsh-hook
-add-zsh-hook chpwd _fab_hook
-_fab_hook() {
-    eval "$(command f env "$PWD")"
-    command f banner "$PWD"
-}
-_fab_hook  # fire on new shell/tab startup
-```
-
-### Bash (`~/.bashrc`)
-```bash
-# fab auto-banner hook
-_fab_hook() {
-    eval "$(command f env "$PWD")"
-    command f banner "$PWD"
-}
-PROMPT_COMMAND="_fab_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
-```
-
-Then reload: `exec zsh` or `source ~/.bashrc`
-
----
-
-## Usage
+If the banner ever looks stale, restart the daemon and give the background size refresh a moment:
 
 ```bash
-f                          # Show banner for current directory
-f banner /some/path        # Show banner for specific directory
-f banner --json            # JSON output
-f stats                    # Directory statistics
-f yank file.txt            # Copy to clipboard
-f paste                    # Paste from clipboard
-f mv src/file target/      # Move file
-f diff src cmd             # Compare directories
-f pin myproject            # Pin current directory
-f jump myproject           # Jump to pinned directory
-f install-hook             # Print shell hook for manual setup
+f daemon restart
+f ~/Downloads
+sleep 35
+f ~/Downloads
 ```
+
+The first fast view of a large directory may show temporary `4.0k` placeholders while the daemon refreshes directory sizes in the background. After the refresh completes, subsequent views should use populated sizes from cache.
 
 ## Testing
 
 ```bash
-cargo run                   # Test the banner
-cargo test                  # Run test suite
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
 ```
