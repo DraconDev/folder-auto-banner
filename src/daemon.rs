@@ -735,6 +735,14 @@ fn handle_client(
                 let mut data = entry.data;
                 let t1 = std::time::Instant::now();
                 if expired || !root_fresh {
+                    tracing::debug!(
+                        "Cache miss/recompute: path={} expired={} root_fresh={} root_mtime={:?} current_mtime={:?}",
+                        path.display(),
+                        expired,
+                        root_fresh,
+                        entry.root_mtime,
+                        current_dir_mtime(&path),
+                    );
                     let data = match compute_banner_data(&path) {
                         Ok(data) => data,
                         Err(e) => {
