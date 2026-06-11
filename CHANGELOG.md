@@ -1,3 +1,9 @@
+## [0.6.19] - 2026-06-11
+
+### Fixes
+- **Active background directory-size refresh** — the daemon now periodically refreshes stale or placeholder directory sizes for active roots, so large visited directories such as `~/Downloads` populate child sizes without waiting for the next foreground navigation.
+- **Placeholder-size retry** — cached `4096`/`4.0k` directory inode fallback sizes are no longer treated as authoritative; background refresh retries them later with a longer timeout.
+
 ## [0.6.18] - 2026-06-11
 
 ### Fixes
