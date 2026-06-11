@@ -850,7 +850,14 @@ fn handle_client(
                 };
                 if !cache_hit {
                     match compute_banner_data(&path) {
-                        Ok(data) => {
+                        Ok(mut data) => {
+                            refresh_displayed_dir_sizes(
+                                &mut data.summary.top_items,
+                                &dir_sizes,
+                                &dir_size_mtimes,
+                            );
+                            data.summary.total_size =
+                                data.summary.top_items.iter().map(|item| item.size).sum();
                             let mut c = cache.lock().unwrap_or_else(|e| {
                                 tracing::warn!("Mutex poisoned, recovering");
                                 e.into_inner()
@@ -1178,14 +1185,14 @@ fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
 }
 
 fn compute_dir_size(path: &Path) -> u64 {
-    // Use `du -s` which is much faster than recursive Rust, but keep it
-    // bounded so a pathological directory cannot hang banner responses.
-    // `-x` stays on a single filesystem, which avoids counting through
-    // bind mounts and is significantly faster on trees with many subdirs.
+    // Use `du -s -b` for logical byte sizes. It is much faster than
+    // `du --bytes -x` on large workspace trees while producing the same logical
+    // sizes for normal files, so displayed sizes can be populated from cache
+    // instead of falling back to the 4 KiB directory inode size.
     let path_arg = path.to_string_lossy();
     if let Ok(stdout) = folder_auto_banner::utils::run_with_timeout_stdout(
         "du",
-        &["-s", "--bytes", "-x", path_arg.as_ref()],
+        &["-s", "-b", path_arg.as_ref()],
         SIZE_CACHE_REFRESH_TIMEOUT,
     ) {
         let stdout = stdout.trim();
