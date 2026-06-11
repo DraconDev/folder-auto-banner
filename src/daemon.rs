@@ -770,11 +770,28 @@ fn handle_client(
                     );
                     touch_active_root(&active_roots, &active_order, path.clone());
                 }
-                refresh_displayed_dir_sizes(
-                    &mut data.summary.top_items,
-                    &dir_sizes,
-                    &dir_size_mtimes,
-                );
+                if displayed_dir_sizes_need_refresh(
+                    &data.summary.top_items,
+                    &dir_sizes.lock().unwrap_or_else(|e| {
+                        tracing::warn!("Mutex poisoned, recovering");
+                        e.into_inner()
+                    }),
+                    &dir_size_mtimes.lock().unwrap_or_else(|e| {
+                        tracing::warn!("Mutex poisoned, recovering");
+                        e.into_inner()
+                    }),
+                ) {
+                    schedule_size_refresh(
+                        path.clone(),
+                        data.clone(),
+                        cache,
+                        dir_sizes,
+                        dir_size_mtimes,
+                        active_roots,
+                        active_order,
+                        BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
+                    );
+                }
                 data.summary.total_size = data.summary.top_items.iter().map(|item| item.size).sum();
                 let t2 = std::time::Instant::now();
                 let t3 = std::time::Instant::now();
@@ -812,10 +829,9 @@ fn handle_client(
                 }
             };
 
-            refresh_displayed_dir_sizes(&mut data.summary.top_items, &dir_sizes, &dir_size_mtimes);
-            data.summary.total_size = data.summary.top_items.iter().map(|item| item.size).sum();
-
-            // Store in cache
+            // Store in cache immediately so follow-up navigation is fast. Size
+            // refresh for large directories continues in the background and
+            // replaces the cache entry when accurate sizes are ready.
             {
                 let mut cache = cache.lock().unwrap_or_else(|e| {
                     tracing::warn!("Mutex poisoned, recovering");
@@ -831,7 +847,16 @@ fn handle_client(
                 );
                 touch_active_root(&active_roots, &active_order, path.clone());
             }
-
+            schedule_size_refresh(
+                path.clone(),
+                data.clone(),
+                cache,
+                dir_sizes,
+                dir_size_mtimes,
+                active_roots,
+                active_order,
+                BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
+            );
             Response::Banner(Box::new(data))
         }
         Request::Warm { path } => {
@@ -851,14 +876,7 @@ fn handle_client(
                 };
                 if !cache_hit {
                     match compute_banner_data(&path) {
-                        Ok(mut data) => {
-                            refresh_displayed_dir_sizes(
-                                &mut data.summary.top_items,
-                                &dir_sizes,
-                                &dir_size_mtimes,
-                            );
-                            data.summary.total_size =
-                                data.summary.top_items.iter().map(|item| item.size).sum();
+                        Ok(data) => {
                             let mut c = cache.lock().unwrap_or_else(|e| {
                                 tracing::warn!("Mutex poisoned, recovering");
                                 e.into_inner()
@@ -866,12 +884,22 @@ fn handle_client(
                             c.insert(
                                 path.clone(),
                                 CacheEntry {
-                                    data,
+                                    data: data.clone(),
                                     computed_at: Instant::now(),
                                     root_mtime: current_dir_mtime(&path),
                                 },
                             );
-                            touch_active_root(&active_roots, &active_order, path);
+                            touch_active_root(&active_roots, &active_order, path.clone());
+                            schedule_size_refresh(
+                                path,
+                                data,
+                                cache,
+                                dir_sizes,
+                                dir_size_mtimes,
+                                active_roots,
+                                active_order,
+                                BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
+                            );
                         }
                         Err(e) => {
                             tracing::debug!("Warm request failed for {}: {}", path.display(), e);
@@ -1583,13 +1611,23 @@ mod tests {
         let dir_sizes = Arc::new(Mutex::new(HashMap::new()));
         let dir_size_mtimes = Arc::new(Mutex::new(HashMap::new()));
 
-        refresh_displayed_dir_sizes(&mut items, &dir_sizes, &dir_size_mtimes);
+        refresh_displayed_dir_sizes(
+            &mut items,
+            &dir_sizes,
+            &dir_size_mtimes,
+            Duration::from_secs(5),
+        );
         let first_size = items[0].size;
         assert!(first_size > 0);
 
         std::thread::sleep(Duration::from_millis(20));
         std::fs::write(child.join("two.txt"), "two").unwrap();
-        refresh_displayed_dir_sizes(&mut items, &dir_sizes, &dir_size_mtimes);
+        refresh_displayed_dir_sizes(
+            &mut items,
+            &dir_sizes,
+            &dir_size_mtimes,
+            Duration::from_secs(5),
+        );
 
         assert!(items[0].size > first_size);
     }
