@@ -23,6 +23,8 @@ struct CacheEntry {
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
 const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(750);
 const BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_secs(5);
+const ACTIVE_SIZE_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+const ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK: usize = 5;
 const MAX_SIZE_COMPUTE_THREADS: usize = 16;
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
@@ -58,6 +60,12 @@ struct ShallowItem {
 struct WatchRegistration {
     owner: PathBuf,
     watched_path: PathBuf,
+}
+
+#[derive(Clone, Copy)]
+struct SizeComputation {
+    size: u64,
+    measured: bool,
 }
 
 #[derive(Clone)]
@@ -169,6 +177,16 @@ impl Daemon {
             tracing::info!("Loaded {} banner caches from disk", cache.len());
         }
 
+        let size_refresh_ctx = Arc::new(SizeRefreshContext {
+            cache: self.cache.clone(),
+            dir_sizes: self.dir_sizes.clone(),
+            dir_size_mtimes: self.dir_size_mtimes.clone(),
+            active_roots: active_roots.clone(),
+            active_order: active_order.clone(),
+        });
+        let active_size_refresh_ctx = size_refresh_ctx.clone();
+        thread::spawn(move || active_size_refresh_loop(active_size_refresh_ctx));
+
         let mut last_activity = Instant::now();
         let mut last_save = Instant::now();
 
@@ -181,6 +199,7 @@ impl Daemon {
                     let dir_size_mtimes = self.dir_size_mtimes.clone();
                     let active_roots = active_roots.clone();
                     let active_order = active_order.clone();
+                    let size_refresh_ctx = size_refresh_ctx.clone();
                     thread::spawn(move || {
                         if let Err(e) = handle_client(
                             stream,
@@ -189,6 +208,7 @@ impl Daemon {
                             dir_size_mtimes,
                             active_roots,
                             active_order,
+                            size_refresh_ctx,
                         ) {
                             tracing::error!("Client error: {}", e);
                         }
@@ -696,6 +716,7 @@ fn handle_client(
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
     active_roots: Arc<Mutex<HashSet<PathBuf>>>,
     active_order: Arc<Mutex<Vec<PathBuf>>>,
+    size_refresh_ctx: Arc<SizeRefreshContext>,
 ) -> Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
@@ -711,13 +732,6 @@ fn handle_client(
     let mut req_buf = vec![0u8; req_len];
     stream.read_exact(&mut req_buf)?;
     let request: Request = serde_json::from_slice(&req_buf)?;
-    let size_refresh_ctx = Arc::new(SizeRefreshContext {
-        cache: cache.clone(),
-        dir_sizes: dir_sizes.clone(),
-        dir_size_mtimes: dir_size_mtimes.clone(),
-        active_roots: active_roots.clone(),
-        active_order: active_order.clone(),
-    });
     let t_parse = std::time::Instant::now();
     tracing::debug!(
         "Received request: {:?} (read={:?}, parse={:?})",
