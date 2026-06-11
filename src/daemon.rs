@@ -887,7 +887,7 @@ fn handle_client(
                     size
                 }
                 _ => {
-                    let size = compute_dir_size(&path);
+                    let size = compute_dir_size(path);
                     sizes.insert(path.clone(), size);
                     mtimes.insert(path.clone(), current_dir_mtime(path));
                     size
