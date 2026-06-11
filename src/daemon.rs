@@ -810,7 +810,7 @@ fn handle_client(
             }
 
             // Cache miss or stale shallow snapshot — do full scan
-            let data = match compute_banner_data(&path) {
+            let mut data = match compute_banner_data(&path) {
                 Ok(data) => data,
                 Err(e) => {
                     send_response(
