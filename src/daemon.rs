@@ -770,16 +770,10 @@ fn handle_client(
                     );
                     touch_active_root(&active_roots, &active_order, path.clone());
                 }
-                if displayed_dir_sizes_need_refresh(
+                if displayed_dir_sizes_need_refresh_cached(
                     &data.summary.top_items,
-                    &dir_sizes.lock().unwrap_or_else(|e| {
-                        tracing::warn!("Mutex poisoned, recovering");
-                        e.into_inner()
-                    }),
-                    &dir_size_mtimes.lock().unwrap_or_else(|e| {
-                        tracing::warn!("Mutex poisoned, recovering");
-                        e.into_inner()
-                    }),
+                    &dir_sizes,
+                    &dir_size_mtimes,
                 ) {
                     schedule_size_refresh(
                         path.clone(),
@@ -890,6 +884,7 @@ fn handle_client(
                                 },
                             );
                             touch_active_root(&active_roots, &active_order, path.clone());
+                            drop(c);
                             schedule_size_refresh(
                                 path,
                                 data,
@@ -1134,6 +1129,22 @@ fn displayed_dir_sizes_need_refresh(
     })
 }
 
+fn displayed_dir_sizes_need_refresh_cached(
+    items: &[DirEntry],
+    dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
+    dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+) -> bool {
+    let sizes = dir_sizes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    let mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    displayed_dir_sizes_need_refresh(items, &sizes, &mtimes)
+}
+
 fn schedule_size_refresh(
     path: PathBuf,
     data: BannerData,
@@ -1220,7 +1231,7 @@ fn refresh_displayed_dir_sizes(
     }
 
     // Compute sizes in parallel to keep banner latency bounded on large trees.
-    let results = compute_sizes_parallel(jobs);
+    let results = compute_sizes_parallel(jobs, timeout);
 
     // Update cache and items.
     let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
@@ -1245,6 +1256,7 @@ fn refresh_displayed_dir_sizes(
 
 fn compute_sizes_parallel(
     jobs: Vec<(usize, PathBuf, Option<SystemTime>)>,
+    timeout: Duration,
 ) -> Vec<(usize, u64, Option<SystemTime>)> {
     use std::sync::atomic::{AtomicUsize, Ordering};
     if jobs.is_empty() {
