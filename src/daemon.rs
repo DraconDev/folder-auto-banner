@@ -68,6 +68,8 @@ struct SizeComputation {
     measured: bool,
 }
 
+type SizeComputeResult = (usize, u64, Option<SystemTime>, bool);
+
 #[derive(Clone)]
 struct SizeRefreshContext {
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
@@ -1159,7 +1161,6 @@ fn apply_cached_displayed_dir_sizes(
     });
     let mut needs_refresh = false;
     for item in items.iter_mut().filter(|item| item.is_dir) {
-        let current_mtime = current_dir_mtime(&item.path);
         let cached_mtime = mtimes.get(&item.path).copied().flatten();
         match sizes.get(&item.path).copied() {
             Some(size) if cached_dir_size_is_fresh(&item.path, size, cached_mtime) => {
@@ -1330,7 +1331,7 @@ fn refresh_displayed_dir_sizes(
 fn compute_sizes_parallel(
     jobs: Vec<(usize, PathBuf, Option<SystemTime>)>,
     timeout: Duration,
-) -> Vec<(usize, u64, Option<SystemTime>)> {
+) -> Vec<(usize, u64, Option<SystemTime>, bool)> {
     use std::sync::atomic::{AtomicUsize, Ordering};
     if jobs.is_empty() {
         return Vec::new();
@@ -1361,10 +1362,6 @@ fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
     std::fs::metadata(path)
         .ok()
         .and_then(|metadata| metadata.modified().ok())
-}
-
-fn compute_dir_size(path: &Path, timeout: Duration) -> u64 {
-    compute_dir_size_with_status(path, timeout).size
 }
 
 fn compute_dir_size_with_status(path: &Path, timeout: Duration) -> SizeComputation {
@@ -1659,7 +1656,7 @@ mod tests {
     fn test_compute_dir_size() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("sample.txt"), "hello").unwrap();
-        let size = compute_dir_size(tmp.path(), Duration::from_secs(5));
+        let size = compute_dir_size_with_status(tmp.path(), Duration::from_secs(5)).size;
         assert!(size > 0);
     }
 
