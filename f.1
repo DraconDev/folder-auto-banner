@@ -1,10 +1,9 @@
-.\" Man page for f (fab)
-.\" Folder Auto Banner
+.\" Man page for f (folder-auto-banner)
 .\"
-.TH F 1 "2026-06-04" "fab 0.5.0" "User Commands"
+.TH F 1 "2026-06-11" "f 0.6.20" "User Commands"
 .\"
 .SH NAME
-f \- fab: folder auto banner
+f \- folder-auto-banner: contextual directory dashboard
 .\"
 .SH SYNOPSIS
 .B f
@@ -14,75 +13,106 @@ f \- fab: folder auto banner
 .B f banner
 .RI [ OPTIONS ]
 .RI [ PATH ]
+.RI [ ACTION ]
 .br
 .B f env
 .RI [ PATH ]
 .br
+.B f install
+.RI [ OPTIONS ]
+.br
 .B f config
 .br
 .B f daemon
-.RI { start | stop | status }
+.RI { start | restart | stop | status | clear-cache }
 .\"
 .SH DESCRIPTION
-.B fab
-(folder auto banner) is a directory listing tool that shows instant context
-about your project.
-When you run
-.BR f ,
-you see:
-.IP \(bu 2
-File listing with permissions, owner, group, size, date, name
-.IP \(bu 2
-Git status, last commit, commits today, branches
-.IP \(bu 2
-Build status with duration
-.IP \(bu 2
-TODO count
-.IP \(bu 2
-Languages breakdown
-.IP \(bu 2
-Ports in use
-.IP \(bu 2
-Docker status
-.IP \(bu 2
-Cached test results
+.B f
+(folder-auto-banner) is a contextual directory dashboard. It combines a file
+listing with project signals such as git status, TODO counts, code metrics,
+build status, language breakdowns, ports in use, Docker state, and cached test
+results.
 .PP
-All instantly, no extra commands needed.
+Repeated views are served from a background daemon. The first cold view of a
+very large directory returns quickly and may show temporary
+.B 4.0k
+placeholders while directory sizes refresh in the background; subsequent warm
+views use populated cached sizes.
+.\"
+.SH COMMANDS
+.TP
+.B f banner
+Print the contextual directory dashboard for the current directory or a specific
+path.
+.TP
+.B f env
+Output shell aliases for the detected project type.
+.TP
+.B f install
+Install shell wrappers that enable
+.B f N
+navigation, where
+.B N
+opens or changes into the numbered item from the banner.
+.TP
+.B f config
+Open the configuration file in the configured editor.
+.TP
+.B f daemon
+Manage the background daemon.
 .\"
 .SH OPTIONS
 .SS General Options
 .TP
-.BR \-\-help
+.BR \-\-help ", " \-h
 Display help information.
 .TP
-.BR \-\-version
+.BR \-\-version ", " \-V
 Display version information.
 .TP
 .BR \-v ", " \-\-verbose
-Enable verbose output.
+Verbose output.
 .TP
 .BR \-d ", " \-\-debug
-Enable debug output.
+Debug output.
+.TP
+.BR \-1 ", " \-\-oneline
+Display one entry per line.
+.TP
+.BR \-\-git\-ignore
+Respect .gitignore during traversal.
+.TP
+.BR \-\-only\-dirs
+List only directories.
+.TP
+.BR \-\-only\-files
+List only files.
+.TP
+.BI \-\-highlight\-recent " MODE"
+Background highlight for recent files.
+.TP
+.BI \-\-highlight\-old " MODE"
+Background highlight for old files.
 .\"
 .SS Banner Options
 .TP
-.BR \-\-raw
-Output raw paths (no formatting, for piping).
+.BR \-\-raw ", " \-r
+Output raw paths.
 .TP
 .BR \-\-json
-Output JSON (for scripting).
+Output JSON.
 .TP
 .BR \-c ", " \-\-compact
-Compact output (fewer lines).
+Compact output.
 .TP
 .BR \-a ", " \-\-hidden
-Show hidden files (dotfiles).
+Show hidden files.
 .TP
 .BR \-\-classify
-Append type indicator (*/=>@|).
+Append type indicators.
 .TP
 .BR \-\-relative\-date
-Show relative dates (e.g., "2h ago", "just now").
+Show relative dates.
 .TP
 .BI \-\-sort " MODE"
 Sort order: name, size, date, type, git, extension, version.
@@ -100,10 +130,10 @@ Sort by file extension.
 Sort by git status.
 .TP
 .BR \-\-versionsort
-Natural sort (version numbers).
+Natural sort.
 .TP
 .BR \-U ", " \-\-no\-sort
-No sort \(em list in directory order.
+No sort.
 .TP
 .BR \-\-reverse
 Reverse sort order.
@@ -112,83 +142,117 @@ Reverse sort order.
 Group directories: none, first, last.
 .TP
 .BR \-g ", " \-\-group
-Group items by type (dirs, files, symlinks).
+Group items by type.
 .TP
-.BR \-f ", " \-\-filter \fR=\fIPATTERN
-Filter items by pattern (glob or extension).
+.BI \-\-filter " PATTERN"
+Filter items by glob or extension.
 .TP
-.BR \-m ", " \-\-max \fR=\fIN
+.BI \-\-ignore\-glob " PATTERN"
+Exclude files matching a glob. Can be repeated.
+.TP
+.BI \-\-max " N"
 Maximum number of items to display.
 .TP
+.BI \-\-level " N"
+Limit recursion depth for tree or recursive output.
+.TP
 .BR \-\-blocks \fR=\fICOLUMNS
-Columns to display (comma-separated: permission,owner,group,size,contents,date,name).
+Columns to display: permission, owner, group, size, contents, date, name.
 .TP
 .BR \-\-tree [\fIDEPTH\fR]
-Tree view with specified depth (0 = unlimited).
+Tree view. Depth 0 means unlimited.
+.TP
+.BR \-\-total\-size
+Show total directory size in the header.
+.TP
+.BR \-\-no\-symlink
+Hide symlink targets.
+.TP
+.BR \-\-hyperlink
+Attach terminal hyperlinks to filenames.
+.TP
+.BR \-e ", " \-\-edit
+Force open the selected file in the editor.
+.TP
+.BR \-x ", " \-\-run
+Force run the selected file directly.
 .\"
 .SH EXAMPLES
 .TP
 .B f
-Show the contextual directory dashboard.
+Show the dashboard for the current directory.
 .TP
 .B f /path/to/dir
-Show dashboard for a specific directory.
+Show the dashboard for a specific directory.
 .TP
 .B f \-\-json
-Output as JSON for scripting.
+Output JSON for scripting.
 .TP
 .B f \-\-raw
 Output raw paths for piping.
 .TP
-.B f \-\-classify
-Show type indicators after filenames.
+.B f \-\-tree
+Show a tree view.
 .TP
-.B f \-\-relative\-date
-Show dates as relative times.
+.B f 3
+Open or change into item 3 from the banner when shell wrappers are installed.
 .TP
-.B f \-\-blocks name,size,git
-Show only name, size, and git columns.
+.B f 3 cat
+Open item 3 with
+.BR cat .
 .TP
 .B f env
-Output shell aliases for current project type.
+Output shell aliases for the current project type.
 .TP
 .B f config
-Open configuration file in editor.
+Open the configuration file.
 .TP
 .B f daemon status
-Check if daemon is running.
+Show daemon state.
+.TP
+.B f daemon restart
+Restart the daemon.
 .\"
 .SH CONFIGURATION
-Configuration file is located at
+The configuration file is located at
 .IR ~/.config/fab/config.toml .
 .PP
-See the README for full configuration options.
+Open it with:
+.BR "f config" .
 .\"
 .SH ENVIRONMENT
-.TP
-.B FAB_ICONS
-Set to "1" to enable icons.
-.TP
-.B FAB_COLORS
-Set to "1" to enable colors.
 .TP
 .B NO_COLOR
 Disable colors when set.
 .TP
-.B FAB_TODOS
-Set to "1" to enable TODO counting.
+.B EDITOR
+Editor for
+.BR "f config" .
 .TP
-.B FAB_PORTS
-Set to "1" to enable port detection.
+.B FAB_NO_TODOS
+Set to
+.B 1
+to disable TODO scanning.
 .TP
-.B FAB_DOCKER
-Set to "1" to enable Docker detection.
+.B FAB_NO_PORTS
+Set to
+.B 1
+to disable port detection.
 .TP
-.B FAB_METRICS
-Set to "1" to enable code metrics.
+.B FAB_NO_DOCKER
+Set to
+.B 1
+to disable Docker detection.
+.TP
+.B FAB_NO_METRICS
+Set to
+.B 1
+to disable code metrics.
 .TP
 .B FAB_PROFILE
-Set to "1" to enable IPC profiling output.
+Set to
+.B 1
+to enable IPC profiling output.
 .\"
 .SH FILES
 .TP
