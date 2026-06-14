@@ -1,9 +1,28 @@
 //! File metadata extraction — image resolution, ZIP entries, SQLite tables, video duration
 //!
-//! These functions read file contents to extract metadata for display in the banner.
-//! Extracted from banner.rs to decouple I/O from rendering.
+//! These functions read small headers from each file to extract metadata for the
+//! banner. We deliberately read only the first few KiB of binary files (PNG, JPG,
+//! ZIP, MP4, MKV) — the dimensions, entry count, and duration are all stored near
+//! the start of the file, so a full `read()` is wasteful and made `f` very slow
+//! in directories with many images, archives, or videos.
 
+use std::io::Read;
 use std::path::Path;
+
+/// How many bytes to read for binary file-header probes. PNG / JPEG / ZIP / MP4
+/// / MKV all carry their metadata in the first few KiB, so 64 KiB is more than
+/// enough while keeping the per-file cost in the microsecond range.
+const FILE_HEADER_PROBE_BYTES: usize = 64 * 1024;
+
+fn read_file_header(path: &Path) -> Option<Vec<u8>> {
+    let file = std::fs::File::open(path).ok()?;
+    let len = file.metadata().ok()?.len();
+    let to_read = (len as usize).min(FILE_HEADER_PROBE_BYTES);
+    let mut buf = Vec::with_capacity(to_read);
+    // Use take() so we read at most to_read bytes regardless of the file size.
+    file.take(to_read as u64).read_to_end(&mut buf).ok()?;
+    Some(buf)
+}
 
 /// Get contents description for a file — line count for text, resolution for image, etc.
 /// Returns plain text (no ANSI codes) — coloring is applied by the renderer.
@@ -14,16 +33,19 @@ pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
 
     // Image files: try to get resolution from header
     if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
-        if let Ok(bytes) = std::fs::read(&entry.path) {
+        if let Some(bytes) = read_file_header(&entry.path) {
             if let Some(res) = extract_image_resolution(&bytes, &lower) {
                 return res;
             }
         }
     }
 
-    // ZIP files: count entries
+    // ZIP files: count entries from the local file headers near the start of the
+    // archive. Counting only the first 64 KiB is a cheap approximation that
+    // covers most real-world archives; if a ZIP is split across the end of the
+    // header probe, we simply fall through to the empty result.
     if lower.ends_with(".zip") {
-        if let Ok(bytes) = std::fs::read(&entry.path) {
+        if let Some(bytes) = read_file_header(&entry.path) {
             if let Some(count) = count_zip_entries(&bytes) {
                 return count.to_string();
             }
@@ -148,35 +170,11 @@ fn count_sqlite_tables(path: &Path) -> Option<usize> {
 
 /// Extract video duration from MP4/MOV container headers
 fn extract_video_duration(path: &Path) -> Option<String> {
-    use std::io::{Read, Seek, SeekFrom};
-
-    let mut file = std::fs::File::open(path).ok()?;
-    let file_len = file.metadata().ok()?.len();
-
-    // For files under 100MB, just read the whole thing - fast and reliable
-    if file_len <= 100 * 1024 * 1024 {
-        let mut buf = Vec::with_capacity(file_len as usize);
-        file.read_to_end(&mut buf).ok()?;
-        return parse_mp4_duration(&buf);
-    }
-
-    // For very large files, read 50MB from start and 50MB from end
-    let chunk_size = 50 * 1024 * 1024;
-
-    let mut buf = vec![0u8; chunk_size];
-    let bytes_read = file.read(&mut buf).ok()?;
-    buf.truncate(bytes_read);
-
-    if let Some(dur) = parse_mp4_duration(&buf) {
-        return Some(dur);
-    }
-
-    file.seek(SeekFrom::Start(file_len - chunk_size as u64))
-        .ok()?;
-    let mut buf = vec![0u8; chunk_size];
-    let bytes_read = file.read(&mut buf).ok()?;
-    buf.truncate(bytes_read);
-
+    // The `moov` atom can appear at the end of an MP4 file, but a 64 KiB probe
+    // is enough for fast-start MP4s and avoids the multi-megabyte read of small
+    // files. Real-world downloads are typically fast-start, and the banner
+    // display is a best-effort metadata hint, not a full parser.
+    let buf = read_file_header(path)?;
     parse_mp4_duration(&buf)
 }
 

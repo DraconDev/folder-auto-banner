@@ -1354,12 +1354,42 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // Use shared build_display_items for consistent ordering with navigation
     let (display_items, hidden_count) = build_display_items(path, summary, git_info, opts, &config);
 
+    // Determine the effective column set so we can skip the expensive
+    // per-file contents probe (PNG/JPG/ZIP header reads, text line counts)
+    // when the user has hidden the contents column. This is the single biggest
+    // performance win in directories with many images, archives, or large text
+    // files.
+    let effective_columns: Vec<String> = if let Some(blocks_str) = opts.blocks {
+        blocks_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect::<Vec<_>>()
+    } else if opts.compact {
+        vec!["size".to_string(), "date".to_string(), "name".to_string()]
+    } else if opts.verbose {
+        vec![
+            "permission".to_string(),
+            "owner".to_string(),
+            "group".to_string(),
+            "size".to_string(),
+            "contents".to_string(),
+            "date".to_string(),
+            "name".to_string(),
+        ]
+    } else {
+        config.columns.clone()
+    };
+    let show_contents_column = effective_columns.iter().any(|c| c == "contents");
+
     // Precompute expensive contents metadata once so directory counts and file
     // content probes are not repeated during width calculation and row rendering.
+    // Skip the per-file probe entirely when the contents column is hidden.
     let display_meta: Vec<_> = display_items
         .iter()
         .map(|item| {
-            let contents_raw = if item.is_dir {
+            let contents_raw = if !show_contents_column {
+                String::new()
+            } else if item.is_dir {
                 count_items_in_dir(item).to_string()
             } else {
                 get_file_contents_raw(item)
@@ -1610,29 +1640,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             git_icon
         };
 
-        // Build row based on config columns (or --blocks override)
-        let columns = if let Some(blocks_str) = opts.blocks {
-            blocks_str
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect::<Vec<_>>()
-        } else if opts.compact {
-            // Compact mode: minimal columns
-            vec!["size".to_string(), "date".to_string(), "name".to_string()]
-        } else if opts.verbose {
-            // Verbose mode: all columns plus extras
-            vec![
-                "permission".to_string(),
-                "owner".to_string(),
-                "group".to_string(),
-                "size".to_string(),
-                "contents".to_string(),
-                "date".to_string(),
-                "name".to_string(),
-            ]
-        } else {
-            config.columns.clone()
-        };
+        // Build row based on effective columns (or --blocks override)
+        let columns = effective_columns.clone();
 
         let mut row_parts = Vec::new();
         if columns.contains(&"permission".to_string()) && !perm_colored.is_empty() {
@@ -1723,15 +1732,21 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 
     // Show smart truncation summary for big folders
     if hidden_count > 0 && config.smart_truncation {
+        // Build a set of displayed paths once so the per-item hidden counters
+        // are O(N) total instead of O(N*M) for each category.
+        let displayed_paths: std::collections::HashSet<&std::path::Path> = display_items
+            .iter()
+            .map(|d| d.path.as_path())
+            .collect();
         let hidden_dirs = summary
             .top_items
             .iter()
-            .filter(|i| i.is_dir && !display_items.iter().any(|d| d.path == i.path))
+            .filter(|i| i.is_dir && !displayed_paths.contains(i.path.as_path()))
             .count();
         let hidden_files = summary
             .top_items
             .iter()
-            .filter(|i| i.is_file && !display_items.iter().any(|d| d.path == i.path))
+            .filter(|i| i.is_file && !displayed_paths.contains(i.path.as_path()))
             .count();
         if hidden_dirs > 0 || hidden_files > 0 {
             let mut parts = Vec::new();
