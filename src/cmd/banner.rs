@@ -2167,8 +2167,20 @@ fn aggregate_dir_git_status(
     worst.map(|fs| format!("{}{}{}", color(fs.color()), fs.icon(), color(RESET)))
 }
 
-/// Get raw contents description without ANSI colors (for width calculation)
+/// Get raw contents description without ANSI colors (for width calculation).
+///
+/// In `0.6.25` and earlier this always called `get_file_contents`, which
+/// re-opens and re-reads each file's header on every `f` invocation. As
+/// of `0.6.26` the daemon populates `entry.content_probe` during its
+/// directory scan and ships the results in `BannerData`, so the client
+/// just reads the pre-computed string. We still fall back to the
+/// synchronous probe if the field is missing (e.g. for entries built
+/// outside the daemon pipeline, or for non-probed text files where the
+/// line count is intentionally not cached).
 fn get_file_contents_raw(entry: &crate::fs::DirEntry) -> String {
+    if let Some(probe) = entry.content_probe.as_ref() {
+        return probe.clone();
+    }
     crate::cmd::file_metadata::get_file_contents(entry)
 }
 

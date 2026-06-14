@@ -412,6 +412,7 @@ mod tests {
                 group: String::new(),
                 symlink_target: None,
                 symlink_valid: true,
+                content_probe: None,
             },
             crate::fs::DirEntry {
                 name: "Cargo.toml".to_string(),
@@ -427,6 +428,7 @@ mod tests {
                 group: String::new(),
                 symlink_target: None,
                 symlink_valid: true,
+                content_probe: None,
             },
         ];
 

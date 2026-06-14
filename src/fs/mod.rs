@@ -136,6 +136,16 @@ pub struct DirEntry {
     pub symlink_target: Option<String>,
     #[serde(default = "default_true")]
     pub symlink_valid: bool,
+    /// Cached per-file content-probe result populated by the daemon during
+    /// a directory scan (e.g. `"1024x1536"` for a PNG, `"19"` for a ZIP
+    /// entry count, `""` for files that don't have a probe). The client
+    /// reads this directly instead of re-running the per-file I/O probe
+    /// on every `f` invocation, which is the main reason `f ~/Downloads`
+    /// was the slowest path in 0.6.25 (88 file I/O calls per render).
+    /// `None` means the daemon hasn't populated it yet; the client should
+    /// treat `None` and `Some("")` identically (no metadata available).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_probe: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -342,6 +352,7 @@ impl DirSummary {
                 group,
                 symlink_target,
                 symlink_valid,
+                content_probe: None,
             });
         }
 
@@ -733,6 +744,7 @@ mod tests {
                     group: String::new(),
                     symlink_target: None,
                     symlink_valid: true,
+                    content_probe: None,
                 },
                 DirEntry {
                     name: "main.rs".into(),
@@ -748,6 +760,7 @@ mod tests {
                     group: String::new(),
                     symlink_target: None,
                     symlink_valid: true,
+                    content_probe: None,
                 },
                 DirEntry {
                     name: "readme.md".into(),
@@ -763,6 +776,7 @@ mod tests {
                     group: String::new(),
                     symlink_target: None,
                     symlink_valid: true,
+                    content_probe: None,
                 },
             ],
             project_type: ProjectType::Rust,

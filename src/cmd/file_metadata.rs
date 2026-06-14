@@ -345,6 +345,7 @@ mod tests {
             group: String::new(),
             symlink_target: None,
             symlink_valid: true,
+            content_probe: None,
         };
 
         let count = count_items_in_dir(&entry);
@@ -367,6 +368,7 @@ mod tests {
             group: String::new(),
             symlink_target: None,
             symlink_valid: true,
+            content_probe: None,
         };
 
         let count = count_items_in_dir(&entry);
@@ -393,6 +395,7 @@ mod tests {
             group: String::new(),
             symlink_target: None,
             symlink_valid: true,
+            content_probe: None,
         };
 
         let contents = get_file_contents(&entry);
@@ -415,6 +418,7 @@ mod tests {
             group: String::new(),
             symlink_target: None,
             symlink_valid: true,
+            content_probe: None,
         };
 
         let contents = get_file_contents(&entry);

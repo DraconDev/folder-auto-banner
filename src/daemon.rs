@@ -1058,7 +1058,7 @@ fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
 }
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
-    let summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
+    let mut summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
 
     // Build pathspecs for git status collection. Files use their exact
     // top-level name; directories use `dir/*` so libgit2 only walks immediate
@@ -1079,8 +1079,66 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
         }
     }
 
+    // Pre-populate the per-file content probe (PNG/JPG resolution, ZIP entry
+    // count, MP4/MOV/M4V/WebM/MKV duration, SQLite table count) on each
+    // DirEntry. Doing this on the daemon side means the client (which is a
+    // short-lived process started on every `f` invocation) doesn't have to
+    // re-open each file just to render the contents column. The results
+    // travel with the BannerData and are cached on the daemon for the
+    // configured CACHE_TTL (5 min by default), so the per-file I/O happens
+    // at most once per TTL window per directory.
+    populate_content_probes(&mut summary.top_items);
+
     // Return immediately — sizes come from global cache
     Ok(BannerData { summary, git_info })
+}
+
+/// For each file in `items`, run the per-extension content probe and store
+/// the result in `entry.content_probe`. Directories are left as `None`; the
+/// client populates their child counts from a separate `count_items_in_dir`
+/// cache path (or by reading the on-disk count, which is fast).
+///
+/// This is a sequential walk; in 0.6.25 the client did the same work on
+/// every invocation, so the per-call cost is the same on a cold scan but
+/// collapses to ~0 for every subsequent call within the cache TTL.
+fn populate_content_probes(items: &mut [DirEntry]) {
+    use folder_auto_banner::cmd::file_metadata::get_file_contents;
+    for entry in items.iter_mut() {
+        if !entry.is_file {
+            continue;
+        }
+        // Cheap pre-filter: skip the file-open syscall for files whose
+        // extension we don't probe. `Path::extension` is allocation-free.
+        let ext = std::path::Path::new(&entry.name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+        if !matches!(
+            ext,
+            "png" | "jpg"
+                | "jpeg"
+                | "zip"
+                | "mp4"
+                | "mov"
+                | "m4v"
+                | "webm"
+                | "mkv"
+                | "db"
+                | "sqlite"
+                | "sqlite3"
+        ) {
+            continue;
+        }
+        let probe = get_file_contents(entry);
+        entry.content_probe = if probe.is_empty() {
+            // Some("") makes the field appear in serialized output so the
+            // client knows the probe was attempted (vs None which means
+            // "not probed"). Either way the renderer treats it as empty.
+            Some(String::new())
+        } else {
+            Some(probe)
+        };
+    }
 }
 
 fn cache_entry_root_is_fresh(entry: &CacheEntry, path: &Path) -> bool {
@@ -1789,6 +1847,7 @@ mod tests {
             group: String::new(),
             symlink_target: None,
             symlink_valid: true,
+            content_probe: None,
         }];
         let dir_sizes = Arc::new(Mutex::new(HashMap::new()));
         let dir_size_mtimes = Arc::new(Mutex::new(HashMap::new()));
@@ -1843,6 +1902,7 @@ mod tests {
             group: String::new(),
             symlink_target: None,
             symlink_valid: true,
+            content_probe: None,
         }];
         let dir_sizes = Arc::new(Mutex::new(HashMap::new()));
         let dir_size_mtimes = Arc::new(Mutex::new(HashMap::new()));
