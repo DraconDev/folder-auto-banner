@@ -15,12 +15,16 @@ use std::path::Path;
 const FILE_HEADER_PROBE_BYTES: usize = 64 * 1024;
 
 fn read_file_header(path: &Path) -> Option<Vec<u8>> {
+    // Open the file and read up to FILE_HEADER_PROBE_BYTES. We don't pre-stat
+    // the file (the caller has already done so via `entry.size` for the size
+    // column) — we just take(64KB) which reads at most that many bytes and
+    // stops at EOF. This saves one stat() syscall per probed file, which
+    // matters in directories with hundreds of images / archives / videos.
     let file = std::fs::File::open(path).ok()?;
-    let len = file.metadata().ok()?.len();
-    let to_read = (len as usize).min(FILE_HEADER_PROBE_BYTES);
-    let mut buf = Vec::with_capacity(to_read);
-    // Use take() so we read at most to_read bytes regardless of the file size.
-    file.take(to_read as u64).read_to_end(&mut buf).ok()?;
+    let mut buf = Vec::with_capacity(FILE_HEADER_PROBE_BYTES.min(8 * 1024));
+    file.take(FILE_HEADER_PROBE_BYTES as u64)
+        .read_to_end(&mut buf)
+        .ok()?;
     Some(buf)
 }
 
@@ -28,60 +32,52 @@ fn read_file_header(path: &Path) -> Option<Vec<u8>> {
 /// Returns plain text (no ANSI codes) — coloring is applied by the renderer.
 #[allow(dead_code)]
 pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
-    let name = &entry.name;
-    let lower = name.to_lowercase();
+    // Use Path::extension() to avoid an allocation per probed file. The
+    // returned extension is already ASCII-lower (per std::path docs), so we
+    // don't need to lowercase the name to compare. This drops one String
+    // allocation per file in directories with many different extensions.
+    let ext = std::path::Path::new(&entry.name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
 
-    // Image files: try to get resolution from header
-    if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
-        if let Some(bytes) = read_file_header(&entry.path) {
-            if let Some(res) = extract_image_resolution(&bytes, &lower) {
-                return res;
+    match ext {
+        "png" | "jpg" | "jpeg" => {
+            if let Some(bytes) = read_file_header(&entry.path) {
+                if let Some(res) = extract_image_resolution(&bytes, ext) {
+                    return res;
+                }
             }
+            String::new()
         }
-    }
-
-    // ZIP files: count entries from the local file headers near the start of the
-    // archive. Counting only the first 64 KiB is a cheap approximation that
-    // covers most real-world archives; if a ZIP is split across the end of the
-    // header probe, we simply fall through to the empty result.
-    if lower.ends_with(".zip") {
-        if let Some(bytes) = read_file_header(&entry.path) {
-            if let Some(count) = count_zip_entries(&bytes) {
-                return count.to_string();
+        "zip" => {
+            if let Some(bytes) = read_file_header(&entry.path) {
+                if let Some(count) = count_zip_entries(&bytes) {
+                    return count.to_string();
+                }
             }
+            String::new()
+        }
+        "db" | "sqlite" | "sqlite3" => {
+            if let Some(count) = count_sqlite_tables(&entry.path) {
+                return format!("{}t", count);
+            }
+            String::new()
+        }
+        "mp4" | "mov" | "m4v" => extract_video_duration(&entry.path).unwrap_or_default(),
+        "webm" | "mkv" => extract_video_duration(&entry.path).unwrap_or_default(),
+        _ => {
+            // Text files under 1MB: count lines. We allow the same heuristic
+            // the old code used (size < 1 MiB AND no recognized extension) to
+            // avoid reading huge binary files line-by-line.
+            if entry.size < 1024 * 1024 {
+                if let Ok(content) = std::fs::read_to_string(&entry.path) {
+                    return content.lines().count().to_string();
+                }
+            }
+            String::new()
         }
     }
-
-    // SQLite DB: show table count
-    if lower.ends_with(".db") || lower.ends_with(".sqlite") || lower.ends_with(".sqlite3") {
-        if let Some(count) = count_sqlite_tables(&entry.path) {
-            return format!("{}t", count);
-        }
-    }
-
-    // Video files: extract duration from container headers
-    if lower.ends_with(".mp4") || lower.ends_with(".mov") || lower.ends_with(".m4v") {
-        if let Some(dur) = extract_video_duration(&entry.path) {
-            return dur;
-        }
-    }
-
-    // Text files under 1MB: count lines
-    if entry.size < 1024 * 1024 {
-        if let Ok(content) = std::fs::read_to_string(&entry.path) {
-            let lines = content.lines().count();
-            return lines.to_string();
-        }
-    }
-
-    // WebM/MKV: extract duration from EBML headers
-    if lower.ends_with(".webm") || lower.ends_with(".mkv") {
-        if let Some(dur) = extract_video_duration(&entry.path) {
-            return dur;
-        }
-    }
-
-    String::new()
 }
 
 /// Count items in a directory
@@ -91,16 +87,20 @@ pub fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
         .unwrap_or(0)
 }
 
-/// Extract image resolution from PNG or JPEG header bytes
+/// Extract image resolution from PNG or JPEG header bytes.
+/// `ext` is the lowercased extension with or without the leading dot, e.g.
+/// "png" or ".png". The dispatch is by ext so we can return early without
+/// scanning.
 fn extract_image_resolution(bytes: &[u8], ext: &str) -> Option<String> {
-    if ext.ends_with(".png") && bytes.len() >= 24 {
+    let ext = ext.strip_prefix('.').unwrap_or(ext);
+    if ext == "png" && bytes.len() >= 24 {
         // PNG: width at offset 16-19 (big endian), height at 20-23
         let w = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]) as usize;
         let h = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]) as usize;
         if w > 0 && h > 0 {
             return Some(format!("{}x{}", w, h));
         }
-    } else if ext.ends_with(".jpg") || ext.ends_with(".jpeg") {
+    } else if ext == "jpg" || ext == "jpeg" {
         // JPEG: find SOF marker and read dimensions
         let mut i = 2;
         while i < bytes.len().saturating_sub(9) {

@@ -291,9 +291,9 @@ fn build_display_items<'a>(
                     .rfind('.')
                     .map(|pos| i.name[pos..].to_lowercase())
                     .unwrap_or_default(),
-                date: i.modified.unwrap_or_else(|| {
-                    chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
-                }),
+                date: i
+                    .modified
+                    .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()),
                 git: {
                     let rel = i.path.strip_prefix(path).unwrap_or(&i.path);
                     let rel_str = rel.to_string_lossy();
@@ -1408,21 +1408,37 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // Precompute expensive contents metadata once so directory counts and file
     // content probes are not repeated during width calculation and row rendering.
     // Skip the per-file probe entirely when the contents column is hidden.
+    let mut _dir_probe_total = std::time::Duration::ZERO;
+    let mut _file_probe_total = std::time::Duration::ZERO;
     let display_meta: Vec<_> = display_items
         .iter()
         .map(|item| {
-            let contents_raw = if !show_contents_column {
-                String::new()
-            } else if item.is_dir {
+            if !show_contents_column {
+                return (*item, String::new());
+            }
+            let t_p = std::time::Instant::now();
+            let contents_raw = if item.is_dir {
                 count_items_in_dir(item).to_string()
             } else {
                 get_file_contents_raw(item)
             };
+            if item.is_dir {
+                _dir_probe_total += t_p.elapsed();
+            } else {
+                _file_probe_total += t_p.elapsed();
+            }
             (*item, contents_raw)
         })
         .collect();
     if _profile {
-        eprintln!("[FAB_PROFILE] display_meta ({} items, contents={}): {:?}", display_items.len(), show_contents_column, _t0.elapsed());
+        eprintln!(
+            "[FAB_PROFILE] display_meta ({} items, contents={}): total={:?} dir={:?} file={:?}",
+            display_items.len(),
+            show_contents_column,
+            _t0.elapsed(),
+            _dir_probe_total,
+            _file_probe_total
+        );
     }
     let _t1 = std::time::Instant::now();
 
