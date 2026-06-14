@@ -89,16 +89,38 @@ pub fn cache_file_mtime(path: &Path) -> Option<SystemTime> {
     meta.modified().ok()
 }
 
-/// Returns `true` if the cache file for `path` exists and is younger
-/// than `CACHE_TTL`.
+/// Returns the mtime of the directory at `path`. Used to validate that
+/// a cache file's mtime is not older than the directory it describes
+/// (if a user changes files in the directory, the directory's mtime
+/// advances; the cache file's mtime should track that).
+pub fn directory_mtime(path: &Path) -> Option<SystemTime> {
+    let meta = std::fs::metadata(path).ok()?;
+    meta.modified().ok()
+}
+
+/// Returns `true` if the cache file for `path` exists, is younger than
+/// `CACHE_TTL`, AND is not older than the directory it describes. The
+/// last check guards against the case where the user changed files
+/// in the directory while the daemon was down or the cache file was
+/// otherwise not refreshed.
 pub fn is_cache_fresh(path: &Path) -> bool {
-    let Some(mtime) = cache_file_mtime(path) else {
+    let Some(file_mtime) = cache_file_mtime(path) else {
         return false;
     };
-    let Ok(age) = SystemTime::now().duration_since(mtime) else {
+    let Ok(age) = SystemTime::now().duration_since(file_mtime) else {
         return false;
     };
-    age < CACHE_TTL
+    if age >= CACHE_TTL {
+        return false;
+    }
+    // Guard against stale data: if the directory's mtime is newer than
+    // the cache file's mtime, the file is stale.
+    if let Some(dir_mtime) = directory_mtime(path) {
+        if dir_mtime > file_mtime {
+            return false;
+        }
+    }
+    true
 }
 
 /// Read and deserialize the cache file for `path`. Returns `None` if
