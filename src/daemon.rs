@@ -454,25 +454,77 @@ fn watch_loop(
                         // (create/delete/rename of a direct child) means the
                         // item listing may have changed, so the banner cache
                         // must be invalidated. A descendant event on a file
-                        // (MODIFY/CLOSE_WRITE) can also affect the banner
-                        // data (e.g., text file line counts, image
-                        // dimensions, ZIP entry counts), so we invalidate
-                        // the banner cache for those events too. The
-                        // re-compute is deferred to the next IPC request,
-                        // so a burst of events (e.g., a build writing many
-                        // files) still results in only one re-compute.
+                        // that has a content-probe extension (text files,
+                        // images, archives) can affect the banner data
+                        // (line count, dimensions, entry count), so we
+                        // invalidate the banner cache for those events too.
+                        // Other descendant events (e.g., metadata-only
+                        // changes to binary files) only affect the size
+                        // cache.
                         let is_root_event = watched
                             .get(&event.wd)
                             .and_then(|regs| regs.first())
                             .map(|r| r.watched_path == r.owner)
                             .unwrap_or(false);
-                        // For MODIFY/CLOSE_WRITE events on a file (not a
-                        // directory), the banner data may have changed
-                        // (e.g., line count, image dimensions).
                         let is_file_modify = event.mask.contains(inotify::EventMask::MODIFY)
                             || event.mask.contains(inotify::EventMask::CLOSE_WRITE);
-                        let invalidate_banner = is_root_event
-                            || (is_file_modify && !event.mask.contains(inotify::EventMask::ISDIR));
+                        // A MODIFY/CLOSE_WRITE on a file with a
+                        // content-probe extension means the banner data
+                        // (line count, image dimensions, archive entry
+                        // count) may have changed. Invalidate the banner
+                        // cache for these events.
+                        let has_content_probe_ext = if is_file_modify
+                            && !event.mask.contains(inotify::EventMask::ISDIR)
+                        {
+                            // Get the file name from the event. The
+                            // event name is a relative path under the
+                            // watched directory (OsString).
+                            let name = event.name.to_string_lossy();
+                            let lower = name.to_lowercase();
+                            lower.ends_with(".txt")
+                                || lower.ends_with(".md")
+                                || lower.ends_with(".json")
+                                || lower.ends_with(".js")
+                                || lower.ends_with(".ts")
+                                || lower.ends_with(".jsx")
+                                || lower.ends_with(".tsx")
+                                || lower.ends_with(".rs")
+                                || lower.ends_with(".py")
+                                || lower.ends_with(".go")
+                                || lower.ends_with(".java")
+                                || lower.ends_with(".rb")
+                                || lower.ends_with(".c")
+                                || lower.ends_with(".cpp")
+                                || lower.ends_with(".h")
+                                || lower.ends_with(".hpp")
+                                || lower.ends_with(".sh")
+                                || lower.ends_with(".yaml")
+                                || lower.ends_with(".yml")
+                                || lower.ends_with(".toml")
+                                || lower.ends_with(".xml")
+                                || lower.ends_with(".html")
+                                || lower.ends_with(".css")
+                                || lower.ends_with(".scss")
+                                || lower.ends_with(".png")
+                                || lower.ends_with(".jpg")
+                                || lower.ends_with(".jpeg")
+                                || lower.ends_with(".gif")
+                                || lower.ends_with(".webp")
+                                || lower.ends_with(".bmp")
+                                || lower.ends_with(".tiff")
+                                || lower.ends_with(".zip")
+                                || lower.ends_with(".tar")
+                                || lower.ends_with(".gz")
+                                || lower.ends_with(".mp4")
+                                || lower.ends_with(".mov")
+                                || lower.ends_with(".mkv")
+                                || lower.ends_with(".webm")
+                                || lower.ends_with(".m4v")
+                        } else {
+                            false
+                        };
+                        let invalidate_banner =
+                            is_root_event || has_content_probe_ext;
 
                         if invalidate_banner {
                             let mut cache_guard = cache.lock().unwrap_or_else(|e| {

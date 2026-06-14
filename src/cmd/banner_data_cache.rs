@@ -101,19 +101,69 @@ pub fn directory_mtime(path: &Path) -> Option<SystemTime> {
     meta.modified().ok()
 }
 
-/// Returns the maximum mtime of all files in the directory at `path`
-/// (one level deep, not recursive). Used to detect file content
-/// changes that don't advance the directory's own mtime (e.g.,
-/// editing a text file in-place).
-///
-/// This is O(N) where N is the number of files in the directory.
-/// For Downloads (~211 files), this is ~0.6 ms (page cache). For
-/// large directories (10k+ files), this is ~30 ms, which is still
-/// cheaper than the IPC path (~10 ms) for the typical case.
+/// Returns true if the file name has an extension that the daemon
+/// runs a content probe on (text files, images, archives, etc.).
+/// Used to limit the per-file mtime staleness check to files that
+/// could actually have changed banner metadata.
+fn has_content_probe_ext(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.ends_with(".txt")
+        || lower.ends_with(".md")
+        || lower.ends_with(".json")
+        || lower.ends_with(".js")
+        || lower.ends_with(".ts")
+        || lower.ends_with(".jsx")
+        || lower.ends_with(".tsx")
+        || lower.ends_with(".rs")
+        || lower.ends_with(".py")
+        || lower.ends_with(".go")
+        || lower.ends_with(".java")
+        || lower.ends_with(".rb")
+        || lower.ends_with(".c")
+        || lower.ends_with(".cpp")
+        || lower.ends_with(".h")
+        || lower.ends_with(".hpp")
+        || lower.ends_with(".sh")
+        || lower.ends_with(".yaml")
+        || lower.ends_with(".yml")
+        || lower.ends_with(".toml")
+        || lower.ends_with(".xml")
+        || lower.ends_with(".html")
+        || lower.ends_with(".css")
+        || lower.ends_with(".scss")
+        || lower.ends_with(".png")
+        || lower.ends_with(".jpg")
+        || lower.ends_with(".jpeg")
+        || lower.ends_with(".gif")
+        || lower.ends_with(".webp")
+        || lower.ends_with(".bmp")
+        || lower.ends_with(".tiff")
+        || lower.ends_with(".zip")
+        || lower.ends_with(".tar")
+        || lower.ends_with(".gz")
+        || lower.ends_with(".mp4")
+        || lower.ends_with(".mov")
+        || lower.ends_with(".mkv")
+        || lower.ends_with(".webm")
+        || lower.ends_with(".m4v")
+}
+
+/// Returns the maximum mtime of all files with content-probe
+/// extensions in the directory at `path` (one level deep, not
+/// recursive). Used to detect file content changes that don't
+/// advance the directory's own mtime (e.g., editing a text file
+/// in-place). Only files with extensions the daemon runs a content
+/// probe on are checked, to keep the cost low for directories with
+/// many files (e.g., a build directory with thousands of .o files).
 pub fn max_descendant_mtime(path: &Path) -> Option<SystemTime> {
     let entries = std::fs::read_dir(path).ok()?;
     let mut max: Option<SystemTime> = None;
     for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if !has_content_probe_ext(&name_str) {
+            continue;
+        }
         if let Ok(meta) = entry.metadata() {
             if meta.is_file() {
                 if let Ok(mtime) = meta.modified() {
