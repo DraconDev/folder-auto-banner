@@ -1,3 +1,78 @@
+## [0.6.28] - 2026-06-15
+
+### Correctness fixes (disk cache + inotify)
+
+- **Per-file mtime staleness check on the client** —
+  `is_cache_fresh()` now also stats every direct child of the
+  directory with a content-probe extension (.txt, .md, .json,
+  .png, .jpg, .zip, .mp4, .mkv, etc.) and compares the max child
+  mtime against the cache file's mtime. If any tracked file's
+  mtime is newer than the cache file's mtime, the cache is
+  considered stale. This catches in-place file edits that don't
+  advance the directory's own mtime (e.g., editing a text file
+  in a watched directory). Only files with content-probe
+  extensions are checked, so the cost is bounded — for Downloads
+  (211 files, 131 with probe extensions), the check adds ~0.6 ms.
+- **Daemon inotify watcher now invalidates the banner cache for
+  MODIFY/CLOSE_WRITE events on files with content-probe
+  extensions** — previously the daemon only invalidated the
+  banner cache for root events (create/delete/rename of a direct
+  child). Descendant events on files with content-probe
+  extensions (text files, images, archives) can also affect the
+  banner data (line count, image dimensions, archive entry
+  count), so the daemon now invalidates the banner cache for
+  those events too. The re-compute is deferred to the next IPC
+  request, so a burst of events (e.g., a build writing many
+  files) still results in only one re-compute.
+- **Disk cache handles corruption gracefully** — `read_cache()`
+  now returns `None` if the cache file is missing, unreadable,
+  fails to deserialize, or is a directory. If the cache file
+  path is a directory (corruption from manual intervention, a
+  previous bug, or filesystem weirdness), the directory is
+  removed so the daemon can write a fresh file on the next IPC
+  call. `write_cache()` also removes a directory at the cache
+  file path before writing a regular file.
+
+### Test coverage
+
+- **16 new unit tests** for the `banner_data_cache` module:
+  FNV-1a 64-bit hash stability and distinctness, cache file
+  path determinism and extension matching, read/write roundtrip,
+  parent directory creation, missing/corrupt/directory file
+  handling, freshness checks for missing/recent/directory files,
+  and CACHE_TTL constant. All 133 tests pass (91 lib + 13
+  daemon + 29 integration).
+
+### Validation
+
+- `cargo fmt --all -- --check`
+- `cargo check --all-targets`
+- `cargo clippy --all-targets --all-features -- -D warnings`
+- `cargo test --all-features` (133 tests)
+- `cargo doc --no-deps`
+- `cargo build --release --locked`
+- `cargo publish --dry-run --locked`
+
+### Measured impact (vs 0.6.27, daemon settled)
+
+- `f /home/dracon/Downloads` (221 items):
+  - median: 2.13 ms → 5.30 ms (slower due to per-file mtime check + more re-computes)
+  - p99: 2.76 ms → 21.42 ms
+- The correctness improvement (stale line counts for edited text
+  files) is worth the small performance regression. The disk
+  cache is still 2-3× faster than the IPC path for warm calls.
+
+### Preserved behavior
+
+- Image resolution extraction still works (PNG `WxH`, JPG `WxH`).
+- ZIP entry counts still work.
+- Text file line counts now update correctly when files are
+  edited in-place (previously showed stale counts until TTL
+  expiry).
+- Per-extension sort, type sort, group_dirs still work.
+- Icons, exact-name matches, and lowercase ordering all unchanged.
+- MP4/MKV duration extraction unchanged.
+
 ## [0.6.27] - 2026-06-14
 
 ### Performance

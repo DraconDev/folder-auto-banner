@@ -482,16 +482,13 @@ fn watch_loop(
                             event
                                 .name
                                 .map(|n| {
-                                    is_content_probe_ext(
-                                        &n.to_string_lossy().to_ascii_lowercase(),
-                                    )
+                                    is_content_probe_ext(&n.to_string_lossy().to_ascii_lowercase())
                                 })
                                 .unwrap_or(false)
                         } else {
                             false
                         };
-                        let invalidate_banner =
-                            is_root_event || has_content_probe_ext;
+                        let invalidate_banner = is_root_event || has_content_probe_ext;
 
                         if invalidate_banner {
                             let mut cache_guard = cache.lock().unwrap_or_else(|e| {
