@@ -30,6 +30,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::daemon_types::BannerData;
+use crate::fs::{DirEntry, DirSummary, ProjectType};
 
 /// Maximum age of a cache file before the client considers it stale.
 /// Must match the daemon's `CACHE_TTL` (`Duration::from_secs(300)` in
@@ -135,10 +136,7 @@ pub fn read_cache(path: &Path) -> Option<BannerData> {
     let file = cache_file_path(path)?;
     let meta = std::fs::metadata(&file).ok()?;
     if meta.is_dir() {
-        tracing::warn!(
-            "Cache path is a directory, removing: {}",
-            file.display()
-        );
+        tracing::warn!("Cache path is a directory, removing: {}", file.display());
         let _ = std::fs::remove_dir(&file);
         return None;
     }
@@ -172,10 +170,7 @@ pub fn write_cache(path: &Path, data: &BannerData) -> std::io::Result<()> {
     // — never remove a regular file.
     if let Ok(meta) = std::fs::metadata(&file) {
         if meta.is_dir() {
-            tracing::warn!(
-                "Cache path is a directory, removing: {}",
-                file.display()
-            );
+            tracing::warn!("Cache path is a directory, removing: {}", file.display());
             let _ = std::fs::remove_dir(&file);
         }
     }
@@ -192,6 +187,43 @@ pub fn write_cache(path: &Path, data: &BannerData) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::Duration;
+
+    fn make_test_banner_data() -> BannerData {
+        BannerData {
+            summary: DirSummary {
+                total_items: 1,
+                total_size: 42,
+                files: 1,
+                dirs: 0,
+                top_items: vec![DirEntry {
+                    name: "test.txt".to_string(),
+                    path: PathBuf::from("/tmp/test.txt"),
+                    is_dir: false,
+                    is_file: true,
+                    is_symlink: false,
+                    is_exec: false,
+                    size: 42,
+                    modified: None,
+                    perms: "rw-r--r--".to_string(),
+                    owner: "dracon".to_string(),
+                    group: "users".to_string(),
+                    symlink_target: None,
+                    symlink_valid: true,
+                    content_probe: None,
+                }],
+                project_type: ProjectType::Generic,
+                last_modified: None,
+                build_status: None,
+                todo_info: None,
+                code_metrics: None,
+                port_info: None,
+                docker_info: None,
+            },
+            git_info: None,
+        }
+    }
 
     #[test]
     fn fnv1a_64_is_stable() {
@@ -199,6 +231,12 @@ mod tests {
         assert_eq!(fnv1a_64(b""), 0xcbf29ce484222325);
         assert_eq!(fnv1a_64(b"a"), 0xaf63dc4c8601ec8c);
         assert_eq!(fnv1a_64(b"foobar"), 0x85944171f73967e8);
+    }
+
+    #[test]
+    fn fnv1a_64_changes_with_input() {
+        assert_ne!(fnv1a_64(b"a"), fnv1a_64(b"b"));
+        assert_ne!(fnv1a_64(b"abc"), fnv1a_64(b"abd"));
     }
 
     #[test]
@@ -217,10 +255,206 @@ mod tests {
     }
 
     #[test]
+    fn cache_file_path_uses_hex_hash() {
+        let p = cache_file_path(Path::new("/tmp/test")).unwrap();
+        let fname = p.file_name().unwrap().to_str().unwrap();
+        // Must be 16 hex chars + .json
+        assert_eq!(fname.len(), 21);
+        assert!(fname.ends_with(".json"));
+        let hash = &fname[..16];
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
     fn nonexistent_cache_is_not_fresh() {
         // Use a path that almost certainly does not have a cache file.
         assert!(!is_cache_fresh(Path::new(
             "/tmp/this/path/should/not/exist/fab-test"
         )));
+    }
+
+    #[test]
+    fn write_and_read_cache_roundtrip() {
+        // Use a temp dir for the data dir by overriding the directories call.
+        // We can't easily override directories::ProjectDirs, so we test
+        // write_cache/read_cache with a real temp path.
+        let tmp = std::env::temp_dir().join(format!("fab-test-{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp);
+        let test_path = tmp.join("test_dir");
+        let _ = fs::create_dir_all(&test_path);
+
+        // Write
+        let data = make_test_banner_data();
+        write_cache(&test_path, &data).unwrap();
+
+        // The cache file should exist at the expected location
+        let cache_file = cache_file_path(&test_path).unwrap();
+        assert!(
+            cache_file.exists(),
+            "cache file should exist at {:?}",
+            cache_file
+        );
+
+        // Read back
+        let read_back = read_cache(&test_path).expect("read_cache should succeed");
+        assert_eq!(read_back.summary.total_items, 1);
+        assert_eq!(read_back.summary.total_size, 42);
+        assert_eq!(read_back.summary.top_items.len(), 1);
+        assert_eq!(read_back.summary.top_items[0].name, "test.txt");
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn write_cache_creates_parent_dir() {
+        let tmp = std::env::temp_dir().join(format!("fab-test-parent-{}", std::process::id()));
+        let test_path = tmp.join("nested/test_dir");
+        let _ = fs::create_dir_all(&test_path);
+
+        // The banner_data subdir shouldn't exist yet
+        let cache_file = cache_file_path(&test_path).unwrap();
+        let parent = cache_file.parent().unwrap();
+        let _ = fs::remove_dir_all(parent);
+
+        // Write should create the parent
+        let data = make_test_banner_data();
+        write_cache(&test_path, &data).unwrap();
+        assert!(parent.exists(), "parent dir should be created");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn read_cache_returns_none_for_missing_file() {
+        // Path that doesn't have a cache file
+        let result = read_cache(Path::new(
+            "/tmp/this/path/should/not/exist/fab-test-missing",
+        ));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn read_cache_handles_corrupt_json() {
+        let tmp = std::env::temp_dir().join(format!("fab-test-corrupt-{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp);
+        let test_path = tmp.join("test_dir");
+        let _ = fs::create_dir_all(&test_path);
+
+        // Write garbage to the cache file
+        let cache_file = cache_file_path(&test_path).unwrap();
+        if let Some(parent) = cache_file.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        fs::write(&cache_file, b"{ this is not valid json").unwrap();
+
+        // Read should return None, not panic
+        let result = read_cache(&test_path);
+        assert!(result.is_none(), "corrupt JSON should return None");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn read_cache_handles_directory_at_cache_path() {
+        let tmp = std::env::temp_dir().join(format!("fab-test-dirpath-{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp);
+        let test_path = tmp.join("test_dir");
+        let _ = fs::create_dir_all(&test_path);
+
+        // Create a directory at the cache file path
+        let cache_file = cache_file_path(&test_path).unwrap();
+        if let Some(parent) = cache_file.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::remove_file(&cache_file);
+        fs::create_dir(&cache_file).unwrap();
+
+        // Read should remove the directory and return None
+        let result = read_cache(&test_path);
+        assert!(
+            result.is_none(),
+            "directory at cache path should return None"
+        );
+        assert!(!cache_file.exists(), "directory should be removed");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn write_cache_replaces_directory_at_cache_path() {
+        let tmp = std::env::temp_dir().join(format!("fab-test-replace-{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp);
+        let test_path = tmp.join("test_dir");
+        let _ = fs::create_dir_all(&test_path);
+
+        // Create a directory at the cache file path
+        let cache_file = cache_file_path(&test_path).unwrap();
+        if let Some(parent) = cache_file.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::remove_file(&cache_file);
+        fs::create_dir(&cache_file).unwrap();
+
+        // Write should remove the directory and create a file
+        let data = make_test_banner_data();
+        write_cache(&test_path, &data).unwrap();
+        assert!(
+            cache_file.is_file(),
+            "directory should be replaced with file"
+        );
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn is_cache_fresh_false_for_missing_file() {
+        assert!(!is_cache_fresh(Path::new(
+            "/tmp/this/path/should/not/exist/fab-fresh-test"
+        )));
+    }
+
+    #[test]
+    fn is_cache_fresh_true_for_recent_file() {
+        // Use a real path that we just wrote
+        let tmp = std::env::temp_dir().join(format!("fab-test-isfresh-{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp);
+        let test_path = tmp.join("test_dir");
+        let _ = fs::create_dir_all(&test_path);
+
+        let data = make_test_banner_data();
+        write_cache(&test_path, &data).unwrap();
+
+        // File was just written, so it should be fresh
+        assert!(is_cache_fresh(&test_path));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn is_cache_fresh_false_for_directory() {
+        let tmp = std::env::temp_dir().join(format!("fab-test-isdir-{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp);
+        let test_path = tmp.join("test_dir");
+        let _ = fs::create_dir_all(&test_path);
+
+        // Create a directory at the cache file path
+        let cache_file = cache_file_path(&test_path).unwrap();
+        if let Some(parent) = cache_file.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::remove_file(&cache_file);
+        fs::create_dir(&cache_file).unwrap();
+
+        // Directory at cache path should not be fresh
+        assert!(!is_cache_fresh(&test_path));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn cache_ttl_is_5_minutes() {
+        // Sanity check: the TTL must match the daemon's CACHE_TTL.
+        assert_eq!(CACHE_TTL, Duration::from_secs(300));
     }
 }
