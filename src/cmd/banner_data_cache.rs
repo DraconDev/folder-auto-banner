@@ -82,10 +82,13 @@ fn fnv1a_64(bytes: &[u8]) -> u64 {
 }
 
 /// Returns the mtime of the cache file for `path`, or `None` if the
-/// file does not exist or its mtime cannot be read.
+/// file does not exist, is a directory, or its mtime cannot be read.
 pub fn cache_file_mtime(path: &Path) -> Option<SystemTime> {
     let file = cache_file_path(path)?;
     let meta = std::fs::metadata(&file).ok()?;
+    if meta.is_dir() {
+        return None;
+    }
     meta.modified().ok()
 }
 
@@ -124,9 +127,21 @@ pub fn is_cache_fresh(path: &Path) -> bool {
 }
 
 /// Read and deserialize the cache file for `path`. Returns `None` if
-/// the file is missing, unreadable, or fails to deserialize.
+/// the file is missing, unreadable, is a directory, or fails to
+/// deserialize. If the path is a directory (corruption from a previous
+/// bug, manual intervention, etc.), the directory is removed so the
+/// daemon can write a fresh file on the next IPC call.
 pub fn read_cache(path: &Path) -> Option<BannerData> {
     let file = cache_file_path(path)?;
+    let meta = std::fs::metadata(&file).ok()?;
+    if meta.is_dir() {
+        tracing::warn!(
+            "Cache path is a directory, removing: {}",
+            file.display()
+        );
+        let _ = std::fs::remove_dir(&file);
+        return None;
+    }
     let bytes = std::fs::read(&file).ok()?;
     serde_json::from_slice(&bytes).ok()
 }
@@ -151,6 +166,19 @@ pub fn write_cache(path: &Path, data: &BannerData) -> std::io::Result<()> {
             return Ok(());
         }
     };
+    // If the path exists and is a directory (corruption from a previous
+    // bug, manual intervention, or filesystem weirdness), remove it so
+    // we can write a regular file. We only remove it if it's a directory
+    // — never remove a regular file.
+    if let Ok(meta) = std::fs::metadata(&file) {
+        if meta.is_dir() {
+            tracing::warn!(
+                "Cache path is a directory, removing: {}",
+                file.display()
+            );
+            let _ = std::fs::remove_dir(&file);
+        }
+    }
     if let Err(e) = std::fs::write(&file, &bytes) {
         tracing::warn!("Failed to write banner data cache: {}", e);
         return Ok(());
