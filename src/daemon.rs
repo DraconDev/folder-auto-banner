@@ -848,6 +848,11 @@ fn handle_client(
                 data.summary.total_size = data.summary.top_items.iter().map(|item| item.size).sum();
                 let t2 = std::time::Instant::now();
                 let t3 = std::time::Instant::now();
+                // Persist to the on-disk cache so the next client
+                // call can skip the IPC. We do this on every banner
+                // response (cache hit or miss) so the file's mtime
+                // stays fresh and the client can rely on it.
+                persist_banner_data_cache(&path, &data);
                 send_response(&mut stream, &Response::Banner(Box::new(data)))?;
                 let t4 = std::time::Instant::now();
                 tracing::debug!(
