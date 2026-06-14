@@ -50,7 +50,11 @@ pub fn cache_file_path(path: &Path) -> Option<PathBuf> {
     let data_dir = data_dir()?;
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let hash = fnv1a_64(canonical.to_string_lossy().as_bytes());
-    Some(data_dir.join(CACHE_SUBDIR).join(format!("{:016x}.json", hash)))
+    Some(
+        data_dir
+            .join(CACHE_SUBDIR)
+            .join(format!("{:016x}.json", hash)),
+    )
 }
 
 /// Returns the cache directory, creating it if necessary.
@@ -165,6 +169,8 @@ mod tests {
     #[test]
     fn nonexistent_cache_is_not_fresh() {
         // Use a path that almost certainly does not have a cache file.
-        assert!(!is_cache_fresh(Path::new("/tmp/this/path/should/not/exist/fab-test")));
+        assert!(!is_cache_fresh(Path::new(
+            "/tmp/this/path/should/not/exist/fab-test"
+        )));
     }
 }
