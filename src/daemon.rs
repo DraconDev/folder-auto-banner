@@ -1058,17 +1058,13 @@ fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
 }
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
-    let _profile = std::env::var("FAB_PROFILE").is_ok();
-    let _t0 = std::time::Instant::now();
     let mut summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
-    let _t1 = std::time::Instant::now();
 
     // Build pathspecs for git status collection. Files use their exact
     // top-level name; directories use `dir/*` so libgit2 only walks immediate
     // children that the banner displays or aggregates.
     let filter_paths = folder_auto_banner::git::status_filter_paths_for_items(&summary.top_items);
     let mut git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
-    let _t2 = std::time::Instant::now();
 
     if let Some(ref mut gi) = git_info {
         if !gi.file_statuses.is_empty() {
@@ -1092,17 +1088,6 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     // configured CACHE_TTL (5 min by default), so the per-file I/O happens
     // at most once per TTL window per directory.
     populate_content_probes(&mut summary.top_items);
-    let _t3 = std::time::Instant::now();
-
-    if _profile {
-        eprintln!(
-            "[FAB_PROFILE] compute_banner_data: scan={:?} git={:?} probes={:?} total={:?}",
-            _t1 - _t0,
-            _t2 - _t1,
-            _t3 - _t2,
-            _t3 - _t0
-        );
-    }
 
     // Return immediately — sizes come from global cache
     Ok(BannerData { summary, git_info })
