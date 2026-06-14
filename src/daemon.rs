@@ -1101,32 +1101,20 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
 /// This is a sequential walk; in 0.6.25 the client did the same work on
 /// every invocation, so the per-call cost is the same on a cold scan but
 /// collapses to ~0 for every subsequent call within the cache TTL.
+///
+/// We probe every file. The probe function is cheap for files with
+/// unrecognized extensions (just a `Path::extension` check), and for
+/// recognized text files it does a `read_to_string` and counts lines.
+/// That work is moved off the client (a short-lived per-`f` process)
+/// and onto the daemon (a long-lived cache layer), so it happens at
+/// most once per `CACHE_TTL` per directory instead of once per
+/// invocation. The trade-off is that an in-place edit of a text file
+/// won't update its cached line count until the next refresh, but this
+/// is cosmetic and the refresh happens on the 5-minute TTL boundary.
 fn populate_content_probes(items: &mut [DirEntry]) {
     use folder_auto_banner::cmd::file_metadata::get_file_contents;
     for entry in items.iter_mut() {
         if !entry.is_file {
-            continue;
-        }
-        // Cheap pre-filter: skip the file-open syscall for files whose
-        // extension we don't probe. `Path::extension` is allocation-free.
-        let ext = std::path::Path::new(&entry.name)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
-        if !matches!(
-            ext,
-            "png" | "jpg"
-                | "jpeg"
-                | "zip"
-                | "mp4"
-                | "mov"
-                | "m4v"
-                | "webm"
-                | "mkv"
-                | "db"
-                | "sqlite"
-                | "sqlite3"
-        ) {
             continue;
         }
         let probe = get_file_contents(entry);
