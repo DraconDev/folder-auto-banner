@@ -453,16 +453,28 @@ fn watch_loop(
                         // itself or for a descendant. A root event
                         // (create/delete/rename of a direct child) means the
                         // item listing may have changed, so the banner cache
-                        // must be invalidated. A descendant event only
-                        // affects a child's displayed size, so the banner
-                        // cache stays valid and we only prune the size cache.
+                        // must be invalidated. A descendant event on a file
+                        // (MODIFY/CLOSE_WRITE) can also affect the banner
+                        // data (e.g., text file line counts, image
+                        // dimensions, ZIP entry counts), so we invalidate
+                        // the banner cache for those events too. The
+                        // re-compute is deferred to the next IPC request,
+                        // so a burst of events (e.g., a build writing many
+                        // files) still results in only one re-compute.
                         let is_root_event = watched
                             .get(&event.wd)
                             .and_then(|regs| regs.first())
                             .map(|r| r.watched_path == r.owner)
                             .unwrap_or(false);
+                        // For MODIFY/CLOSE_WRITE events on a file (not a
+                        // directory), the banner data may have changed
+                        // (e.g., line count, image dimensions).
+                        let is_file_modify = event.mask.contains(inotify::EventMask::MODIFY)
+                            || event.mask.contains(inotify::EventMask::CLOSE_WRITE);
+                        let invalidate_banner = is_root_event
+                            || (is_file_modify && !event.mask.contains(inotify::EventMask::ISDIR));
 
-                        if is_root_event {
+                        if invalidate_banner {
                             let mut cache_guard = cache.lock().unwrap_or_else(|e| {
                                 tracing::warn!("Mutex poisoned, recovering");
                                 e.into_inner()
