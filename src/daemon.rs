@@ -827,6 +827,10 @@ fn handle_client(
                         },
                     );
                     touch_active_root(&active_roots, &active_order, path.clone());
+                    // Persist to the on-disk cache so the next client
+                    // call can skip the IPC.
+                    drop(cache);
+                    persist_banner_data_cache(&path, &data);
                 }
                 if apply_cached_displayed_dir_sizes(
                     &mut data.summary.top_items,
@@ -902,6 +906,10 @@ fn handle_client(
                 );
                 touch_active_root(&active_roots, &active_order, path.clone());
             }
+            // Persist the banner data to the per-path on-disk cache so
+            // the client can skip the IPC round-trip on the next call
+            // (the IPC `read4` has a 1–10 ms kernel-scheduling floor).
+            persist_banner_data_cache(&path, &data);
             schedule_size_refresh(
                 size_refresh_ctx,
                 path.clone(),
@@ -1055,6 +1063,15 @@ fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
     stream.write_all(&combined)?;
     stream.flush()?;
     Ok(())
+}
+
+/// Write the per-path `BannerData` cache file. Called by the daemon
+/// after every successful banner compute (cache miss and cache hit).
+/// The file's mtime is the freshness signal that the client checks
+/// before opening an IPC connection.
+fn persist_banner_data_cache(path: &Path, data: &BannerData) {
+    use folder_auto_banner::cmd::banner_data_cache;
+    let _ = banner_data_cache::write_cache(path, data);
 }
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {

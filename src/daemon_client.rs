@@ -60,7 +60,27 @@ fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response>
 /// Try to get cached banner data from daemon.
 /// Auto-starts daemon if socket doesn't exist or is stale.
 pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
+    use crate::cmd::banner_data_cache;
+
     let t0 = std::time::Instant::now();
+
+    // Fast path: read the per-path on-disk cache directly, bypassing
+    // the IPC round-trip entirely. The daemon writes this file on every
+    // successful banner compute; the file's mtime is the freshness
+    // signal. The disk read is <0.1 ms (page cache) versus 1–10 ms for
+    // the IPC read4 (kernel scheduling).
+    if banner_data_cache::is_cache_fresh(path) {
+        if let Some(data) = banner_data_cache::read_cache(path) {
+            if std::env::var("FAB_PROFILE").is_ok() {
+                eprintln!(
+                    "[FAB_PROFILE] banner_data_cache: hit total={:?}",
+                    t0.elapsed()
+                );
+            }
+            return Some(data);
+        }
+    }
+
     let socket = socket_path().ok()?;
 
     // Try connecting — if it fails, start daemon and retry once
