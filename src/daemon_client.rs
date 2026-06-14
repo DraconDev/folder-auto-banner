@@ -26,25 +26,32 @@ fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response>
     combined.extend_from_slice(&req_bytes);
     let t0 = std::time::Instant::now();
     stream.write_all(&combined)?;
-    stream.shutdown(std::net::Shutdown::Write)?;
-    let t1 = std::time::Instant::now();
+    let t_write = std::time::Instant::now();
+    // NOTE: previously called stream.shutdown(Shutdown::Write) here, but
+    // measuring shows it adds 1–78 ms of latency on Linux Unix sockets
+    // because the kernel needs to deliver a FIN to the peer and reschedule
+    // the client. The daemon's length-prefixed protocol already tells the
+    // server when the request ends (it reads exactly req_len bytes), so
+    // the shutdown is unnecessary and we skip it for latency.
+    let t_shutdown = std::time::Instant::now();
     let mut len_bytes = [0u8; 4];
     stream.read_exact(&mut len_bytes)?;
-    let t2 = std::time::Instant::now();
+    let t_read4 = std::time::Instant::now();
     let resp_len = u32::from_le_bytes(len_bytes) as usize;
     let mut resp_bytes = vec![0u8; resp_len];
     stream.read_exact(&mut resp_bytes)?;
-    let t3 = std::time::Instant::now();
+    let t_read_payload = std::time::Instant::now();
     let response: Response = serde_json::from_slice(&resp_bytes)?;
-    let t4 = std::time::Instant::now();
+    let t_deser = std::time::Instant::now();
     if std::env::var("FAB_PROFILE").is_ok() {
         eprintln!(
-            "[FAB_PROFILE] ipc: write={:?} len_read={:?} payload_read={:?} deser={:?} total={:?}",
-            t1 - t0,
-            t2 - t1,
-            t3 - t2,
-            t4 - t3,
-            t4 - t0
+            "[FAB_PROFILE] ipc: write={:?} shutdown={:?} read4={:?} read_payload={:?} deser={:?} total={:?}",
+            t_write - t0,
+            t_shutdown - t_write,
+            t_read4 - t_shutdown,
+            t_read_payload - t_read4,
+            t_deser - t_read_payload,
+            t_deser - t0
         );
     }
     Ok(response)

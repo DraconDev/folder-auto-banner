@@ -770,6 +770,7 @@ fn handle_client(
         Request::Banner { path } => {
             let path = path.canonicalize().unwrap_or_else(|_| path.clone());
             touch_active_root(&active_roots, &active_order, path.clone());
+            let _t_req_start = std::time::Instant::now();
 
             // Check cache — if hit, do a cheap root-mtime check and refresh displayed
             // directory sizes only when their mtime changed.
@@ -791,6 +792,7 @@ fn handle_client(
                 let expired = entry.computed_at.elapsed() >= CACHE_TTL;
                 let mut data = entry.data;
                 let t1 = std::time::Instant::now();
+                let _t_root_done = t1;
                 if expired || !root_fresh {
                     tracing::debug!(
                         "Cache miss/recompute: path={} expired={} root_fresh={} root_mtime={:?} current_mtime={:?}",
@@ -845,10 +847,11 @@ fn handle_client(
                 send_response(&mut stream, &Response::Banner(Box::new(data)))?;
                 let t4 = std::time::Instant::now();
                 tracing::debug!(
-                    "Cache hit: clone={:?} root_check={:?} send={:?}",
+                    "Cache hit: clone={:?} root_check={:?} send={:?} total={:?}",
                     t1 - t0,
                     t2 - t1,
-                    t4 - t3
+                    t4 - t3,
+                    t4 - _t_req_start,
                 );
                 // Keep stream alive while client reads
                 let mut discard = [0u8; 256];

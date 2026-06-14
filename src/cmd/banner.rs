@@ -244,9 +244,11 @@ fn build_display_items<'a>(
             .filter(|i| i.is_symlink)
             .copied()
             .collect();
-        dirs.sort_by_key(|i| i.name.to_lowercase());
-        files.sort_by_key(|i| i.name.to_lowercase());
-        symlinks.sort_by_key(|i| i.name.to_lowercase());
+        // `to_lowercase` allocates; cache the key once per item instead of
+        // lowercasing on every comparison.
+        dirs.sort_by_cached_key(|i| i.name.to_lowercase());
+        files.sort_by_cached_key(|i| i.name.to_lowercase());
+        symlinks.sort_by_cached_key(|i| i.name.to_lowercase());
         display_items = dirs.into_iter().chain(files).chain(symlinks).collect();
     }
 
@@ -270,7 +272,55 @@ fn build_display_items<'a>(
 
         let group_dirs_mode = opts.group_dirs.unwrap_or("first");
 
-        display_items.sort_by(|a, b| {
+        // Pre-compute lowercase names, extensions, and date keys once so the
+        // per-comparison sort callback does no allocation. This converts the
+        // N log N allocations in the old `a.name.to_lowercase().cmp(...)`
+        // calls into a single O(N) pass.
+        struct SortKeys {
+            lower: String,
+            ext: String,
+            date: chrono::DateTime<chrono::Utc>,
+            git: u8,
+        }
+        let sort_keys: Vec<SortKeys> = display_items
+            .iter()
+            .map(|i| SortKeys {
+                lower: i.name.to_lowercase(),
+                ext: i
+                    .name
+                    .rfind('.')
+                    .map(|pos| i.name[pos..].to_lowercase())
+                    .unwrap_or_default(),
+                date: i.modified.unwrap_or_else(|| {
+                    chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
+                }),
+                git: {
+                    let rel = i.path.strip_prefix(path).unwrap_or(&i.path);
+                    let rel_str = rel.to_string_lossy();
+                    git_info
+                        .file_statuses
+                        .get(rel_str.as_ref())
+                        .or_else(|| git_info.file_statuses.get(i.name.as_str()))
+                        .map(|fs| match fs {
+                            crate::git::FileStatus::Conflict => 5,
+                            crate::git::FileStatus::Deleted => 4,
+                            crate::git::FileStatus::Modified => 3,
+                            crate::git::FileStatus::Added => 2,
+                            crate::git::FileStatus::Renamed => 1,
+                            crate::git::FileStatus::Untracked => 0,
+                        })
+                        .unwrap_or(0)
+                },
+            })
+            .collect();
+        // Permute indices so the sort can index into sort_keys cheaply.
+        let mut order: Vec<usize> = (0..display_items.len()).collect();
+        order.sort_by(|&ia, &ib| {
+            let a = &display_items[ia];
+            let b = &display_items[ib];
+            let ka = &sort_keys[ia];
+            let kb = &sort_keys[ib];
+
             if group_dirs_mode != "none" && a.is_dir != b.is_dir {
                 return if group_dirs_mode == "last" {
                     if opts.reverse {
@@ -289,57 +339,24 @@ fn build_display_items<'a>(
 
             let ordering = match sort_mode {
                 "size" => a.size.cmp(&b.size),
-                "date" => {
-                    let a_time = a.modified.unwrap_or_else(|| {
-                        chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
-                    });
-                    let b_time = b.modified.unwrap_or_else(|| {
-                        chrono::DateTime::from_timestamp(0, 0).unwrap_or_default()
-                    });
-                    a_time.cmp(&b_time)
-                }
+                "date" => ka.date.cmp(&kb.date),
                 "type" => {
-                    let a_ext = a.name.rfind('.').map(|i| &a.name[i..]).unwrap_or("");
-                    let b_ext = b.name.rfind('.').map(|i| &b.name[i..]).unwrap_or("");
-                    let ext_cmp = a_ext.cmp(b_ext);
-                    if ext_cmp != std::cmp::Ordering::Equal {
-                        ext_cmp
+                    if ka.ext != kb.ext {
+                        ka.ext.cmp(&kb.ext)
                     } else {
-                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                        ka.lower.cmp(&kb.lower)
                     }
                 }
                 "extension" => {
-                    let a_ext = a.name.rfind('.').map(|i| &a.name[i + 1..]).unwrap_or("");
-                    let b_ext = b.name.rfind('.').map(|i| &b.name[i + 1..]).unwrap_or("");
-                    let ext_cmp = a_ext.to_lowercase().cmp(&b_ext.to_lowercase());
-                    if ext_cmp != std::cmp::Ordering::Equal {
-                        ext_cmp
+                    if ka.ext != kb.ext {
+                        ka.ext.cmp(&kb.ext)
                     } else {
-                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                        ka.lower.cmp(&kb.lower)
                     }
                 }
-                "git" => {
-                    let get_git_order = |item: &&crate::fs::DirEntry| -> u8 {
-                        let rel = item.path.strip_prefix(path).unwrap_or(&item.path);
-                        let rel_str = rel.to_string_lossy();
-                        git_info
-                            .file_statuses
-                            .get(rel_str.as_ref())
-                            .or_else(|| git_info.file_statuses.get(item.name.as_str()))
-                            .map(|fs| match fs {
-                                crate::git::FileStatus::Conflict => 5,
-                                crate::git::FileStatus::Deleted => 4,
-                                crate::git::FileStatus::Modified => 3,
-                                crate::git::FileStatus::Added => 2,
-                                crate::git::FileStatus::Renamed => 1,
-                                crate::git::FileStatus::Untracked => 0,
-                            })
-                            .unwrap_or(0)
-                    };
-                    get_git_order(a).cmp(&get_git_order(b))
-                }
+                "git" => ka.git.cmp(&kb.git),
                 "version" => natural_cmp(&a.name, &b.name),
-                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                _ => ka.lower.cmp(&kb.lower),
             };
 
             if opts.reverse {
@@ -348,6 +365,9 @@ fn build_display_items<'a>(
                 ordering
             }
         });
+        // Project the permutation back into display_items.
+        let permuted: Vec<&crate::fs::DirEntry> = order.iter().map(|&i| display_items[i]).collect();
+        display_items = permuted;
     }
 
     (display_items, hidden_count)
@@ -859,6 +879,8 @@ fn build_git_status_indicators(git_info: &GitInfo) -> String {
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &BannerOptions) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
+    let _profile = std::env::var("FAB_PROFILE").is_ok();
+    let _t_outer = std::time::Instant::now();
 
     let path_str = path.to_string_lossy();
     let project_icon = summary.project_type.icon();
@@ -1380,6 +1402,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         config.columns.clone()
     };
     let show_contents_column = effective_columns.iter().any(|c| c == "contents");
+    let _profile = std::env::var("FAB_PROFILE").is_ok();
+    let _t0 = std::time::Instant::now();
 
     // Precompute expensive contents metadata once so directory counts and file
     // content probes are not repeated during width calculation and row rendering.
@@ -1397,6 +1421,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             (*item, contents_raw)
         })
         .collect();
+    if _profile {
+        eprintln!("[FAB_PROFILE] display_meta ({} items, contents={}): {:?}", display_items.len(), show_contents_column, _t0.elapsed());
+    }
+    let _t1 = std::time::Instant::now();
 
     // Compute max column widths for alignment
     let mut max_owner = 5; // "OWNER"
@@ -1728,6 +1756,9 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             .unwrap_or_else(|| row_parts.join(" "));
 
         println!("{}{}{}", row_tint, row_str, tint_reset);
+    }
+    if _profile {
+        eprintln!("[FAB_PROFILE] row loop + widths: {:?}", _t1.elapsed());
     }
 
     // Show smart truncation summary for big folders
