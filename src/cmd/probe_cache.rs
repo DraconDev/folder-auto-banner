@@ -52,16 +52,29 @@ impl CacheKey {
     /// Build a cache key for a single file's content probe
     /// (PNG/JPG resolution, ZIP entry count, MP4/MOV/M4V/WebM/MKV
     /// duration, SQLite table count, text line count).
-    pub fn for_file(path: &std::path::Path, size: u64, modified: Option<chrono::DateTime<chrono::Utc>>) -> Self {
+    pub fn for_file(
+        path: &std::path::Path,
+        size: u64,
+        modified: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Self {
         Self::new(path, size, modified, PROBE_KIND_FILE)
     }
 
     /// Build a cache key for a directory's child count.
-    pub fn for_dir(path: &std::path::Path, size: u64, modified: Option<chrono::DateTime<chrono::Utc>>) -> Self {
+    pub fn for_dir(
+        path: &std::path::Path,
+        size: u64,
+        modified: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Self {
         Self::new(path, size, modified, PROBE_KIND_DIR_COUNT)
     }
 
-    fn new(path: &std::path::Path, size: u64, modified: Option<chrono::DateTime<chrono::Utc>>, kind: u8) -> Self {
+    fn new(
+        path: &std::path::Path,
+        size: u64,
+        modified: Option<chrono::DateTime<chrono::Utc>>,
+        kind: u8,
+    ) -> Self {
         let mtime_nanos = modified.map(|dt| {
             let nanos = dt.timestamp_nanos_opt().unwrap_or(0);
             nanos as i128
@@ -116,7 +129,13 @@ impl ProbeCache {
         }
         let order = guard.next_order;
         guard.next_order = guard.next_order.wrapping_add(1);
-        guard.entries.insert(key, CacheEntry { insert_order: order, value });
+        guard.entries.insert(
+            key,
+            CacheEntry {
+                insert_order: order,
+                value,
+            },
+        );
     }
 
     /// Number of entries currently in the cache. Used for tests / metrics.

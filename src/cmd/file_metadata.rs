@@ -36,11 +36,8 @@ pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     // from memory, so a warm `f` on the same directory doesn't re-read
     // headers we already know about. The cache is bounded by an LRU-style
     // eviction; see `probe_cache.rs` for the full design.
-    let cache_key = crate::cmd::probe_cache::CacheKey::for_file(
-        &entry.path,
-        entry.size,
-        entry.modified,
-    );
+    let cache_key =
+        crate::cmd::probe_cache::CacheKey::for_file(&entry.path, entry.size, entry.modified);
     if let Some(cached) = crate::cmd::probe_cache::ProbeCache::get(&cache_key) {
         return cached;
     }
@@ -99,11 +96,8 @@ pub fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
     // repeated counts from the cache as long as the directory's mtime
     // and size don't change. (For directories we treat `size` as a
     // rough hint; the mtime is the real signal that children changed.)
-    let cache_key = crate::cmd::probe_cache::CacheKey::for_dir(
-        &entry.path,
-        entry.size,
-        entry.modified,
-    );
+    let cache_key =
+        crate::cmd::probe_cache::CacheKey::for_dir(&entry.path, entry.size, entry.modified);
     if let Some(cached) = crate::cmd::probe_cache::ProbeCache::get(&cache_key) {
         if let Ok(n) = cached.parse::<usize>() {
             return n;
