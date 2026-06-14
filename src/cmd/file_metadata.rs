@@ -32,6 +32,19 @@ fn read_file_header(path: &Path) -> Option<Vec<u8>> {
 /// Returns plain text (no ANSI codes) — coloring is applied by the renderer.
 #[allow(dead_code)]
 pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
+    // Per-process cache: identical (path, size, mtime) lookups are served
+    // from memory, so a warm `f` on the same directory doesn't re-read
+    // headers we already know about. The cache is bounded by an LRU-style
+    // eviction; see `probe_cache.rs` for the full design.
+    let cache_key = crate::cmd::probe_cache::CacheKey::for_file(
+        &entry.path,
+        entry.size,
+        entry.modified,
+    );
+    if let Some(cached) = crate::cmd::probe_cache::ProbeCache::get(&cache_key) {
+        return cached;
+    }
+
     // Use Path::extension() to avoid an allocation per probed file. The
     // returned extension is already ASCII-lower (per std::path docs), so we
     // don't need to lowercase the name to compare. This drops one String
@@ -41,35 +54,27 @@ pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
         .and_then(|e| e.to_str())
         .unwrap_or("");
 
-    match ext {
-        "png" | "jpg" | "jpeg" => {
-            if let Some(bytes) = read_file_header(&entry.path) {
-                if let Some(res) = extract_image_resolution(&bytes, ext) {
-                    return res;
-                }
-            }
-            String::new()
+    let result = match ext {
+        "png" | "jpg" | "jpeg" => read_file_header(&entry.path)
+            .and_then(|bytes| extract_image_resolution(&bytes, ext))
+            .unwrap_or_default(),
+        "zip" => read_file_header(&entry.path)
+            .and_then(|bytes| count_zip_entries(&bytes))
+            .map(|c| c.to_string())
+            .unwrap_or_default(),
+        "db" | "sqlite" | "sqlite3" => count_sqlite_tables(&entry.path)
+            .map(|c| format!("{}t", c))
+            .unwrap_or_default(),
+        "mp4" | "mov" | "m4v" | "webm" | "mkv" => {
+            extract_video_duration(&entry.path).unwrap_or_default()
         }
-        "zip" => {
-            if let Some(bytes) = read_file_header(&entry.path) {
-                if let Some(count) = count_zip_entries(&bytes) {
-                    return count.to_string();
-                }
-            }
-            String::new()
-        }
-        "db" | "sqlite" | "sqlite3" => {
-            if let Some(count) = count_sqlite_tables(&entry.path) {
-                return format!("{}t", count);
-            }
-            String::new()
-        }
-        "mp4" | "mov" | "m4v" => extract_video_duration(&entry.path).unwrap_or_default(),
-        "webm" | "mkv" => extract_video_duration(&entry.path).unwrap_or_default(),
         _ => {
-            // Text files under 1MB: count lines. We allow the same heuristic
-            // the old code used (size < 1 MiB AND no recognized extension) to
-            // avoid reading huge binary files line-by-line.
+            // Text files under 1 MiB: count lines. We deliberately do NOT
+            // cache this result, because text files are commonly edited in
+            // place and the size/mtime signal isn't a reliable change
+            // detector for in-place line-count changes. The cost of a fresh
+            // `read_to_string` on a small text file is small (a few hundred
+            // microseconds at most), so re-reading is the right tradeoff.
             if entry.size < 1024 * 1024 {
                 if let Ok(content) = std::fs::read_to_string(&entry.path) {
                     return content.lines().count().to_string();
@@ -77,14 +82,39 @@ pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
             }
             String::new()
         }
-    }
+    };
+
+    // Cache the result. We only cache binary-file probes (PNG/JPG/ZIP/
+    // MP4/MOV/M4V/WebM/MKV/SQLite) above; the text-file branch returns
+    // early without caching.
+    crate::cmd::probe_cache::ProbeCache::put(cache_key, result.clone());
+    result
 }
 
 /// Count items in a directory
 pub fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
-    std::fs::read_dir(&entry.path)
+    // Same per-process cache pattern as `get_file_contents`. Directory
+    // contents are cheap (just `readdir`) but the call still costs a
+    // syscall and path resolution; on a warm `f` invocation we can serve
+    // repeated counts from the cache as long as the directory's mtime
+    // and size don't change. (For directories we treat `size` as a
+    // rough hint; the mtime is the real signal that children changed.)
+    let cache_key = crate::cmd::probe_cache::CacheKey::for_dir(
+        &entry.path,
+        entry.size,
+        entry.modified,
+    );
+    if let Some(cached) = crate::cmd::probe_cache::ProbeCache::get(&cache_key) {
+        if let Ok(n) = cached.parse::<usize>() {
+            return n;
+        }
+    }
+
+    let count = std::fs::read_dir(&entry.path)
         .map(|d| d.count())
-        .unwrap_or(0)
+        .unwrap_or(0);
+    crate::cmd::probe_cache::ProbeCache::put(cache_key, count.to_string());
+    count
 }
 
 /// Extract image resolution from PNG or JPEG header bytes.
