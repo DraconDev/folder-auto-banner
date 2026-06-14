@@ -477,49 +477,16 @@ fn watch_loop(
                             && !event.mask.contains(inotify::EventMask::ISDIR)
                         {
                             // Get the file name from the event. The
-                            // event name is a relative path under the
-                            // watched directory (OsString).
-                            let name = event.name.to_string_lossy();
-                            let lower = name.to_lowercase();
-                            lower.ends_with(".txt")
-                                || lower.ends_with(".md")
-                                || lower.ends_with(".json")
-                                || lower.ends_with(".js")
-                                || lower.ends_with(".ts")
-                                || lower.ends_with(".jsx")
-                                || lower.ends_with(".tsx")
-                                || lower.ends_with(".rs")
-                                || lower.ends_with(".py")
-                                || lower.ends_with(".go")
-                                || lower.ends_with(".java")
-                                || lower.ends_with(".rb")
-                                || lower.ends_with(".c")
-                                || lower.ends_with(".cpp")
-                                || lower.ends_with(".h")
-                                || lower.ends_with(".hpp")
-                                || lower.ends_with(".sh")
-                                || lower.ends_with(".yaml")
-                                || lower.ends_with(".yml")
-                                || lower.ends_with(".toml")
-                                || lower.ends_with(".xml")
-                                || lower.ends_with(".html")
-                                || lower.ends_with(".css")
-                                || lower.ends_with(".scss")
-                                || lower.ends_with(".png")
-                                || lower.ends_with(".jpg")
-                                || lower.ends_with(".jpeg")
-                                || lower.ends_with(".gif")
-                                || lower.ends_with(".webp")
-                                || lower.ends_with(".bmp")
-                                || lower.ends_with(".tiff")
-                                || lower.ends_with(".zip")
-                                || lower.ends_with(".tar")
-                                || lower.ends_with(".gz")
-                                || lower.ends_with(".mp4")
-                                || lower.ends_with(".mov")
-                                || lower.ends_with(".mkv")
-                                || lower.ends_with(".webm")
-                                || lower.ends_with(".m4v")
+                            // event name is an optional relative path
+                            // under the watched directory.
+                            event
+                                .name
+                                .map(|n| {
+                                    is_content_probe_ext(
+                                        &n.to_string_lossy().to_ascii_lowercase(),
+                                    )
+                                })
+                                .unwrap_or(false)
                         } else {
                             false
                         };
@@ -1218,6 +1185,54 @@ fn populate_content_probes(items: &mut [DirEntry]) {
 
 fn cache_entry_root_is_fresh(entry: &CacheEntry, path: &Path) -> bool {
     entry.root_mtime == current_dir_mtime(path)
+}
+
+/// Returns true if the (lower-cased) file name has an extension that
+/// the daemon runs a content probe on (text files, images, archives,
+/// etc.). Used by the inotify watcher to decide whether a
+/// MODIFY/CLOSE_WRITE event on a file should invalidate the banner
+/// cache (because the line count, image dimensions, archive entry
+/// count, etc. may have changed).
+pub(crate) fn is_content_probe_ext(lower_name: &str) -> bool {
+    lower_name.ends_with(".txt")
+        || lower_name.ends_with(".md")
+        || lower_name.ends_with(".json")
+        || lower_name.ends_with(".js")
+        || lower_name.ends_with(".ts")
+        || lower_name.ends_with(".jsx")
+        || lower_name.ends_with(".tsx")
+        || lower_name.ends_with(".rs")
+        || lower_name.ends_with(".py")
+        || lower_name.ends_with(".go")
+        || lower_name.ends_with(".java")
+        || lower_name.ends_with(".rb")
+        || lower_name.ends_with(".c")
+        || lower_name.ends_with(".cpp")
+        || lower_name.ends_with(".h")
+        || lower_name.ends_with(".hpp")
+        || lower_name.ends_with(".sh")
+        || lower_name.ends_with(".yaml")
+        || lower_name.ends_with(".yml")
+        || lower_name.ends_with(".toml")
+        || lower_name.ends_with(".xml")
+        || lower_name.ends_with(".html")
+        || lower_name.ends_with(".css")
+        || lower_name.ends_with(".scss")
+        || lower_name.ends_with(".png")
+        || lower_name.ends_with(".jpg")
+        || lower_name.ends_with(".jpeg")
+        || lower_name.ends_with(".gif")
+        || lower_name.ends_with(".webp")
+        || lower_name.ends_with(".bmp")
+        || lower_name.ends_with(".tiff")
+        || lower_name.ends_with(".zip")
+        || lower_name.ends_with(".tar")
+        || lower_name.ends_with(".gz")
+        || lower_name.ends_with(".mp4")
+        || lower_name.ends_with(".mov")
+        || lower_name.ends_with(".mkv")
+        || lower_name.ends_with(".webm")
+        || lower_name.ends_with(".m4v")
 }
 
 #[cfg(test)]
