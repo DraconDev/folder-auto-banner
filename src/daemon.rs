@@ -802,7 +802,12 @@ fn handle_client(
                         entry.root_mtime,
                         current_dir_mtime(&path),
                     );
-                    let data = match compute_banner_data(&path) {
+                    // Re-compute and replace the outer `data` so the
+                    // response below (and the disk cache write) reflects
+                    // the freshly-computed banner, not the stale entry.
+                    // (Pre-0.6.27 the inner `let data =` shadowed the
+                    // outer `data` and the response used the old data.)
+                    data = match compute_banner_data(&path) {
                         Ok(data) => data,
                         Err(e) => {
                             send_response(
@@ -827,10 +832,6 @@ fn handle_client(
                         },
                     );
                     touch_active_root(&active_roots, &active_order, path.clone());
-                    // Persist to the on-disk cache so the next client
-                    // call can skip the IPC.
-                    drop(cache);
-                    persist_banner_data_cache(&path, &data);
                 }
                 if apply_cached_displayed_dir_sizes(
                     &mut data.summary.top_items,
