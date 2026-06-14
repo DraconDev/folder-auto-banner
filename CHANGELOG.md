@@ -1,3 +1,10 @@
+## [0.6.24] - 2026-06-14
+
+### Performance
+- **Header-only file content probes** — the contents column for `.png` / `.jpg` / `.zip` / `.mp4` / `.mov` / `.mkv` / `.webm` now reads at most 64 KiB of each file instead of the entire file. This makes `f` in directories with many images, archives, or videos dramatically faster.
+- **Skipped contents probe when hidden** — the per-file content probe is skipped entirely when the `contents` column is not in the effective column set, removing a per-item O(file size) cost from the hot path.
+- **Bounded hidden-count scan** — the smart-truncation hidden counter is now O(N) total instead of O(N×M) per category.
+
 ## [0.6.23] - 2026-06-11
 
 ### Docs

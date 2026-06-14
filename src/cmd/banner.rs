@@ -1734,10 +1734,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     if hidden_count > 0 && config.smart_truncation {
         // Build a set of displayed paths once so the per-item hidden counters
         // are O(N) total instead of O(N*M) for each category.
-        let displayed_paths: std::collections::HashSet<&std::path::Path> = display_items
-            .iter()
-            .map(|d| d.path.as_path())
-            .collect();
+        let displayed_paths: std::collections::HashSet<&std::path::Path> =
+            display_items.iter().map(|d| d.path.as_path()).collect();
         let hidden_dirs = summary
             .top_items
             .iter()

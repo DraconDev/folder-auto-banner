@@ -1,6 +1,6 @@
 [package]
 name = "folder-auto-banner"
-version = "0.6.23"
+version = "0.6.24"
 edition = "2021"
 description = "Folder Auto Banner — A directory listing with instant context"
 license = "MIT"
