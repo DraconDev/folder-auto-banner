@@ -1,3 +1,108 @@
+## [0.7.0] - 2026-06-15
+
+### BREAKING: Lazy flags removed, replaced with built-in aliases
+
+The entire lazy flag system (single-char chains, case-insensitive aliases,
+`:` value-binding) has been **removed**. It is replaced with a cleaner
+built-in alias system.
+
+**Before (0.6.x):** `f trc` → `-t -r -c`, `f mLf: 10` → `-f 10`
+**After (0.7.0):** `f new -r -c`, `f -f 10` (use explicit flags)
+
+#### New built-in aliases (18)
+
+| Alias     | Expands to        | What it does                          |
+|-----------|-------------------|---------------------------------------|
+| `tree`    | `-R -D`           | Recursive, only dirs (like `tree`)    |
+| `flat`    | `-o`              | One file per line                     |
+| `compact` | `-c`              | Compact output                        |
+| `verbose` | `-v`              | Verbose output                        |
+| `hidden`  | `-a`              | Show hidden files                     |
+| `dirs`    | `-D`              | Only directories                      |
+| `new`     | `-t`              | Sort by time, newest first            |
+| `old`     | `-t -r`           | Sort by time, oldest first            |
+| `big`     | `-S`              | Sort by size, largest first           |
+| `small`   | `-S -r`           | Sort by size, smallest first          |
+| `ext`     | `-X`              | Sort by extension                     |
+| `git`     | `-G`              | Sort by git status                    |
+| `nosort`  | `-U`              | No sort                               |
+| `top`     | `-S -r -m 20`     | Top 20 largest files                  |
+| `newest`  | `-t -r -m 20`     | 20 newest files                       |
+| `recurse` | `-R`              | Recurse into subdirectories           |
+| `edit`    | `-e`              | Force open in editor                  |
+| `run`     | `-x`              | Force run file                        |
+
+#### New routing logic
+
+- `f` (no args) → default banner for cwd
+- `f -<flag>` or `f --<flag>` → explicit flags
+- `f <number>` → navigate to item N
+- `f <alias>` → expand and run
+- `f <word>` (not number, not alias) → default banner for cwd (no error)
+- `f ./path`, `f /path`, `f ~/path` → explicit path
+- Aliases compose: `f hidden verbose` → `-a -v`
+- Aliases compose with explicit flags: `f tree -L 2` → `-R -D -L 2`
+- Aliases compose with paths: `f top ./src` → `-S -r -m 20` for `./src`
+
+#### Migration from 0.6.x
+
+| 0.6.x form   | 0.7.0 equivalent                |
+|--------------|----------------------------------|
+| `f t`        | `f new` (or `f -t`)             |
+| `f trc`      | `f new -r -c`                   |
+| `f S`        | `f big`                         |
+| `f mL 10 2`  | `f -m 10 -L 2`                  |
+| `f mLf: 10`  | `f -f 10`                       |
+| `f s`        | `f big`                         |
+| `f l5`       | `f -L 5`                        |
+| `f Downloads`| `f ./Downloads` (bare = alias)  |
+
+For common combinations, add a shell alias:
+
+```bash
+alias ftrc='f -t -r -c'
+alias ftree='f -R -D'
+```
+
+#### What was removed
+
+- `LAZY_FLAGS`, `LOWERCASE_ALIASES`, `VALUE_TAKING_FLAGS` constants
+- `resolve_lazy_flag_char`, `expand_lazy_flags`, `expand_lazy_flags_with_binding` functions
+- `ExpandedChain` struct
+- The 0.6.37 `:` value-binding syntax
+- The "no fallback" error for bare words
+- ~60 lazy-flag-related unit and integration tests
+- The `tests/lazy_flags_test.rs` file (replaced with `tests/alias_test.rs`)
+
+#### What was preserved
+
+- 0.6.34 flag wiring (`e`/`U`/`x`/`f` short flags in top-level `Cli`)
+- Explicit flag parsing (`-t`, `--filter txt`)
+- Number navigation (`f 1` → item 1)
+- Path handling (`f ./x`, `f /x`, `f ~/x`)
+
+### New documentation
+
+- `LAZY_FLAGS_REMOVAL.md` — design doc with the new routing rules,
+  alias table, and migration guide from 0.6.x.
+- Historical docs marked: `LAZY_FLAGS_AUDIT.md`, `LAZY_FLAGS_MESSINESS.md`,
+  `LAZY_FLAGS_VALUE_BINDING.md`, `LAZY_FLAGS_TESTING.md` all have a
+  header noting they describe the removed 0.6.x system.
+
+### Test metrics
+
+| Metric | 0.6.37 | 0.7.0 | Change |
+|--------|--------|-------|--------|
+| Unit tests | 64 | 36 | -28 (lazy flag tests removed) |
+| Integration tests (active) | 29 | 62 | +33 |
+| Alias tests | 0 | 41 | +41 (new) |
+| **Total** | **303** | **210** | **-93** |
+| **Pass rate** | **100%** | **100%** | — |
+
+The test count dropped because ~60 lazy-flag-specific tests were removed.
+The new alias test suite (41 tests) covers all 18 aliases, composition,
+routing, and removal verification.
+
 ## [0.6.37] - 2026-06-15
 
 ### Lazy flag value-binding with `:` separator
