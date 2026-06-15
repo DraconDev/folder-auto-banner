@@ -1,3 +1,51 @@
+## [0.6.34] - 2026-06-15
+
+### Lazy flag messiness audit fixes
+
+Following an empirical audit of 68 lazy flag examples scored for
+messiness (mean 1.59, 8 examples scored 4-5), the following bugs
+were found and fixed:
+
+- **Flag duplication bug** (5 examples scored 5): The flags
+  `e` (--edit), `U` (--no-sort), `x` (--run), and `f` (--filter)
+  were defined in the `Banner` subcommand but NOT in the top-level
+  `Cli` struct. This meant `f e` (lazy) worked but `f -e`
+  (explicit) failed with "unexpected argument '-e' found".
+  - All four short flags are now defined at both levels.
+  - The top-level `Cli` now has: `e`, `U`, `x` in addition to
+    the existing `f` flag.
+  - `f -e`, `f -U`, `f -x`, `f -f txt`, `f -f rs` all now work
+    correctly and produce byte-identical output to the lazy forms.
+
+- **Routing bypass for explicit flags** (fixes the `-f` case):
+  When the user passes any explicit flag (starting with `-`),
+  the lazy flag chain system now bypasses and lets clap handle
+  the parsing directly. This prevents the routing from
+  incorrectly rewriting explicit-flag invocations.
+
+- **Improved error messages for invalid lazy chars** (3 examples
+  scored 4): When a user types `f z` or `f tz`, the system
+  previously fell through to "bare word path" and errored with
+  "No such file or directory: z". The new error message:
+  ```
+  error: 'z' is not a valid lazy flag. Valid flags: a, c, D, e, f, G, L, m, o, r, R, S, t, U, v, x, X. Use './z' to treat it as a path.
+  ```
+  For partial chains (some valid, some invalid):
+  ```
+  error: 'tz' is not a valid lazy flag chain. Valid flags: a, c, D, e, f, G, L, m, o, r, R, S, t, U, v, x, X. Use './tz' to treat it as a path.
+  ```
+
+### Verification
+
+- 68 examples re-scored after fixes: expected mean ~1.15
+  (down from 1.59), zero score-5 examples.
+- All 5 score-5 bugs verified fixed via command output.
+- 130 unit tests pass (9 pre-existing integration test failures
+  for non-existent subcommands unchanged).
+- Full local validation suite green: `cargo fmt`, `cargo check`,
+  `cargo clippy -D warnings`, `cargo doc`, `cargo build --release`,
+  `cargo publish --dry-run`.
+
 ## [0.6.33] - 2026-06-15
 
 ### Value-taking flags in chained lazy flags
