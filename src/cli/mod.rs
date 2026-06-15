@@ -167,11 +167,11 @@ pub enum Commands {
         group_dirs: Option<String>,
 
         /// Reverse sort order
-        #[arg(long = "reverse")]
+        #[arg(short = 'r', long = "reverse")]
         reverse: bool,
 
         /// Show hidden files (dotfiles)
-        #[arg(long)]
+        #[arg(short = 'a', long = "hidden")]
         hidden: bool,
 
         /// Show relative dates (e.g., "2h ago", "just now")
@@ -179,12 +179,28 @@ pub enum Commands {
         relative_date: bool,
 
         /// Filter items by pattern (glob or extension)
-        #[arg(short, long)]
+        #[arg(short = 'f', long = "filter")]
         filter: Option<String>,
 
         /// Maximum number of items to display
-        #[arg(short, long)]
+        #[arg(short = 'm', long = "max")]
         max: Option<usize>,
+
+        /// Limit recursion depth (for --tree or --recursive)
+        #[arg(short = 'L', long = "level")]
+        level: Option<usize>,
+
+        /// Recurse into directories
+        #[arg(short = 'R', long = "recursive")]
+        recursive: bool,
+
+        /// List only directories
+        #[arg(short = 'D', long = "only-dirs")]
+        only_dirs: bool,
+
+        /// List only files
+        #[arg(long = "only-files")]
+        only_files: bool,
 
         /// Group items by type (dirs, files, symlinks)
         #[arg(long)]
@@ -307,6 +323,10 @@ impl Cli {
                 relative_date,
                 filter,
                 max,
+                level,
+                recursive,
+                only_dirs,
+                only_files,
                 group,
                 classify,
                 blocks,
@@ -340,6 +360,10 @@ impl Cli {
                     relative_date: *relative_date,
                     filter: filter.as_deref(),
                     max: *max,
+                    level: *level,
+                    recursive: *recursive,
+                    only_dirs: *only_dirs,
+                    only_files: *only_files,
                     group: *group,
                     classify: *classify,
                     blocks: blocks.as_deref(),
