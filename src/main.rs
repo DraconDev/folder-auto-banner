@@ -65,6 +65,49 @@ fn is_lazy_flag(arg: &str) -> Option<char> {
     None
 }
 
+/// Resolve a single character to its canonical lazy-flag form
+/// (e.g. `s` → `S`). Returns `None` if the char is not a lazy flag.
+fn resolve_lazy_flag_char(c: char) -> Option<char> {
+    if LAZY_FLAGS.contains(&c) {
+        return Some(c);
+    }
+    for &(from, to) in LOWERCASE_ALIASES {
+        if c == from {
+            return Some(to);
+        }
+    }
+    None
+}
+
+/// Expand a multi-character arg into a list of canonical lazy flags.
+/// Returns `Some(Vec<char>)` if EVERY character in `arg` resolves to
+/// a lazy flag, `None` otherwise.
+///
+/// No fallback: `f trc` ALWAYS means `-t -r -c`. To show a banner
+/// for a path, the path must start with `./`, `/`, or `~` (explicit
+/// path indicators). Bare words are always lazy-flag chains.
+fn expand_lazy_flags(arg: &str) -> Option<Vec<char>> {
+    if arg.is_empty() {
+        return None;
+    }
+    let mut result = Vec::with_capacity(arg.len());
+    for c in arg.chars() {
+        result.push(resolve_lazy_flag_char(c)?);
+    }
+    Some(result)
+}
+
+/// Returns true if the arg looks like an explicit path (starts with
+/// `.`, `/`, or `~`). Used to disambiguate paths from lazy-flag chains
+/// in the routing logic.
+fn is_explicit_path(arg: &str) -> bool {
+    if arg.is_empty() {
+        return false;
+    }
+    let first = arg.chars().next().unwrap();
+    first == '.' || first == '/' || first == '~'
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
 
@@ -88,15 +131,27 @@ fn main() -> Result<()> {
             return cli.run();
         }
 
-        // If it's a single-char lazy flag (e.g. `t` → `-t`) → expand it.
-        // No fallback: `f t` ALWAYS means sort by time. Use `./t` for a
-        // file/dir called `t`. For chained flags, use explicit
-        // `f -trc` instead of `f trc` to avoid ambiguity with paths.
-        if let Some(c) = is_lazy_flag(arg) {
+        // If it's an explicit path (starts with `.`, `/`, or `~`) → path
+        // No fallback: bare words without explicit path indicators are
+        // always lazy-flag chains, never paths.
+        if is_explicit_path(arg) {
+            let mut new_args = vec!["f".to_string(), "banner".to_string()];
+            new_args.extend(args);
+            let cli = cli::Cli::parse_from(new_args);
+            return cli.run();
+        }
+
+        // If it's a single-char lazy flag (e.g. `t` → `-t`) or a chain
+        // of lazy flags (e.g. `trc` → `-t -r -c`) → expand it.
+        // No fallback: `f trc` ALWAYS means time+reverse+compact. Use
+        // `./trc` for a file/dir called `trc`.
+        if let Some(flags) = expand_lazy_flags(arg) {
             let mut new_args: Vec<String> = vec!["f".to_string(), "banner".to_string()];
             for a in &args {
                 if a == arg {
-                    new_args.push(format!("-{}", c));
+                    for c in &flags {
+                        new_args.push(format!("-{}", c));
+                    }
                 } else {
                     new_args.push(a.clone());
                 }
@@ -105,7 +160,9 @@ fn main() -> Result<()> {
             return cli.run();
         }
 
-        // Otherwise it's a path → route to banner subcommand
+        // Bare word that's not a lazy flag chain (e.g. contains a digit
+        // or non-flag char). This is an unusual case — we treat it as
+        // a path. The user should use `./` or `/` for explicit paths.
         let mut new_args = vec!["f".to_string(), "banner".to_string()];
         new_args.extend(args);
         let cli = cli::Cli::parse_from(new_args);
