@@ -45,20 +45,19 @@ fn lookup_alias(name: &str) -> Option<&'static [&'static str]> {
         .map(|(_, flags)| *flags)
 }
 
-/// Expand a list of args: for each non-flag arg that matches a
-/// built-in alias, substitute the alias's flag list. Unknown bare
-/// words — including paths and arbitrary words — are DROPPED (the
-/// user said: only numbers, aliases, and flags produce output; paths
-/// are dropped along with everything else that's not a number, alias,
-/// or flag).
-/// Returns the expanded arg list ready for clap to parse.
-///
-/// The expansion produces: ["f", "banner", <expanded-flags-and-numbers>].
-fn expand_aliases_in_args(args: &[String]) -> Vec<String> {
+/// Expand a list of args for the banner subcommand: pass through
+/// flags, numbers, and paths; expand aliases to their flag lists;
+/// drop everything else. Used when the user opts into banner mode
+/// with `-b`, where paths are allowed.
+fn expand_args_for_banner(args: &[String]) -> Vec<String> {
     let mut new_args: Vec<String> = vec!["f".to_string(), "banner".to_string()];
     for a in args {
-        if a.starts_with('-') || a.parse::<usize>().is_ok() {
-            // Explicit flag or number — pass through unchanged.
+        if a == "-b" {
+            // The banner switch itself is consumed.
+            continue;
+        }
+        if a.starts_with('-') || is_path_like(a) || a.parse::<usize>().is_ok() {
+            // Explicit flag, path, or number — pass through unchanged.
             new_args.push(a.clone());
         } else if let Some(flags) = lookup_alias(a) {
             // Known alias — expand to its flags.
@@ -66,9 +65,20 @@ fn expand_aliases_in_args(args: &[String]) -> Vec<String> {
                 new_args.push(flag.to_string());
             }
         }
-        // Anything else (paths, unknown words) — DROP.
+        // Unknown bare word — DROP.
     }
     new_args
+}
+
+/// Returns true if the arg looks like an explicit path (starts with
+/// `.`, `/`, or `~`). Used only in banner mode (`-b`) where paths
+/// are allowed.
+fn is_path_like(arg: &str) -> bool {
+    if arg.is_empty() {
+        return false;
+    }
+    let first = arg.chars().next().unwrap();
+    first == '.' || first == '/' || first == '~'
 }
 
 /// Known subcommands that clap should parse. When the first non-flag
@@ -108,12 +118,24 @@ fn main() -> Result<()> {
         }
     }
 
+    // `-b` flag: switch to banner mode, which allows paths. This is
+    // the way to see a banner for a specific path without using the
+    // `banner` subcommand. `f -b` shows the default banner, `f -b
+    // ./src` shows the banner for ./src, `f -b tree` shows a tree
+    // banner, etc. Aliases still expand; unknown words are dropped.
+    if args.iter().any(|a| a == "-b") {
+        let expanded = expand_args_for_banner(&args);
+        let cli = cli::Cli::parse_from(expanded);
+        return cli.run();
+    }
+
     // "Nothing happens" rule: if the user typed only args that match
     // no alias, number, or flag (e.g. `f t`, `f foo`, `f ./src`,
     // `f /tmp`, `f Downloads`), the command exits 0 with no output.
     // The user said: "we only take numbers, aliases, and flags, not
     // folders and files by name." `f` (no args) still shows the
-    // default banner for cwd.
+    // default banner for cwd. Use `f -b <path>` for path-specific
+    // banners.
     if should_exit_silently(&args) {
         return Ok(());
     }
@@ -133,7 +155,7 @@ fn main() -> Result<()> {
     // Expand any built-in aliases in the args. Explicit flags and
     // numbers pass through. Anything else (paths, unknown words) is
     // dropped. The result is routed to the banner subcommand.
-    let expanded = expand_aliases_in_args(&args);
+    let expanded = expand_args_for_banner(&args);
     let cli = cli::Cli::parse_from(expanded);
     cli.run()
 }
@@ -315,11 +337,11 @@ mod tests {
         assert_eq!(lookup_alias("trc"), None); // chains not aliases
     }
 
-    // ===== expand_aliases_in_args tests =====
+    // ===== expand_args_for_banner tests =====
 
     #[test]
     fn test_expand_aliases_empty_args() {
-        let result = expand_aliases_in_args(&[]);
+        let result = expand_args_for_banner(&[]);
         assert_eq!(result, vec!["f", "banner"]);
     }
 
@@ -386,19 +408,19 @@ mod tests {
 
     #[test]
     fn test_expand_aliases_single_alias() {
-        let result = expand_aliases_in_args(&["tree".to_string()]);
+        let result = expand_args_for_banner(&["tree".to_string()]);
         assert_eq!(result, vec!["f", "banner", "-R", "-D"]);
     }
 
     #[test]
     fn test_expand_aliases_two_aliases() {
-        let result = expand_aliases_in_args(&["hidden".to_string(), "verbose".to_string()]);
+        let result = expand_args_for_banner(&["hidden".to_string(), "verbose".to_string()]);
         assert_eq!(result, vec!["f", "banner", "-a", "-v"]);
     }
 
     #[test]
     fn test_expand_aliases_three_aliases() {
-        let result = expand_aliases_in_args(&[
+        let result = expand_args_for_banner(&[
             "new".to_string(),
             "recurse".to_string(),
             "hidden".to_string(),
@@ -411,7 +433,7 @@ mod tests {
         // User's rule: "if no alias found, nothing happens" — unknown
         // bare words are dropped from the args, leaving the default
         // banner for cwd.
-        let result = expand_aliases_in_args(&["nonexistentword".to_string()]);
+        let result = expand_args_for_banner(&["nonexistentword".to_string()]);
         assert_eq!(result, vec!["f", "banner"]);
     }
 
@@ -419,7 +441,7 @@ mod tests {
     fn test_expand_aliases_drops_paths() {
         // Paths are dropped (the "nothing happens" rule applies to
         // paths too — only numbers, aliases, and flags are useful).
-        let result = expand_aliases_in_args(&["tree".to_string(), "./src".to_string()]);
+        let result = expand_args_for_banner(&["tree".to_string(), "./src".to_string()]);
         assert_eq!(result, vec!["f", "banner", "-R", "-D"]);
     }
 
@@ -427,20 +449,20 @@ mod tests {
     fn test_expand_aliases_drops_unknown_words() {
         // Unknown bare words (e.g. `f`, `foo`, `Downloads`) are dropped.
         let result =
-            expand_aliases_in_args(&["f".to_string(), "foo".to_string(), "Downloads".to_string()]);
+            expand_args_for_banner(&["f".to_string(), "foo".to_string(), "Downloads".to_string()]);
         assert_eq!(result, vec!["f", "banner"]);
     }
 
     #[test]
     fn test_expand_aliases_with_number() {
-        let result = expand_aliases_in_args(&["1".to_string()]);
+        let result = expand_args_for_banner(&["1".to_string()]);
         assert_eq!(result, vec!["f", "banner", "1"]);
     }
 
     #[test]
     fn test_expand_aliases_alias_with_value_flags() {
         // top has 4 flags including a value
-        let result = expand_aliases_in_args(&["top".to_string()]);
+        let result = expand_args_for_banner(&["top".to_string()]);
         assert_eq!(result, vec!["f", "banner", "-S", "-r", "-m", "20"]);
     }
 
@@ -448,7 +470,7 @@ mod tests {
     fn test_expand_aliases_mix_of_alias_and_path_drops_path() {
         // `f hidden /tmp verbose` — /tmp is dropped, alias and verbose
         // are kept.
-        let result = expand_aliases_in_args(&[
+        let result = expand_args_for_banner(&[
             "hidden".to_string(),
             "/tmp".to_string(),
             "verbose".to_string(),
