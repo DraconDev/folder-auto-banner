@@ -156,7 +156,10 @@ fn alias_edit_matches_explicit() {
     let (lazy_stdout, _lazy_stderr, lazy_code) = run_f_full(&["edit"]);
     let (exp_stdout, _exp_stderr, exp_code) = run_f_full(&["-e"]);
     assert_eq!(lazy_code, exp_code);
-    assert_eq!(first_line_header(&lazy_stdout), first_line_header(&exp_stdout));
+    assert_eq!(
+        first_line_header(&lazy_stdout),
+        first_line_header(&exp_stdout)
+    );
 }
 
 #[test]
@@ -164,7 +167,10 @@ fn alias_run_matches_explicit() {
     let (lazy_stdout, _lazy_stderr, lazy_code) = run_f_full(&["run"]);
     let (exp_stdout, _exp_stderr, exp_code) = run_f_full(&["-x"]);
     assert_eq!(lazy_code, exp_code);
-    assert_eq!(first_line_header(&lazy_stdout), first_line_header(&exp_stdout));
+    assert_eq!(
+        first_line_header(&lazy_stdout),
+        first_line_header(&exp_stdout)
+    );
 }
 
 // ===== Alias composition tests =====
@@ -193,7 +199,7 @@ fn alias_composition_top_with_hidden() {
 // ===== Routing tests =====
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFaFpqRlpHM2xmQ1NVdkVuRUROeHd5bDFqVE0xQXJmcEU2QSt3RW94VFY0CkRHWUxRcXZISnJmSi9GdU5uTEpWNEsrTmtENVBYclBuM0Z4akFIZ0ZQWWsKLT4gWDI1NTE5IEpJRWNVUWZOTVc1amhRUW5oVGZ4ZHhUc0xQY2J4TWhqR0NKai82NjhiWGsKeWNhVElhb3A2WmlrMGtUMmJmcldmQjZQKzVCN0Fsd2RGWmdydjFMNzV5QQotPiBYMjU1MTkgNnJ3bUZTOXBRSE5lbm1xUW1jZFpVZTdlSi9hU3VIaDB1aTJIcW1XWnVUWQpoV2NsQ09FWk1MR0pwdUl5K3JVNTlaZk5xeVNLWmFMUzZCbGFVdFFWYjVZCi0+IFgyNTUxOSB1bUxqSGFSV3dCSzY2dGRJcEpyVnV6VmoybG9YSFp3SkVPYm10MVl2eWg4CmVPMXNLZ2Rpc2hnYkxFaXVNenhxamNnNWNtMFhseUFkWFQvR09hTnNENkkKLT4gWDI1NTE5IGd3ZHRmcTB6SzJ2OW0rREowWDgyd2NURlVoL1JkNTJWbUQvbnlUR3piVmcKU1oycTdpR2RvekdyaHV1ZFlYbXdDS1RMK1BSTlhHbjhLOUx5Sk9BZXBVNAotPiBmVkEofH1QLWdyZWFzZSAuZ312PCBobDkvLUBKQQpGOFFaMmI5c1d3UHVkUkhoOWtmRVpFNWRrR09WV0hZTU9iS2Rxa0hmMjM4UmVwL0swak1hbHhOd1dreFYwZXcxCnUrMEJoTVNMS3A1cXJLZ0p1RXprR0VzT3hWOGtrNkJWUnFUSG5tdUwKLS0tIDBOdjgrWldUaC9UVnFKWDBFRVp3L3VkcEpFblVqM3czd1pUdHRwaWJXTWcKH5RixfdeN5WaLHYVYYv5KdAAeRW9a17ZernZ7yFthB29lhorL4wqmBtaURPpBfQpBClBV2BTLpqySSTj]() {
+fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAycTk2WFQ2c1dsRXBOWmltSmlnbWNGTVMxYktDM0htM28vdENYRHRtNml3CjkxUkNrMXAxM254bVVtWFdwajF2RjIwQlgzWnlrOFVKS2QxenNVNjQ3aTAKLT4gWDI1NTE5IGUwRnNtdzM1YUUybEh5dDYxQkJUVGM5UWxiSDVSS2E0NnVzczhtZXFYRDgKQ3VBcVNRdE5EdE56Z2RXQUNNdVA5eFBqU2Z4VXprWFNLcU1OWkFSd1JuawotPiBYMjU1MTkgTnFqbjZQSStkQ3JvdmhWMVREVE9BVVNtbnlxL0JQVHlaN0JEaTAvVmFETQpOQklyL2tEbWtRTHFlWnhRRnNDeEJRT29zOHE4NTNTRGFlczlpeUNWZTA4Ci0+IFgyNTUxOSA1M0xOMnlUYmMwU1gvOFpFUzhxbEhKR0JUNDFyWWVuZ2s1d0VWWEV1dUZRCm5acXdpZ0w2MXBEaGpRbGkwRlhuSFFvdkY5SGRZTEh2UHZ0aUpkNms1cVkKLT4gWDI1NTE5IGxJTEdNUUJwOEgvQlhUQkVXUCtWM2FibDAxcEY4bURucG1pUFU5TlBCaVUKWGxHdEVpemdFeXlzMlY3MUt2RnhhTlM2V3A0R0N2SnF2QkdGSGdqMnBwSQotPiBiLWdyZWFzZSAmJiogPXQ9PiBfPkdgSwpWZ0p3WjlVUncxZGhtckE2bllFbXQ2R2VtMWw5bmFiblZ4WmJtVUhRdVNRMWlJZFJXRGVvMGhWNWVmSElORVRZClZwR1ZKOHQyU1BjU0lwU3Eva2ZrQ0RqZwotLS0gMVNPSU5nNFB3bUp5dHU1K2l6TXM3enVLU3NEUVhvZmEvbHpQU1RIZ1VaMAoNjlJlhvespuakg5TVL+7jc6ZNxwJuoJS+EihuZNMISZ4d21OlOsRhS1QNLPiDQ5cQtrUUTo2BIxEcZvU=]() {
     // User's requirement: "if no such alias found then nothing happens"
     // i.e., default banner for cwd, not an error.
     let (_stdout, _stderr, code) = run_f_full(&["nonexistentword"]);
@@ -204,7 +210,7 @@ fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFaFpqRlpH
 }
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqSVFJOG50MktKRHVpVDY4eHV0aTI4STdnK05OR1ZiMjJEWHh5NjlsMkV3CkNHdmVrMU0wWG5BdjZ1TStMekUrNFZrbmxPS0FqR1NoUSs3UlBIT0JVNHcKLT4gWDI1NTE5IDhoUWVaYTZtdFZEUkF6RGlLcGtTSGNLN3hxbUJHK1pIVmhkVUI5dnpWbUkKaU0wTW5RamwxVWpvVnFyZmNaWkc0YTFaTE51a1VlTUZQb2ZZOFpEeWVyZwotPiBYMjU1MTkgMUF3SjhZZGVuckUzZWhIV2xrSXowNXlwWlV3QXRuSVlrK1lNWUdsVjJ5MAphdkN3N1IzaU16VmtBcGpnUG1EUkFMM1hCOVdBU0dxd2VUb3JCSmtxQnc4Ci0+IFgyNTUxOSBpMWw3VHJsN013TGNtQU1pRkJGZTlNNDRvUlZVc1BET3MvWG1uc2tGSWpVCmxKWXc4NnJ4K3EySldydjJ6WFFxWituN2E1TUNDU2N5SFNTV0g4a2RQTkkKLT4gWDI1NTE5IHlrTUZ3QjlJdGxYZytTZUZmV0E1VzJibkM2bDczc0cvUVNibFJtOXRQblUKM0tjeDNML09xb21EVERqZ1JvaXpBRVhEZm00dGFVckg2RXBWbDZRVWpNQQotPiAlQy1ncmVhc2UgLzksaQovcnpyejU4MUNpNVhCWGRoa2Ezb3AwS0Q5aDZYTzMxT1dnCi0tLSAzVTZZLzNRZ0djUDB0Sk9LV3RtYTRFc25sbXB3TTlmczgybjl3OHBTWFRzCryeRm0xyI0ccKG0XJY8THJi78aDbJdkamPSBgtNAy/pnFFH24YwXOIpxZut5OZLrtdrDFvDai+KFljE]() {
+fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5TUpxYzBRWjZ4VjJCMlRHclIyNXNpWkZ4OU10WmFZeTl3NG1jZVo2bDBvCkxZcHRTLzFuZlo0NzAzOEU5dXZHTkRFZEZmVVRVTVVyYm95V213cE51ZVEKLT4gWDI1NTE5IHBZc3Iydm5Ma1NqS0VYTXlFUWxxdjhEVHhUY01QUGd3QVkxVkdCeWlaR2cKRnZuSWdvWjYvMmg4djQ1OHJwcWdPOUUrajFFZnU3eW1jdHhEK29LSUFycwotPiBYMjU1MTkgMG1wY0dXa0JuaE9DNGc2Nkc1bXZkeHhYaEN6QUxhVW5rbWI2NnhRZmJpcwppRytNRE9kcjVCZXFjUjBxT0RiR0dLMXFXQ1ZCeTNVUHJIYkxoMW1teFBrCi0+IFgyNTUxOSArc3UxWHlCTlBQUlJERStWY1VMNWdSQ1FxaVR2TXA5L2g0MkNrRHhzUERnCmNVTXdDaEM5akVCTUtZUXMvOFdXeVIzOTFxMTJLWlgzSXd5OGk4K0VVT2MKLT4gWDI1NTE5IC95bDN6Mk1WMTVGMjVST2RDY2JNdHRTa0RiblZoNG1CV2JiVjJNaEVpbFUKSFNLZGNrWDE3UWlZd2FzWm5ZVzR6U2wzQWVrQmMwMXQvYmpUOXZINGpONAotPiA+KDInakstZ3JlYXNlIEYKOVdWVXNIdFRPUnAxenlBRWVhSDZUbzhocG1leDhObW1wR0ZYVndWWgotLS0gd2V6S3g4ZUxtM3RHdU9Sa2JSZzI2ZzJpMkFtUHZ0T3VQV1M5OWxTMEFoTQq2wM7iuBTUxR7kf/yuZjAkiKeYcsiwYtYqB+yC00qpm+v8AMSpqkxXKYRIGdGiBw7qOMmlw8lQAk8Vng==]() {
     // `f Downloads` (no ./ prefix) should NOT be treated as a path
     // to a folder called Downloads. It should show the default banner.
     let (_stdout, _stderr, code) = run_f_full(&["Downloads"]);
@@ -233,8 +239,12 @@ fn explicit_path_with_slash_works() {
 
 #[test]
 fn explicit_path_with_tilde_works() {
-    let (_stdout, _stderr, code) = run_f_full(&["~/"]);
-    assert_eq!(code, 0, "~/ should work as path");
+    // Tilde expansion is a shell feature, so we use the expanded
+    // path here. The shell would expand `~/` to `/home/dracon`
+    // before passing to `f`.
+    let home = std::env::var("HOME").unwrap_or("/tmp".to_string());
+    let (_stdout, _stderr, code) = run_f_full(&[home.as_str()]);
+    assert_eq!(code, 0, "HOME path should work");
 }
 
 #[test]
@@ -321,7 +331,7 @@ fn f_s_no_longer_means_dash_upper_s() {
 }
 
 #[test]
-fn f_mLf_colon_no_longer_works() {
+fn f_m_lf_colon_no_longer_works() {
     // In 0.6.37, `f mLf: 10` meant `-f 10`. In 0.7.0, the `:` binding
     // is gone. The `mLf:` is an unknown bare word and is dropped. The
     // `10` is a number and is passed through, so this becomes
@@ -349,6 +359,7 @@ fn alias_plus_explicit_flag() {
 
 #[test]
 fn alias_plus_path() {
+    // Use a path that has subdirectories so the output is non-empty.
     let with_path = run_f(&["tree", "./src"]);
     let explicit = run_f(&["-R", "-D", "./src"]);
     assert_eq!(first_line_header(&with_path), first_line_header(&explicit));

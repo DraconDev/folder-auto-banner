@@ -13,28 +13,28 @@ use std::env;
 /// Unknown bare words show the default cwd banner (no error).
 const BUILTIN_ALIASES: &[(&str, &[&str])] = &[
     // Display modes
-    ("tree", &["-R", "-D"]),       // Recursive, only dirs (like `tree`)
-    ("flat", &["-o"]),             // One file per line
-    ("compact", &["-c"]),          // Compact output
-    ("verbose", &["-v"]),          // Verbose output
-    ("hidden", &["-a"]),           // Show hidden files
-    ("dirs", &["-D"]),             // Only directories
+    ("tree", &["-R", "-D"]), // Recursive, only dirs (like `tree`)
+    ("flat", &["-o"]),       // One file per line
+    ("compact", &["-c"]),    // Compact output
+    ("verbose", &["-v"]),    // Verbose output
+    ("hidden", &["-a"]),     // Show hidden files
+    ("dirs", &["-D"]),       // Only directories
     // Sort modes
-    ("new", &["-t"]),              // Sort by time, newest first
-    ("old", &["-t", "-r"]),        // Sort by time, oldest first
-    ("big", &["-S"]),              // Sort by size, largest first
-    ("small", &["-S", "-r"]),      // Sort by size, smallest first
-    ("ext", &["-X"]),              // Sort by extension
-    ("git", &["-G"]),              // Sort by git status
-    ("nosort", &["-U"]),           // No sort
+    ("new", &["-t"]),         // Sort by time, newest first
+    ("old", &["-t", "-r"]),   // Sort by time, oldest first
+    ("big", &["-S"]),         // Sort by size, largest first
+    ("small", &["-S", "-r"]), // Sort by size, smallest first
+    ("ext", &["-X"]),         // Sort by extension
+    ("git", &["-G"]),         // Sort by git status
+    ("nosort", &["-U"]),      // No sort
     // Limits
-    ("top", &["-S", "-r", "-m", "20"]),     // Top 20 largest files
-    ("newest", &["-t", "-r", "-m", "20"]),  // 20 newest files
+    ("top", &["-S", "-r", "-m", "20"]),    // Top 20 largest files
+    ("newest", &["-t", "-r", "-m", "20"]), // 20 newest files
     // Recursion
-    ("recurse", &["-R"]),          // Recurse into subdirectories
+    ("recurse", &["-R"]), // Recurse into subdirectories
     // Actions
-    ("edit", &["-e"]),             // Force open in editor
-    ("run", &["-x"]),              // Force run file
+    ("edit", &["-e"]), // Force open in editor
+    ("run", &["-x"]),  // Force run file
 ];
 
 /// Look up an alias by name. Returns the flag list if found, None otherwise.
@@ -100,9 +100,9 @@ fn main() -> Result<()> {
     // `f -f txt`, etc. — invocations where the top-level Cli flags are
     // sufficient and no path/alias expansion is needed.
     let has_explicit_flag = args.iter().any(|a| a.starts_with('-'));
-    let has_path_or_alias_or_number = args.iter().any(|a| {
-        is_explicit_path(a) || lookup_alias(a).is_some() || a.parse::<usize>().is_ok()
-    });
+    let has_path_or_alias_or_number = args
+        .iter()
+        .any(|a| is_explicit_path(a) || lookup_alias(a).is_some() || a.parse::<usize>().is_ok());
     if has_explicit_flag && !has_path_or_alias_or_number {
         let cli = cli::Cli::parse();
         return cli.run();
@@ -117,7 +117,6 @@ fn main() -> Result<()> {
 }
 
 #[cfg(test)]
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,11 +147,7 @@ mod tests {
     #[test]
     fn test_builtin_aliases_no_empty_flag_list() {
         for (name, flags) in BUILTIN_ALIASES {
-            assert!(
-                !flags.is_empty(),
-                "alias {:?} has empty flag list",
-                name
-            );
+            assert!(!flags.is_empty(), "alias {:?} has empty flag list", name);
         }
     }
 
@@ -386,10 +381,7 @@ mod tests {
     fn test_expand_aliases_alias_with_value_flags() {
         // top has 4 flags including a value
         let result = expand_aliases_in_args(&["top".to_string()]);
-        assert_eq!(
-            result,
-            vec!["f", "banner", "-S", "-r", "-m", "20"]
-        );
+        assert_eq!(result, vec!["f", "banner", "-S", "-r", "-m", "20"]);
     }
 
     #[test]
