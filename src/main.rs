@@ -278,4 +278,332 @@ mod tests {
         assert!(!is_explicit_path("t"));
         assert!(!is_explicit_path(""));
     }
+
+    // ===== resolve_lazy_flag_char tests =====
+
+    #[test]
+    fn test_resolve_all_17_canonical_flags() {
+        // Every entry in LAZY_FLAGS must resolve to itself
+        for &c in LAZY_FLAGS {
+            assert_eq!(resolve_lazy_flag_char(c), Some(c), "flag {:?} should resolve to itself", c);
+        }
+    }
+
+    #[test]
+    fn test_resolve_all_5_lowercase_aliases() {
+        // Every lowercase alias must resolve to its canonical uppercase
+        for &(from, to) in LOWERCASE_ALIASES {
+            assert_eq!(resolve_lazy_flag_char(from), Some(to), "alias {:?} should resolve to {:?}", from, to);
+        }
+    }
+
+    #[test]
+    fn test_resolve_rejects_non_flags() {
+        // Letters that are not in LAZY_FLAGS and not in LOWERCASE_ALIASES
+        // must resolve to None. Check all 26 letters.
+        let mut valid_chars: std::collections::HashSet<char> = LAZY_FLAGS.iter().copied().collect();
+        for &(from, to) in LOWERCASE_ALIASES {
+            valid_chars.insert(from);
+            valid_chars.insert(to);
+        }
+        for c in 'a'..='z' {
+            if !valid_chars.contains(&c) {
+                assert_eq!(resolve_lazy_flag_char(c), None, "char {:?} should not resolve", c);
+            }
+        }
+        for c in 'A'..='Z' {
+            if !valid_chars.contains(&c) {
+                assert_eq!(resolve_lazy_flag_char(c), None, "char {:?} should not resolve", c);
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolve_non_ascii_returns_none() {
+        // Non-ASCII characters must not resolve
+        assert_eq!(resolve_lazy_flag_char('é'), None);
+        assert_eq!(resolve_lazy_flag_char('ñ'), None);
+        assert_eq!(resolve_lazy_flag_char('中'), None);
+        assert_eq!(resolve_lazy_flag_char('🦀'), None);
+    }
+
+    #[test]
+    fn test_resolve_digits_and_symbols() {
+        // Digits and symbols must not resolve
+        assert_eq!(resolve_lazy_flag_char('0'), None);
+        assert_eq!(resolve_lazy_flag_char('9'), None);
+        assert_eq!(resolve_lazy_flag_char('-'), None);
+        assert_eq!(resolve_lazy_flag_char('_'), None);
+    }
+
+    // ===== expand_lazy_flags tests =====
+
+    #[test]
+    fn test_expand_empty_string() {
+        assert_eq!(expand_lazy_flags(""), None);
+    }
+
+    #[test]
+    fn test_expand_single_char_each_canonical() {
+        for &c in LAZY_FLAGS {
+            assert_eq!(expand_lazy_flags(&c.to_string()), Some(vec![c]), "single char {:?} failed", c);
+        }
+    }
+
+    #[test]
+    fn test_expand_single_char_each_alias() {
+        for &(from, to) in LOWERCASE_ALIASES {
+            assert_eq!(expand_lazy_flags(&from.to_string()), Some(vec![to]), "alias {:?}→{:?} failed", from, to);
+        }
+    }
+
+    #[test]
+    fn test_expand_two_char_chains() {
+        // Test all valid 2-char combinations
+        assert_eq!(expand_lazy_flags("tr"), Some(vec!['t', 'r']));
+        assert_eq!(expand_lazy_flags("tS"), Some(vec!['t', 'S']));
+        assert_eq!(expand_lazy_flags("ta"), Some(vec!['t', 'a']));
+        assert_eq!(expand_lazy_flags("tc"), Some(vec!['t', 'c']));
+        assert_eq!(expand_lazy_flags("rS"), Some(vec!['r', 'S']));
+        assert_eq!(expand_lazy_flags("aR"), Some(vec!['a', 'R']));
+        assert_eq!(expand_lazy_flags("GS"), Some(vec!['G', 'S']));
+        assert_eq!(expand_lazy_flags("oR"), Some(vec!['o', 'R']));
+        assert_eq!(expand_lazy_flags("Dt"), Some(vec!['D', 't']));
+        assert_eq!(expand_lazy_flags("Rc"), Some(vec!['R', 'c']));
+    }
+
+    #[test]
+    fn test_expand_three_char_chains() {
+        assert_eq!(expand_lazy_flags("trc"), Some(vec!['t', 'r', 'c']));
+        assert_eq!(expand_lazy_flags("tSr"), Some(vec!['t', 'S', 'r']));
+        assert_eq!(expand_lazy_flags("aRc"), Some(vec!['a', 'R', 'c']));
+        assert_eq!(expand_lazy_flags("GSr"), Some(vec!['G', 'S', 'r']));
+        assert_eq!(expand_lazy_flags("Dta"), Some(vec!['D', 't', 'a']));
+    }
+
+    #[test]
+    fn test_expand_four_char_chains() {
+        assert_eq!(expand_lazy_flags("trca"), Some(vec!['t', 'r', 'c', 'a']));
+        assert_eq!(expand_lazy_flags("tSra"), Some(vec!['t', 'S', 'r', 'a']));
+        assert_eq!(expand_lazy_flags("trcS"), Some(vec!['t', 'r', 'c', 'S']));
+    }
+
+    #[test]
+    fn test_expand_value_taking_chains() {
+        // Value-taking flags mixed with boolean flags
+        assert_eq!(expand_lazy_flags("mL"), Some(vec!['m', 'L']));
+        assert_eq!(expand_lazy_flags("Lm"), Some(vec!['L', 'm']));
+        assert_eq!(expand_lazy_flags("tSm"), Some(vec!['t', 'S', 'm']));
+        assert_eq!(expand_lazy_flags("mLf"), Some(vec!['m', 'L', 'f']));
+        assert_eq!(expand_lazy_flags("tSmL"), Some(vec!['t', 'S', 'm', 'L']));
+    }
+
+    #[test]
+    fn test_expand_mixed_case_aliases() {
+        // Mixed case: some canonical, some alias
+        assert_eq!(expand_lazy_flags("sG"), Some(vec!['S', 'G']));
+        assert_eq!(expand_lazy_flags("sd"), Some(vec!['S', 'D']));
+        assert_eq!(expand_lazy_flags("gl"), Some(vec!['G', 'L']));
+        assert_eq!(expand_lazy_flags("ud"), Some(vec!['U', 'D']));
+    }
+
+    #[test]
+    fn test_expand_rejects_single_non_flag() {
+        // Each non-flag letter should reject
+        for c in 'a'..='z' {
+            if !LAZY_FLAGS.contains(&c) && !LOWERCASE_ALIASES.iter().any(|&(f, _)| f == c) {
+                assert_eq!(expand_lazy_flags(&c.to_string()), None, "char {:?} should reject", c);
+            }
+        }
+    }
+
+    #[test]
+    fn test_expand_rejects_mixed_valid_invalid() {
+        // Chain with at least one invalid char must reject
+        assert_eq!(expand_lazy_flags("tz"), None);
+        assert_eq!(expand_lazy_flags("trz"), None);
+        assert_eq!(expand_lazy_flags("ztr"), None);
+        assert_eq!(expand_lazy_flags("tqr"), None);
+        assert_eq!(expand_lazy_flags("tn"), None);
+        assert_eq!(expand_lazy_flags("tp"), None);
+        assert_eq!(expand_lazy_flags("tw"), None);
+        assert_eq!(expand_lazy_flags("tb"), None);
+    }
+
+    #[test]
+    fn test_expand_rejects_digits() {
+        assert_eq!(expand_lazy_flags("1"), None);
+        assert_eq!(expand_lazy_flags("t1"), None);
+        assert_eq!(expand_lazy_flags("123"), None);
+    }
+
+    #[test]
+    fn test_expand_rejects_special_chars() {
+        assert_eq!(expand_lazy_flags("t-"), None);
+        assert_eq!(expand_lazy_flags("t."), None);
+        assert_eq!(expand_lazy_flags("t/"), None);
+        assert_eq!(expand_lazy_flags("t~"), None);
+        assert_eq!(expand_lazy_flags("t "), None); // space
+    }
+
+    #[test]
+    fn test_expand_rejects_unicode() {
+        assert_eq!(expand_lazy_flags("t\u{00e9}"), None); // é
+        assert_eq!(expand_lazy_flags("\u{4e2d}"), None); // 中
+    }
+
+    #[test]
+    fn test_expand_x_vs_X_distinct() {
+        // x and X must remain distinct (x=run, X=extensionsort)
+        assert_eq!(expand_lazy_flags("x"), Some(vec!['x']));
+        assert_eq!(expand_lazy_flags("X"), Some(vec!['X']));
+        assert_eq!(expand_lazy_flags("xX"), Some(vec!['x', 'X']));
+        assert_eq!(expand_lazy_flags("Xx"), Some(vec!['X', 'x']));
+    }
+
+    #[test]
+    fn test_expand_r_not_aliased_to_R() {
+        // r is canonical for --reverse, NOT aliased to R (which doesn't exist)
+        assert_eq!(expand_lazy_flags("r"), Some(vec!['r']));
+        // R is canonical for --recursive
+        assert_eq!(expand_lazy_flags("R"), Some(vec!['R']));
+    }
+
+    #[test]
+    fn test_expand_long_chain() {
+        // 10-char chain of unique flags
+        assert_eq!(expand_lazy_flags("tacSDGvRrx"), Some(vec!['t', 'a', 'c', 'S', 'D', 'G', 'v', 'R', 'r', 'x']));
+    }
+
+    // ===== is_explicit_path tests =====
+
+    #[test]
+    fn test_explicit_path_dot_prefix() {
+        assert!(is_explicit_path("."));
+        assert!(is_explicit_path(".."));
+        assert!(is_explicit_path("./Downloads"));
+        assert!(is_explicit_path("../sibling"));
+        assert!(is_explicit_path(".hidden"));
+    }
+
+    #[test]
+    fn test_explicit_path_slash_prefix() {
+        assert!(is_explicit_path("/"));
+        assert!(is_explicit_path("/tmp"));
+        assert!(is_explicit_path("/home/user"));
+        assert!(is_explicit_path("/usr/local/bin"));
+    }
+
+    #[test]
+    fn test_explicit_path_tilde_prefix() {
+        assert!(is_explicit_path("~"));
+        assert!(is_explicit_path("~/"));
+        assert!(is_explicit_path("~/Downloads"));
+        assert!(is_explicit_path("~/.config"));
+    }
+
+    #[test]
+    fn test_explicit_path_bare_words() {
+        // Bare words without prefix are NOT explicit paths
+        assert!(!is_explicit_path("Downloads"));
+        assert!(!is_explicit_path("Documents"));
+        assert!(!is_explicit_path("trc"));
+        assert!(!is_explicit_path("src"));
+        assert!(!is_explicit_path("home"));
+    }
+
+    #[test]
+    fn test_explicit_path_empty() {
+        assert!(!is_explicit_path(""));
+    }
+
+    #[test]
+    fn test_explicit_path_unicode() {
+        // Unicode chars that aren't `.`, `/`, or `~` are not explicit paths
+        assert!(!is_explicit_path("é"));
+        assert!(!is_explicit_path("中"));
+        assert!(!is_explicit_path("🦀"));
+    }
+
+    #[test]
+    fn test_explicit_path_dollar_env_var() {
+        // $ is not a recognized explicit path prefix
+        // (shell would expand $VAR before f sees it)
+        assert!(!is_explicit_path("$HOME"));
+        assert!(!is_explicit_path("$VAR/path"));
+    }
+
+    // ===== Constants integrity tests =====
+
+    #[test]
+    fn test_lazy_flags_count_is_17() {
+        assert_eq!(LAZY_FLAGS.len(), 17, "LAZY_FLAGS should have 17 entries");
+    }
+
+    #[test]
+    fn test_lowercase_aliases_count_is_5() {
+        assert_eq!(LOWERCASE_ALIASES.len(), 5, "LOWERCASE_ALIASES should have 5 entries");
+    }
+
+    #[test]
+    fn test_value_taking_flags_count_is_3() {
+        assert_eq!(VALUE_TAKING_FLAGS.len(), 3, "VALUE_TAKING_FLAGS should have 3 entries (m, f, L)");
+    }
+
+    #[test]
+    fn test_value_taking_flags_are_m_f_L() {
+        let mut v: Vec<char> = VALUE_TAKING_FLAGS.to_vec();
+        v.sort();
+        assert_eq!(v, vec!['L', 'f', 'm'], "VALUE_TAKING_FLAGS should be {{m, f, L}}");
+    }
+
+    #[test]
+    fn test_value_taking_flags_are_in_lazy_flags() {
+        // Every value-taking flag must also be a canonical lazy flag
+        for &c in VALUE_TAKING_FLAGS {
+            assert!(LAZY_FLAGS.contains(&c), "value-taking flag {:?} must be in LAZY_FLAGS", c);
+        }
+    }
+
+    #[test]
+    fn test_no_duplicate_lazy_flags() {
+        let mut sorted: Vec<char> = LAZY_FLAGS.to_vec();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), LAZY_FLAGS.len(), "LAZY_FLAGS must have no duplicates");
+    }
+
+    #[test]
+    fn test_no_duplicate_value_taking_flags() {
+        let mut sorted: Vec<char> = VALUE_TAKING_FLAGS.to_vec();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), VALUE_TAKING_FLAGS.len(), "VALUE_TAKING_FLAGS must have no duplicates");
+    }
+
+    #[test]
+    fn test_aliases_dont_override_canonical() {
+        // A lowercase alias should never map to a char that's already
+        // a canonical lazy flag with a different meaning.
+        // r is canonical for --reverse; if we aliased r→R, that would
+        // be wrong because R is --recursive.
+        for &(from, to) in LOWERCASE_ALIASES {
+            // The 'from' char must NOT be in LAZY_FLAGS
+            assert!(!LAZY_FLAGS.contains(&from), "alias source {:?} should not be a canonical flag", from);
+            // The 'to' char must BE in LAZY_FLAGS
+            assert!(LAZY_FLAGS.contains(&to), "alias target {:?} should be a canonical flag", to);
+        }
+    }
+
+    #[test]
+    fn test_known_subcommands_list() {
+        assert!(KNOWN_SUBCOMMANDS.contains(&"banner"));
+        assert!(KNOWN_SUBCOMMANDS.contains(&"env"));
+        assert!(KNOWN_SUBCOMMANDS.contains(&"install"));
+        assert!(KNOWN_SUBCOMMANDS.contains(&"config"));
+        assert!(KNOWN_SUBCOMMANDS.contains(&"daemon"));
+        assert!(KNOWN_SUBCOMMANDS.contains(&"help"));
+        assert!(!KNOWN_SUBCOMMANDS.contains(&"stats")); // not a real subcommand
+        assert!(!KNOWN_SUBCOMMANDS.contains(&"mv"));
+    }
 }
