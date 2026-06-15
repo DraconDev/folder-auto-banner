@@ -220,20 +220,6 @@ see a banner for a specific path, use `f -b <path>` (banner mode)
 or `f banner <path>` (subcommand). To see a banner for cwd, just
 type `f`.
 
-#### Migration from 0.6.x
-
-If you were using lazy flag chains in 0.6.x, here's the 0.7+
-equivalent for common invocations:
-
-| 0.6.x | 0.7+ |
-|-------|------|
-| `f t` | `f new` or `f -t` |
-| `f trc` | `f new -r -c` |
-| `f S` | `f big` or `f -S` |
-| `f mL 10 2` | `f -m 10 -L 2` |
-| `f mLf: 10` | `f -f 10` |
-| `f l5` | `f -L 5` |
-
 For your personal common combinations, add a shell alias:
 
 ```bash
