@@ -678,4 +678,116 @@ mod tests {
         assert!(!KNOWN_SUBCOMMANDS.contains(&"stats")); // not a real subcommand
         assert!(!KNOWN_SUBCOMMANDS.contains(&"mv"));
     }
+
+    // ===== Property-based tests (using proptest) =====
+    // These tests verify invariants that should hold for ALL inputs,
+    // not just specific cases. They run at least 1000 cases each.
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1000))]
+
+        #[test]
+        fn prop_resolve_lazy_flag_is_total(s in any::<char>()) {
+            // resolve_lazy_flag_char must never panic and must return
+            // either Some(c) where c is a valid lazy flag, or None
+            let result = resolve_lazy_flag_char(s);
+            if let Some(c) = result {
+                assert!(
+                    LAZY_FLAGS.contains(&c) || LOWERCASE_ALIASES.iter().any(|&(_, t)| t == c),
+                    "resolve_lazy_flag_char({:?}) returned {:?} which is not a valid lazy flag", s, c
+                );
+            }
+        }
+
+        #[test]
+        fn prop_expand_lazy_flags_valid_chains(s in "[a-zA-Z]{1,20}") {
+            // For any string of 1-20 alphabetic chars, if every char
+            // resolves to a lazy flag, the expansion must succeed and
+            // contain one entry per char
+            if let Some(flags) = expand_lazy_flags(&s) {
+                assert_eq!(flags.len(), s.chars().count(), "expansion length mismatch for {:?}", s);
+                // Every expanded char must be a canonical lazy flag
+                for c in &flags {
+                    assert!(LAZY_FLAGS.contains(c) || LOWERCASE_ALIASES.iter().any(|&(_, t)| t == *c),
+                        "expanded flag {:?} is not canonical for input {:?}", c, s);
+                }
+            }
+        }
+
+        #[test]
+        fn prop_expand_empty_string_returns_none(_unit in Just(())) {
+            prop_assert_eq!(expand_lazy_flags(""), None);
+        }
+
+        #[test]
+        fn prop_is_explicit_path_dot_prefix(s in "[a-zA-Z0-9_/]{1,20}") {
+            // Any string starting with . is an explicit path
+            let arg = format!(".{}", s);
+            prop_assert!(is_explicit_path(&arg), "expected {:?} to be explicit path", arg);
+        }
+
+        #[test]
+        fn prop_is_explicit_path_slash_prefix(s in "[a-zA-Z0-9_]{1,20}") {
+            // Any string starting with / is an explicit path
+            let arg = format!("/{}", s);
+            prop_assert!(is_explicit_path(&arg), "expected {:?} to be explicit path", arg);
+        }
+
+        #[test]
+        fn prop_is_explicit_path_tilde_prefix(s in "[a-zA-Z0-9_/]{1,20}") {
+            // Any string starting with ~ is an explicit path
+            let arg = format!("~{}", s);
+            prop_assert!(is_explicit_path(&arg), "expected {:?} to be explicit path", arg);
+        }
+
+        #[test]
+        fn prop_is_explicit_path_bare_alpha_rejected(s in "[a-zA-Z]{1,20}") {
+            // Bare alphabetic strings are NOT explicit paths
+            // (they're lazy flag chains)
+            // We filter out strings that happen to be explicit (e.g., starting with .)
+            if !s.starts_with('.') && !s.starts_with('/') && !s.starts_with('~') {
+                prop_assert!(!is_explicit_path(&s), "expected {:?} to NOT be explicit path", s);
+            }
+        }
+
+        #[test]
+        fn prop_expand_and_resolve_consistent(s in "[a-zA-Z]{1,10}") {
+            // For any string, expand_lazy_flags must agree with
+            // resolve_lazy_flag_char for every char in the string
+            let expanded = expand_lazy_flags(&s);
+            let mut manual = Vec::new();
+            let mut all_resolve = true;
+            for c in s.chars() {
+                if let Some(r) = resolve_lazy_flag_char(c) {
+                    manual.push(r);
+                } else {
+                    all_resolve = false;
+                    break;
+                }
+            }
+            if all_resolve {
+                prop_assert_eq!(expanded.clone(), Some(manual), "mismatch for {:?}", s);
+            } else {
+                prop_assert_eq!(expanded, None, "expected None for {:?}", s);
+            }
+        }
+
+        #[test]
+        fn prop_chain_length_equals_input_length(s in "[a-zA-Z]{1,15}") {
+            // For any valid chain, the expanded length must equal input length
+            if let Some(flags) = expand_lazy_flags(&s) {
+                prop_assert_eq!(flags.len(), s.chars().count());
+            }
+        }
+
+        #[test]
+        fn prop_no_panic_on_random_input(s in ".*") {
+            // The parser must never panic on any input
+            let _ = expand_lazy_flags(&s);
+            let _ = is_explicit_path(&s);
+            let _ = resolve_lazy_flag_char(s.chars().next().unwrap_or('a'));
+        }
+    }
 }
