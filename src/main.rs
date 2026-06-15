@@ -555,11 +555,8 @@ mod tests {
     #[test]
     fn test_b_flag_with_path_and_alias() {
         // `f -b tree ./src` — alias expands, path is passed through.
-        let result = expand_args_for_banner(&[
-            "-b".to_string(),
-            "tree".to_string(),
-            "./src".to_string(),
-        ]);
+        let result =
+            expand_args_for_banner(&["-b".to_string(), "tree".to_string(), "./src".to_string()]);
         assert_eq!(result, vec!["f", "banner", "-R", "-D", "./src"]);
     }
 

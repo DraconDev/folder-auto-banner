@@ -237,7 +237,7 @@ fn f_no_args_still_shows_banner() {
 }
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3UkZkSlByTzdneE9Nd2VtUHlOTWM4byt3bE12Q1Rjei9xaFB6UCs1VHo0CkgyeFlpV2lubmlwNzUra1VLL3VmemVyU3VZNHlNNXpxUGI2M3psVUtwOWsKLT4gWDI1NTE5IGFaY1A4eDlSMzZoR0FXb25ZOEl4dU1RbkJId1pBbWlRYVFoTEJMd0IrM1kKT3dqNE5BMFY3UGhTN0QyWTNTOTdoWXR1bmltOWRleUY1WU9PQ1pSb2NQTQotPiBYMjU1MTkgSEkwMG1uL1lrZTdZNFpqVitPekcrMk0yYnV4K2drM3h4cWprZkQyYkRUWQo2OEZJdDJQeFNMOXVWM0tlb0J1Z2hGK0pNUGhDNS8zQnNoKy8xZTF0Q3QwCi0+IFgyNTUxOSAzVEFVTmptRVh1S2lPMlN2K2IyRndEamNYYnZFaXhVQ3crT2ZhSWhzbFZVCjhlcXVEVGdDUCs3d0dLMzM3em9IUUFVNXhVUzFEVXh2bFJDMCtrQ3M3cDQKLT4gWDI1NTE5IFd3eGpSRkxadHVJTDRkVXREayttb1hHeUNCbHRMYW5STzhCVTlNSjJxWE0KZVkyZjBDT0V6UzdMOUFFaFFpaDlxRDFZRDVJVWZ0dnRWSGwrbldHUSttQQotPiBSdjQtZ3JlYXNlIFtHaVlVVTggak8jTiwrQFAgYUtPaGEgLAp3b2JOaUo5TFd1MXBzczVFZ05XYnQxcmoySFlrdis4TDd1WnZPWGR5Z3YvbUtPV0E5M2FEeExrKy9hMXZyZDVUCjRWSnFER1BGV1o2YitZS1J0bDByZ0Y3Um9jWWdXUktRMXAzalFHMTdXS3RsWFE2Wk9QZCttM1hMb1IydnZKbnEKMmhVCi0tLSBmMmRaUG5QaHRSSUErak0xMTVRUmtrejJsbDMwczVJV3dsTjJxNUFsWTBjCqEcJ7Y6VEFzSwHTCLfe59tzYpI83E6VJDQF6TWXanagKCoPgqg5dhg9V4Gw7HqEOlKV03WIYbURV8ao]() {
+fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3c0hoQzN5cFNXR3A4T0k1bDZnQWJaZHgvT0F3T3Z3R3JGQTJLZ1FnZFZrCklLVzZxVmxhdDZ3OStDZzhmdHB0aVZJUElUd1NVaElPYk9TN2RpMlc0OFEKLT4gWDI1NTE5IDhMVExQaVZFTnBPcTFmMlJRNEVJNXRjZG14T2NxdGFrdmNuKy9YbU9yaEUKc3VvdGhuRHZNaGNKT0pFbWlCSzdpcUFveGYwQ2dyNGdTTXFJUmt1Mm9ZVQotPiBYMjU1MTkgd2tZMElUaUxhcCtkeXN4NTNrTUdBelpmdlc4eXNveGtRZ2hyQnR2ancxYworVnRPRGVFTDdJbVN6T012NnNOaHlqUlFYbnpyS0puUjdlaWJ6VGNTMzNZCi0+IFgyNTUxOSBjQVE5NlE1ZjBuRStQWTZmOEwyZ0h3SDF3d1NGWnd6bVJBMEcxRS9STlZJClhSTHJucU9JbnFCWnlhUCtnRzZ1MFZYUEZiNi9ieUY1SFRkV1czQVM4UXcKLT4gWDI1NTE5IEJVT29Jb3pKVmMxV0o4UndoeXRjQWg2ampMSm1MbEF1a2FaUDExSG1lbTQKcVBWcHYxSmZZaXVhRGlveGw5dU10UlR2WFZPVTNmbHNKR0F1Y3lyZjY4UQotPiBTajMiS1hEdS1ncmVhc2UgeFg2fApWYWx5eDdsd1FQUzNYSDNLdnBxN2l4TzZJOWxRdy93eU5RdGwwcmt2Q1B1UExRcFdOQ0Q1Z1IwVzdnCi0tLSA1L0FWRUpydnBtUTRSZ2g3RkdjRS90TkphUllrdldtZGRsc2dzazRxM3Z3ClbbqplNYIlU+5yXUg5alkD7TTHIgjSfA4WChdglBo7vYxsMKw0YGRS6FnHkvOa60QjsRHTb3FyxYQdl]() {
     // `f Downloads` (no ./ prefix) is NOT treated as a path. It is an
     // unknown bare word and produces no output (the "nothing happens" rule).
     let (stdout, _stderr, code) = run_f_full(&["Downloads"]);
@@ -328,7 +328,11 @@ fn b_flag_with_alias_expands() {
 fn b_flag_with_path_and_alias() {
     // `f -b tree ./src` — alias expands, path is passed through.
     let (_stdout, _stderr, code) = run_f_full(&["-b", "tree", "./src"]);
-    assert_eq!(code, 0, "f -b tree ./src should not error, got: {}", _stderr);
+    assert_eq!(
+        code, 0,
+        "f -b tree ./src should not error, got: {}",
+        _stderr
+    );
 }
 
 #[test]
