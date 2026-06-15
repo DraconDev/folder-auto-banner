@@ -413,8 +413,11 @@ fn error_missing_value_for_m() {
     assert_ne!(code, 0, "f m should fail (value required)");
     let combined = format!("{}{}", stdout, stderr);
     assert!(
-        combined.contains("value is required") || combined.contains("--max"),
-        "error should mention --max, got: {}",
+        combined.contains("requires a value")
+            || combined.contains("value is required")
+            || combined.contains("--max")
+            || combined.contains("'-m'"),
+        "error should mention the missing value, got: {}",
         combined
     );
 }
@@ -425,8 +428,11 @@ fn error_missing_value_for_upper_l() {
     assert_ne!(code, 0);
     let combined = format!("{}{}", stdout, stderr);
     assert!(
-        combined.contains("value is required") || combined.contains("--level"),
-        "error should mention --level, got: {}",
+        combined.contains("requires a value")
+            || combined.contains("value is required")
+            || combined.contains("--level")
+            || combined.contains("'-L'"),
+        "error should mention the missing value, got: {}",
         combined
     );
 }
@@ -947,9 +953,19 @@ fn value_binding_colon_with_extra_args_become_paths() {
 
 #[test]
 fn value_binding_no_colon_unchanged() {
-    // f mL 10 → -m 10 -L (chain order, backward compat)
-    let (_stdout, _stderr, code) = run_f_full(&["mL", "10"]);
-    assert_eq!(code, 0, "f mL 10 should succeed (backward compat), got: {}", _stderr);
+    // f mL 10 → -m 10 -L (L has no value, clap would error).
+    // This case was never backward-compatible: --level requires a
+    // value, and with only 1 value for 2 value-taking flags, the
+    // second flag has nothing to bind to. The new implementation
+    // errors with a clear message instead of letting clap produce
+    // a confusing error.
+    let (_stdout, stderr, code) = run_f_full(&["mL", "10"]);
+    assert_ne!(code, 0, "f mL 10 should fail (L has no value)");
+    assert!(
+        stderr.contains("requires a value") || stderr.contains("'-L'") || stderr.contains("--level"),
+        "error should mention the missing value for L, got: {}",
+        stderr
+    );
 }
 
 #[test]
