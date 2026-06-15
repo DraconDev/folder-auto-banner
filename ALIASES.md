@@ -1,8 +1,8 @@
-# Lazy Flags Removal — folder-auto-banner
+# Built-in Alias System — folder-auto-banner
 
 **Date**: 2026-06-15
-**Status**: Approved, implementation in progress
-**Version**: 0.7.0 (breaking change from 0.6.x)
+**Status**: Implemented and shipped in 0.7.0+
+**Version**: Current (0.7.5)
 
 ## Why remove lazy flags?
 
