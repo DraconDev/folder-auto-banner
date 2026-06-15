@@ -1,3 +1,24 @@
+## [0.6.30] - 2026-06-15
+
+### Breaking change: oneline short flag is now `-o`, not `-1`
+
+- **Oneline now uses `-o`** — the previous short flag `-1` was
+  unreachable as a lazy flag because `f 1` always navigates to
+  item 1 (number precedence). Changed to `-o` so `f o` works as
+  a lazy flag.
+- **`f 1` now navigates unambiguously** — no more ambiguity
+  between "navigate to item 1" and "oneline mode". `f 1` always
+  navigates.
+- **Migration**: replace `f -1` with `f -o` (short) or keep
+  `f --oneline` (long, unchanged).
+
+### Updated `src/main.rs` lazy flag list
+
+- Removed `'1'` from `LAZY_FLAGS` (was unreachable).
+- Added `'o'` to `LAZY_FLAGS` (now reachable as lazy flag).
+- The lazy-flag list is now 17 single-character flags, all of
+  which are reachable.
+
 ## [0.6.29] - 2026-06-15
 
 ### Lazy flags (no fallback)

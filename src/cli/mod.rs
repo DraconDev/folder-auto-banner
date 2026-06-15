@@ -50,7 +50,7 @@ pub struct Cli {
     pub hidden: bool,
 
     /// One file per line (for piping)
-    #[arg(short = '1', long = "oneline")]
+    #[arg(short = 'o', long = "oneline")]
     pub oneline: bool,
 
     /// Filter items by pattern
@@ -203,7 +203,7 @@ pub enum Commands {
         tree: Option<Option<usize>>,
 
         /// Display one entry per line (for piping)
-        #[arg(short = '1', long = "oneline")]
+        #[arg(short = 'o', long = "oneline")]
         oneline: bool,
 
         /// Show total directory size in header

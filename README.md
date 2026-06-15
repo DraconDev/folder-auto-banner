@@ -161,7 +161,7 @@ path.
 | `f v` | `f -v` | Verbose output |
 | `f R` | `f -R` | Recurse into subdirectories |
 | `f D` | `f -D` | List only directories |
-| `f 1` | `f -1` | One file per line |
+| `f o` | `f -o` | One file per line |
 | `f m` | `f -m` | Maximum items |
 | `f L` | `f -L` | Limit recursion depth |
 | `f f` | `f -f` | Filter by pattern |
@@ -171,7 +171,7 @@ path.
 
 **Precedence**: numbers (`f 1` → navigate to item 1) take
 precedence over lazy flags, so `f 1` navigates rather than
-enabling oneline mode.
+enabling oneline mode. (Oneline uses `f o` / `f -o`.)
 
 ### Sorting
 | Flag | Description |
