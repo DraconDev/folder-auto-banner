@@ -41,9 +41,16 @@ fn run_f_full(args: &[&str]) -> (String, String, i32) {
 fn regression_0_6_34_f_dash_e_works() {
     // f -e was failing with "unexpected argument '-e' found" before 0.6.34
     let (stdout, _stderr, code) = run_f_full(&["-e"]);
-    assert_eq!(code, 0, "f -e should succeed (exit 0), got exit {}: {}", code, _stderr);
-    assert!(stdout.contains("fabd") || stdout.contains("Folder") || stdout.contains("│"),
-        "f -e should produce a banner, got: {}", stdout);
+    assert_eq!(
+        code, 0,
+        "f -e should succeed (exit 0), got exit {}: {}",
+        code, _stderr
+    );
+    assert!(
+        stdout.contains("fabd") || stdout.contains("Folder") || stdout.contains("│"),
+        "f -e should produce a banner, got: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -325,7 +332,10 @@ fn byte_identical_value_tSm_10() {
 fn byte_identical_value_mLf_10_2_txt() {
     let lazy = run_f(&["mLf", "10", "2", "txt"]);
     let explicit = run_f(&["-m", "10", "-L", "2", "-f", "txt"]);
-    assert_eq!(lazy, explicit, "f mLf 10 2 txt should equal f -m 10 -L 2 -f txt");
+    assert_eq!(
+        lazy, explicit,
+        "f mLf 10 2 txt should equal f -m 10 -L 2 -f txt"
+    );
 }
 
 // ===== Error message tests =====
@@ -335,9 +345,21 @@ fn error_message_invalid_single_char() {
     let (stdout, stderr, code) = run_f_full(&["z"]);
     assert_ne!(code, 0, "f z should fail with non-zero exit");
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("'z'"), "error should mention 'z', got: {}", combined);
-    assert!(combined.contains("not a valid lazy flag"), "error should explain lazy flag system, got: {}", combined);
-    assert!(combined.contains("./z"), "error should suggest './z' escape, got: {}", combined);
+    assert!(
+        combined.contains("'z'"),
+        "error should mention 'z', got: {}",
+        combined
+    );
+    assert!(
+        combined.contains("not a valid lazy flag"),
+        "error should explain lazy flag system, got: {}",
+        combined
+    );
+    assert!(
+        combined.contains("./z"),
+        "error should suggest './z' escape, got: {}",
+        combined
+    );
 }
 
 #[test]
@@ -345,9 +367,21 @@ fn error_message_invalid_chain() {
     let (stdout, stderr, code) = run_f_full(&["tz"]);
     assert_ne!(code, 0, "f tz should fail");
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("'tz'"), "error should mention 'tz', got: {}", combined);
-    assert!(combined.contains("not a valid lazy flag chain"), "error should explain chain failure, got: {}", combined);
-    assert!(combined.contains("./tz"), "error should suggest './tz' escape, got: {}", combined);
+    assert!(
+        combined.contains("'tz'"),
+        "error should mention 'tz', got: {}",
+        combined
+    );
+    assert!(
+        combined.contains("not a valid lazy flag chain"),
+        "error should explain chain failure, got: {}",
+        combined
+    );
+    assert!(
+        combined.contains("./tz"),
+        "error should suggest './tz' escape, got: {}",
+        combined
+    );
 }
 
 #[test]
@@ -355,16 +389,23 @@ fn error_message_all_invalid() {
     let (stdout, stderr, code) = run_f_full(&["xyz"]);
     assert_ne!(code, 0, "f xyz should fail");
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("'xyz'"), "error should mention 'xyz', got: {}", combined);
+    assert!(
+        combined.contains("'xyz'"),
+        "error should mention 'xyz', got: {}",
+        combined
+    );
 }
 
 #[test]
 fn error_message_lists_valid_flags() {
     let (_stdout, stderr, _code) = run_f_full(&["q"]);
     // The error should list the valid flags
-    assert!(stderr.contains("a, c, D, e, f, G, L, m, o, r, R, S, t, U, v, x, X")
-        || stderr.contains("a,c,D,e,f,G,L,m,o,r,R,S,t,U,v,x,X"),
-        "error should list valid flags, got: {}", stderr);
+    assert!(
+        stderr.contains("a, c, D, e, f, G, L, m, o, r, R, S, t, U, v, x, X")
+            || stderr.contains("a,c,D,e,f,G,L,m,o,r,R,S,t,U,v,x,X"),
+        "error should list valid flags, got: {}",
+        stderr
+    );
 }
 
 #[test]
@@ -372,8 +413,11 @@ fn error_missing_value_for_m() {
     let (stdout, stderr, code) = run_f_full(&["m"]);
     assert_ne!(code, 0, "f m should fail (value required)");
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("value is required") || combined.contains("--max"),
-        "error should mention --max, got: {}", combined);
+    assert!(
+        combined.contains("value is required") || combined.contains("--max"),
+        "error should mention --max, got: {}",
+        combined
+    );
 }
 
 #[test]
@@ -381,8 +425,11 @@ fn error_missing_value_for_L() {
     let (stdout, stderr, code) = run_f_full(&["L"]);
     assert_ne!(code, 0);
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("value is required") || combined.contains("--level"),
-        "error should mention --level, got: {}", combined);
+    assert!(
+        combined.contains("value is required") || combined.contains("--level"),
+        "error should mention --level, got: {}",
+        combined
+    );
 }
 
 #[test]
@@ -390,8 +437,11 @@ fn error_invalid_value_for_m() {
     let (stdout, stderr, code) = run_f_full(&["m", "abc"]);
     assert_ne!(code, 0);
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("invalid") || combined.contains("--max"),
-        "error should mention invalid value, got: {}", combined);
+    assert!(
+        combined.contains("invalid") || combined.contains("--max"),
+        "error should mention invalid value, got: {}",
+        combined
+    );
 }
 
 // ===== Routing tests =====
@@ -400,7 +450,11 @@ fn error_invalid_value_for_m() {
 fn routing_number_navigates() {
     let output = run_f(&["1"]);
     // Should navigate to item 1 (a path), not show the cwd banner
-    assert!(!output.contains("fabd │"), "f 1 should navigate, not show cwd banner, got: {}", output);
+    assert!(
+        !output.contains("fabd │"),
+        "f 1 should navigate, not show cwd banner, got: {}",
+        output
+    );
 }
 
 #[test]
@@ -419,8 +473,11 @@ fn routing_subcommand_help_works() {
 fn routing_explicit_dot_slash_path() {
     let output = run_f(&["./src"]);
     // Should show banner for ./src, not the cwd
-    assert!(output.contains("src") || output.contains("Folder"),
-        "f ./src should show banner for src/, got: {}", output);
+    assert!(
+        output.contains("src") || output.contains("Folder"),
+        "f ./src should show banner for src/, got: {}",
+        output
+    );
 }
 
 #[test]
@@ -455,14 +512,14 @@ fn property_all_17_flags_chain() {
 #[test]
 fn stress_test_20_random_combinations() {
     let combinations = [
-        "t", "S", "G", "r", "c", "a", "D", "R", "o", "v",
-        "tr", "tS", "trc", "taR", "GSr",
-        "m", "f", "L", // value-taking singles (will fail without value, tested separately)
+        "t", "S", "G", "r", "c", "a", "D", "R", "o", "v", "tr", "tS", "trc", "taR", "GSr", "m",
+        "f", "L", // value-taking singles (will fail without value, tested separately)
         "tSm", "mL", "Lmf", "tSmL", "aRcSD",
     ];
     // Only test the boolean chains here (value-taking ones are tested separately)
-    let boolean_chains = ["t", "S", "G", "r", "c", "a", "D", "R", "o", "v",
-        "tr", "tS", "trc", "taR", "GSr", "aRcSD"];
+    let boolean_chains = [
+        "t", "S", "G", "r", "c", "a", "D", "R", "o", "v", "tr", "tS", "trc", "taR", "GSr", "aRcSD",
+    ];
     for chain in &boolean_chains {
         let (_stdout, _stderr, code) = run_f_full(&[chain]);
         assert_eq!(code, 0, "f {} should succeed (exit 0)", chain);

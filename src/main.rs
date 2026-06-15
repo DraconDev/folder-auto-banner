@@ -285,7 +285,12 @@ mod tests {
     fn test_resolve_all_17_canonical_flags() {
         // Every entry in LAZY_FLAGS must resolve to itself
         for &c in LAZY_FLAGS {
-            assert_eq!(resolve_lazy_flag_char(c), Some(c), "flag {:?} should resolve to itself", c);
+            assert_eq!(
+                resolve_lazy_flag_char(c),
+                Some(c),
+                "flag {:?} should resolve to itself",
+                c
+            );
         }
     }
 
@@ -293,7 +298,13 @@ mod tests {
     fn test_resolve_all_5_lowercase_aliases() {
         // Every lowercase alias must resolve to its canonical uppercase
         for &(from, to) in LOWERCASE_ALIASES {
-            assert_eq!(resolve_lazy_flag_char(from), Some(to), "alias {:?} should resolve to {:?}", from, to);
+            assert_eq!(
+                resolve_lazy_flag_char(from),
+                Some(to),
+                "alias {:?} should resolve to {:?}",
+                from,
+                to
+            );
         }
     }
 
@@ -308,12 +319,22 @@ mod tests {
         }
         for c in 'a'..='z' {
             if !valid_chars.contains(&c) {
-                assert_eq!(resolve_lazy_flag_char(c), None, "char {:?} should not resolve", c);
+                assert_eq!(
+                    resolve_lazy_flag_char(c),
+                    None,
+                    "char {:?} should not resolve",
+                    c
+                );
             }
         }
         for c in 'A'..='Z' {
             if !valid_chars.contains(&c) {
-                assert_eq!(resolve_lazy_flag_char(c), None, "char {:?} should not resolve", c);
+                assert_eq!(
+                    resolve_lazy_flag_char(c),
+                    None,
+                    "char {:?} should not resolve",
+                    c
+                );
             }
         }
     }
@@ -346,14 +367,25 @@ mod tests {
     #[test]
     fn test_expand_single_char_each_canonical() {
         for &c in LAZY_FLAGS {
-            assert_eq!(expand_lazy_flags(&c.to_string()), Some(vec![c]), "single char {:?} failed", c);
+            assert_eq!(
+                expand_lazy_flags(&c.to_string()),
+                Some(vec![c]),
+                "single char {:?} failed",
+                c
+            );
         }
     }
 
     #[test]
     fn test_expand_single_char_each_alias() {
         for &(from, to) in LOWERCASE_ALIASES {
-            assert_eq!(expand_lazy_flags(&from.to_string()), Some(vec![to]), "alias {:?}→{:?} failed", from, to);
+            assert_eq!(
+                expand_lazy_flags(&from.to_string()),
+                Some(vec![to]),
+                "alias {:?}→{:?} failed",
+                from,
+                to
+            );
         }
     }
 
@@ -412,7 +444,12 @@ mod tests {
         // Each non-flag letter should reject
         for c in 'a'..='z' {
             if !LAZY_FLAGS.contains(&c) && !LOWERCASE_ALIASES.iter().any(|&(f, _)| f == c) {
-                assert_eq!(expand_lazy_flags(&c.to_string()), None, "char {:?} should reject", c);
+                assert_eq!(
+                    expand_lazy_flags(&c.to_string()),
+                    None,
+                    "char {:?} should reject",
+                    c
+                );
             }
         }
     }
@@ -472,7 +509,10 @@ mod tests {
     #[test]
     fn test_expand_long_chain() {
         // 10-char chain of unique flags
-        assert_eq!(expand_lazy_flags("tacSDGvRrx"), Some(vec!['t', 'a', 'c', 'S', 'D', 'G', 'v', 'R', 'r', 'x']));
+        assert_eq!(
+            expand_lazy_flags("tacSDGvRrx"),
+            Some(vec!['t', 'a', 'c', 'S', 'D', 'G', 'v', 'R', 'r', 'x'])
+        );
     }
 
     // ===== is_explicit_path tests =====
@@ -542,26 +582,42 @@ mod tests {
 
     #[test]
     fn test_lowercase_aliases_count_is_5() {
-        assert_eq!(LOWERCASE_ALIASES.len(), 5, "LOWERCASE_ALIASES should have 5 entries");
+        assert_eq!(
+            LOWERCASE_ALIASES.len(),
+            5,
+            "LOWERCASE_ALIASES should have 5 entries"
+        );
     }
 
     #[test]
     fn test_value_taking_flags_count_is_3() {
-        assert_eq!(VALUE_TAKING_FLAGS.len(), 3, "VALUE_TAKING_FLAGS should have 3 entries (m, f, L)");
+        assert_eq!(
+            VALUE_TAKING_FLAGS.len(),
+            3,
+            "VALUE_TAKING_FLAGS should have 3 entries (m, f, L)"
+        );
     }
 
     #[test]
     fn test_value_taking_flags_are_m_f_L() {
         let mut v: Vec<char> = VALUE_TAKING_FLAGS.to_vec();
         v.sort();
-        assert_eq!(v, vec!['L', 'f', 'm'], "VALUE_TAKING_FLAGS should be {{m, f, L}}");
+        assert_eq!(
+            v,
+            vec!['L', 'f', 'm'],
+            "VALUE_TAKING_FLAGS should be {{m, f, L}}"
+        );
     }
 
     #[test]
     fn test_value_taking_flags_are_in_lazy_flags() {
         // Every value-taking flag must also be a canonical lazy flag
         for &c in VALUE_TAKING_FLAGS {
-            assert!(LAZY_FLAGS.contains(&c), "value-taking flag {:?} must be in LAZY_FLAGS", c);
+            assert!(
+                LAZY_FLAGS.contains(&c),
+                "value-taking flag {:?} must be in LAZY_FLAGS",
+                c
+            );
         }
     }
 
@@ -570,7 +626,11 @@ mod tests {
         let mut sorted: Vec<char> = LAZY_FLAGS.to_vec();
         sorted.sort();
         sorted.dedup();
-        assert_eq!(sorted.len(), LAZY_FLAGS.len(), "LAZY_FLAGS must have no duplicates");
+        assert_eq!(
+            sorted.len(),
+            LAZY_FLAGS.len(),
+            "LAZY_FLAGS must have no duplicates"
+        );
     }
 
     #[test]
@@ -578,7 +638,11 @@ mod tests {
         let mut sorted: Vec<char> = VALUE_TAKING_FLAGS.to_vec();
         sorted.sort();
         sorted.dedup();
-        assert_eq!(sorted.len(), VALUE_TAKING_FLAGS.len(), "VALUE_TAKING_FLAGS must have no duplicates");
+        assert_eq!(
+            sorted.len(),
+            VALUE_TAKING_FLAGS.len(),
+            "VALUE_TAKING_FLAGS must have no duplicates"
+        );
     }
 
     #[test]
@@ -589,9 +653,17 @@ mod tests {
         // be wrong because R is --recursive.
         for &(from, to) in LOWERCASE_ALIASES {
             // The 'from' char must NOT be in LAZY_FLAGS
-            assert!(!LAZY_FLAGS.contains(&from), "alias source {:?} should not be a canonical flag", from);
+            assert!(
+                !LAZY_FLAGS.contains(&from),
+                "alias source {:?} should not be a canonical flag",
+                from
+            );
             // The 'to' char must BE in LAZY_FLAGS
-            assert!(LAZY_FLAGS.contains(&to), "alias target {:?} should be a canonical flag", to);
+            assert!(
+                LAZY_FLAGS.contains(&to),
+                "alias target {:?} should be a canonical flag",
+                to
+            );
         }
     }
 
