@@ -67,8 +67,12 @@ exec zsh   # or: source ~/.bashrc
 ## Usage
 
 ```bash
-f                    # Directory listing + context
-f <dir>              # Listing for specific dir
+f                    # Directory listing + context (cwd)
+f 4                  # Navigate to item 4 (cd into it or open it)
+f -b ./src           # Banner for specific path
+f -b tree            # Tree banner (alias + path mode)
+f tree               # Tree banner (alias, cwd)
+f hidden verbose     # Multiple aliases compose
 f -S                 # Sort by size
 f -t                 # Sort by time
 f -X                 # Sort by extension
@@ -81,12 +85,25 @@ f -R, --recursive    # Recurse into subdirectories
 f --filter rs        # Filter by pattern
 f install            # Install shell function for f N → cd
 f config             # Open config file
-f daemon restart   # Restart daemon
-f daemon status    # Check daemon status
-f daemon stop      # Stop daemon
-f install          # Install shell function for f N → cd
-f config           # Open config file
+f daemon restart     # Restart daemon
+f daemon status      # Check daemon status
+f daemon stop        # Stop daemon
 ```
+
+### Routing rules (0.7+)
+
+The CLI accepts exactly three kinds of input:
+
+| Input | Examples | Behavior |
+|-------|----------|----------|
+| **Numbers** | `f 1`, `f 4` | Navigate to item N |
+| **Aliases** | `f tree`, `f hidden verbose` | Expand and run |
+| **Flags** | `f -t`, `f --json` | Clap direct |
+| **`-b` switch** | `f -b ./src`, `f -b tree ./src` | Banner mode (allows paths) |
+| **Subcommand** | `f banner ./src`, `f install` | Pass through to clap |
+
+Anything else (`f t`, `f foo`, `f ./src`, `f Downloads`, `f /tmp`) exits 0 with
+no output. Use `f -b <path>` for path-specific banners.
 
 ## Shell Function (`f install`)
 
@@ -122,7 +139,8 @@ When `numbered = true` in config (or enabled by default), each item gets a numbe
 [ 3] 📄 README.md
 ```
 
-Navigate with `f N`:
+Navigate with `f N` (a number is the **only** non-alias bare word
+that produces a result):
 
 ```bash
 f 2          # cd into item 2 (if directory)
@@ -131,6 +149,7 @@ f 3 cat      # open item 3 with `cat`
 f 3 krita    # open item 3 with krita
 f 3 -e       # force open in editor
 f 3 -x       # force run the file directly
+f -b 4       # navigate to item 4 in banner mode
 ```
 
 > **Note:** `f N` requires the shell wrappers installed by `./install.sh` or `f install`. To activate them in your current terminal without restarting your shell:
@@ -142,49 +161,106 @@ f 3 -x       # force run the file directly
 
 ## CLI Flags (Actions)
 
-### Lazy Flags
+### Built-in Aliases (0.7+)
 
-Single-character flags can be used without the leading dash.
-**No fallback**: `f t` always means `-t` (sort by time). To show a
-banner for a file or directory named `t`, use `./t` or an absolute
-path.
+Each alias is a single word that expands to one or more clap flags.
+Aliases are an alternative to typing flags explicitly — they make
+common invocations shorter and more memorable.
 
-**Chained**: flags can also be chained. `f trc` is equivalent to
-`f -t -r -c` (time + reverse + compact). Every character in the
-arg must be a valid lazy flag.
+**Multiple aliases compose** by concatenating their flag lists:
 
-| Lazy | Equivalent | Description |
-|------|------------|-------------|
-| `f t` | `f -t` | Sort by time modified |
-| `f S` | `f -S` | Sort by size |
-| `f X` | `f -X` | Sort by extension |
-| `f G` | `f -G` | Sort by git status |
-| `f r` | `f -r` | Reverse sort |
-| `f a` | `f -a` | Show hidden files |
-| `f c` | `f -c` | Compact output |
-| `f v` | `f -v` | Verbose output |
-| `f R` | `f -R` | Recurse into subdirectories |
-| `f D` | `f -D` | List only directories |
-| `f o` | `f -o` | One file per line |
-| `f m` | `f -m` | Maximum items |
-| `f L` | `f -L` | Limit recursion depth |
-| `f f` | `f -f` | Filter by pattern |
-| `f U` | `f -U` | No sort |
-| `f e` | `f -e` | Force open in editor |
-| `f x` | `f -x` | Force run file |
-| `f trc` | `f -t -r -c` | Chained: time + reverse + compact |
-| `f tS` | `f -t -S` | Chained: time + size |
-| `f mL 10 2` | `f -m 10 -L 2` | Chained: max=10 + level=2 |
-| `f tSm 10` | `f -t -S -m 10` | Chained: time + size + max=10 |
-| `f mLf 10 2 txt` | `f -m 10 -L 2 -f txt` | Chained: max=10 + level=2 + filter=txt |
+```bash
+f hidden verbose      # → -a -v  (show hidden + verbose output)
+f new recurse         # → -t -R  (sort by time + recurse)
+f tree hidden         # → -R -D -a  (tree view + show hidden)
+```
 
-**Precedence**: numbers (`f 1` → navigate to item 1) take
-precedence over lazy flags, so `f 1` navigates rather than
-enabling oneline mode. (Oneline uses `f o` / `f -o`.)
+**Aliases compose with explicit flags** (the flags are added after
+the alias expansion):
 
-**Paths**: bare words without `.`, `/`, or `~` are always
-lazy-flag chains. To show a banner for a file or directory,
-use `./path`, `/abs/path`, or `~/path` (explicit path indicators).
+```bash
+f tree -L 2           # → -R -D -L 2  (tree with depth limit)
+```
+
+**Aliases compose with paths in banner mode** (`-b`):
+
+```bash
+f -b top ./src        # → -S -r -m 20 for ./src  (top 20 in src)
+```
+
+| Alias | Expands to | What it does |
+|-------|-----------|--------------|
+| **Display** | | |
+| `tree` | `-R -D` | Recursive, only dirs (like `tree` command) |
+| `flat` | `-o` | One file per line |
+| `compact` | `-c` | Compact output |
+| `verbose` | `-v` | Verbose output |
+| `hidden` | `-a` | Show hidden files (dotfiles) |
+| `dirs` | `-D` | Only directories |
+| **Sort** | | |
+| `new` | `-t` | Sort by time, newest first |
+| `old` | `-t -r` | Sort by time, oldest first |
+| `big` | `-S` | Sort by size, largest first |
+| `small` | `-S -r` | Sort by size, smallest first |
+| `ext` | `-X` | Sort by extension |
+| `git` | `-G` | Sort by git status |
+| `nosort` | `-U` | No sort (directory order) |
+| **Limits** | | |
+| `top` | `-S -r -m 20` | Top 20 largest files |
+| `newest` | `-t -r -m 20` | 20 newest files |
+| **Recursion** | | |
+| `recurse` | `-R` | Recurse into subdirectories |
+| **Actions** | | |
+| `edit` | `-e` | Force open in editor |
+| `run` | `-x` | Force run file |
+
+**Unknown bare words** (`f t`, `f foo`, `f Downloads`) exit 0 with
+no output. The CLI only accepts numbers, aliases, and flags. To
+see a banner for a specific path, use `f -b <path>` (banner mode)
+or `f banner <path>` (subcommand). To see a banner for cwd, just
+type `f`.
+
+#### Migration from 0.6.x
+
+If you were using lazy flag chains in 0.6.x, here's the 0.7+
+equivalent for common invocations:
+
+| 0.6.x | 0.7+ |
+|-------|------|
+| `f t` | `f new` or `f -t` |
+| `f trc` | `f new -r -c` |
+| `f S` | `f big` or `f -S` |
+| `f mL 10 2` | `f -m 10 -L 2` |
+| `f mLf: 10` | `f -f 10` |
+| `f l5` | `f -L 5` |
+
+For your personal common combinations, add a shell alias:
+
+```bash
+# ~/.zshrc or ~/.bashrc
+alias ftrc='f -t -r -c'
+alias ftree='f -R -D'
+```
+
+### `-b` Banner Mode (0.7.3+)
+
+The `-b` flag switches to banner mode, where paths are allowed.
+This is the way to see a banner for a specific path without
+typing the subcommand name.
+
+```bash
+f -b                   # default banner for cwd (same as `f`)
+f -b ./src             # banner for ./src
+f -b /tmp              # banner for /tmp
+f -b ~/Downloads       # banner for ~/Downloads
+f -b tree              # tree banner (alias still expands)
+f -b tree ./src        # tree banner for ./src
+f -b -t                # banner with -t flag
+f -b 5                 # navigate to item 5
+```
+
+Unknown words in banner mode are dropped (e.g. `f -b foo` runs the
+default banner, ignoring `foo`).
 
 ### Sorting
 | Flag | Description |
@@ -300,7 +376,3 @@ cargo clippy --all-targets --all-features -- -D warnings
 ## License
 
 MIT
-# test 1781471758
-# live parallel test 1781472248
-# live parallel test 1781472742
-# live parallel test 1781473042
