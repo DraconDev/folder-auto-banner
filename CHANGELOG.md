@@ -1,3 +1,54 @@
+## [0.6.36] - 2026-06-15
+
+### Extended test coverage for lazy flags
+
+Added 49 new tests for the lazy flag system, bringing the total to
+280 tests with 100% pass rate (was 231 in 0.6.35).
+
+- **10 new property-based tests** using `proptest` (added as dev-dependency):
+  - `prop_resolve_lazy_flag_is_total` — every char returns valid result
+  - `prop_expand_lazy_flags_valid_chains` — 1000 random alpha strings
+  - `prop_is_explicit_path_dot_prefix` / `slash_prefix` / `tilde_prefix` / `bare_alpha_rejected`
+  - `prop_expand_and_resolve_consistent` — both functions agree
+  - `prop_chain_length_equals_input_length`
+  - `prop_no_panic_on_random_input` — no panics on any string
+  - Each runs 1000 cases
+
+- **39 new integration tests** in `tests/lazy_flags_test.rs`:
+  - **Edge cases (27 tests)**: very long chains, all 14 boolean flags,
+    subcommand routing, unicode, empty strings, version flag, etc.
+  - **Cross-platform path tests (4 tests)**: `./`, `/`, `..`, `$HOME`
+  - **Daemon interaction tests (8 tests)**: cold start, warm, repeated
+    invocation consistency
+
+- **New standalone test harness**: `scripts/test_lazy_flags.sh`
+  - Runs 37 lazy flag examples
+  - Verifies exit codes match between lazy and explicit forms
+  - Can be run independently of `cargo test`
+  - Exits with non-zero on any failure
+
+### Test metrics
+
+| Metric | 0.6.35 | 0.6.36 | Change |
+|--------|--------|--------|--------|
+| Unit tests | 43 | 53 | +10 |
+| Integration tests (active) | 29 | 29 | 0 |
+| Lazy flags tests | 55 | 94 | +39 |
+| **Total** | **231** | **280** | **+49** |
+| Pass rate | 100% | 100% | — |
+
+### New dev-dependency
+
+- `proptest = "1.4"` — for property-based testing
+
+### Known limitations discovered
+
+- `f --debug <lazy>` doesn't work (clap sees next arg as subcommand)
+- `f banner <lazy>` doesn't work (routing bypasses lazy expansion)
+- `f help <lazy>` doesn't work (same reason)
+- Mixing explicit (`-c`) and lazy (`t`) flags doesn't work
+- Use all-lazy or all-explicit forms
+
 ## [0.6.35] - 2026-06-15
 
 ### Comprehensive lazy flags test suite

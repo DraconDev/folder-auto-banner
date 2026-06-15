@@ -555,8 +555,10 @@ fn edge_case_lazy_with_debug() {
 fn edge_case_lazy_with_explicit_path() {
     // Lazy flag followed by explicit path
     let output = run_f(&["t", "./src"]);
-    assert!(output.contains("src") || output.contains("Folder"),
-        "f t ./src should show banner for src/");
+    assert!(
+        output.contains("src") || output.contains("Folder"),
+        "f t ./src should show banner for src/"
+    );
 }
 
 #[test]
@@ -582,8 +584,11 @@ fn edge_case_very_large_number() {
     let (stdout, stderr, code) = run_f_full(&["99999"]);
     assert_ne!(code, 0, "f 99999 should fail");
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("out of range") || combined.contains("99999"),
-        "error should mention out of range, got: {}", combined);
+    assert!(
+        combined.contains("out of range") || combined.contains("99999"),
+        "error should mention out of range, got: {}",
+        combined
+    );
 }
 
 #[test]
@@ -592,7 +597,7 @@ fn edge_case_negative_number() {
     // f -1 is not a valid flag.
     let (_stdout, stderr, _code) = run_f_full(&["-1"]);
     let _ = stderr; // suppress unused
-    // f -1 is not recognized — clap will error
+                    // f -1 is not recognized — clap will error
 }
 
 #[test]
@@ -601,7 +606,10 @@ fn edge_case_zero() {
     let (stdout, stderr, code) = run_f_full(&["0"]);
     assert_ne!(code, 0, "f 0 should fail");
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("out of range"), "error should mention out of range");
+    assert!(
+        combined.contains("out of range"),
+        "error should mention out of range"
+    );
 }
 
 #[test]
@@ -610,8 +618,11 @@ fn edge_case_repeated_same_flag() {
     let (stdout, stderr, code) = run_f_full(&["tt"]);
     assert_ne!(code, 0, "f tt should fail (duplicate flag)");
     let combined = format!("{}{}", stdout, stderr);
-    assert!(combined.contains("cannot be used multiple times") || combined.contains("duplicate"),
-        "error should mention duplicate, got: {}", combined);
+    assert!(
+        combined.contains("cannot be used multiple times") || combined.contains("duplicate"),
+        "error should mention duplicate, got: {}",
+        combined
+    );
 }
 
 #[test]
@@ -676,7 +687,10 @@ fn edge_case_version_flag() {
     // f --version should work
     let (stdout, _stderr, code) = run_f_full(&["--version"]);
     assert_eq!(code, 0, "f --version should succeed");
-    assert!(stdout.contains("0.6"), "version output should contain version number");
+    assert!(
+        stdout.contains("0.6"),
+        "version output should contain version number"
+    );
 }
 
 #[test]
@@ -713,8 +727,8 @@ fn edge_case_chain_with_value_at_end() {
     // f tr 10 — value at end after boolean chain
     let (stdout, stderr, code) = run_f_full(&["tr", "10"]);
     let _ = (stdout, stderr); // suppress unused
-    // 10 would be a positional (path), not a value for any flag
-    // Should not panic
+                              // 10 would be a positional (path), not a value for any flag
+                              // Should not panic
     let _ = code;
 }
 

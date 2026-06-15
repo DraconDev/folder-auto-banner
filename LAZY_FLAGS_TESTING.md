@@ -1,8 +1,8 @@
-# Lazy Flags Testing — folder-auto-banner 0.6.35
+# Lazy Flags Testing — folder-auto-banner 0.6.36
 
 **Date**: 2026-06-15
-**Total test count**: 231 (was 139 in 0.6.33, +92 new)
-**Pass rate**: 100% (231/231, 0 failures)
+**Total test count**: 280 (was 231 in 0.6.35, +49 new)
+**Pass rate**: 100% (280/280, 0 failures)
 
 ## Overview
 
