@@ -174,6 +174,9 @@ arg must be a valid lazy flag.
 | `f x` | `f -x` | Force run file |
 | `f trc` | `f -t -r -c` | Chained: time + reverse + compact |
 | `f tS` | `f -t -S` | Chained: time + size |
+| `f mL 10 2` | `f -m 10 -L 2` | Chained: max=10 + level=2 |
+| `f tSm 10` | `f -t -S -m 10` | Chained: time + size + max=10 |
+| `f mLf 10 2 txt` | `f -m 10 -L 2 -f txt` | Chained: max=10 + level=2 + filter=txt |
 
 **Precedence**: numbers (`f 1` → navigate to item 1) take
 precedence over lazy flags, so `f 1` navigates rather than

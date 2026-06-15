@@ -46,6 +46,14 @@ const LOWERCASE_ALIASES: &[(char, char)] = &[
     ('u', 'U'), // --no-sort
 ];
 
+/// Flags that take a value (the value is the next argument).
+/// Used for smart expansion of chained lazy flags.
+const VALUE_TAKING_FLAGS: &[char] = &[
+    'm', // --max <MAX> (usize)
+    'f', // --filter <PATTERN> (String)
+    'L', // --level <LEVEL> (usize)
+];
+
 /// Resolve a single character to its canonical lazy-flag form
 /// (e.g. `s` → `S`). Returns `None` if the char is not a lazy flag.
 fn resolve_lazy_flag_char(c: char) -> Option<char> {
@@ -126,17 +134,37 @@ fn main() -> Result<()> {
         // of lazy flags (e.g. `trc` → `-t -r -c`) → expand it.
         // No fallback: `f trc` ALWAYS means time+reverse+compact. Use
         // `./trc` for a file/dir called `trc`.
+        //
+        // Value-taking flags in the chain consume the next arg as their
+        // value. E.g. `f mL 10 2 path` → `-m 10 -L 2 path`. The values
+        // are assigned in chain order to value-taking flags.
         if let Some(flags) = expand_lazy_flags(arg) {
+            let arg_pos = args.iter().position(|a| a == arg).unwrap();
             let mut new_args: Vec<String> = vec!["f".to_string(), "banner".to_string()];
-            for a in &args {
-                if a == arg {
-                    for c in &flags {
-                        new_args.push(format!("-{}", c));
+
+            // Args before the chain
+            for a in &args[..arg_pos] {
+                new_args.push(a.clone());
+            }
+
+            // Expand the chain, consuming values for value-taking flags
+            let mut value_idx = arg_pos + 1;
+            for c in &flags {
+                new_args.push(format!("-{}", c));
+                if VALUE_TAKING_FLAGS.contains(c) {
+                    // Consume the next arg as the value
+                    if value_idx < args.len() {
+                        new_args.push(args[value_idx].clone());
+                        value_idx += 1;
                     }
-                } else {
-                    new_args.push(a.clone());
                 }
             }
+
+            // Args after the consumed values (the path and any remaining args)
+            for a in &args[value_idx..] {
+                new_args.push(a.clone());
+            }
+
             let cli = cli::Cli::parse_from(new_args);
             return cli.run();
         }

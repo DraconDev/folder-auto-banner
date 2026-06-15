@@ -1,3 +1,38 @@
+## [0.6.33] - 2026-06-15
+
+### Value-taking flags in chained lazy flags
+
+- **Value-taking flags can now be chained** — `f mL 10 2` is
+  equivalent to `f -m 10 -L 2` (max=10, level=2). The values are
+  consumed in chain order from the args following the chain.
+- **New `VALUE_TAKING_FLAGS` constant** in `src/main.rs` lists the
+  3 single-character flags that take values: `m` (max, usize),
+  `f` (filter, String), `L` (level, usize).
+- **Smart chain expansion** — when a chain contains value-taking
+  flags, the expansion interleaves the flags with their values
+  in the correct order. For example, `f mLf 10 2 txt` expands to
+  `-m 10 -L 2 -f txt` (max=10, level=2, filter=txt).
+- **Why interleaving is needed** — clap cannot handle
+  `-m -L 10 2` (value-taking flag immediately followed by another
+  flag confuses clap). The expansion produces `-m 10 -L 2` which
+  clap handles correctly.
+- **Error handling** — if a value-taking flag doesn't have a
+  value, clap will report a clear error (e.g. "a value is required
+  for '--max <MAX>' but none was supplied").
+
+### Examples
+
+| Input | Expands to | Result |
+|-------|-----------|--------|
+| `f tSc` | `-t -S -c` | time + sizesort + compact |
+| `f m 10` | `-m 10` | max=10 |
+| `f L 2` | `-L 2` | level=2 |
+| `f f txt` | `-f txt` | filter=txt |
+| `f mL 10 2` | `-m 10 -L 2` | max=10, level=2 |
+| `f tSm 10` | `-t -S -m 10` | time + sizesort + max=10 |
+| `f mSt 10` | `-m 10 -S -t` | max=10 + sizesort + time |
+| `f mLf 10 2 txt` | `-m 10 -L 2 -f txt` | max=10, level=2, filter=txt |
+
 ## [0.6.32] - 2026-06-15
 
 ### Chained lazy flags (no fallback)
