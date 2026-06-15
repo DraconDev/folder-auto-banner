@@ -90,7 +90,8 @@ fn main() -> Result<()> {
 
         // If it's a single-char lazy flag (e.g. `t` → `-t`) → expand it.
         // No fallback: `f t` ALWAYS means sort by time. Use `./t` for a
-        // file/dir called `t`.
+        // file/dir called `t`. For chained flags, use explicit
+        // `f -trc` instead of `f trc` to avoid ambiguity with paths.
         if let Some(c) = is_lazy_flag(arg) {
             let mut new_args: Vec<String> = vec!["f".to_string(), "banner".to_string()];
             for a in &args {
