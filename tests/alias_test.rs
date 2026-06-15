@@ -237,7 +237,7 @@ fn f_no_args_still_shows_banner() {
 }
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPaHllczdEd3pTY1FvanVwOHdBdWhvbFFjMW1ndlBwd2N1NFliWXQyZkVjCnlRSWdSaDRtQ3IwYi9adEhMTDZYTkhvSWRWTU42ZzdtSVpQT0VBZFdiVFEKLT4gWDI1NTE5IHNhalZ4eGc1YlN4M2luaVhZamNjQUVFb05EZTJXdnVHaFhCQkd1SDNqVDgKZnNzaEhvc1BabUJwUmJWL05XbWZYeG9mMzZUSkNVbHBnM1dld2VYejFUVQotPiBYMjU1MTkgTFZreTFJSkR1eFh4VFJucTBxeUFvVmczOFNuV2d2UU85MlI1UzFLaHVuYwpJK3dycjRBUCtqdU15OG01YjF0RE1qak9URWMvanMrdWFCSkxBRHZLc0RjCi0+IFgyNTUxOSA1M3JwUXJPME1qNVp4bGtXVVBxdmZueXB2amhiRVVGNG0zeUs1VzdaZTBnCjRCTGEzQVlPbEdDL2VhQS9VQjg3WU0yRngzdnRxT1JySi9meUNab3ROODQKLT4gWDI1NTE5IDAzNFp0dHJIL0JVVHd3VHhSU1BoRVhYb2JkUnZ2RjFaeTgyelpPSkJwQXMKZHIyS2xscXNaQ3BSOW10UGxOSHBtbzZsVGcrbjBpdVQ4ZTQ1SXZTZnhFOAotPiBtUzBvcWJlLWdyZWFzZSA2I2hNcyAubmw/bFkKZTgxR3hNZmYKLS0tIFpma0Z6b1V0VTluZVUzRUlmQnluUllXUU96OEpkblNJMWg4K0I5T3J5SkkKL9oIazTXfGXGSOiX+J7f5yCiMhNH9AjUomiS/PfdejNaj/AJV+yy1zEQUHzfih2nC4jbDDyQRYTjOFs=]() {
+fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaUWlTNC8wL0lKeHZPanV6K3hscHBBU21zaS9aTUc3N1lxNDlYZ0xOVkdrCnM4VVA1MklJV3FOeGhac1hYVjZTRngzZzdCK01meWdjTHlna21nbmU3YjQKLT4gWDI1NTE5IEtxbW4zeVN6SmZ5UjI2YXZnaWsydndQSy84Yit6RVNFZWhhZzRMRzRJQ00KVnZUb3NUUHA0YlBLR0V4Y1F3R2wvQ2dHcnhCOVlhL05qN2pCYjVPdVZobwotPiBYMjU1MTkgZGdPZG5DSVVMQTF6Vm1TZWhZSmpmditPSXFrUWFTSUxGanU5b0dzdENrNAoxL0FTYU9GalQxMnJRVWsvNTc0RGQ5Q3lLdVM5Y2xYNVVxaGEwMnZQTlNRCi0+IFgyNTUxOSAzb0tBa3I1QTdIOVFTNWhIMDVrUTlUT0tBOVZwVk9KTkg1QkRFdTZENVhnClVTNE1US1l1eWtOK1JjRWtuS0RkaElBNkxtNmg5YVNVdUtIU3pJaDB5amcKLT4gWDI1NTE5IHQ4UlVOU3hld3Y4aTUrRVNCbFF3aG9nYVJ6SHcyZUIwL01FdGlFSHR3bncKNnk5dWVFa3ByNWxZVFZuVytWY2pDOHJHT3doR210aHg5OS9WUklMbWhGWQotPiBWLWdyZWFzZSB8PCA0Jlc8ICY+TCBGcVgKYVhtZ05udHZoNW9xUWhSWUN6Z1lUN3Q2RHU2Q0tZclpCd0tnN3U1MXRXdEFVOGtoREsrQWhiZHZ5Z28KLS0tIEswdHJwbGRtY2N2TXJRVHBZbHNHQllqVUFvZHJ4OWh0TUxaNkdmUU4zWWcKHmQ68JdeLXDYYGPsBBYEOgyjsSxgyRd/euKpNHTjRau57CeeCd6giuwlkHBwZ9V3Dp91Djrx1y+NKgM=]() {
     // `f Downloads` (no ./ prefix) is NOT treated as a path. It is an
     // unknown bare word and produces no output (the "nothing happens" rule).
     let (stdout, _stderr, code) = run_f_full(&["Downloads"]);
@@ -250,31 +250,55 @@ fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPaHllczdE
 }
 
 #[test]
-fn explicit_path_with_dot_slash_works() {
+fn explicit_path_with_dot_slash_does_nothing() {
+    // `f ./src` is dropped (paths are not in the routing table).
+    // User said: "we only take numbers, aliases, and flags, not
+    // folders and files by name."
     let (stdout, _stderr, code) = run_f_full(&["./src"]);
-    assert_eq!(code, 0, "./src should work as path");
-    // Banner for ./src should be different from default cwd banner
-    let default_out = run_f(&[]);
-    // They may or may not be different in the header, but ./src should
-    // at least succeed.
-    let _ = stdout;
-    let _ = default_out;
+    assert_eq!(code, 0, "./src should not error, got: {}", _stderr);
+    assert!(
+        stdout.is_empty(),
+        "./src should produce no output, got: {}",
+        stdout
+    );
 }
 
 #[test]
-fn explicit_path_with_slash_works() {
-    let (_stdout, _stderr, code) = run_f_full(&["/tmp"]);
-    assert_eq!(code, 0, "/tmp should work as path");
+fn explicit_path_with_slash_does_nothing() {
+    let (stdout, _stderr, code) = run_f_full(&["/tmp"]);
+    assert_eq!(code, 0, "/tmp should not error, got: {}", _stderr);
+    assert!(
+        stdout.is_empty(),
+        "/tmp should produce no output, got: {}",
+        stdout
+    );
 }
 
 #[test]
-fn explicit_path_with_tilde_works() {
+fn explicit_path_with_tilde_does_nothing() {
     // Tilde expansion is a shell feature, so we use the expanded
-    // path here. The shell would expand `~/` to `/home/dracon`
-    // before passing to `f`.
+    // path here. Even when expanded, paths are still dropped.
     let home = std::env::var("HOME").unwrap_or("/tmp".to_string());
-    let (_stdout, _stderr, code) = run_f_full(&[home.as_str()]);
-    assert_eq!(code, 0, "HOME path should work");
+    let (stdout, _stderr, code) = run_f_full(&[home.as_str()]);
+    assert_eq!(code, 0, "HOME path should not error, got: {}", _stderr);
+    assert!(
+        stdout.is_empty(),
+        "HOME path should produce no output, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn f_subcommand_path_still_works() {
+    // The user can still get a banner for a specific path by using
+    // the banner subcommand explicitly. Aliases do not apply to
+    // subcommand invocations.
+    let (_stdout, _stderr, code) = run_f_full(&["banner", "./src"]);
+    assert_eq!(
+        code, 0,
+        "f banner ./src should still work, got: {}",
+        _stderr
+    );
 }
 
 #[test]
@@ -401,11 +425,12 @@ fn alias_plus_explicit_flag() {
 }
 
 #[test]
-fn alias_plus_path() {
-    // Use a path that has subdirectories so the output is non-empty.
+fn alias_plus_path_drops_path() {
+    // `f tree ./src` — the alias expands to `-R -D`, the path is
+    // dropped. The result is equivalent to `f tree`.
     let with_path = run_f(&["tree", "./src"]);
-    let explicit = run_f(&["-R", "-D", "./src"]);
-    assert_eq!(first_line_header(&with_path), first_line_header(&explicit));
+    let just_tree = run_f(&["tree"]);
+    assert_eq!(first_line_header(&with_path), first_line_header(&just_tree));
 }
 
 #[test]
