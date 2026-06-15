@@ -199,24 +199,54 @@ fn alias_composition_top_with_hidden() {
 // ===== Routing tests =====
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAycTk2WFQ2c1dsRXBOWmltSmlnbWNGTVMxYktDM0htM28vdENYRHRtNml3CjkxUkNrMXAxM254bVVtWFdwajF2RjIwQlgzWnlrOFVKS2QxenNVNjQ3aTAKLT4gWDI1NTE5IGUwRnNtdzM1YUUybEh5dDYxQkJUVGM5UWxiSDVSS2E0NnVzczhtZXFYRDgKQ3VBcVNRdE5EdE56Z2RXQUNNdVA5eFBqU2Z4VXprWFNLcU1OWkFSd1JuawotPiBYMjU1MTkgTnFqbjZQSStkQ3JvdmhWMVREVE9BVVNtbnlxL0JQVHlaN0JEaTAvVmFETQpOQklyL2tEbWtRTHFlWnhRRnNDeEJRT29zOHE4NTNTRGFlczlpeUNWZTA4Ci0+IFgyNTUxOSA1M0xOMnlUYmMwU1gvOFpFUzhxbEhKR0JUNDFyWWVuZ2s1d0VWWEV1dUZRCm5acXdpZ0w2MXBEaGpRbGkwRlhuSFFvdkY5SGRZTEh2UHZ0aUpkNms1cVkKLT4gWDI1NTE5IGxJTEdNUUJwOEgvQlhUQkVXUCtWM2FibDAxcEY4bURucG1pUFU5TlBCaVUKWGxHdEVpemdFeXlzMlY3MUt2RnhhTlM2V3A0R0N2SnF2QkdGSGdqMnBwSQotPiBiLWdyZWFzZSAmJiogPXQ9PiBfPkdgSwpWZ0p3WjlVUncxZGhtckE2bllFbXQ2R2VtMWw5bmFiblZ4WmJtVUhRdVNRMWlJZFJXRGVvMGhWNWVmSElORVRZClZwR1ZKOHQyU1BjU0lwU3Eva2ZrQ0RqZwotLS0gMVNPSU5nNFB3bUp5dHU1K2l6TXM3enVLU3NEUVhvZmEvbHpQU1RIZ1VaMAoNjlJlhvespuakg5TVL+7jc6ZNxwJuoJS+EihuZNMISZ4d21OlOsRhS1QNLPiDQ5cQtrUUTo2BIxEcZvU=]() {
+fn unknown_bare_word_does_nothing() {
     // User's requirement: "if no such alias found then nothing happens"
-    // i.e., default banner for cwd, not an error.
-    let (_stdout, _stderr, code) = run_f_full(&["nonexistentword"]);
+    // i.e., exit 0 with no output, not the default banner.
+    let (stdout, _stderr, code) = run_f_full(&["nonexistentword"]);
     assert_eq!(code, 0, "unknown word should not error, got: {}", _stderr);
-    // Should produce some banner output (default for cwd)
-    let default_out = run_f(&[]);
-    assert_eq!(first_line_header(&_stdout), first_line_header(&default_out));
+    assert!(
+        stdout.is_empty(),
+        "unknown word should produce no output, got: {}",
+        stdout
+    );
 }
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5TUpxYzBRWjZ4VjJCMlRHclIyNXNpWkZ4OU10WmFZeTl3NG1jZVo2bDBvCkxZcHRTLzFuZlo0NzAzOEU5dXZHTkRFZEZmVVRVTVVyYm95V213cE51ZVEKLT4gWDI1NTE5IHBZc3Iydm5Ma1NqS0VYTXlFUWxxdjhEVHhUY01QUGd3QVkxVkdCeWlaR2cKRnZuSWdvWjYvMmg4djQ1OHJwcWdPOUUrajFFZnU3eW1jdHhEK29LSUFycwotPiBYMjU1MTkgMG1wY0dXa0JuaE9DNGc2Nkc1bXZkeHhYaEN6QUxhVW5rbWI2NnhRZmJpcwppRytNRE9kcjVCZXFjUjBxT0RiR0dLMXFXQ1ZCeTNVUHJIYkxoMW1teFBrCi0+IFgyNTUxOSArc3UxWHlCTlBQUlJERStWY1VMNWdSQ1FxaVR2TXA5L2g0MkNrRHhzUERnCmNVTXdDaEM5akVCTUtZUXMvOFdXeVIzOTFxMTJLWlgzSXd5OGk4K0VVT2MKLT4gWDI1NTE5IC95bDN6Mk1WMTVGMjVST2RDY2JNdHRTa0RiblZoNG1CV2JiVjJNaEVpbFUKSFNLZGNrWDE3UWlZd2FzWm5ZVzR6U2wzQWVrQmMwMXQvYmpUOXZINGpONAotPiA+KDInakstZ3JlYXNlIEYKOVdWVXNIdFRPUnAxenlBRWVhSDZUbzhocG1leDhObW1wR0ZYVndWWgotLS0gd2V6S3g4ZUxtM3RHdU9Sa2JSZzI2ZzJpMkFtUHZ0T3VQV1M5OWxTMEFoTQq2wM7iuBTUxR7kf/yuZjAkiKeYcsiwYtYqB+yC00qpm+v8AMSpqkxXKYRIGdGiBw7qOMmlw8lQAk8Vng==]() {
-    // `f Downloads` (no ./ prefix) should NOT be treated as a path
-    // to a folder called Downloads. It should show the default banner.
-    let (_stdout, _stderr, code) = run_f_full(&["Downloads"]);
-    assert_eq!(code, 0);
-    let default_out = run_f(&[]);
-    assert_eq!(first_line_header(&_stdout), first_line_header(&default_out));
+fn f_t_does_nothing() {
+    // `f t` used to mean `-t` (timesort) in 0.6.x lazy flags.
+    // In 0.7.1, `t` is not a known alias — it produces no output.
+    let (stdout, _stderr, code) = run_f_full(&["t"]);
+    assert_eq!(code, 0, "f t should not error, got: {}", _stderr);
+    assert!(
+        stdout.is_empty(),
+        "f t should produce no output, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn f_no_args_still_shows_banner() {
+    // `f` (no args) is different from `f <unknown-word>`.
+    // `f` shows the default banner for cwd.
+    let (stdout, _stderr, code) = run_f_full(&[]);
+    assert_eq!(code, 0, "f (no args) should not error");
+    assert!(
+        !stdout.is_empty(),
+        "f (no args) should show the default banner"
+    );
+}
+
+#[test]
+fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPaHllczdEd3pTY1FvanVwOHdBdWhvbFFjMW1ndlBwd2N1NFliWXQyZkVjCnlRSWdSaDRtQ3IwYi9adEhMTDZYTkhvSWRWTU42ZzdtSVpQT0VBZFdiVFEKLT4gWDI1NTE5IHNhalZ4eGc1YlN4M2luaVhZamNjQUVFb05EZTJXdnVHaFhCQkd1SDNqVDgKZnNzaEhvc1BabUJwUmJWL05XbWZYeG9mMzZUSkNVbHBnM1dld2VYejFUVQotPiBYMjU1MTkgTFZreTFJSkR1eFh4VFJucTBxeUFvVmczOFNuV2d2UU85MlI1UzFLaHVuYwpJK3dycjRBUCtqdU15OG01YjF0RE1qak9URWMvanMrdWFCSkxBRHZLc0RjCi0+IFgyNTUxOSA1M3JwUXJPME1qNVp4bGtXVVBxdmZueXB2amhiRVVGNG0zeUs1VzdaZTBnCjRCTGEzQVlPbEdDL2VhQS9VQjg3WU0yRngzdnRxT1JySi9meUNab3ROODQKLT4gWDI1NTE5IDAzNFp0dHJIL0JVVHd3VHhSU1BoRVhYb2JkUnZ2RjFaeTgyelpPSkJwQXMKZHIyS2xscXNaQ3BSOW10UGxOSHBtbzZsVGcrbjBpdVQ4ZTQ1SXZTZnhFOAotPiBtUzBvcWJlLWdyZWFzZSA2I2hNcyAubmw/bFkKZTgxR3hNZmYKLS0tIFpma0Z6b1V0VTluZVUzRUlmQnluUllXUU96OEpkblNJMWg4K0I5T3J5SkkKL9oIazTXfGXGSOiX+J7f5yCiMhNH9AjUomiS/PfdejNaj/AJV+yy1zEQUHzfih2nC4jbDDyQRYTjOFs=]() {
+    // `f Downloads` (no ./ prefix) is NOT treated as a path. It is an
+    // unknown bare word and produces no output (the "nothing happens" rule).
+    let (stdout, _stderr, code) = run_f_full(&["Downloads"]);
+    assert_eq!(code, 0, "f Downloads should not error, got: {}", _stderr);
+    assert!(
+        stdout.is_empty(),
+        "f Downloads should produce no output, got: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -306,28 +336,41 @@ fn subcommand_env_passthrough() {
 
 #[test]
 fn f_t_no_longer_means_dash_t() {
-    // In 0.6.x, `f t` meant `-t`. In 0.7.0, `t` is not an alias,
-    // so it should show the default banner (not sort by time).
-    let default = run_f(&[]);
-    let single_t = run_f(&["t"]);
-    assert_eq!(first_line_header(&single_t), first_line_header(&default));
+    // In 0.6.x, `f t` meant `-t`. In 0.7.1, `t` is not an alias,
+    // so it produces no output (the "nothing happens" rule).
+    let (stdout, _stderr, code) = run_f_full(&["t"]);
+    assert_eq!(code, 0, "f t should not error, got: {}", _stderr);
+    assert!(
+        stdout.is_empty(),
+        "f t should produce no output, got: {}",
+        stdout
+    );
 }
 
 #[test]
 fn f_trc_no_longer_means_dash_t_dash_r_dash_c() {
-    // In 0.6.x, `f trc` meant `-t -r -c`. In 0.7.0, it doesn't.
-    let default = run_f(&[]);
-    let chain = run_f(&["trc"]);
-    assert_eq!(first_line_header(&chain), first_line_header(&default));
+    // In 0.6.x, `f trc` meant `-t -r -c`. In 0.7.1, it produces
+    // no output.
+    let (stdout, _stderr, code) = run_f_full(&["trc"]);
+    assert_eq!(code, 0, "f trc should not error, got: {}", _stderr);
+    assert!(
+        stdout.is_empty(),
+        "f trc should produce no output, got: {}",
+        stdout
+    );
 }
 
 #[test]
 fn f_s_no_longer_means_dash_upper_s() {
     // In 0.6.x, `f s` meant `-S` (case-insensitive alias).
-    // In 0.7.0, `s` is not an alias.
-    let default = run_f(&[]);
-    let single_s = run_f(&["s"]);
-    assert_eq!(first_line_header(&single_s), first_line_header(&default));
+    // In 0.7.1, `s` is not an alias, so it produces no output.
+    let (stdout, _stderr, code) = run_f_full(&["s"]);
+    assert_eq!(code, 0, "f s should not error, got: {}", _stderr);
+    assert!(
+        stdout.is_empty(),
+        "f s should produce no output, got: {}",
+        stdout
+    );
 }
 
 #[test]

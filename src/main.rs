@@ -83,6 +83,27 @@ fn expand_aliases_in_args(args: &[String]) -> Vec<String> {
 /// the invocation directly.
 const KNOWN_SUBCOMMANDS: &[&str] = &["banner", "env", "install", "config", "daemon", "help"];
 
+/// Returns true if the user-provided args contain a path, alias,
+/// number, or flag (i.e., anything the banner subcommand should act on).
+fn args_contain_something_useful(args: &[String]) -> bool {
+    args.iter().any(|a| {
+        a.starts_with('-')
+            || is_explicit_path(a)
+            || lookup_alias(a).is_some()
+            || a.parse::<usize>().is_ok()
+    })
+}
+
+/// Returns true if the invocation should exit 0 with no output —
+/// the "nothing happens" rule. This is when the user typed at least
+/// one bare word but none of them are paths, aliases, numbers, or flags.
+/// E.g. `f t`, `f foo`, `f Downloads` (no ./ prefix) all match.
+/// `f` (no args) returns false (default banner is shown).
+/// `f tree`, `f 4`, `f ./src`, `f -t` all return false.
+fn should_exit_silently(args: &[String]) -> bool {
+    !args.is_empty() && !args_contain_something_useful(args)
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
 
@@ -95,22 +116,32 @@ fn main() -> Result<()> {
         }
     }
 
+    // "Nothing happens" rule: if the user typed only bare words that
+    // match no alias, path, or number (e.g. `f t`, `f foo`), the command
+    // exits 0 with no output. The user said: "If the user types `f
+    // <not-a-number>`, they are using an alias. If no such alias found
+    // then nothing happens." `f` (no args) still shows the default
+    // banner for cwd.
+    if should_exit_silently(&args) {
+        return Ok(());
+    }
+
     // If the args contain only flags (no paths, no aliases, no numbers),
     // let clap handle directly. This covers `f -V`, `f --help`, `f -e`,
     // `f -f txt`, etc. — invocations where the top-level Cli flags are
     // sufficient and no path/alias expansion is needed.
-    let has_explicit_flag = args.iter().any(|a| a.starts_with('-'));
     let has_path_or_alias_or_number = args
         .iter()
         .any(|a| is_explicit_path(a) || lookup_alias(a).is_some() || a.parse::<usize>().is_ok());
-    if has_explicit_flag && !has_path_or_alias_or_number {
+    if !has_path_or_alias_or_number && args.iter().any(|a| a.starts_with('-')) {
         let cli = cli::Cli::parse();
         return cli.run();
     }
 
-    // Expand any built-in aliases in the args. Unknown bare words are
-    // dropped (the "nothing happens" rule). Explicit flags, paths, and
-    // numbers pass through. The result is routed to the banner subcommand.
+    // Expand any built-in aliases in the args. Explicit flags, paths,
+    // and numbers pass through. Unknown bare words are dropped (the
+    // "nothing happens" rule). The result is routed to the banner
+    // subcommand.
     let expanded = expand_aliases_in_args(&args);
     let cli = cli::Cli::parse_from(expanded);
     cli.run()
@@ -332,6 +363,65 @@ mod tests {
     fn test_expand_aliases_empty_args() {
         let result = expand_aliases_in_args(&[]);
         assert_eq!(result, vec!["f", "banner"]);
+    }
+
+    // ===== should_exit_silently tests =====
+
+    #[test]
+    fn test_should_exit_silently_no_args() {
+        // `f` (no args) shows the default banner — not silent.
+        assert!(!should_exit_silently(&[]));
+    }
+
+    #[test]
+    fn test_should_exit_silently_unknown_word() {
+        // `f t`, `f foo` — no flag/path/alias/number, exit silently.
+        assert!(should_exit_silently(&["t".to_string()]));
+        assert!(should_exit_silently(&["foo".to_string()]));
+        assert!(should_exit_silently(&["Downloads".to_string()]));
+    }
+
+    #[test]
+    fn test_should_exit_silently_with_flag() {
+        // `f -e` — has flag, not silent.
+        assert!(!should_exit_silently(&["-e".to_string()]));
+        assert!(!should_exit_silently(&["-t".to_string()]));
+        assert!(!should_exit_silently(&["--version".to_string()]));
+    }
+
+    #[test]
+    fn test_should_exit_silently_with_path() {
+        // `f ./src`, `f /tmp` — has path, not silent.
+        assert!(!should_exit_silently(&["./src".to_string()]));
+        assert!(!should_exit_silently(&["/tmp".to_string()]));
+    }
+
+    #[test]
+    fn test_should_exit_silently_with_alias() {
+        // `f tree`, `f hidden verbose` — has alias, not silent.
+        assert!(!should_exit_silently(&["tree".to_string()]));
+        assert!(!should_exit_silently(&[
+            "hidden".to_string(),
+            "verbose".to_string()
+        ]));
+    }
+
+    #[test]
+    fn test_should_exit_silently_with_number() {
+        // `f 4` — has number, not silent.
+        assert!(!should_exit_silently(&["4".to_string()]));
+        assert!(!should_exit_silently(&["42".to_string()]));
+    }
+
+    #[test]
+    fn test_should_exit_silently_mixed() {
+        // `f t 4` — has number 4, not silent.
+        assert!(!should_exit_silently(&["t".to_string(), "4".to_string()]));
+        // `f t ./src` — has path, not silent.
+        assert!(!should_exit_silently(&[
+            "t".to_string(),
+            "./src".to_string()
+        ]));
     }
 
     #[test]
