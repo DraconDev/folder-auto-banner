@@ -1,3 +1,96 @@
+## [0.6.37] - 2026-06-15
+
+### Lazy flag value-binding with `:` separator
+
+Added a new explicit syntax for binding values to specific flags in
+a lazy flag chain. Solves the ambiguity when a chain has multiple
+value-taking flags and the user wants to control which flag gets
+the value.
+
+**Problem**: `f mLf 10` was ambiguous — does `10` bind to `-m` (the
+first value-taking flag, chain order) or `-f` (the last one, what
+the user might intend)?
+
+**Solution**: a `:` immediately after a value-taking flag marks it
+as an **explicit value-binding target**. The next arg binds to that
+flag. Non-target value-taking flags that come before the last target
+are omitted from the output (clap requires a value for value-taking
+flags).
+
+### Examples
+
+```text
+f mLf: 10         →  -f 10                  (10 → f, m and L use defaults)
+f m:L:f: 10 2 txt →  -m 10 -L 2 -f txt      (all marked, chain order)
+f m:L: 10 2       →  -m 10 -L 2 -f          (m and L marked, f is not)
+f trcL: 5         →  -t -r -c -L 5          (L is the only target)
+f ml: 10          →  -m -L 10               (l is alias for L, : marks L)
+```
+
+### Backward compatibility
+
+- `f m 10`, `f t`, `f trc`, `f mL 10 2`, `f mLf 10 2 txt` — all unchanged.
+- The 0.6.36 test suite passes unchanged.
+- The new `:` syntax is purely additive.
+
+### Improved error messages
+
+`f m` (no value for a value-taking flag, no `:` marker) now produces:
+
+```text
+error: flag '-m' in chain 'm' requires a value, but no more arguments
+were provided. Use 'm:' to mark which flag should receive the value,
+or supply a value after the chain.
+```
+
+Previously, clap produced a less helpful "a value is required for
+'--max <MAX>' but none was supplied" message.
+
+### Test coverage
+
+Added 12 new integration tests in `tests/lazy_flags_test.rs`:
+- `value_binding_colon_after_last_value_taking` — the user's exact question
+- `value_binding_colon_partial_marks`
+- `value_binding_colon_with_boolean_flags`
+- `value_binding_colon_with_aliases`
+- `value_binding_colon_after_non_value_taking_rejected`
+- `value_binding_colon_with_extra_args_become_paths`
+- `value_binding_no_colon_unchanged`
+- `value_binding_no_colon_full_chain_unchanged`
+- `value_binding_byte_identical_lazy_colon_vs_explicit`
+- `value_binding_byte_identical_m_l_colon_vs_explicit`
+- Plus 2 updated error-message tests
+
+Added 9 new unit tests in `src/main.rs`:
+- `test_with_binding_no_colon_matches_expand`
+- `test_with_binding_colon_after_value_taking`
+- `test_with_binding_colon_after_non_value_taking_rejected`
+- `test_with_binding_colon_with_aliases`
+- `test_with_binding_colon_with_boolean_flags_in_chain`
+- `test_with_binding_empty_string`
+- `test_with_binding_invalid_flag_still_rejected`
+- `test_with_binding_only_value_taking_with_colon`
+- `test_with_binding_single_value_taking_with_colon`
+
+Added 2 new property-based tests:
+- `prop_with_binding_invariants` — 1000 random `:zA-Z` strings
+- `prop_with_binding_count_targets` — colon count invariant
+
+### Test metrics
+
+| Metric | 0.6.36 | 0.6.37 | Change |
+|--------|--------|--------|--------|
+| Unit tests | 53 | 64 | +11 |
+| Integration tests (active) | 29 | 41 | +12 |
+| Lazy flags tests | 94 | 106 | +12 |
+| **Total** | **280** | **303** | **+23** |
+| Pass rate | 100% | 100% | — |
+
+### New documentation
+
+- `LAZY_FLAGS_VALUE_BINDING.md` — design doc with 5 alternatives,
+  chosen design, parsing rules, examples, and trade-offs.
+
 ## [0.6.36] - 2026-06-15
 
 ### Extended test coverage for lazy flags
