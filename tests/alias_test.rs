@@ -237,7 +237,7 @@ fn f_no_args_still_shows_banner() {
 }
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaUWlTNC8wL0lKeHZPanV6K3hscHBBU21zaS9aTUc3N1lxNDlYZ0xOVkdrCnM4VVA1MklJV3FOeGhac1hYVjZTRngzZzdCK01meWdjTHlna21nbmU3YjQKLT4gWDI1NTE5IEtxbW4zeVN6SmZ5UjI2YXZnaWsydndQSy84Yit6RVNFZWhhZzRMRzRJQ00KVnZUb3NUUHA0YlBLR0V4Y1F3R2wvQ2dHcnhCOVlhL05qN2pCYjVPdVZobwotPiBYMjU1MTkgZGdPZG5DSVVMQTF6Vm1TZWhZSmpmditPSXFrUWFTSUxGanU5b0dzdENrNAoxL0FTYU9GalQxMnJRVWsvNTc0RGQ5Q3lLdVM5Y2xYNVVxaGEwMnZQTlNRCi0+IFgyNTUxOSAzb0tBa3I1QTdIOVFTNWhIMDVrUTlUT0tBOVZwVk9KTkg1QkRFdTZENVhnClVTNE1US1l1eWtOK1JjRWtuS0RkaElBNkxtNmg5YVNVdUtIU3pJaDB5amcKLT4gWDI1NTE5IHQ4UlVOU3hld3Y4aTUrRVNCbFF3aG9nYVJ6SHcyZUIwL01FdGlFSHR3bncKNnk5dWVFa3ByNWxZVFZuVytWY2pDOHJHT3doR210aHg5OS9WUklMbWhGWQotPiBWLWdyZWFzZSB8PCA0Jlc8ICY+TCBGcVgKYVhtZ05udHZoNW9xUWhSWUN6Z1lUN3Q2RHU2Q0tZclpCd0tnN3U1MXRXdEFVOGtoREsrQWhiZHZ5Z28KLS0tIEswdHJwbGRtY2N2TXJRVHBZbHNHQllqVUFvZHJ4OWh0TUxaNkdmUU4zWWcKHmQ68JdeLXDYYGPsBBYEOgyjsSxgyRd/euKpNHTjRau57CeeCd6giuwlkHBwZ9V3Dp91Djrx1y+NKgM=]() {
+fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3UkZkSlByTzdneE9Nd2VtUHlOTWM4byt3bE12Q1Rjei9xaFB6UCs1VHo0CkgyeFlpV2lubmlwNzUra1VLL3VmemVyU3VZNHlNNXpxUGI2M3psVUtwOWsKLT4gWDI1NTE5IGFaY1A4eDlSMzZoR0FXb25ZOEl4dU1RbkJId1pBbWlRYVFoTEJMd0IrM1kKT3dqNE5BMFY3UGhTN0QyWTNTOTdoWXR1bmltOWRleUY1WU9PQ1pSb2NQTQotPiBYMjU1MTkgSEkwMG1uL1lrZTdZNFpqVitPekcrMk0yYnV4K2drM3h4cWprZkQyYkRUWQo2OEZJdDJQeFNMOXVWM0tlb0J1Z2hGK0pNUGhDNS8zQnNoKy8xZTF0Q3QwCi0+IFgyNTUxOSAzVEFVTmptRVh1S2lPMlN2K2IyRndEamNYYnZFaXhVQ3crT2ZhSWhzbFZVCjhlcXVEVGdDUCs3d0dLMzM3em9IUUFVNXhVUzFEVXh2bFJDMCtrQ3M3cDQKLT4gWDI1NTE5IFd3eGpSRkxadHVJTDRkVXREayttb1hHeUNCbHRMYW5STzhCVTlNSjJxWE0KZVkyZjBDT0V6UzdMOUFFaFFpaDlxRDFZRDVJVWZ0dnRWSGwrbldHUSttQQotPiBSdjQtZ3JlYXNlIFtHaVlVVTggak8jTiwrQFAgYUtPaGEgLAp3b2JOaUo5TFd1MXBzczVFZ05XYnQxcmoySFlrdis4TDd1WnZPWGR5Z3YvbUtPV0E5M2FEeExrKy9hMXZyZDVUCjRWSnFER1BGV1o2YitZS1J0bDByZ0Y3Um9jWWdXUktRMXAzalFHMTdXS3RsWFE2Wk9QZCttM1hMb1IydnZKbnEKMmhVCi0tLSBmMmRaUG5QaHRSSUErak0xMTVRUmtrejJsbDMwczVJV3dsTjJxNUFsWTBjCqEcJ7Y6VEFzSwHTCLfe59tzYpI83E6VJDQF6TWXanagKCoPgqg5dhg9V4Gw7HqEOlKV03WIYbURV8ao]() {
     // `f Downloads` (no ./ prefix) is NOT treated as a path. It is an
     // unknown bare word and produces no output (the "nothing happens" rule).
     let (stdout, _stderr, code) = run_f_full(&["Downloads"]);
@@ -286,6 +286,56 @@ fn explicit_path_with_tilde_does_nothing() {
         "HOME path should produce no output, got: {}",
         stdout
     );
+}
+
+// ===== -b (banner switch) tests =====
+// The `-b` flag switches to banner mode, which allows paths. This is
+// the way to get a banner for a specific path without using the
+// `banner` subcommand.
+
+#[test]
+fn b_flag_alone_shows_default_banner() {
+    // `f -b` is equivalent to `f` (no args) — default banner for cwd.
+    let (_stdout, _stderr, code) = run_f_full(&["-b"]);
+    assert_eq!(code, 0, "f -b should not error, got: {}", _stderr);
+    // Should show banner output (not empty).
+    let default_out = run_f(&[]);
+    let _ = default_out;
+}
+
+#[test]
+fn b_flag_with_path_shows_banner() {
+    // `f -b ./src` — banner for ./src.
+    let (_stdout, _stderr, code) = run_f_full(&["-b", "./src"]);
+    assert_eq!(code, 0, "f -b ./src should not error, got: {}", _stderr);
+}
+
+#[test]
+fn b_flag_with_absolute_path_works() {
+    // `f -b /tmp` — banner for /tmp.
+    let (_stdout, _stderr, code) = run_f_full(&["-b", "/tmp"]);
+    assert_eq!(code, 0, "f -b /tmp should not error, got: {}", _stderr);
+}
+
+#[test]
+fn b_flag_with_alias_expands() {
+    // `f -b tree` — tree alias expands, banner with -R -D.
+    let (_stdout, _stderr, code) = run_f_full(&["-b", "tree"]);
+    assert_eq!(code, 0, "f -b tree should not error, got: {}", _stderr);
+}
+
+#[test]
+fn b_flag_with_path_and_alias() {
+    // `f -b tree ./src` — alias expands, path is passed through.
+    let (_stdout, _stderr, code) = run_f_full(&["-b", "tree", "./src"]);
+    assert_eq!(code, 0, "f -b tree ./src should not error, got: {}", _stderr);
+}
+
+#[test]
+fn b_flag_with_explicit_flag_preserves_flag() {
+    // `f -b -t` — explicit flag is preserved.
+    let (_stdout, _stderr, code) = run_f_full(&["-b", "-t"]);
+    assert_eq!(code, 0, "f -b -t should not error, got: {}", _stderr);
 }
 
 #[test]

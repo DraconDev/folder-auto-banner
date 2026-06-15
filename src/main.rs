@@ -477,4 +477,89 @@ mod tests {
         ]);
         assert_eq!(result, vec!["f", "banner", "-a", "-v"]);
     }
+
+    // ===== -b (banner switch) tests =====
+
+    #[test]
+    fn test_b_flag_alone() {
+        // `f -b` — just the switch, no path, default banner for cwd.
+        let result = expand_args_for_banner(&["-b".to_string()]);
+        assert_eq!(result, vec!["f", "banner"]);
+    }
+
+    #[test]
+    fn test_b_flag_with_path() {
+        // `f -b ./src` — banner for ./src.
+        let result = expand_args_for_banner(&["-b".to_string(), "./src".to_string()]);
+        assert_eq!(result, vec!["f", "banner", "./src"]);
+    }
+
+    #[test]
+    fn test_b_flag_with_absolute_path() {
+        // `f -b /tmp` — banner for /tmp.
+        let result = expand_args_for_banner(&["-b".to_string(), "/tmp".to_string()]);
+        assert_eq!(result, vec!["f", "banner", "/tmp"]);
+    }
+
+    #[test]
+    fn test_b_flag_with_tilde_path() {
+        // `f -b ~/Downloads` — banner for ~/Downloads.
+        let result = expand_args_for_banner(&["-b".to_string(), "~/Downloads".to_string()]);
+        assert_eq!(result, vec!["f", "banner", "~/Downloads"]);
+    }
+
+    #[test]
+    fn test_b_flag_with_alias() {
+        // `f -b tree` — tree alias expands, path is implicit (cwd).
+        let result = expand_args_for_banner(&["-b".to_string(), "tree".to_string()]);
+        assert_eq!(result, vec!["f", "banner", "-R", "-D"]);
+    }
+
+    #[test]
+    fn test_b_flag_with_path_and_alias() {
+        // `f -b tree ./src` — alias expands, path is passed through.
+        let result = expand_args_for_banner(&[
+            "-b".to_string(),
+            "tree".to_string(),
+            "./src".to_string(),
+        ]);
+        assert_eq!(result, vec!["f", "banner", "-R", "-D", "./src"]);
+    }
+
+    #[test]
+    fn test_b_flag_drops_unknown_words() {
+        // `f -b foo` — unknown word dropped, only the switch remains.
+        let result = expand_args_for_banner(&["-b".to_string(), "foo".to_string()]);
+        assert_eq!(result, vec!["f", "banner"]);
+    }
+
+    #[test]
+    fn test_b_flag_with_explicit_flag() {
+        // `f -b -t` — explicit flag is preserved.
+        let result = expand_args_for_banner(&["-b".to_string(), "-t".to_string()]);
+        assert_eq!(result, vec!["f", "banner", "-t"]);
+    }
+
+    #[test]
+    fn test_b_flag_with_number() {
+        // `f -b 5` — navigate to item 5.
+        let result = expand_args_for_banner(&["-b".to_string(), "5".to_string()]);
+        assert_eq!(result, vec!["f", "banner", "5"]);
+    }
+
+    // ===== is_path_like tests =====
+
+    #[test]
+    fn test_is_path_like() {
+        assert!(is_path_like("."));
+        assert!(is_path_like(".."));
+        assert!(is_path_like("./src"));
+        assert!(is_path_like("/"));
+        assert!(is_path_like("/tmp"));
+        assert!(is_path_like("~"));
+        assert!(is_path_like("~/Downloads"));
+        assert!(!is_path_like("tree"));
+        assert!(!is_path_like("foo"));
+        assert!(!is_path_like(""));
+    }
 }
