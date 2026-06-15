@@ -61,9 +61,9 @@ If the banner ever looks stale, restart the daemon and give the background size 
 
 ```bash
 f daemon restart
-f ~/Downloads
+f -b ~/Downloads
 sleep 35
-f ~/Downloads
+f -b ~/Downloads
 ```
 
 The first fast view of a large directory may show temporary `4.0k` placeholders while the daemon refreshes directory sizes in the background. After the refresh completes, subsequent views should use populated sizes from cache.
