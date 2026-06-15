@@ -189,10 +189,78 @@ f -f txt
 
 **Option E** is the safest fallback if the user wants to avoid code changes.
 
+## Chosen design: Option C (colon separator)
+
+The user approved implementation. The chosen design is **Option C with a
+refined syntax**: a `:` immediately after a value-taking flag in the chain
+marks that flag as an **explicit value-binding target**. The next argument
+in the command line binds to that flag.
+
+### Rule
+
+- `f mL` (no `:`) → chain order (current behavior, unchanged). If a value
+  is available, it binds to `m`. Otherwise `m` uses its default.
+- `f mL: 10` → the `:` after `L` marks `L` as the binding target. The next
+  arg (`10`) binds to `L`. `m` uses its default.
+- `f m:L: 10 2` → both `m` and `L` are binding targets. `10` → `m`, `2` → `L`.
+  If a value-taking flag has no `:` and no available value, it uses default.
+- `f m:L:f: 10 2 txt` → all three bind in chain order: `10`→`m`, `2`→`L`, `txt`→`f`.
+- Mixing `:`, no `:`, and multiple values: values are consumed in chain
+  order, but only flags marked with `:` are required to consume a value.
+
+### Why this design
+
+- ✅ **Solves the user's question**: `f mLf: 10` binds `10` to `f` (the last
+  value-taking flag), so the user can choose which flag gets the value.
+- ✅ **Backward compatible**: existing chains without `:` work exactly as
+  before. The 0.6.34–0.6.36 test suite must still pass unchanged.
+- ✅ **Explicit binding**: the `:` is a clear visual marker — no ambiguity.
+- ✅ **Composable**: any subset of flags can be marked, the rest use defaults.
+- ✅ **No new chars added to LAZY_FLAGS**: `:` is parsed in `expand_lazy_flags`
+  as a separator, not a flag.
+- ✅ **Preserves the no-fallback rule**: bare words are still lazy-flag
+  chains, never paths.
+- ✅ **Preserves case-insensitive aliases**: `l`→`L`, etc.
+- ❌ Slightly more characters: `mLf:` vs `mLf`. Acceptable.
+
+### Examples
+
+| Form               | Expansion                  | Notes                              |
+|--------------------|----------------------------|------------------------------------|
+| `f m 10`           | `-m 10`                    | Unchanged (backward compat)        |
+| `f mL 10`          | `-m 10 -L`                 | Unchanged (chain order)            |
+| `f mL 10 2`        | `-m 10 -L 2`               | Unchanged (chain order)            |
+| `f mL: 10`         | `-m -L 10`                 | `L` is the binding target          |
+| `f :mL 10`         | `-m 10 -L`                 | `m` is the binding target (same as chain order) |
+| `f m:L: 10 2`      | `-m 10 -L 2`               | Both marked, values bind in order  |
+| `f mLf 10`         | `-m 10 -L -f`              | Unchanged (chain order)            |
+| `f mLf: 10`        | `-m -L -f 10`              | `f` is the binding target — **answers the user's question** |
+| `f m:L:f 10 2`     | `-m 10 -L 2 -f`            | `m` and `L` are targets; `f` uses chain order for the leftover value |
+| `f mLf: 10 2 txt`  | `-m -L -f 10 2 txt`        | `f` is the target; `2` and `txt` are paths |
+
+### Parsing rules
+
+1. Iterate over the chars in the chain argument.
+2. For each char that is a value-taking flag, check if the **next char** is `:`.
+3. If yes, mark the flag as a binding target and skip the `:`.
+4. If no, the flag follows chain-order behavior.
+5. After parsing all flags, iterate through the chain flags in order.
+   For each value-taking flag that is a binding target, consume the next
+   arg as its value.
+6. For value-taking flags that are NOT binding targets, follow chain-order:
+   consume the next available arg if any, else use the default.
+
+### What does NOT change
+
+- `f t`, `f trc`, `f -t` — all unchanged.
+- `f m 10`, `f mL 10 2` — unchanged (no `:` in chain).
+- `expand_lazy_flags("trc")` — returns `Some(vec!['t', 'r', 'c'])` (unchanged).
+- The function signature stays the same.
+- The 0.6.34 routing bypass for explicit flags stays.
+- The no-fallback rule stays.
+- Case-insensitive aliases stay.
+
 ## Awaiting decision
 
-The user must choose:
-- **A, B, C, D** — implement the new design.
-- **E** — keep current behavior, just document the workaround.
-
-No code changes will be made until the user explicitly approves a design.
+The user approved going with **Option C (colon separator)**. Implementation
+is in progress. See commit history for the change.
