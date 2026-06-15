@@ -86,15 +86,6 @@ const KNOWN_SUBCOMMANDS: &[&str] = &["banner", "env", "install", "config", "daem
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
 
-    // If the user passed any explicit flags (starting with `-`), let clap
-    // handle the parsing directly. Aliases are for bare-word invocations
-    // like `f tree`, `f hidden verbose`, `f top`.
-    let has_explicit_flag = args.iter().any(|a| a.starts_with('-'));
-    if has_explicit_flag {
-        let cli = cli::Cli::parse();
-        return cli.run();
-    }
-
     // If the first arg is a known subcommand, let clap handle it
     // directly. Aliases do not apply to subcommand invocations.
     if let Some(first) = args.first() {
@@ -104,9 +95,22 @@ fn main() -> Result<()> {
         }
     }
 
+    // If the args contain only flags (no paths, no aliases, no numbers),
+    // let clap handle directly. This covers `f -V`, `f --help`, `f -e`,
+    // `f -f txt`, etc. — invocations where the top-level Cli flags are
+    // sufficient and no path/alias expansion is needed.
+    let has_explicit_flag = args.iter().any(|a| a.starts_with('-'));
+    let has_path_or_alias_or_number = args.iter().any(|a| {
+        is_explicit_path(a) || lookup_alias(a).is_some() || a.parse::<usize>().is_ok()
+    });
+    if has_explicit_flag && !has_path_or_alias_or_number {
+        let cli = cli::Cli::parse();
+        return cli.run();
+    }
+
     // Expand any built-in aliases in the args. Unknown bare words are
-    // passed through unchanged — the banner subcommand will treat them
-    // as "default banner for cwd" (no path, no flags).
+    // dropped (the "nothing happens" rule). Explicit flags, paths, and
+    // numbers pass through. The result is routed to the banner subcommand.
     let expanded = expand_aliases_in_args(&args);
     let cli = cli::Cli::parse_from(expanded);
     cli.run()
