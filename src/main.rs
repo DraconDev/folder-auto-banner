@@ -79,6 +79,11 @@ fn expand_aliases_in_args(args: &[String]) -> Vec<String> {
     new_args
 }
 
+/// Known subcommands that clap should parse. When the first non-flag
+/// arg is one of these, we skip alias expansion and let clap handle
+/// the invocation directly.
+const KNOWN_SUBCOMMANDS: &[&str] = &["banner", "env", "install", "config", "daemon", "help"];
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
 
@@ -89,6 +94,15 @@ fn main() -> Result<()> {
     if has_explicit_flag {
         let cli = cli::Cli::parse();
         return cli.run();
+    }
+
+    // If the first arg is a known subcommand, let clap handle it
+    // directly. Aliases do not apply to subcommand invocations.
+    if let Some(first) = args.first() {
+        if KNOWN_SUBCOMMANDS.contains(&first.as_str()) {
+            let cli = cli::Cli::parse();
+            return cli.run();
+        }
     }
 
     // Expand any built-in aliases in the args. Unknown bare words are
