@@ -1,5 +1,10 @@
 # Lazy Flags Messiness Audit — folder-auto-banner 0.6.33
 
+> **HISTORICAL**: This document describes the lazy flag system that was
+> **removed in 0.7.0** in favor of the built-in alias system. See
+> `LAZY_FLAGS_REMOVAL.md` for the current design.
+> Retained for reference and git history.
+
 **Date**: 2026-06-15
 **Binary tested**: `f 0.6.33` (release build)
 **Total examples**: 68

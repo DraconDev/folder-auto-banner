@@ -1,5 +1,10 @@
 # Lazy Flags Value Binding — folder-auto-banner
 
+> **HISTORICAL**: This document describes the `:` value-binding syntax
+> from 0.6.37. The entire lazy flag system was **removed in 0.7.0**
+> in favor of the built-in alias system. See `LAZY_FLAGS_REMOVAL.md`
+> for the current design. Retained for reference and git history.
+
 **Date**: 2026-06-15
 **Status**: Design phase — awaiting user decision.
 

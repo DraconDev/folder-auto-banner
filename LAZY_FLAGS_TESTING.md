@@ -1,5 +1,11 @@
 # Lazy Flags Testing — folder-auto-banner 0.6.36
 
+> **HISTORICAL**: This document describes the test suite for the lazy
+> flag system that was **removed in 0.7.0**. The replacement test
+> suite is `tests/alias_test.rs` (41 tests for the alias system).
+> See `LAZY_FLAGS_REMOVAL.md` for the current design.
+> Retained for reference and git history.
+
 **Date**: 2026-06-15
 **Total test count**: 280 (was 231 in 0.6.35, +49 new)
 **Pass rate**: 100% (280/280, 0 failures)
