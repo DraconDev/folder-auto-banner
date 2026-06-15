@@ -1,3 +1,62 @@
+## [0.7.2] - 2026-06-15
+
+### Paths are dropped too (only numbers, aliases, and flags are accepted)
+
+In 0.7.1, paths like `f ./src`, `f /tmp`, `f ~/Downloads` were
+treated as useful input and routed to the banner subcommand. The
+user clarified: **"we only take numbers, aliases, and flags, not
+folders and files by name."** Paths are now dropped, the same as
+unknown bare words.
+
+**New behavior:**
+
+- `f` (no args) → default banner for cwd
+- `f <number>` → navigate to item N
+- `f <alias>` → expand and run
+- `f <flag>` → clap direct
+- `f <path>` (`./src`, `/tmp`, `~/Downloads`) → exit 0, no output
+- `f <unknown-word>` → exit 0, no output
+- `f banner <path>` → still works (subcommand bypasses alias routing)
+
+#### Implementation
+
+- Removed `is_explicit_path` from `src/main.rs` (no longer needed).
+- `args_contain_something_useful` now checks only flags, aliases,
+  and numbers — paths no longer count as "useful".
+- `expand_aliases_in_args` no longer passes paths through; paths
+  are dropped alongside unknown bare words.
+- The `should_exit_silently` check now catches paths the same way
+  it catches unknown words.
+
+#### Tests
+
+- 4 is_explicit_path unit tests removed (function deleted).
+- 2 expand_aliases tests rewritten (`with_explicit_path` →
+  `drops_paths`, `mix_of_alias_and_path` → `mix_of_alias_and_path_drops_path`).
+- 1 new unit test: `test_expand_aliases_drops_unknown_words`.
+- `test_should_exit_silently_with_path` updated to expect paths
+  to be silent.
+- `test_should_exit_silently_mixed` updated: paths no longer make
+  a mixed invocation non-silent.
+- 3 integration tests renamed and updated:
+  - `explicit_path_with_dot_slash_works` → `explicit_path_with_dot_slash_does_nothing`
+  - `explicit_path_with_slash_works` → `explicit_path_with_slash_does_nothing`
+  - `explicit_path_with_tilde_works` → `explicit_path_with_tilde_does_nothing`
+- 1 new integration test: `f_subcommand_path_still_works` (verifies
+  `f banner ./src` still works).
+- `alias_plus_path` → `alias_plus_path_drops_path` (verifies the
+  path is dropped from the alias invocation).
+
+#### Files changed
+
+- `src/main.rs` — `is_explicit_path` deleted, `args_contain_something_useful`
+  updated, `expand_aliases_in_args` updated, `should_exit_silently` updated,
+  related tests updated.
+- `tests/alias_test.rs` — 3 tests renamed and updated, 2 new tests.
+- `LAZY_FLAGS_REMOVAL.md` — routing table updated.
+- `Cargo.toml` — version bump 0.7.1 → 0.7.2.
+- `f.1` — version bump 0.7.1 → 0.7.2.
+
 ## [0.7.1] - 2026-06-15
 
 ### "Nothing happens" rule, made literal
@@ -43,8 +102,8 @@ before the explicit-flag check, so `f t` exits 0 silently while
   - `f_t_no_longer_means_dash_t` (now expects nothing)
   - `f_trc_no_longer_means_dash_t_dash_r_dash_c` (now expects nothing)
   - `f_s_no_longer_means_dash_upper_s` (now expects nothing)
-  - `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArS0U2amhUVTllSTF5Z2doZTBEbHlIYVVGL0EyZnBlU2ZCRWh2VW8yU0NNCnhwV3BCNW55ZDgrT3pLamIrRDBQOWhBL2hCOEd2aUNGbVdHb0szaXhtSEEKLT4gWDI1NTE5IFd1NjlUMzh4dVdHVTQ5N3RnK01FSFI4a0k0NWdoMFVkV0NlYzR0dnJmQ1UKcGhuM1VFZ3FOM2p3dXFsVFpESm01ckVGWXZ1alovdUY1R2JBRjdKZG11OAotPiBYMjU1MTkgdFJ4Wnl0ekpNOS85cUgrMVVMWXJhdkV0OW1qSXh2Z004MXRWQUZhb2FrWQp1aGx2Y0JsajJmZFU4UVFESXdjWlJoQ2g3MHYxR2Ryam5EenlFL1JrOWtzCi0+IFgyNTUxOSBiSW9GN001ajliR1JONmVHZlNReHFkcGFXOVgxeHZaMTB3cjhSVDlOcUhzCjh4bFd4ejVSVUw5bXF5RjU3TGlmNTFsOGtWa1llOHp5Vm9QUDE4aHFUdlEKLT4gWDI1NTE5IEJpZVJYSDRySGlOMDhVR1dwa0ExaHY3V2tOYi9kbWxiRWRnaTAwNlhwV3cKYjYzQ2xaQW5tc05idGkzY1huWVpVUTdpTkhNNDlJVXNkb3VWSDZqRkszOAotPiBAVi1ncmVhc2UKQWROMW5Vdm91RzFSSVNyRjNRbmMzTWtBcU5ZdmxnCi0tLSBBUjV4TE5OMzdCR3B0ZElaU1pXalhScWJIWXdXNko3TGkrVEZhV0U1ZFNvCqFFxGWVVj0fgJO3hbqRCghoPAdOJ6D40TkgWQIC2D3wOKhq58ofMx7ZIP6+La2qpMUc5eIc1wSLgi+3]` (now expects nothing)
-- 1 renamed test: `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwQ0NxdGNOSy9FU1RZTndFWTU3UlZER3hXRDNObjBnVEJXN0pTaUIyMnhVCkFFNmhHTWdvUXNuSFdGZkhJeDlDU1NkMGdvaU9NQkFRZ3QwbHhVY0g0a1kKLT4gWDI1NTE5IHRMeWdlRnRQK3Y3OE5UakRIbCtUL01CbE5zNHdYSVdvS1dTZHhGblUwMTQKajFVaGEvbXlWcjB5bUdSaWM5Ly9nKy9NeGFYaUlsMXpoWVFyeGtCYnR4dwotPiBYMjU1MTkgRk9aT1N2RnpCdmNlUjE4TW03SHk5dmhkUDBNRDRBY016VHZ2WVZ2WEFYZwozOXMrb0ZhTHFmRjhZMGJoWGE3ZmtvYjU0N0FnNXpIK1JwN3kwcnhLVXQ4Ci0+IFgyNTUxOSBxeGJoUTAwcDhlZUoyR0NRZ05jdGRYSFZTbXl4a0ZaZmMrSEFtdkFGbEJ3CnJLc291M2ZoaDZseXAzQXBQbUtsU2lkeCs4cDJyQTlCR09QeEl6QkZtdFkKLT4gWDI1NTE5IE1mWjUrT1J1SUN6U2tCYVlOaStpd0V2UGpKTm5iMkdtTEpLN3JySGtMa3cKRzdIQTc1a3NTQ0FxeERMZkVqZFhTRVVjSVZtL1VDS2dXbGVaZmQ1R1hrYwotPiBuXm1RfTQtZ3JlYXNlCkJNSQotLS0gWWpCZlUvcm1xMVhwSkRYK1FOQ3doR3VheUw5eEJnK3pESzF2SVgxWTQ2RQrTaCLd0xr2bs0/5ecLBAfbGrKlaaHHt+jsPd/DGdaHp+TVuzfkTRzkU0QeC249zCMFZ32k/WhM3iY14V8=]` →
+  - `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBjVmxnYWpLbjdNbnNjNHZndW1PZ0x1b2M5c3dJcFBtZHZrSkhKVVBDd1V3Cm9XUGtRS202bTVwcnB3bUNFN2ZNSjZxVDY4RTN2TjcxcWVDbDVyS29tUUEKLT4gWDI1NTE5IHlybjFqZnMwOE5KVXY2YzdQd2VEeVRjZ3Q2c2hhZmdPcVMvRk5NZ0wxMmcKVVV3SjNCdEV5V2U5YUw4MTd5bzhzblA1eEgrUUsxRWxTTU0wV2ppUmh5WQotPiBYMjU1MTkgSTkrSEdwTmRrUlh6RVlUTXlNejBRUGZXbUZ5RUpqamxGMmdabElQN2tuSQpzUWs1Um1PV2pCNlJBWi91MVlJeldwekxxYlZuVkdYYmhpRzFNV1dwdlhjCi0+IFgyNTUxOSAvWXluODB5UVBPQWRyeEIxWjZoYzlBeEZ4bENmVWpNNllYYmNjbnJSS0I0CkdidnhOcjF3V01NMFJZeFlZTzgya0piL0R3S1dyS2pSZlg0bXN0aHZKZVUKLT4gWDI1NTE5IDR2aFpMTVJLMnpaSFFXVnlydFlndkl0cmpEa2RyL1BLZS9peGxWK3ZhakkKeThwWi9lc0NCVGU0S2doMEpoTlEwL0pLd3c4ZkZuVjZYQjY3SVd4QVZsTQotPiB5Oy1ncmVhc2UgKH5BIExXNE9GMEJZCmtSUkgrVnhKYjE1M0d1anEwTm9PRXdiaFk2cFZlbE9ZbzVMbFQzWGYxL1g4RXQ3Nm9ybElHeVp6bXRBbDFyS0kKaEJQR1JaNnUrSUFLZzRKNnNZangzT04vZTdpbG5rNFMKLS0tIEJZQlAwT3E4eGMzR2NZcUJNaEhsbThja3VqUU1MeXZVcDJBMmQvUG1veXMKVokbB3M1O5Sx3Rkv07pURynYOnAjJuzGun2FAcRjoyPdxWCdeV+1hxcuf5KmWUU9ZhSSZt3dDNi7JDo=]` (now expects nothing)
+- 1 renamed test: `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4aCtwM2JXNWRmRHlPaHlGRUZpWmdZRnFDNUNYWEVjdktrUXpFdFhEdWlZCnpRRlIrZFNmLzRSbktWaHVRQUJtOE1aOXgreThObW5hb0RPT3IrcWplOG8KLT4gWDI1NTE5IDFvMTFGQUtwNy9UM3RlZEdubXdWVGg0eXdKYWNLcnI2NDBLQVIydXZSV0EKL2h6cjhCMlZUMkNmZEtHNmNjUWlMbTZ2Ylp1VVVWa2dUcFFXVmQyVUlIRQotPiBYMjU1MTkgTkdKN3h6THZVRXVMbDBJYyt6WUJndkFoTzRwRVE5UUVldDcydVVZSWhYMAprbjlieWpOamYvbzFla21wODFyTk0zK3hmNEY3VlE1dW84U3ZaRlM2THNvCi0+IFgyNTUxOSB1NElZeFY1S0pGQ1B1NVlBRWNUU2F0NTB3a0NKSVBXYlIwMXk1UEpucWlJCjJUeEZtSU9ueGoxbnFqMjNQK0k4WDdBVElQRkErTWtiMEFpaTdqem1DRWcKLT4gWDI1NTE5IFFtNmdJQ0JCYnlwZGxRL2V6bGJRYnR4R2F6RUFaODZkV3p4QkNTeE5NVDgKR3doLzlGL1BJZVFLdWFab3VhVWk3bTBmWWVUaEdOSm8zTmF1MW1FTWN2YwotPiA7VSt5PC1ncmVhc2UgUiBiIFZOLzZIOiBMZFQKakFDcGVsWVh0T2xFRkwyUm9GN2JpWGNGZnVBYnFNWm9XU3JFZ3NRay9ITjlDVlFTb000cTlTVzZ2NUtpcGEragpZRHZLWVEKLS0tIFBDNVdWVFVJbSs4UEZDTWxDNGMvcnNFQ2tSVUVBZmhNWkZWdjVBcHFJODQKwpGa4/pb78eiJI7zD4AZl9LYT4NZLwEYQkn83zHyweZZIyzEy8IZCEWsolFxhTuaVc43e/9mPPrGDPMf]` →
   `unknown_bare_word_does_nothing`
 
 #### Files changed

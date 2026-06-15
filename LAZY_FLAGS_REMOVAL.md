@@ -36,19 +36,18 @@ no case-insensitive ambiguity. Just words and flags.
 | `f <number>`            | Navigate to item N (existing)                           |
 | `f <alias>`             | Expand built-in alias, then run                         |
 | `f <word>` (not number, not alias) | Exit 0, no output (the "nothing happens" rule) |
-| `f ./path`              | Explicit path                                           |
-| `f /path`               | Explicit path                                           |
-| `f ~/path`              | Explicit path                                           |
+| `f <path>`              | Exit 0, no output (paths are dropped, same as unknown words) |
 | `f <alias1> <alias2>`   | Expand both, concatenate flags                          |
 | `f <alias> -<flag>`     | Expand alias, then apply explicit flag                  |
-| `f <alias> <path>`      | Expand alias, then apply to path                        |
+| `f <alias> <path>`      | Expand alias, drop the path, run                        |
+| `f banner <path>`       | Subcommand bypass — clap handles banner with path       |
 
-The "nothing happens" rule for unknown bare words replaces the
-0.6.x no-fallback error. If you want to open a folder called
-`foo`, use `./foo`. To see a banner for cwd, just type `f` (with
-no args). To see a banner for a folder, use `./foldername` or
-`/path/to/folder`. Unknown bare words like `f t` or `f foo` exit
-0 with no output. This is simpler and more forgiving.
+The "nothing happens" rule for unknown bare words and paths replaces
+the 0.6.x no-fallback error. The only ways to see a banner for a
+specific path are: (1) `cd <path> && f` to see the banner for cwd,
+or (2) `f banner <path>` to bypass the alias routing. Unknown bare
+words, paths, and any other unrecognized input exit 0 with no
+output.
 
 ## Built-in aliases (19)
 
