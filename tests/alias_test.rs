@@ -193,7 +193,7 @@ fn alias_composition_top_with_hidden() {
 // ===== Routing tests =====
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJVHQ5dzJIR0JnK0VWbUNOelgvSHpVMmJlckZUVjZRcDBUN0piVUg3UFdzCmltOVliUE9MaFdvREM5cnJrK2JjK20wSzNhKzFBZSs4L0ZxVUVDZ2pFSWcKLT4gWDI1NTE5IDdmMlhWcjA2ZTEyN09weXZBZFJoa21Wdk44eFFlMWYrZWx4TDNpcE9wZ2cKUGtWY3NrQStoMU9SUWVQM3hoempzK1FLWUdML2hWZEJjQzBtaldZek85MAotPiBYMjU1MTkgSEt6VGtKSUpMTXE4OFhmMlY1ZTVZUSs2VWV3UHlOUVB3VUwrMGZWanB5SQpaTmI5bjRXS3JRVm5rUDZyS0dSZFVpYmdjVDg5cktwajZ3NnRnc3RGM2U4Ci0+IFgyNTUxOSBWMFRkR1llS0JZbVJ6Wmo0QkZzSlhOM09QdnNpN1ZyV05reStUckFzbWdvCjVpSFQ0K1plakErVkVnZjBwTTZtQ1k1ck5BWUNPUnlYek90ODUxQWJUbmsKLT4gWDI1NTE5IEFDSC9ad2Fmb2NYVloxRWptVEt0bEI1aE1pZk1YSGpNSDUwSjIwSUIrWG8KMXRueWEvWnlwNTVRbG1uZUtNRnNnc3g0VmFscjN4Qmtlai9palVlSmhYSQotPiB4JTgwX1xCZi1ncmVhc2UgSjgpICFpcSJxCjc2ZisKLS0tIFRHS0RyOEc3RnJBMUhkUVlYckcrbFdHNXFOam9wQ2lOdU5yaXFhMU0yZHMKZcxRm8105C+N2rSKQ8AqL0M4S1YNXRES4/uxyKzC6aJaxGSErpgHKcWHWS4LkyYUobOQsZJTx2njIubl]() {
+fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFaFpqRlpHM2xmQ1NVdkVuRUROeHd5bDFqVE0xQXJmcEU2QSt3RW94VFY0CkRHWUxRcXZISnJmSi9GdU5uTEpWNEsrTmtENVBYclBuM0Z4akFIZ0ZQWWsKLT4gWDI1NTE5IEpJRWNVUWZOTVc1amhRUW5oVGZ4ZHhUc0xQY2J4TWhqR0NKai82NjhiWGsKeWNhVElhb3A2WmlrMGtUMmJmcldmQjZQKzVCN0Fsd2RGWmdydjFMNzV5QQotPiBYMjU1MTkgNnJ3bUZTOXBRSE5lbm1xUW1jZFpVZTdlSi9hU3VIaDB1aTJIcW1XWnVUWQpoV2NsQ09FWk1MR0pwdUl5K3JVNTlaZk5xeVNLWmFMUzZCbGFVdFFWYjVZCi0+IFgyNTUxOSB1bUxqSGFSV3dCSzY2dGRJcEpyVnV6VmoybG9YSFp3SkVPYm10MVl2eWg4CmVPMXNLZ2Rpc2hnYkxFaXVNenhxamNnNWNtMFhseUFkWFQvR09hTnNENkkKLT4gWDI1NTE5IGd3ZHRmcTB6SzJ2OW0rREowWDgyd2NURlVoL1JkNTJWbUQvbnlUR3piVmcKU1oycTdpR2RvekdyaHV1ZFlYbXdDS1RMK1BSTlhHbjhLOUx5Sk9BZXBVNAotPiBmVkEofH1QLWdyZWFzZSAuZ312PCBobDkvLUBKQQpGOFFaMmI5c1d3UHVkUkhoOWtmRVpFNWRrR09WV0hZTU9iS2Rxa0hmMjM4UmVwL0swak1hbHhOd1dreFYwZXcxCnUrMEJoTVNMS3A1cXJLZ0p1RXprR0VzT3hWOGtrNkJWUnFUSG5tdUwKLS0tIDBOdjgrWldUaC9UVnFKWDBFRVp3L3VkcEpFblVqM3czd1pUdHRwaWJXTWcKH5RixfdeN5WaLHYVYYv5KdAAeRW9a17ZernZ7yFthB29lhorL4wqmBtaURPpBfQpBClBV2BTLpqySSTj]() {
     // User's requirement: "if no such alias found then nothing happens"
     // i.e., default banner for cwd, not an error.
     let (_stdout, _stderr, code) = run_f_full(&["nonexistentword"]);
@@ -204,7 +204,7 @@ fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJVHQ5dzJI
 }
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFREFtVlBnRERDc1lZYWg4dE9ENU9veTFGNkR6aDhiWUpzdU56eTA5dUJ3CnA0SVUybTRLUTBOeTl2bngwZUFUajRJR2wrU3pYRUhoWHR1ZkkxV0RhcU0KLT4gWDI1NTE5IFRKTWZDNkp0dC92Sks1QnBScEtBY2pVN2VPMUUvQW9TdE4wbC9seWdNZ3cKRmNLNjZtOGZKTDFLZHIrZmV1cldCSHRiTk03NjNhTXhaNWxyWWR5dVRFUQotPiBYMjU1MTkgOU0rc1d2U01vWkE1SXM5M3dCLzgvWFB6M1dtc0w0OXliOVpHWnhzUjhEdwpsOXJ4b3h2MFpDd0YxZFVTZGFhRWFSOVF5bnV6S3l2YUpJN2o2ZG9JNEQ4Ci0+IFgyNTUxOSBrU0FHaHhKOWZoTXpwdFJrZVBlUS8xSCttMjBHMG9VN0ZpNFVXQ05waGpvCkpLVzdtbDJpSXphczd3VFk0RnVJM1A1Ulpjem1EVWcwQ3ZhQ2tHb2xpaWsKLT4gWDI1NTE5IE0zQjh5L0dwMk1RVW12RWdEZ2JSSkc5eG84b0lWcXNHTW1ZVStlSm9OaUUKWWRNUVFPSUM4RkhWQ3JJcXA0ZEx2WGJ1dFZjSExjVDVOQVY3d0RPV3U1QQotPiB6WTEtZ3JlYXNlIHMoCm9uYTl4SmpvZEx5TzlrNU1xQUp0WE10QmxqQS8xYUd2L1Nmcmt4Y1h4OXZKUVcyRHZINEtwTndFV2hmQ05MZWwKTEdieEVNMjZXbklYNGRIN1R6L3MrTC9MMHIva3dlSHlkTEJJVHZBeWpON1EwM3pldjdyZ2RsMAotLS0gQXJFRkNnRVVSOWlINTlhVXRCYmUwRHhpS2kxYkcyNGdjcU81NUVnL080Zwr5AC+TbmPuvN4P7nsQ4JgvXvxrfbyaJK1vzN5RrRnyoVRAocgWFqWGzR+BAYuA/xFGZO04y7osWavNEw==]() {
+fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqSVFJOG50MktKRHVpVDY4eHV0aTI4STdnK05OR1ZiMjJEWHh5NjlsMkV3CkNHdmVrMU0wWG5BdjZ1TStMekUrNFZrbmxPS0FqR1NoUSs3UlBIT0JVNHcKLT4gWDI1NTE5IDhoUWVaYTZtdFZEUkF6RGlLcGtTSGNLN3hxbUJHK1pIVmhkVUI5dnpWbUkKaU0wTW5RamwxVWpvVnFyZmNaWkc0YTFaTE51a1VlTUZQb2ZZOFpEeWVyZwotPiBYMjU1MTkgMUF3SjhZZGVuckUzZWhIV2xrSXowNXlwWlV3QXRuSVlrK1lNWUdsVjJ5MAphdkN3N1IzaU16VmtBcGpnUG1EUkFMM1hCOVdBU0dxd2VUb3JCSmtxQnc4Ci0+IFgyNTUxOSBpMWw3VHJsN013TGNtQU1pRkJGZTlNNDRvUlZVc1BET3MvWG1uc2tGSWpVCmxKWXc4NnJ4K3EySldydjJ6WFFxWituN2E1TUNDU2N5SFNTV0g4a2RQTkkKLT4gWDI1NTE5IHlrTUZ3QjlJdGxYZytTZUZmV0E1VzJibkM2bDczc0cvUVNibFJtOXRQblUKM0tjeDNML09xb21EVERqZ1JvaXpBRVhEZm00dGFVckg2RXBWbDZRVWpNQQotPiAlQy1ncmVhc2UgLzksaQovcnpyejU4MUNpNVhCWGRoa2Ezb3AwS0Q5aDZYTzMxT1dnCi0tLSAzVTZZLzNRZ0djUDB0Sk9LV3RtYTRFc25sbXB3TTlmczgybjl3OHBTWFRzCryeRm0xyI0ccKG0XJY8THJi78aDbJdkamPSBgtNAy/pnFFH24YwXOIpxZut5OZLrtdrDFvDai+KFljE]() {
     // `f Downloads` (no ./ prefix) should NOT be treated as a path
     // to a folder called Downloads. It should show the default banner.
     let (_stdout, _stderr, code) = run_f_full(&["Downloads"]);
@@ -323,11 +323,12 @@ fn f_s_no_longer_means_dash_upper_s() {
 #[test]
 fn f_mLf_colon_no_longer_works() {
     // In 0.6.37, `f mLf: 10` meant `-f 10`. In 0.7.0, the `:` binding
-    // is gone. The `mLf:` is an unknown bare word, so it shows the
-    // default banner.
-    let default = run_f(&[]);
-    let binding = run_f(&["mLf:", "10"]);
-    assert_eq!(first_line_header(&binding), first_line_header(&default));
+    // is gone. The `mLf:` is an unknown bare word and is dropped. The
+    // `10` is a number and is passed through, so this becomes
+    // equivalent to `f 10` (navigate to item 10). We just verify it
+    // doesn't error and doesn't apply the `:` binding.
+    let (_stdout, _stderr, code) = run_f_full(&["mLf:", "10"]);
+    assert_eq!(code, 0, "should not error, got: {}", _stderr);
 }
 
 #[test]

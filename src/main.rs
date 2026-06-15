@@ -56,8 +56,9 @@ fn is_explicit_path(arg: &str) -> bool {
 }
 
 /// Expand a list of args: for each non-flag, non-path arg that matches
-/// a built-in alias, substitute the alias's flag list. Returns the
-/// expanded arg list and a list of positions where aliases were expanded.
+/// a built-in alias, substitute the alias's flag list. Unknown bare
+/// words are DROPPED (the user said "if no alias found, nothing happens").
+/// Returns the expanded arg list ready for clap to parse.
 ///
 /// The expansion produces: ["f", "banner", <expanded-flags-and-other-args>].
 fn expand_aliases_in_args(args: &[String]) -> Vec<String> {
@@ -71,10 +72,8 @@ fn expand_aliases_in_args(args: &[String]) -> Vec<String> {
             for flag in flags {
                 new_args.push(flag.to_string());
             }
-        } else {
-            // Unknown bare word — pass through (will become cwd banner).
-            new_args.push(a.clone());
         }
+        // Unknown bare word — DROP (the "nothing happens" rule).
     }
     new_args
 }
@@ -359,9 +358,12 @@ mod tests {
     }
 
     #[test]
-    fn test_expand_aliases_unknown_word_passes_through() {
+    fn test_expand_aliases_unknown_word_dropped() {
+        // User's rule: "if no alias found, nothing happens" — unknown
+        // bare words are dropped from the args, leaving the default
+        // banner for cwd.
         let result = expand_aliases_in_args(&["nonexistentword".to_string()]);
-        assert_eq!(result, vec!["f", "banner", "nonexistentword"]);
+        assert_eq!(result, vec!["f", "banner"]);
     }
 
     #[test]
