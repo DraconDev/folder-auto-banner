@@ -7,7 +7,6 @@
 // Note: tests must run with --test-threads=1 because the daemon uses
 // a single shared socket and parallel runs can flake.
 
-use assert_cmd::cargo::CommandCargoExt;
 use assert_cmd::Command;
 
 /// Helper: run `f` with the given args and return trimmed stdout.
@@ -54,7 +53,7 @@ fn regression_0_6_34_f_dash_e_works() {
 }
 
 #[test]
-fn regression_0_6_34_f_dash_U_works() {
+fn regression_0_6_34_f_dash_upper_u_works() {
     // f -U was failing with "unexpected argument '-U' found" before 0.6.34
     let (_stdout, _stderr, code) = run_f_full(&["-U"]);
     assert_eq!(code, 0, "f -U should succeed (exit 0)");
@@ -99,7 +98,7 @@ fn byte_identical_single_flag_c() {
 }
 
 #[test]
-fn byte_identical_single_flag_D() {
+fn byte_identical_single_flag_upper_d() {
     let lazy = run_f(&["D"]);
     let explicit = run_f(&["-D"]);
     assert_eq!(lazy, explicit, "f D should equal f -D");
@@ -113,7 +112,7 @@ fn byte_identical_single_flag_e() {
 }
 
 #[test]
-fn byte_identical_single_flag_G() {
+fn byte_identical_single_flag_upper_g() {
     let lazy = run_f(&["G"]);
     let explicit = run_f(&["-G"]);
     assert_eq!(lazy, explicit, "f G should equal f -G");
@@ -134,14 +133,14 @@ fn byte_identical_single_flag_r() {
 }
 
 #[test]
-fn byte_identical_single_flag_R() {
+fn byte_identical_single_flag_upper_r() {
     let lazy = run_f(&["R"]);
     let explicit = run_f(&["-R"]);
     assert_eq!(lazy, explicit, "f R should equal f -R");
 }
 
 #[test]
-fn byte_identical_single_flag_S() {
+fn byte_identical_single_flag_upper_s() {
     let lazy = run_f(&["S"]);
     let explicit = run_f(&["-S"]);
     assert_eq!(lazy, explicit, "f S should equal f -S");
@@ -155,7 +154,7 @@ fn byte_identical_single_flag_t() {
 }
 
 #[test]
-fn byte_identical_single_flag_U() {
+fn byte_identical_single_flag_upper_u() {
     let lazy = run_f(&["U"]);
     let explicit = run_f(&["-U"]);
     assert_eq!(lazy, explicit, "f U should equal f -U");
@@ -176,7 +175,7 @@ fn byte_identical_single_flag_x() {
 }
 
 #[test]
-fn byte_identical_single_flag_X() {
+fn byte_identical_single_flag_upper_x() {
     let lazy = run_f(&["X"]);
     let explicit = run_f(&["-X"]);
     assert_eq!(lazy, explicit, "f X should equal f -X");
@@ -185,35 +184,35 @@ fn byte_identical_single_flag_X() {
 // ===== Byte-identical tests: lowercase aliases =====
 
 #[test]
-fn byte_identical_alias_s_to_S() {
+fn byte_identical_alias_s_to_upper_s() {
     let lazy = run_f(&["s"]);
     let explicit = run_f(&["S"]);
     assert_eq!(lazy, explicit, "f s should equal f S");
 }
 
 #[test]
-fn byte_identical_alias_g_to_G() {
+fn byte_identical_alias_g_to_upper_g() {
     let lazy = run_f(&["g"]);
     let explicit = run_f(&["G"]);
     assert_eq!(lazy, explicit, "f g should equal f G");
 }
 
 #[test]
-fn byte_identical_alias_d_to_D() {
+fn byte_identical_alias_d_to_upper_d() {
     let lazy = run_f(&["d"]);
     let explicit = run_f(&["D"]);
     assert_eq!(lazy, explicit, "f d should equal f D");
 }
 
 #[test]
-fn byte_identical_alias_l_1_to_L_1() {
+fn byte_identical_alias_l_1_to_upper_l_1() {
     let lazy = run_f(&["l", "1"]);
     let explicit = run_f(&["L", "1"]);
     assert_eq!(lazy, explicit, "f l 1 should equal f L 1");
 }
 
 #[test]
-fn byte_identical_alias_u_to_U() {
+fn byte_identical_alias_u_to_upper_u() {
     let lazy = run_f(&["u"]);
     let explicit = run_f(&["U"]);
     assert_eq!(lazy, explicit, "f u should equal f U");
@@ -236,28 +235,28 @@ fn byte_identical_chain_trc() {
 }
 
 #[test]
-fn byte_identical_chain_tS() {
+fn byte_identical_chain_t_s() {
     let lazy = run_f(&["tS"]);
     let explicit = run_f(&["-t", "-S"]);
     assert_eq!(lazy, explicit, "f tS should equal f -t -S");
 }
 
 #[test]
-fn byte_identical_chain_GS() {
+fn byte_identical_chain_upper_g_s() {
     let lazy = run_f(&["GS"]);
     let explicit = run_f(&["-G", "-S"]);
     assert_eq!(lazy, explicit, "f GS should equal f -G -S");
 }
 
 #[test]
-fn byte_identical_chain_Rc() {
+fn byte_identical_chain_upper_rc() {
     let lazy = run_f(&["Rc"]);
     let explicit = run_f(&["-R", "-c"]);
     assert_eq!(lazy, explicit, "f Rc should equal f -R -c");
 }
 
 #[test]
-fn byte_identical_chain_rS() {
+fn byte_identical_chain_r_s() {
     let lazy = run_f(&["rS"]);
     let explicit = run_f(&["-r", "-S"]);
     assert_eq!(lazy, explicit, "f rS should equal f -r -S");
@@ -271,21 +270,21 @@ fn byte_identical_chain_ta() {
 }
 
 #[test]
-fn byte_identical_chain_aR() {
+fn byte_identical_chain_a_r() {
     let lazy = run_f(&["aR"]);
     let explicit = run_f(&["-a", "-R"]);
     assert_eq!(lazy, explicit, "f aR should equal f -a -R");
 }
 
 #[test]
-fn byte_identical_chain_oR() {
+fn byte_identical_chain_o_r() {
     let lazy = run_f(&["oR"]);
     let explicit = run_f(&["-o", "-R"]);
     assert_eq!(lazy, explicit, "f oR should equal f -o -R");
 }
 
 #[test]
-fn byte_identical_chain_Dt() {
+fn byte_identical_chain_upper_dt() {
     let lazy = run_f(&["Dt"]);
     let explicit = run_f(&["-D", "-t"]);
     assert_eq!(lazy, explicit, "f Dt should equal f -D -t");
@@ -301,7 +300,7 @@ fn byte_identical_value_m_10() {
 }
 
 #[test]
-fn byte_identical_value_L_2() {
+fn byte_identical_value_upper_l_2() {
     let lazy = run_f(&["L", "2"]);
     let explicit = run_f(&["-L", "2"]);
     assert_eq!(lazy, explicit, "f L 2 should equal f -L 2");
@@ -315,21 +314,21 @@ fn byte_identical_value_f_txt() {
 }
 
 #[test]
-fn byte_identical_value_mL_10_2() {
+fn byte_identical_value_m_l_10_2() {
     let lazy = run_f(&["mL", "10", "2"]);
     let explicit = run_f(&["-m", "10", "-L", "2"]);
     assert_eq!(lazy, explicit, "f mL 10 2 should equal f -m 10 -L 2");
 }
 
 #[test]
-fn byte_identical_value_tSm_10() {
+fn byte_identical_value_t_sm_10() {
     let lazy = run_f(&["tSm", "10"]);
     let explicit = run_f(&["-t", "-S", "-m", "10"]);
     assert_eq!(lazy, explicit, "f tSm 10 should equal f -t -S -m 10");
 }
 
 #[test]
-fn byte_identical_value_mLf_10_2_txt() {
+fn byte_identical_value_m_lf_10_2_txt() {
     let lazy = run_f(&["mLf", "10", "2", "txt"]);
     let explicit = run_f(&["-m", "10", "-L", "2", "-f", "txt"]);
     assert_eq!(
@@ -421,7 +420,7 @@ fn error_missing_value_for_m() {
 }
 
 #[test]
-fn error_missing_value_for_L() {
+fn error_missing_value_for_upper_l() {
     let (stdout, stderr, code) = run_f_full(&["L"]);
     assert_ne!(code, 0);
     let combined = format!("{}{}", stdout, stderr);
@@ -511,11 +510,6 @@ fn property_all_17_flags_chain() {
 
 #[test]
 fn stress_test_20_random_combinations() {
-    let combinations = [
-        "t", "S", "G", "r", "c", "a", "D", "R", "o", "v", "tr", "tS", "trc", "taR", "GSr", "m",
-        "f", "L", // value-taking singles (will fail without value, tested separately)
-        "tSm", "mL", "Lmf", "tSmL", "aRcSD",
-    ];
     // Only test the boolean chains here (value-taking ones are tested separately)
     let boolean_chains = [
         "t", "S", "G", "r", "c", "a", "D", "R", "o", "v", "tr", "tS", "trc", "taR", "GSr", "aRcSD",

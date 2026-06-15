@@ -490,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn test_expand_x_vs_X_distinct() {
+    fn test_expand_x_vs_upper_x_distinct() {
         // x and X must remain distinct (x=run, X=extensionsort)
         assert_eq!(expand_lazy_flags("x"), Some(vec!['x']));
         assert_eq!(expand_lazy_flags("X"), Some(vec!['X']));
@@ -499,7 +499,7 @@ mod tests {
     }
 
     #[test]
-    fn test_expand_r_not_aliased_to_R() {
+    fn test_expand_r_not_aliased_to_r() {
         // r is canonical for --reverse, NOT aliased to R (which doesn't exist)
         assert_eq!(expand_lazy_flags("r"), Some(vec!['r']));
         // R is canonical for --recursive
@@ -599,7 +599,7 @@ mod tests {
     }
 
     #[test]
-    fn test_value_taking_flags_are_m_f_L() {
+    fn test_value_taking_flags_are_m_f_l() {
         let mut v: Vec<char> = VALUE_TAKING_FLAGS.to_vec();
         v.sort();
         assert_eq!(
