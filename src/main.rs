@@ -174,7 +174,6 @@ fn main() -> Result<()> {
                 new_args.push(a.clone());
             }
 
-            eprintln!("DEBUG: new_args = {:?}", new_args);
             let cli = cli::Cli::parse_from(new_args);
             return cli.run();
         }
@@ -182,6 +181,27 @@ fn main() -> Result<()> {
         // Bare word that's not a lazy flag chain (e.g. contains a digit
         // or non-flag char). This is an unusual case — we treat it as
         // a path. The user should use `./` or `/` for explicit paths.
+        // If the arg looks like it MIGHT have been intended as a lazy
+        // chain (only alpha chars, but with at least one valid flag),
+        // give a helpful error explaining the lazy flag system.
+        if arg.chars().all(|c| c.is_ascii_alphabetic()) {
+            if arg.chars().any(|c| resolve_lazy_flag_char(c).is_some()) {
+                eprintln!(
+                    "error: '{}' is not a valid lazy flag chain. \
+                     Valid flags: a, c, D, e, f, G, L, m, o, r, R, S, t, U, v, x, X. \
+                     Use './{}' to treat it as a path.",
+                    arg, arg
+                );
+            } else {
+                eprintln!(
+                    "error: '{}' is not a valid lazy flag. \
+                     Valid flags: a, c, D, e, f, G, L, m, o, r, R, S, t, U, v, x, X. \
+                     Use './{}' to treat it as a path.",
+                    arg, arg
+                );
+            }
+            std::process::exit(2);
+        }
         let mut new_args = vec!["f".to_string(), "banner".to_string()];
         new_args.extend(args);
         let cli = cli::Cli::parse_from(new_args);
