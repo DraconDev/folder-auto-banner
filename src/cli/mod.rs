@@ -119,7 +119,7 @@ pub enum Commands {
         path: Option<PathBuf>,
 
         /// Output raw paths (no formatting, for piping)
-        #[arg(short, long)]
+        #[arg(long = "raw")]
         raw: bool,
 
         /// Output JSON (for scripting)

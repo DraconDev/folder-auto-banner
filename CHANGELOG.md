@@ -1,3 +1,57 @@
+## [0.6.31] - 2026-06-15
+
+### Bug fix: lazy flags for value-taking flags and missing short flags
+
+Lazy flags (`f t`, `f S`, etc.) from `0.6.29` only worked for flags
+that were defined in **both** the top-level CLI and the `Banner`
+subcommand. Flags that were only in the top-level CLI (or only in
+`Banner`) would fail with "unexpected argument" when used as a
+lazy flag with a path.
+
+#### Flags added to the `Banner` subcommand
+
+The following short flags were missing from the `Banner` subcommand
+(they only existed on the top-level CLI). Added them to `Banner`
+so lazy flags work consistently:
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `-r` | bool | Reverse sort order |
+| `-a` | bool | Show hidden files (dotfiles) |
+| `-L` | usize | Limit recursion depth |
+| `-R` | bool | Recurse into directories |
+| `-D` | bool | List only directories |
+| `--only-files` | bool | List only files |
+
+The `Banner` subcommand now accepts the same short flags as the
+top-level CLI. Lazy flags `f r`, `f a`, `f L`, `f R`, `f D` now
+work correctly.
+
+#### Flag conflict fix
+
+`raw` in the `Banner` subcommand had `#[arg(short, long)]` which
+auto-assigned `-r`, conflicting with `reverse` which has
+`#[arg(short = 'r', long = "reverse")]`. Changed `raw` to
+`#[arg(long = "raw")]` (no short flag), matching the top-level
+CLI. `raw` is now only available as `--raw`.
+
+#### Value-taking flags work with lazy flags
+
+Lazy flags that take values (e.g. `f m 10`, `f f txt`, `f L 2`)
+now work correctly because the `Banner` subcommand has the same
+short flags as the top-level CLI. The value is passed as the next
+argument, same as explicit flags.
+
+| Input | Result |
+|-------|--------|
+| `f m 5` | max=5, path=cwd |
+| `f m 5 Downloads` | max=5, path=Downloads |
+| `f f txt` | filter=txt, path=cwd |
+| `f f txt Downloads` | filter=txt, path=Downloads |
+| `f L 2` | level=2, path=cwd |
+| `f R --max 5` | recursive=true, max=5 |
+| `f D Downloads` | only-dirs=true, path=Downloads |
+
 ## [0.6.30] - 2026-06-15
 
 ### Breaking change: oneline short flag is now `-o`, not `-1`
