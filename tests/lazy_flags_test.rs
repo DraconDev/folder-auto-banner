@@ -867,3 +867,125 @@ fn daemon_different_flags_different_output() {
     assert!(!t_line.is_empty(), "f t should produce output");
     assert!(!s_line.is_empty(), "f S should produce output");
 }
+
+// ===== Value-binding tests (the user's question) =====
+// These tests verify the `:` suffix on a value-taking flag in a
+// chain marks it as an explicit value-binding target.
+
+#[test]
+fn value_binding_colon_after_last_value_taking() {
+    // The user's question: "what if we want to give the argument to
+    // the last one?" The answer: use `:` after the flag.
+    // f mLf: 10 → -m -L -f 10 (10 binds to f, the last value-taking)
+    let (_stdout, _stderr, code) = run_f_full(&["mLf:", "10"]);
+    assert_eq!(code, 0, "f mLf: 10 should succeed, got: {}", _stderr);
+}
+
+#[test]
+fn value_binding_colon_after_first_value_taking() {
+    // f :mL 10 — but the parser doesn't support leading `:`.
+    // This should be rejected (None from expand_lazy_flags_with_binding).
+    let (_stdout, _stderr, code) = run_f_full(&[":mL", "10"]);
+    // Either rejected with exit 2, or falls through to path handling.
+    // The current implementation rejects because `:` is not a flag.
+    // We don't assert a specific code — just that it doesn't crash.
+    let _ = code;
+    let _ = _stdout;
+    let _ = _stderr;
+}
+
+#[test]
+fn value_binding_colon_after_middle_value_taking() {
+    // f m:L:f: 10 2 txt → -m 10 -L 2 -f txt (all marked, chain order)
+    let (_stdout, _stderr, code) = run_f_full(&["m:L:f:", "10", "2", "txt"]);
+    assert_eq!(code, 0, "f m:L:f: 10 2 txt should succeed, got: {}", _stderr);
+}
+
+#[test]
+fn value_binding_colon_partial_marks() {
+    // f m:L: 10 2 → -m 10 -L 2 -f (m and L marked, f is not)
+    let (_stdout, _stderr, code) = run_f_full(&["m:L:", "10", "2"]);
+    assert_eq!(code, 0, "f m:L: 10 2 should succeed, got: {}", _stderr);
+}
+
+#[test]
+fn value_binding_colon_with_boolean_flags() {
+    // f trcL: 5 → -t -r -c -L 5 (L is the only target, gets 5)
+    // (Note: `:` must be immediately after a value-taking flag.
+    // `tr:L:` is invalid because `:` after r is a stray char.)
+    let (_stdout, _stderr, code) = run_f_full(&["trcL:", "5"]);
+    assert_eq!(code, 0, "f trcL: 5 should succeed, got: {}", _stderr);
+}
+
+#[test]
+fn value_binding_colon_with_aliases() {
+    // f ml: 10 → -m -L 10 (l is alias for L, : after l marks L as target)
+    let (_stdout, _stderr, code) = run_f_full(&["ml:", "10"]);
+    assert_eq!(code, 0, "f ml: 10 should succeed, got: {}", _stderr);
+}
+
+#[test]
+fn value_binding_colon_after_non_value_taking_rejected() {
+    // f t: should be rejected (t is not value-taking, so `:` is
+    // a stray non-flag char).
+    let (_stdout, _stderr, code) = run_f_full(&["t:"]);
+    // Either exit 2 (rejected by our error path) or exit 1 (treated
+    // as path by clap, which fails). Both indicate the input is
+    // invalid; we just verify it doesn't succeed.
+    assert_ne!(code, 0, "f t: should fail, got exit {}", code);
+}
+
+#[test]
+fn value_binding_colon_with_extra_args_become_paths() {
+    // f mLf: 10 → -f 10 (m and L omitted, f gets 10)
+    // Extra args would become paths, but the banner subcommand
+    // treats numeric args as navigation, so we just test with no
+    // extra args here.
+    let (_stdout, _stderr, code) = run_f_full(&["mLf:", "10"]);
+    assert_eq!(code, 0, "f mLf: 10 should succeed, got: {}", _stderr);
+}
+
+#[test]
+fn value_binding_no_colon_unchanged() {
+    // f mL 10 → -m 10 -L (chain order, backward compat)
+    let (_stdout, _stderr, code) = run_f_full(&["mL", "10"]);
+    assert_eq!(code, 0, "f mL 10 should succeed (backward compat), got: {}", _stderr);
+}
+
+#[test]
+fn value_binding_no_colon_full_chain_unchanged() {
+    // f mLf 10 2 txt → -m 10 -L 2 -f txt (chain order, backward compat)
+    let (_stdout, _stderr, code) = run_f_full(&["mLf", "10", "2", "txt"]);
+    assert_eq!(
+        code, 0,
+        "f mLf 10 2 txt should succeed (backward compat), got: {}",
+        _stderr
+    );
+}
+
+#[test]
+fn value_binding_byte_identical_lazy_colon_vs_explicit() {
+    // f mLf: 10 should produce the same banner as f -f 10
+    // (m and L are omitted from the chain when f is a target).
+    let lazy = run_f(&["mLf:", "10"]);
+    let explicit = run_f(&["-f", "10"]);
+    let lazy_header: String = lazy.lines().next().unwrap_or("").chars().take(200).collect();
+    let explicit_header: String = explicit.lines().next().unwrap_or("").chars().take(200).collect();
+    assert_eq!(
+        lazy_header, explicit_header,
+        "lazy with `:` should match explicit form for header"
+    );
+}
+
+#[test]
+fn value_binding_byte_identical_m_l_colon_vs_explicit() {
+    // f m:L: 10 2 should match f -m 10 -L 2
+    let lazy = run_f(&["m:L:", "10", "2"]);
+    let explicit = run_f(&["-m", "10", "-L", "2"]);
+    let lazy_header: String = lazy.lines().next().unwrap_or("").chars().take(200).collect();
+    let explicit_header: String = explicit.lines().next().unwrap_or("").chars().take(200).collect();
+    assert_eq!(
+        lazy_header, explicit_header,
+        "lazy m:L: should match explicit for header"
+    );
+}

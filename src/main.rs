@@ -54,6 +54,16 @@ const VALUE_TAKING_FLAGS: &[char] = &[
     'L', // --level <LEVEL> (usize)
 ];
 
+/// Result of expanding a lazy-flag chain. `flags` are the canonical
+/// flags in chain order; `binding_targets[i]` is true if flag `i` was
+/// marked with a `:` suffix and is therefore an explicit value-binding
+/// target (must consume the next arg as its value).
+#[derive(Debug, Clone, PartialEq)]
+struct ExpandedChain {
+    flags: Vec<char>,
+    binding_targets: Vec<bool>,
+}
+
 /// Resolve a single character to its canonical lazy-flag form
 /// (e.g. `s` → `S`). Returns `None` if the char is not a lazy flag.
 fn resolve_lazy_flag_char(c: char) -> Option<char> {
@@ -75,15 +85,49 @@ fn resolve_lazy_flag_char(c: char) -> Option<char> {
 /// No fallback: `f trc` ALWAYS means `-t -r -c`. To show a banner
 /// for a path, the path must start with `./`, `/`, or `~` (explicit
 /// path indicators). Bare words are always lazy-flag chains.
+#[allow(dead_code)] // Used by unit tests; main uses expand_lazy_flags_with_binding
 fn expand_lazy_flags(arg: &str) -> Option<Vec<char>> {
+    expand_lazy_flags_with_binding(arg).map(|c| c.flags)
+}
+
+/// Expand a multi-character arg into a list of canonical lazy flags
+/// AND record which value-taking flags were marked as explicit
+/// value-binding targets with a `:` suffix.
+///
+/// Syntax:
+/// - `mL` → both flags, no binding targets (chain order applies).
+/// - `mL:` → `L` is a binding target; the next arg binds to `L`.
+/// - `m:L:` → both are binding targets; values bind in chain order.
+/// - `m:Lf:` → all three are binding targets.
+///
+/// Returns `None` if any character in `arg` is not a lazy flag
+/// (including stray `:` chars that are not immediately after a
+/// value-taking flag, or `:` chars that are not adjacent to a
+/// value-taking flag).
+fn expand_lazy_flags_with_binding(arg: &str) -> Option<ExpandedChain> {
     if arg.is_empty() {
         return None;
     }
-    let mut result = Vec::with_capacity(arg.len());
-    for c in arg.chars() {
-        result.push(resolve_lazy_flag_char(c)?);
+    let mut flags = Vec::with_capacity(arg.len());
+    let mut binding_targets = Vec::with_capacity(arg.len());
+    let mut chars = arg.chars().peekable();
+    while let Some(c) = chars.next() {
+        let canonical = resolve_lazy_flag_char(c)?;
+        let is_value_taking = VALUE_TAKING_FLAGS.contains(&canonical);
+        // `:` is only valid immediately after a value-taking flag.
+        if is_value_taking && chars.peek() == Some(&':') {
+            chars.next(); // consume the `:`
+            flags.push(canonical);
+            binding_targets.push(true);
+        } else {
+            flags.push(canonical);
+            binding_targets.push(false);
+        }
     }
-    Some(result)
+    Some(ExpandedChain {
+        flags,
+        binding_targets,
+    })
 }
 
 /// Returns true if the arg looks like an explicit path (starts with
@@ -147,7 +191,17 @@ fn main() -> Result<()> {
         // Value-taking flags in the chain consume the next arg as their
         // value. E.g. `f mL 10 2 path` → `-m 10 -L 2 path`. The values
         // are assigned in chain order to value-taking flags.
-        if let Some(flags) = expand_lazy_flags(arg) {
+        //
+        // A `:` immediately after a value-taking flag marks that flag
+        // as an EXPLICIT VALUE-BINDING TARGET. The next arg binds to
+        // that flag. Any non-target value-taking flags that come
+        // before the LAST target in the chain are OMITTED from the
+        // output entirely (clap requires a value for value-taking
+        // flags, so they cannot be pushed without one). E.g.
+        // `f mLf: 10` → `-f 10` (m and L are omitted, f gets 10).
+        // This answers the user's question: "what if we want to give
+        // the argument to the last one?"
+        if let Some(chain) = expand_lazy_flags_with_binding(arg) {
             let arg_pos = args.iter().position(|a| a == arg).unwrap();
             let mut new_args: Vec<String> = vec!["f".to_string(), "banner".to_string()];
 
@@ -156,16 +210,65 @@ fn main() -> Result<()> {
                 new_args.push(a.clone());
             }
 
-            // Expand the chain, consuming values for value-taking flags
+            // Pre-compute: for each position, is there a binding target
+            // later in the chain? Non-target value-taking flags are
+            // omitted from the output if a target comes after them,
+            // because clap requires a value for value-taking flags.
+            let mut has_target_later: Vec<bool> = vec![false; chain.flags.len()];
+            let mut seen_target = false;
+            for i in (0..chain.flags.len()).rev() {
+                if chain.binding_targets[i] {
+                    seen_target = true;
+                }
+                has_target_later[i] = seen_target;
+            }
+
+            // Expand the chain, consuming values per the binding rules.
             let mut value_idx = arg_pos + 1;
-            for c in &flags {
-                new_args.push(format!("-{}", c));
+            for (i, c) in chain.flags.iter().enumerate() {
                 if VALUE_TAKING_FLAGS.contains(c) {
-                    // Consume the next arg as the value
-                    if value_idx < args.len() {
+                    if chain.binding_targets[i] {
+                        // Explicit binding target: MUST consume the next arg.
+                        if value_idx < args.len() {
+                            new_args.push(format!("-{}", c));
+                            new_args.push(args[value_idx].clone());
+                            value_idx += 1;
+                        } else {
+                            eprintln!(
+                                "error: ':' after '{}' in chain '{}' requires a value, \
+                                 but no more arguments were provided.",
+                                c, arg
+                            );
+                            std::process::exit(2);
+                        }
+                    } else if has_target_later[i] {
+                        // Not a target, but a target comes later.
+                        // OMIT this flag entirely (clap would reject
+                        // a value-taking flag without a value, and
+                        // the user explicitly marked a later flag
+                        // as the binding target).
+                    } else if value_idx < args.len() {
+                        // Not a target, no target later, value available:
+                        // chain-order consumption.
+                        new_args.push(format!("-{}", c));
                         new_args.push(args[value_idx].clone());
                         value_idx += 1;
+                    } else {
+                        // Not a target, no target later, NO value available.
+                        // Error: the user put a value-taking flag in the
+                        // chain but didn't supply a value.
+                        eprintln!(
+                            "error: flag '-{}' in chain '{}' requires a value, \
+                             but no more arguments were provided. \
+                             Use '{}:' to mark which flag should receive the value, \
+                             or supply a value after the chain.",
+                            c, arg, c
+                        );
+                        std::process::exit(2);
                     }
+                } else {
+                    // Boolean flag: always push.
+                    new_args.push(format!("-{}", c));
                 }
             }
 
@@ -679,6 +782,156 @@ mod tests {
         assert!(!KNOWN_SUBCOMMANDS.contains(&"mv"));
     }
 
+    // ===== expand_lazy_flags_with_binding tests =====
+
+    #[test]
+    fn test_with_binding_no_colon_matches_expand() {
+        // Without any `:`, the new function returns the same flags
+        // as expand_lazy_flags, and all binding_targets are false.
+        let cases = ["t", "trc", "mL", "mLf", "sG", "tSmL", ""];
+        for arg in &cases {
+            let plain = expand_lazy_flags(arg);
+            let with_binding = expand_lazy_flags_with_binding(arg);
+            match (plain, with_binding) {
+                (Some(flags), Some(chain)) => {
+                    assert_eq!(chain.flags, flags, "flags mismatch for {:?}", arg);
+                    assert!(
+                        chain.binding_targets.iter().all(|&t| !t),
+                        "no `:` in {:?} but some binding_targets are true",
+                        arg
+                    );
+                }
+                (None, None) => {}
+                (a, b) => panic!(
+                    "mismatch for {:?}: plain={:?}, with_binding={:?}",
+                    arg, a, b
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn test_with_binding_colon_after_value_taking() {
+        // `:` after a value-taking flag marks it as a target.
+        assert_eq!(
+            expand_lazy_flags_with_binding("mL:"),
+            Some(ExpandedChain {
+                flags: vec!['m', 'L'],
+                binding_targets: vec![false, true],
+            })
+        );
+        assert_eq!(
+            expand_lazy_flags_with_binding("m:L:"),
+            Some(ExpandedChain {
+                flags: vec!['m', 'L'],
+                binding_targets: vec![true, true],
+            })
+        );
+        assert_eq!(
+            expand_lazy_flags_with_binding("mLf:"),
+            Some(ExpandedChain {
+                flags: vec!['m', 'L', 'f'],
+                binding_targets: vec![false, false, true],
+            })
+        );
+        assert_eq!(
+            expand_lazy_flags_with_binding("m:L:f:"),
+            Some(ExpandedChain {
+                flags: vec!['m', 'L', 'f'],
+                binding_targets: vec![true, true, true],
+            })
+        );
+    }
+
+    #[test]
+    fn test_with_binding_colon_after_non_value_taking_rejected() {
+        // `:` after a non-value-taking flag is invalid (the `:` is
+        // not a valid flag char itself).
+        assert_eq!(expand_lazy_flags_with_binding("t:"), None);
+        assert_eq!(expand_lazy_flags_with_binding("tr:"), None);
+        assert_eq!(expand_lazy_flags_with_binding("trc:"), None);
+        assert_eq!(expand_lazy_flags_with_binding("t:L:"), None);
+        assert_eq!(expand_lazy_flags_with_binding(":t"), None);
+        assert_eq!(expand_lazy_flags_with_binding(":"), None);
+        assert_eq!(expand_lazy_flags_with_binding("t::L"), None);
+    }
+
+    #[test]
+    fn test_with_binding_colon_with_aliases() {
+        // Case-insensitive aliases work with `:`.
+        assert_eq!(
+            expand_lazy_flags_with_binding("l:"),
+            Some(ExpandedChain {
+                flags: vec!['L'],
+                binding_targets: vec![true],
+            })
+        );
+        assert_eq!(
+            expand_lazy_flags_with_binding("ml:"),
+            Some(ExpandedChain {
+                flags: vec!['m', 'L'],
+                binding_targets: vec![false, true],
+            })
+        );
+    }
+
+    #[test]
+    fn test_with_binding_colon_with_boolean_flags_in_chain() {
+        // Boolean flags mixed with value-taking flags and `:` markers.
+        assert_eq!(
+            expand_lazy_flags_with_binding("trcSm:"),
+            Some(ExpandedChain {
+                flags: vec!['t', 'r', 'c', 'S', 'm'],
+                binding_targets: vec![false, false, false, false, true],
+            })
+        );
+        assert_eq!(
+            expand_lazy_flags_with_binding("m:rLc"),
+            Some(ExpandedChain {
+                flags: vec!['m', 'r', 'L', 'c'],
+                binding_targets: vec![true, false, false, false],
+            })
+        );
+    }
+
+    #[test]
+    fn test_with_binding_empty_string() {
+        assert_eq!(expand_lazy_flags_with_binding(""), None);
+    }
+
+    #[test]
+    fn test_with_binding_invalid_flag_still_rejected() {
+        // Invalid lazy flags are still rejected even with `:` markers.
+        assert_eq!(expand_lazy_flags_with_binding("tz"), None);
+        assert_eq!(expand_lazy_flags_with_binding("z"), None);
+        assert_eq!(expand_lazy_flags_with_binding("m:z"), None);
+        assert_eq!(expand_lazy_flags_with_binding("mL:z"), None);
+    }
+
+    #[test]
+    fn test_with_binding_only_value_taking_with_colon() {
+        // Chain of only value-taking flags with all marked.
+        assert_eq!(
+            expand_lazy_flags_with_binding("m:L:f:"),
+            Some(ExpandedChain {
+                flags: vec!['m', 'L', 'f'],
+                binding_targets: vec![true, true, true],
+            })
+        );
+    }
+
+    #[test]
+    fn test_with_binding_single_value_taking_with_colon() {
+        // Single value-taking flag marked.
+        assert_eq!(
+            expand_lazy_flags_with_binding("m:"),
+            Some(ExpandedChain {
+                flags: vec!['m'],
+                binding_targets: vec![true],
+            })
+        );
+    }
+
     // ===== Property-based tests (using proptest) =====
     // These tests verify invariants that should hold for ALL inputs,
     // not just specific cases. They run at least 1000 cases each.
@@ -788,6 +1041,42 @@ mod tests {
             let _ = expand_lazy_flags(&s);
             let _ = is_explicit_path(&s);
             let _ = resolve_lazy_flag_char(s.chars().next().unwrap_or('a'));
+        }
+
+        #[test]
+        fn prop_with_binding_invariants(s in "[a-zA-Z:]{0,20}") {
+            // The with_binding function must never panic, and if it
+            // returns Some, the flags and binding_targets must have
+            // the same length.
+            if let Some(chain) = expand_lazy_flags_with_binding(&s) {
+                prop_assert_eq!(chain.flags.len(), chain.binding_targets.len());
+                // Every binding target must be a value-taking flag.
+                for (i, &c) in chain.flags.iter().enumerate() {
+                    if chain.binding_targets[i] {
+                        prop_assert!(
+                            VALUE_TAKING_FLAGS.contains(&c),
+                            "binding target {} ({:?}) is not value-taking in {:?}",
+                            i, c, s
+                        );
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn prop_with_binding_count_targets(s in "[a-zA-Z:]{0,20}") {
+            // The number of binding targets in the result must equal
+            // the number of `:` chars in the input (since each `:` is
+            // either consumed as a target marker or causes rejection).
+            if let Some(chain) = expand_lazy_flags_with_binding(&s) {
+                let expected_targets = s.chars().filter(|&c| c == ':').count();
+                let actual_targets = chain.binding_targets.iter().filter(|&&t| t).count();
+                prop_assert_eq!(
+                    actual_targets, expected_targets,
+                    "target count mismatch for {:?}: expected {}, got {}",
+                    s, expected_targets, actual_targets
+                );
+            }
         }
     }
 }
