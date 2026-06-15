@@ -77,6 +77,18 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose")]
     pub verbose: bool,
 
+    /// No sort — list in directory order
+    #[arg(short = 'U', long = "no-sort")]
+    pub no_sort: bool,
+
+    /// Force open in editor (overrides default behavior)
+    #[arg(short = 'e', long = "edit")]
+    pub edit: bool,
+
+    /// Force run the file directly (overrides default behavior)
+    #[arg(short = 'x', long = "run")]
+    pub run: bool,
+
     /// Output raw paths (no formatting, for piping)
     #[arg(long = "raw")]
     pub raw: bool,
@@ -393,7 +405,7 @@ impl Cli {
                     extensionsort: self.extensionsort,
                     gitsort: self.gitsort,
                     versionsort: false,
-                    no_sort: false,
+                    no_sort: self.no_sort,
                     group_dirs: None,
                     reverse: self.reverse,
                     hidden: self.hidden,
@@ -420,8 +432,8 @@ impl Cli {
                     highlight_recent: self.highlight_recent.clone(),
                     highlight_old: self.highlight_old.clone(),
                     action: None,
-                    force_edit: false,
-                    force_run: false,
+                    force_edit: self.edit,
+                    force_run: self.run,
                 })
             }
 

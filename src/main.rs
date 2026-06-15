@@ -100,6 +100,15 @@ fn is_explicit_path(arg: &str) -> bool {
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
 
+    // If the user passed any explicit flags (starting with `-`), let clap
+    // handle the parsing directly. The lazy flag chain system is only for
+    // bare-word invocations like `f t`, `f trc`, `f m 10`.
+    let has_explicit_flag = args.iter().any(|a| a.starts_with('-'));
+    if has_explicit_flag {
+        let cli = cli::Cli::parse();
+        return cli.run();
+    }
+
     // Find the first non-flag argument (skip --debug, -d, etc.)
     let first_non_flag = args.iter().find(|a| !a.starts_with('-'));
 
@@ -165,6 +174,7 @@ fn main() -> Result<()> {
                 new_args.push(a.clone());
             }
 
+            eprintln!("DEBUG: new_args = {:?}", new_args);
             let cli = cli::Cli::parse_from(new_args);
             return cli.run();
         }
