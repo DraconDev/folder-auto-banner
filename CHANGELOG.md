@@ -1,3 +1,60 @@
+## [0.7.1] - 2026-06-15
+
+### "Nothing happens" rule, made literal
+
+In 0.7.0, unknown bare words (e.g. `f t`, `f foo`) were silently
+passed to the banner subcommand, which produced the default banner
+for cwd. The user clarified: **"nothing happens" means literally
+nothing** — exit 0, no output.
+
+**New behavior:**
+
+- `f` (no args) → default banner for cwd
+- `f <unknown-word>` → exit 0, no output (was: default banner for cwd)
+- `f <number>`, `f <path>`, `f <alias>`, `f <flag>` → all unchanged
+
+#### Implementation
+
+New helper `should_exit_silently(args) -> bool` in `src/main.rs` is
+the single source of truth for the "nothing happens" decision. It
+returns true when:
+- args is non-empty, AND
+- no arg is a flag (starts with `-`), AND
+- no arg is an explicit path (starts with `.`, `/`, or `~`), AND
+- no arg is a known alias, AND
+- no arg parses as a number.
+
+The check runs in `main()` after the known-subcommand check and
+before the explicit-flag check, so `f t` exits 0 silently while
+`f -e` and `f -V` continue to work normally.
+
+#### Tests
+
+- 3 new unit tests in `src/main.rs`:
+  - `test_should_exit_silently_with_flag`
+  - `test_should_exit_silently_with_path`
+  - `test_should_exit_silently_with_alias`
+  - `test_should_exit_silently_with_number`
+  - `test_should_exit_silently_mixed`
+- 1 new integration test in `tests/alias_test.rs`:
+  - `f_t_does_nothing` (verifies `f t` exits 0 with no output)
+  - `f_no_args_still_shows_banner` (verifies `f` still shows the banner)
+- 4 updated integration tests in `tests/alias_test.rs`:
+  - `f_t_no_longer_means_dash_t` (now expects nothing)
+  - `f_trc_no_longer_means_dash_t_dash_r_dash_c` (now expects nothing)
+  - `f_s_no_longer_means_dash_upper_s` (now expects nothing)
+  - `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArS0U2amhUVTllSTF5Z2doZTBEbHlIYVVGL0EyZnBlU2ZCRWh2VW8yU0NNCnhwV3BCNW55ZDgrT3pLamIrRDBQOWhBL2hCOEd2aUNGbVdHb0szaXhtSEEKLT4gWDI1NTE5IFd1NjlUMzh4dVdHVTQ5N3RnK01FSFI4a0k0NWdoMFVkV0NlYzR0dnJmQ1UKcGhuM1VFZ3FOM2p3dXFsVFpESm01ckVGWXZ1alovdUY1R2JBRjdKZG11OAotPiBYMjU1MTkgdFJ4Wnl0ekpNOS85cUgrMVVMWXJhdkV0OW1qSXh2Z004MXRWQUZhb2FrWQp1aGx2Y0JsajJmZFU4UVFESXdjWlJoQ2g3MHYxR2Ryam5EenlFL1JrOWtzCi0+IFgyNTUxOSBiSW9GN001ajliR1JONmVHZlNReHFkcGFXOVgxeHZaMTB3cjhSVDlOcUhzCjh4bFd4ejVSVUw5bXF5RjU3TGlmNTFsOGtWa1llOHp5Vm9QUDE4aHFUdlEKLT4gWDI1NTE5IEJpZVJYSDRySGlOMDhVR1dwa0ExaHY3V2tOYi9kbWxiRWRnaTAwNlhwV3cKYjYzQ2xaQW5tc05idGkzY1huWVpVUTdpTkhNNDlJVXNkb3VWSDZqRkszOAotPiBAVi1ncmVhc2UKQWROMW5Vdm91RzFSSVNyRjNRbmMzTWtBcU5ZdmxnCi0tLSBBUjV4TE5OMzdCR3B0ZElaU1pXalhScWJIWXdXNko3TGkrVEZhV0U1ZFNvCqFFxGWVVj0fgJO3hbqRCghoPAdOJ6D40TkgWQIC2D3wOKhq58ofMx7ZIP6+La2qpMUc5eIc1wSLgi+3]` (now expects nothing)
+- 1 renamed test: `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwQ0NxdGNOSy9FU1RZTndFWTU3UlZER3hXRDNObjBnVEJXN0pTaUIyMnhVCkFFNmhHTWdvUXNuSFdGZkhJeDlDU1NkMGdvaU9NQkFRZ3QwbHhVY0g0a1kKLT4gWDI1NTE5IHRMeWdlRnRQK3Y3OE5UakRIbCtUL01CbE5zNHdYSVdvS1dTZHhGblUwMTQKajFVaGEvbXlWcjB5bUdSaWM5Ly9nKy9NeGFYaUlsMXpoWVFyeGtCYnR4dwotPiBYMjU1MTkgRk9aT1N2RnpCdmNlUjE4TW03SHk5dmhkUDBNRDRBY016VHZ2WVZ2WEFYZwozOXMrb0ZhTHFmRjhZMGJoWGE3ZmtvYjU0N0FnNXpIK1JwN3kwcnhLVXQ4Ci0+IFgyNTUxOSBxeGJoUTAwcDhlZUoyR0NRZ05jdGRYSFZTbXl4a0ZaZmMrSEFtdkFGbEJ3CnJLc291M2ZoaDZseXAzQXBQbUtsU2lkeCs4cDJyQTlCR09QeEl6QkZtdFkKLT4gWDI1NTE5IE1mWjUrT1J1SUN6U2tCYVlOaStpd0V2UGpKTm5iMkdtTEpLN3JySGtMa3cKRzdIQTc1a3NTQ0FxeERMZkVqZFhTRVVjSVZtL1VDS2dXbGVaZmQ1R1hrYwotPiBuXm1RfTQtZ3JlYXNlCkJNSQotLS0gWWpCZlUvcm1xMVhwSkRYK1FOQ3doR3VheUw5eEJnK3pESzF2SVgxWTQ2RQrTaCLd0xr2bs0/5ecLBAfbGrKlaaHHt+jsPd/DGdaHp+TVuzfkTRzkU0QeC249zCMFZ32k/WhM3iY14V8=]` →
+  `unknown_bare_word_does_nothing`
+
+#### Files changed
+
+- `src/main.rs` — new helper `should_exit_silently`, new `main()`
+  routing order, 5 new unit tests.
+- `tests/alias_test.rs` — 2 new tests, 4 updated tests, 1 renamed test.
+- `Cargo.toml` — version bump 0.7.0 → 0.7.1.
+- `f.1` — version bump 0.7.0 → 0.7.1.
+
 ## [0.7.0] - 2026-06-15
 
 ### BREAKING: Lazy flags removed, replaced with built-in aliases

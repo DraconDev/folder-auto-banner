@@ -35,7 +35,7 @@ no case-insensitive ambiguity. Just words and flags.
 | `f --<flag>`            | Explicit long flag                                      |
 | `f <number>`            | Navigate to item N (existing)                           |
 | `f <alias>`             | Expand built-in alias, then run                         |
-| `f <word>` (not number, not alias) | Default banner for cwd (no error, "nothing happens") |
+| `f <word>` (not number, not alias) | Exit 0, no output (the "nothing happens" rule) |
 | `f ./path`              | Explicit path                                           |
 | `f /path`               | Explicit path                                           |
 | `f ~/path`              | Explicit path                                           |
@@ -45,9 +45,10 @@ no case-insensitive ambiguity. Just words and flags.
 
 The "nothing happens" rule for unknown bare words replaces the
 0.6.x no-fallback error. If you want to open a folder called
-`foo`, use `./foo`. If you want a banner with default flags,
-just type `f` (or any unknown word). This is simpler and more
-forgiving.
+`foo`, use `./foo`. To see a banner for cwd, just type `f` (with
+no args). To see a banner for a folder, use `./foldername` or
+`/path/to/folder`. Unknown bare words like `f t` or `f foo` exit
+0 with no output. This is simpler and more forgiving.
 
 ## Built-in aliases (19)
 
