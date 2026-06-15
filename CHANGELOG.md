@@ -1,3 +1,60 @@
+## [0.6.32] - 2026-06-15
+
+### Chained lazy flags (no fallback)
+
+- **Lazy flags can now be chained** — `f trc` is equivalent to
+  `f -t -r -c` (time + reverse + compact). Every character in the
+  arg must be a valid lazy flag; if any character is not a lazy
+  flag, the arg is treated as a path (if it starts with `.`, `/`,
+  or `~`) or an error.
+- **No fallback rule extended to chains** — `f trc` ALWAYS means
+  `-t -r -c`, never a path. To show a banner for a file or
+  directory, use `./path`, `/abs/path`, or `~/path` (explicit
+  path indicators). Bare words are always lazy-flag chains.
+- **Routing priority in `src/main.rs`**:
+  1. Number (`f 1` → navigate to item 1)
+  2. Known subcommand (`f banner`, `f env`, etc.)
+  3. Explicit path (`./path`, `/abs/path`, `~/path`)
+  4. All-chars-are-lazy-flags → expand to chain
+  5. Otherwise → treat as bare-word path (will fail unless it's
+     a valid path)
+- **New `expand_lazy_flags(arg) -> Option<Vec<char>>` function**
+  resolves each character via `resolve_lazy_flag_char`, which
+  checks the canonical `LAZY_FLAGS` list first, then the
+  `LOWERCASE_ALIASES` map (e.g. `s` → `S`).
+- **New `is_explicit_path(arg) -> bool` helper** checks if a path
+  starts with `.`, `/`, or `~` — the explicit path indicators.
+- **Removed unused `is_lazy_flag` function** — replaced by
+  `expand_lazy_flags` which handles both single-char and multi-char.
+
+### Examples
+
+| Input | Expands to |
+|-------|-----------|
+| `f t` | `-t` (sort by time) |
+| `f S` | `-S` (sort by size) |
+| `f trc` | `-t -r -c` (time + reverse + compact) |
+| `f tS` | `-t -S` (time + size) |
+| `f tsaG` | `-t -S -a -G` (time + sizesort + hidden + git) |
+| `f Downloads` | path `./Downloads` |
+| `f ./Downloads` | explicit path |
+| `f /abs/path` | explicit path |
+| `f ~/Downloads` | explicit path |
+| `f 1` | navigate to item 1 |
+| `f banner` | subcommand |
+
+### Stale tests disabled
+
+Five integration tests for non-existent subcommands
+(`test_stats_help`, `test_mv_help`, `test_rm_help`, `test_root_help`,
+`test_do_help`) were disabled. These tests were written for
+subcommands that don't exist (`stats`, `mv`, `rm`, `root`, `do`)
+and were only passing because the old routing fell through to
+banner's `--help`. With chained lazy flags, these all-flag-char
+words now correctly expand to flag chains, not fall through. The
+tests are commented out with a note explaining they can be
+re-enabled when/if those subcommands are added.
+
 ## [0.6.31] - 2026-06-15
 
 ### Bug fix: lazy flags for value-taking flags and missing short flags

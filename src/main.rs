@@ -46,25 +46,6 @@ const LOWERCASE_ALIASES: &[(char, char)] = &[
     ('u', 'U'), // --no-sort
 ];
 
-fn is_lazy_flag(arg: &str) -> Option<char> {
-    let mut chars = arg.chars();
-    let c = chars.next()?;
-    if chars.next().is_some() {
-        return None; // not single char
-    }
-    // Canonical list first (preserves case for x vs X)
-    if LAZY_FLAGS.contains(&c) {
-        return Some(c);
-    }
-    // Lowercase aliases for uppercase flags (e.g. `s` → `S`)
-    for &(from, to) in LOWERCASE_ALIASES {
-        if c == from {
-            return Some(to);
-        }
-    }
-    None
-}
-
 /// Resolve a single character to its canonical lazy-flag form
 /// (e.g. `s` → `S`). Returns `None` if the char is not a lazy flag.
 fn resolve_lazy_flag_char(c: char) -> Option<char> {
@@ -179,57 +160,64 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_lazy_flag_single_char() {
-        assert_eq!(is_lazy_flag("t"), Some('t'));
-        assert_eq!(is_lazy_flag("S"), Some('S'));
-        assert_eq!(is_lazy_flag("X"), Some('X'));
-        assert_eq!(is_lazy_flag("a"), Some('a'));
+    fn test_expand_lazy_flags_single_char() {
+        // Single chars work (backward compat with single-char lazy flags)
+        assert_eq!(expand_lazy_flags("t"), Some(vec!['t']));
+        assert_eq!(expand_lazy_flags("S"), Some(vec!['S']));
+        assert_eq!(expand_lazy_flags("X"), Some(vec!['X']));
+        assert_eq!(expand_lazy_flags("a"), Some(vec!['a']));
     }
 
     #[test]
-    fn test_is_lazy_flag_rejects_multi_char() {
-        assert_eq!(is_lazy_flag("tt"), None);
-        assert_eq!(is_lazy_flag("abc"), None);
+    fn test_expand_lazy_flags_all_flags() {
+        // All characters are lazy flags → expand each
+        assert_eq!(expand_lazy_flags("trc"), Some(vec!['t', 'r', 'c']));
+        assert_eq!(expand_lazy_flags("tS"), Some(vec!['t', 'S']));
+        assert_eq!(expand_lazy_flags("aG"), Some(vec!['a', 'G']));
     }
 
     #[test]
-    fn test_is_lazy_flag_rejects_unknown() {
-        // 'z' is not a known flag
-        assert_eq!(is_lazy_flag("z"), None);
-        // 'Q' is not a known flag
-        assert_eq!(is_lazy_flag("Q"), None);
+    fn test_expand_lazy_flags_rejects_non_flag() {
+        // Any non-flag character → None
+        assert_eq!(expand_lazy_flags("z"), None); // z is not a flag
+        assert_eq!(expand_lazy_flags("tz"), None);
+        assert_eq!(expand_lazy_flags("trz"), None);
+        assert_eq!(expand_lazy_flags("Downloads"), None); // path
+        assert_eq!(expand_lazy_flags("Q"), None); // uppercase Q not a flag
+        assert_eq!(expand_lazy_flags(""), None); // empty
     }
 
     #[test]
-    fn test_is_lazy_flag_rejects_empty() {
-        assert_eq!(is_lazy_flag(""), None);
-    }
-
-    #[test]
-    fn test_is_lazy_flag_case_insensitive_uppercase() {
+    fn test_expand_lazy_flags_case_insensitive_uppercase() {
         // Uppercase flags should also accept lowercase (where the
         // lowercase letter is not already a canonical flag).
-        assert_eq!(is_lazy_flag("s"), Some('S')); // sizesort
-        assert_eq!(is_lazy_flag("g"), Some('G')); // gitsort
-        assert_eq!(is_lazy_flag("d"), Some('D')); // only-dirs
-        assert_eq!(is_lazy_flag("l"), Some('L')); // level
-        assert_eq!(is_lazy_flag("u"), Some('U')); // no-sort
-                                                  // `r` is already canonical (--reverse), so it stays as `r`
-        assert_eq!(is_lazy_flag("r"), Some('r')); // --reverse (not aliased to R)
+        assert_eq!(expand_lazy_flags("s"), Some(vec!['S'])); // sizesort
+        assert_eq!(expand_lazy_flags("g"), Some(vec!['G'])); // gitsort
+        assert_eq!(expand_lazy_flags("d"), Some(vec!['D'])); // only-dirs
+        assert_eq!(expand_lazy_flags("l"), Some(vec!['L'])); // level
+        assert_eq!(expand_lazy_flags("u"), Some(vec!['U'])); // no-sort
+                                                             // `r` is already canonical (--reverse), so it stays as `r`
+        assert_eq!(expand_lazy_flags("r"), Some(vec!['r'])); // --reverse (not aliased to R)
     }
 
     #[test]
-    fn test_is_lazy_flag_preserves_x_case() {
+    fn test_expand_lazy_flags_preserves_x_case() {
         // x and X are distinct — x is --run, X is --extensionsort
-        assert_eq!(is_lazy_flag("x"), Some('x')); // --run
-        assert_eq!(is_lazy_flag("X"), Some('X')); // --extensionsort
+        assert_eq!(expand_lazy_flags("x"), Some(vec!['x'])); // --run
+        assert_eq!(expand_lazy_flags("X"), Some(vec!['X'])); // --extensionsort
     }
 
     #[test]
-    fn test_is_lazy_flag_lowercase_still_works() {
-        // Lowercase flags should still work
-        assert_eq!(is_lazy_flag("t"), Some('t')); // timesort
-        assert_eq!(is_lazy_flag("a"), Some('a')); // hidden
-        assert_eq!(is_lazy_flag("c"), Some('c')); // compact
+    fn test_is_explicit_path() {
+        // Paths starting with `.`, `/`, or `~` are explicit
+        assert!(is_explicit_path("./Downloads"));
+        assert!(is_explicit_path("/home/user"));
+        assert!(is_explicit_path("~/Downloads"));
+        assert!(is_explicit_path("../sibling"));
+        // Bare words are NOT explicit paths — they're lazy flag chains
+        assert!(!is_explicit_path("Downloads"));
+        assert!(!is_explicit_path("trc"));
+        assert!(!is_explicit_path("t"));
+        assert!(!is_explicit_path(""));
     }
 }

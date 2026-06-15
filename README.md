@@ -149,6 +149,10 @@ Single-character flags can be used without the leading dash.
 banner for a file or directory named `t`, use `./t` or an absolute
 path.
 
+**Chained**: flags can also be chained. `f trc` is equivalent to
+`f -t -r -c` (time + reverse + compact). Every character in the
+arg must be a valid lazy flag.
+
 | Lazy | Equivalent | Description |
 |------|------------|-------------|
 | `f t` | `f -t` | Sort by time modified |
@@ -168,10 +172,16 @@ path.
 | `f U` | `f -U` | No sort |
 | `f e` | `f -e` | Force open in editor |
 | `f x` | `f -x` | Force run file |
+| `f trc` | `f -t -r -c` | Chained: time + reverse + compact |
+| `f tS` | `f -t -S` | Chained: time + size |
 
 **Precedence**: numbers (`f 1` → navigate to item 1) take
 precedence over lazy flags, so `f 1` navigates rather than
 enabling oneline mode. (Oneline uses `f o` / `f -o`.)
+
+**Paths**: bare words without `.`, `/`, or `~` are always
+lazy-flag chains. To show a banner for a file or directory,
+use `./path`, `/abs/path`, or `~/path` (explicit path indicators).
 
 ### Sorting
 | Flag | Description |
