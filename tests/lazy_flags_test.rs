@@ -904,7 +904,11 @@ fn value_binding_colon_after_first_value_taking() {
 fn value_binding_colon_after_middle_value_taking() {
     // f m:L:f: 10 2 txt → -m 10 -L 2 -f txt (all marked, chain order)
     let (_stdout, _stderr, code) = run_f_full(&["m:L:f:", "10", "2", "txt"]);
-    assert_eq!(code, 0, "f m:L:f: 10 2 txt should succeed, got: {}", _stderr);
+    assert_eq!(
+        code, 0,
+        "f m:L:f: 10 2 txt should succeed, got: {}",
+        _stderr
+    );
 }
 
 #[test]
@@ -962,7 +966,9 @@ fn value_binding_no_colon_unchanged() {
     let (_stdout, stderr, code) = run_f_full(&["mL", "10"]);
     assert_ne!(code, 0, "f mL 10 should fail (L has no value)");
     assert!(
-        stderr.contains("requires a value") || stderr.contains("'-L'") || stderr.contains("--level"),
+        stderr.contains("requires a value")
+            || stderr.contains("'-L'")
+            || stderr.contains("--level"),
         "error should mention the missing value for L, got: {}",
         stderr
     );
@@ -985,8 +991,20 @@ fn value_binding_byte_identical_lazy_colon_vs_explicit() {
     // (m and L are omitted from the chain when f is a target).
     let lazy = run_f(&["mLf:", "10"]);
     let explicit = run_f(&["-f", "10"]);
-    let lazy_header: String = lazy.lines().next().unwrap_or("").chars().take(200).collect();
-    let explicit_header: String = explicit.lines().next().unwrap_or("").chars().take(200).collect();
+    let lazy_header: String = lazy
+        .lines()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .take(200)
+        .collect();
+    let explicit_header: String = explicit
+        .lines()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .take(200)
+        .collect();
     assert_eq!(
         lazy_header, explicit_header,
         "lazy with `:` should match explicit form for header"
@@ -998,8 +1016,20 @@ fn value_binding_byte_identical_m_l_colon_vs_explicit() {
     // f m:L: 10 2 should match f -m 10 -L 2
     let lazy = run_f(&["m:L:", "10", "2"]);
     let explicit = run_f(&["-m", "10", "-L", "2"]);
-    let lazy_header: String = lazy.lines().next().unwrap_or("").chars().take(200).collect();
-    let explicit_header: String = explicit.lines().next().unwrap_or("").chars().take(200).collect();
+    let lazy_header: String = lazy
+        .lines()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .take(200)
+        .collect();
+    let explicit_header: String = explicit
+        .lines()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .take(200)
+        .collect();
     assert_eq!(
         lazy_header, explicit_header,
         "lazy m:L: should match explicit for header"
