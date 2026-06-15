@@ -1,3 +1,100 @@
+## [0.7.3] - 2026-06-15
+
+### `-b` flag: banner mode, allows paths
+
+In 0.7.2, paths were dropped entirely. The user wanted a way to get
+a banner for a specific path without typing the subcommand name.
+The new `-b` flag switches to banner mode, which allows paths.
+
+**New behavior:**
+
+- `f -b` → default banner for cwd
+- `f -b <path>` → banner for path
+- `f -b <alias>` → expand alias, run banner (e.g. `f -b tree` → tree banner)
+- `f -b <alias> <path>` → expand alias, apply to path
+- `f -b -<flag>` → explicit flag in banner mode
+- `f -b <number>` → navigate to item N in banner mode
+- `f -b <unknown-word>` → drop unknown word, run banner
+
+#### Implementation
+
+- New `expand_args_for_banner(args)` function: pass through flags,
+  paths, and numbers; expand aliases; drop unknown words.
+- New `expand_args_strict(args)` function: pass through flags and
+  numbers; expand aliases; drop paths and unknown words.
+- New `is_path_like(arg)` helper: returns true if arg starts with
+  `.`, `/`, or `~`.
+- New routing branch in `main()`: if `-b` is in args, use
+  `expand_args_for_banner`; otherwise use `expand_args_strict`.
+
+#### Alias audit
+
+All 18 built-in aliases reviewed and confirmed clean:
+
+| Alias | Expands to | Notes |
+|-------|-----------|-------|
+| `tree` | `-R -D` | Recursive, only dirs |
+| `flat` | `-o` | One file per line |
+| `compact` | `-c` | Compact output |
+| `verbose` | `-v` | Verbose output |
+| `hidden` | `-a` | Show hidden files |
+| `dirs` | `-D` | Only directories |
+| `new` | `-t` | Sort by time, newest first |
+| `old` | `-t -r` | Sort by time, oldest first |
+| `big` | `-S` | Sort by size, largest first |
+| `small` | `-S -r` | Sort by size, smallest first |
+| `ext` | `-X` | Sort by extension |
+| `git` | `-G` | Sort by git status |
+| `nosort` | `-U` | No sort |
+| `top` | `-S -r -m 20` | Top 20 largest |
+| `newest` | `-t -r -m 20` | 20 newest |
+| `recurse` | `-R` | Recurse into subdirectories |
+| `edit` | `-e` | Force open in editor |
+| `run` | `-x` | Force run file |
+
+The alias table is a simple `&[(&str, &[&str])]` constant. Adding a
+new alias is one line. Naming convention: lowercase, single word,
+no abbreviations. Aliases that need a value (`top` and `newest`)
+have the value baked in (`-m 20`).
+
+#### Flag audit
+
+All 25 top-level Cli flags reviewed and confirmed clean. Short forms
+use sensible single letters: `t` (time), `S` (size), `X` (extension),
+`G` (git), `r` (reverse), `a` (all/hidden), `o` (oneline), `f` (filter),
+`m` (max), `L` (level), `c` (compact), `v` (verbose), `U` (no-sort),
+`e` (edit), `x` (run), `R` (recursive), `D` (dirs). The new `-b` is
+a routing switch, not a Cli flag.
+
+#### Tests
+
+- 10 new unit tests in `src/main.rs`:
+  - `test_b_flag_alone`, `test_b_flag_with_path`,
+  - `test_b_flag_with_absolute_path`, `test_b_flag_with_tilde_path`,
+  - `test_b_flag_with_alias`, `test_b_flag_with_path_and_alias`,
+  - `test_b_flag_drops_unknown_words`, `test_b_flag_with_explicit_flag`,
+  - `test_b_flag_with_number`, `test_is_path_like`
+- 1 updated test: `test_expand_aliases_keeps_paths` (renamed from
+  `drops_paths`, now reflects banner mode behavior).
+- 1 new test: `test_expand_aliases_strict_drops_paths` (covers
+  strict mode path dropping).
+- 1 new test: `test_expand_aliases_mix_of_alias_and_path_drops_path_in_strict`.
+- 6 new integration tests in `tests/alias_test.rs`:
+  - `b_flag_alone_shows_default_banner`,
+  - `b_flag_with_path_shows_banner`,
+  - `b_flag_with_absolute_path_works`,
+  - `b_flag_with_alias_expands`,
+  - `b_flag_with_path_and_alias`,
+  - `b_flag_with_explicit_flag_preserves_flag`.
+
+#### Files changed
+
+- `src/main.rs` — `expand_args_for_banner`, `expand_args_strict`,
+  `is_path_like` functions added; routing updated; tests added.
+- `tests/alias_test.rs` — 6 new tests, 1 updated test.
+- `Cargo.toml` — version bump 0.7.2 → 0.7.3.
+- `f.1` — version bump 0.7.2 → 0.7.3.
+
 ## [0.7.2] - 2026-06-15
 
 ### Paths are dropped too (only numbers, aliases, and flags are accepted)
@@ -102,8 +199,8 @@ before the explicit-flag check, so `f t` exits 0 silently while
   - `f_t_no_longer_means_dash_t` (now expects nothing)
   - `f_trc_no_longer_means_dash_t_dash_r_dash_c` (now expects nothing)
   - `f_s_no_longer_means_dash_upper_s` (now expects nothing)
-  - `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBjVmxnYWpLbjdNbnNjNHZndW1PZ0x1b2M5c3dJcFBtZHZrSkhKVVBDd1V3Cm9XUGtRS202bTVwcnB3bUNFN2ZNSjZxVDY4RTN2TjcxcWVDbDVyS29tUUEKLT4gWDI1NTE5IHlybjFqZnMwOE5KVXY2YzdQd2VEeVRjZ3Q2c2hhZmdPcVMvRk5NZ0wxMmcKVVV3SjNCdEV5V2U5YUw4MTd5bzhzblA1eEgrUUsxRWxTTU0wV2ppUmh5WQotPiBYMjU1MTkgSTkrSEdwTmRrUlh6RVlUTXlNejBRUGZXbUZ5RUpqamxGMmdabElQN2tuSQpzUWs1Um1PV2pCNlJBWi91MVlJeldwekxxYlZuVkdYYmhpRzFNV1dwdlhjCi0+IFgyNTUxOSAvWXluODB5UVBPQWRyeEIxWjZoYzlBeEZ4bENmVWpNNllYYmNjbnJSS0I0CkdidnhOcjF3V01NMFJZeFlZTzgya0piL0R3S1dyS2pSZlg0bXN0aHZKZVUKLT4gWDI1NTE5IDR2aFpMTVJLMnpaSFFXVnlydFlndkl0cmpEa2RyL1BLZS9peGxWK3ZhakkKeThwWi9lc0NCVGU0S2doMEpoTlEwL0pLd3c4ZkZuVjZYQjY3SVd4QVZsTQotPiB5Oy1ncmVhc2UgKH5BIExXNE9GMEJZCmtSUkgrVnhKYjE1M0d1anEwTm9PRXdiaFk2cFZlbE9ZbzVMbFQzWGYxL1g4RXQ3Nm9ybElHeVp6bXRBbDFyS0kKaEJQR1JaNnUrSUFLZzRKNnNZangzT04vZTdpbG5rNFMKLS0tIEJZQlAwT3E4eGMzR2NZcUJNaEhsbThja3VqUU1MeXZVcDJBMmQvUG1veXMKVokbB3M1O5Sx3Rkv07pURynYOnAjJuzGun2FAcRjoyPdxWCdeV+1hxcuf5KmWUU9ZhSSZt3dDNi7JDo=]` (now expects nothing)
-- 1 renamed test: `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4aCtwM2JXNWRmRHlPaHlGRUZpWmdZRnFDNUNYWEVjdktrUXpFdFhEdWlZCnpRRlIrZFNmLzRSbktWaHVRQUJtOE1aOXgreThObW5hb0RPT3IrcWplOG8KLT4gWDI1NTE5IDFvMTFGQUtwNy9UM3RlZEdubXdWVGg0eXdKYWNLcnI2NDBLQVIydXZSV0EKL2h6cjhCMlZUMkNmZEtHNmNjUWlMbTZ2Ylp1VVVWa2dUcFFXVmQyVUlIRQotPiBYMjU1MTkgTkdKN3h6THZVRXVMbDBJYyt6WUJndkFoTzRwRVE5UUVldDcydVVZSWhYMAprbjlieWpOamYvbzFla21wODFyTk0zK3hmNEY3VlE1dW84U3ZaRlM2THNvCi0+IFgyNTUxOSB1NElZeFY1S0pGQ1B1NVlBRWNUU2F0NTB3a0NKSVBXYlIwMXk1UEpucWlJCjJUeEZtSU9ueGoxbnFqMjNQK0k4WDdBVElQRkErTWtiMEFpaTdqem1DRWcKLT4gWDI1NTE5IFFtNmdJQ0JCYnlwZGxRL2V6bGJRYnR4R2F6RUFaODZkV3p4QkNTeE5NVDgKR3doLzlGL1BJZVFLdWFab3VhVWk3bTBmWWVUaEdOSm8zTmF1MW1FTWN2YwotPiA7VSt5PC1ncmVhc2UgUiBiIFZOLzZIOiBMZFQKakFDcGVsWVh0T2xFRkwyUm9GN2JpWGNGZnVBYnFNWm9XU3JFZ3NRay9ITjlDVlFTb000cTlTVzZ2NUtpcGEragpZRHZLWVEKLS0tIFBDNVdWVFVJbSs4UEZDTWxDNGMvcnNFQ2tSVUVBZmhNWkZWdjVBcHFJODQKwpGa4/pb78eiJI7zD4AZl9LYT4NZLwEYQkn83zHyweZZIyzEy8IZCEWsolFxhTuaVc43e/9mPPrGDPMf]` →
+  - `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkRzZZOFZUZ2llZW9oMFhEZHVmZWQwbmZGNHZXOStKNzFlUGpySXphMnlNCmhjSWZQMnE2TUtuVFVtWFowdkgzMFRzUmQyU1NQbmg2Zy9Ba3VhMkxkNEUKLT4gWDI1NTE5IHlJQk44SjhzWkJydU5kREpJYmwxbU5uZDV4QXJzMllqeEVzQ0tPdHdEUWMKRTRtQ0x2SkVHWW9RYnNtUmdSUVp1bWtvZ2JVcjRydk4zZmdUNVY0d0o5ZwotPiBYMjU1MTkgQkFDQkQxQVcrdGhvR09wdUUzSlNTNFdsendXSkVSWHlTKzhlZWR1bWMyawpmN2EvR2dHWWhDYWRHdjFwK0JCdDZtdXk2dmNtdmtIelF1QXoyaUtrbjc4Ci0+IFgyNTUxOSBwQ29BcXc2UTFZSUpjZHdkdlVhK1Boa0dMRklHeVJqaEhOUU91UWZIcnlRCmowWm0yRkpzOHRRUXpUcHgrQUw2YnM3Z2w4bGlldVloaFJ5bDQyU2ZQKzAKLT4gWDI1NTE5IDByV0FtZmVqQ1kxQm1zK2Rva1NlUkhQdUtnT211QkRhc2dNRFoyY2svRkEKTXBobDlNd3JROGVWY243aXpadTJPOHFsRUhpajlZM3dDdlljTUxneEw0TQotPiBsPURaXjN0LWdyZWFzZSAtWSBeWApNdVhQcGFXNlQ0WWxKVGxMTStjcDdGMW4zdVFsRnJqVWZXelp5S3BYSG5XRFFtWlBjNE1ZMlBXZ0E4Q21BRHF5CjJmeUh1bXREVG9TTDRNZzhKNUJYM21HNEpHSlRwNmtMNnV2RW01ZmJxN2RqNEVEVmhBL1hGUQotLS0gZE9kSmR2MkV0T1phUUwvYjg2YkM1d0h4QTh0cU8wMHJUcUh3d0NYZkxxOAoQepiccHqrY1HAJ7eeoSWXzYIRlTWrWNkPXzp9tmpxY3/BXD7tzhl59ZH34IJSleBhNj87XXFVX3TXUA==]` (now expects nothing)
+- 1 renamed test: `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwRGJXN21lUVFzdlF2YlJUWE9sWjdCNkRsdXllS3RkanQ4eDlBa1JpQ2owCk9LMlI5dUJwVU1wWkRlNk1vVkZyT1V0SVJ0Sndpd2h6c3E2bldTQ2dJZzgKLT4gWDI1NTE5IFdFL2dhY0JJZXhHbFZBd3RBYmJ2SytrRnpQV0ZndHdWdWE2aUU0diszbjQKSFljSmxFeCtjeW4zY01yNjl0d0tvQ2VoL2tiaUNkb05jZkw4ZDBoVXN1UQotPiBYMjU1MTkgcWNZQ0FET2hXeGFhWWVtdE5BYTE2bE5ZdllJeXhTZU9LdGliVDBobjhGcwpqS05HdG4ya3BYOEtFNlZZeXpPSVlTRmlnZnpGV1owcnZIZEk0TVZXRllvCi0+IFgyNTUxOSBnUzNzK0tvTmZ2UXV2RjRCMy9aWVhnSDFLaW4ycUpMZ3duVUMxZWJjMGc0Cm1oSHduUEhhY25aTEMrdFFiRk5YSWRoYmc3S05pK2FKZk5POXRqUGlvdTAKLT4gWDI1NTE5IEZkWEZuN0VXWS9ZelFMb2xPNnpiZExaWW5RQi82YjZXOEpwam5OSWtWMTAKNENlaWp1ampvbmhVWmE3NmxEazZLaTJPemlBTUtmc3VOdndNb1FRNnU0ZwotPiBeKV9LNiMtZ3JlYXNlIDdaLUIvRiBPUCBVCi9WUFQ0ZlBNNFBrNnFsOXVFeUF5Ui9mMi8wQVZFZ3lDVjhBQ2JxMFlTanZkTEtjK2pGV1BYWllvN1ZDTW5qTmkKdWRtY3RUQUFlNUJvaFNLdUZheU5zK01hUG96aHFhLzBYNUJLZDVMTlc2Q29Qd3BuMjdwRTNOTFdyT3pxCi0tLSBkbTBpRG9DWEJseUdZZ0dKWEhlUGd5ajMyWnZxMmJuOGJWQnZqLzZIbkk0Cl16W49HMol0Yy/yildH5jsy/KJKJZ17eZqHofeAGH/IU/2/b7gkj8cOMqZilZYNZuBfpgGwXBP4UDvbWQ==]` →
   `unknown_bare_word_does_nothing`
 
 #### Files changed

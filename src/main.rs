@@ -7,10 +7,14 @@ use std::env;
 ///
 /// Multiple aliases compose: `f hidden verbose` → `-a -v`.
 /// Aliases compose with explicit flags: `f tree -L 2` → `-R -D -L 2`.
-/// Aliases compose with paths: `f top ./src` → `-S -r -m 20` for `./src`.
+/// Aliases compose with paths in banner mode: `f -b top ./src` → `-S -r -m 20` for `./src`.
 ///
 /// User intent: bare words (not numbers, not paths) are alias lookups.
-/// Unknown bare words show the default cwd banner (no error).
+/// The routing accepts only numbers, aliases, and flags. Unknown bare
+/// words and paths are dropped (the "nothing happens" rule, exit 0
+/// with no output). For path-specific banners, use `f -b <path>` or
+/// `f banner <path>`. `f -b` switches to banner mode where paths
+/// are allowed.
 const BUILTIN_ALIASES: &[(&str, &[&str])] = &[
     // Display modes
     ("tree", &["-R", "-D"]), // Recursive, only dirs (like `tree`)
