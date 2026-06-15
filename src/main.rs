@@ -3,136 +3,50 @@ use clap::Parser;
 use folder_auto_banner::cli;
 use std::env;
 
-/// Known subcommands that clap should parse.
-const KNOWN_SUBCOMMANDS: &[&str] = &["banner", "env", "install", "config", "daemon", "help"];
-
-/// Single-character short flags that can be used as lazy flags
-/// (e.g. `f t` is equivalent to `f -t`).
+/// Built-in aliases. Each alias expands to a list of clap flags.
 ///
-/// Rule: no fallback. `f t` ALWAYS means `-t`. To show a banner
-/// for a file called `t`, use `./t` or an absolute path.
-const LAZY_FLAGS: &[char] = &[
-    'a', // --hidden
-    'c', // --compact
-    'D', // --only-dirs
-    'e', // --edit
-    'f', // --filter
-    'G', // --gitsort
-    'L', // --level
-    'm', // --max
-    'o', // --oneline
-    'r', // --reverse
-    'R', // --recursive
-    'S', // --sizesort
-    't', // --timesort
-    'U', // --no-sort
-    'v', // --verbose
-    'x', // --run
-    'X', // --extensionsort
+/// Multiple aliases compose: `f hidden verbose` → `-a -v`.
+/// Aliases compose with explicit flags: `f tree -L 2` → `-R -D -L 2`.
+/// Aliases compose with paths: `f top ./src` → `-S -r -m 20` for `./src`.
+///
+/// User intent: bare words (not numbers, not paths) are alias lookups.
+/// Unknown bare words show the default cwd banner (no error).
+const BUILTIN_ALIASES: &[(&str, &[&str])] = &[
+    // Display modes
+    ("tree", &["-R", "-D"]),       // Recursive, only dirs (like `tree`)
+    ("flat", &["-o"]),             // One file per line
+    ("compact", &["-c"]),          // Compact output
+    ("verbose", &["-v"]),          // Verbose output
+    ("hidden", &["-a"]),           // Show hidden files
+    ("dirs", &["-D"]),             // Only directories
+    // Sort modes
+    ("new", &["-t"]),              // Sort by time, newest first
+    ("old", &["-t", "-r"]),        // Sort by time, oldest first
+    ("big", &["-S"]),              // Sort by size, largest first
+    ("small", &["-S", "-r"]),      // Sort by size, smallest first
+    ("ext", &["-X"]),              // Sort by extension
+    ("git", &["-G"]),              // Sort by git status
+    ("nosort", &["-U"]),           // No sort
+    // Limits
+    ("top", &["-S", "-r", "-m", "20"]),     // Top 20 largest files
+    ("newest", &["-t", "-r", "-m", "20"]),  // 20 newest files
+    // Recursion
+    ("recurse", &["-R"]),          // Recurse into subdirectories
+    // Actions
+    ("edit", &["-e"]),             // Force open in editor
+    ("run", &["-x"]),              // Force run file
 ];
 
-/// Lowercase aliases for uppercase flags. `f s` is equivalent to
-/// `f S` (sort by size), `f g` to `f G` (sort by git), etc.
-///
-/// Only letters NOT already in `LAZY_FLAGS` can be aliased:
-/// `r` is already `--reverse`, so it is NOT aliased to `R`
-/// (--recursive). `x` and `X` are NOT aliased — they are
-/// distinct flags (`x` = --run, `X` = --extensionsort).
-const LOWERCASE_ALIASES: &[(char, char)] = &[
-    ('s', 'S'), // --sizesort
-    ('g', 'G'), // --gitsort
-    ('d', 'D'), // --only-dirs
-    ('l', 'L'), // --level
-    ('u', 'U'), // --no-sort
-];
-
-/// Flags that take a value (the value is the next argument).
-/// Used for smart expansion of chained lazy flags.
-const VALUE_TAKING_FLAGS: &[char] = &[
-    'm', // --max <MAX> (usize)
-    'f', // --filter <PATTERN> (String)
-    'L', // --level <LEVEL> (usize)
-];
-
-/// Result of expanding a lazy-flag chain. `flags` are the canonical
-/// flags in chain order; `binding_targets[i]` is true if flag `i` was
-/// marked with a `:` suffix and is therefore an explicit value-binding
-/// target (must consume the next arg as its value).
-#[derive(Debug, Clone, PartialEq)]
-struct ExpandedChain {
-    flags: Vec<char>,
-    binding_targets: Vec<bool>,
-}
-
-/// Resolve a single character to its canonical lazy-flag form
-/// (e.g. `s` → `S`). Returns `None` if the char is not a lazy flag.
-fn resolve_lazy_flag_char(c: char) -> Option<char> {
-    if LAZY_FLAGS.contains(&c) {
-        return Some(c);
-    }
-    for &(from, to) in LOWERCASE_ALIASES {
-        if c == from {
-            return Some(to);
-        }
-    }
-    None
-}
-
-/// Expand a multi-character arg into a list of canonical lazy flags.
-/// Returns `Some(Vec<char>)` if EVERY character in `arg` resolves to
-/// a lazy flag, `None` otherwise.
-///
-/// No fallback: `f trc` ALWAYS means `-t -r -c`. To show a banner
-/// for a path, the path must start with `./`, `/`, or `~` (explicit
-/// path indicators). Bare words are always lazy-flag chains.
-#[allow(dead_code)] // Used by unit tests; main uses expand_lazy_flags_with_binding
-fn expand_lazy_flags(arg: &str) -> Option<Vec<char>> {
-    expand_lazy_flags_with_binding(arg).map(|c| c.flags)
-}
-
-/// Expand a multi-character arg into a list of canonical lazy flags
-/// AND record which value-taking flags were marked as explicit
-/// value-binding targets with a `:` suffix.
-///
-/// Syntax:
-/// - `mL` → both flags, no binding targets (chain order applies).
-/// - `mL:` → `L` is a binding target; the next arg binds to `L`.
-/// - `m:L:` → both are binding targets; values bind in chain order.
-/// - `m:Lf:` → all three are binding targets.
-///
-/// Returns `None` if any character in `arg` is not a lazy flag
-/// (including stray `:` chars that are not immediately after a
-/// value-taking flag, or `:` chars that are not adjacent to a
-/// value-taking flag).
-fn expand_lazy_flags_with_binding(arg: &str) -> Option<ExpandedChain> {
-    if arg.is_empty() {
-        return None;
-    }
-    let mut flags = Vec::with_capacity(arg.len());
-    let mut binding_targets = Vec::with_capacity(arg.len());
-    let mut chars = arg.chars().peekable();
-    while let Some(c) = chars.next() {
-        let canonical = resolve_lazy_flag_char(c)?;
-        let is_value_taking = VALUE_TAKING_FLAGS.contains(&canonical);
-        // `:` is only valid immediately after a value-taking flag.
-        if is_value_taking && chars.peek() == Some(&':') {
-            chars.next(); // consume the `:`
-            flags.push(canonical);
-            binding_targets.push(true);
-        } else {
-            flags.push(canonical);
-            binding_targets.push(false);
-        }
-    }
-    Some(ExpandedChain {
-        flags,
-        binding_targets,
-    })
+/// Look up an alias by name. Returns the flag list if found, None otherwise.
+fn lookup_alias(name: &str) -> Option<&'static [&'static str]> {
+    BUILTIN_ALIASES
+        .iter()
+        .find(|(n, _)| *n == name)
+        .map(|(_, flags)| *flags)
 }
 
 /// Returns true if the arg looks like an explicit path (starts with
-/// `.`, `/`, or `~`). Used to disambiguate paths from lazy-flag chains
-/// in the routing logic.
+/// `.`, `/`, or `~`). Used to disambiguate paths from aliases.
 fn is_explicit_path(arg: &str) -> bool {
     if arg.is_empty() {
         return false;
@@ -141,178 +55,47 @@ fn is_explicit_path(arg: &str) -> bool {
     first == '.' || first == '/' || first == '~'
 }
 
+/// Expand a list of args: for each non-flag, non-path arg that matches
+/// a built-in alias, substitute the alias's flag list. Returns the
+/// expanded arg list and a list of positions where aliases were expanded.
+///
+/// The expansion produces: ["f", "banner", <expanded-flags-and-other-args>].
+fn expand_aliases_in_args(args: &[String]) -> Vec<String> {
+    let mut new_args: Vec<String> = vec!["f".to_string(), "banner".to_string()];
+    for a in args {
+        if a.starts_with('-') || is_explicit_path(a) || a.parse::<usize>().is_ok() {
+            // Explicit flag, path, or number — pass through unchanged.
+            new_args.push(a.clone());
+        } else if let Some(flags) = lookup_alias(a) {
+            // Known alias — expand to its flags.
+            for flag in flags {
+                new_args.push(flag.to_string());
+            }
+        } else {
+            // Unknown bare word — pass through (will become cwd banner).
+            new_args.push(a.clone());
+        }
+    }
+    new_args
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
 
     // If the user passed any explicit flags (starting with `-`), let clap
-    // handle the parsing directly. The lazy flag chain system is only for
-    // bare-word invocations like `f t`, `f trc`, `f m 10`.
+    // handle the parsing directly. Aliases are for bare-word invocations
+    // like `f tree`, `f hidden verbose`, `f top`.
     let has_explicit_flag = args.iter().any(|a| a.starts_with('-'));
     if has_explicit_flag {
         let cli = cli::Cli::parse();
         return cli.run();
     }
 
-    // Find the first non-flag argument (skip --debug, -d, etc.)
-    let first_non_flag = args.iter().find(|a| !a.starts_with('-'));
-
-    if let Some(arg) = first_non_flag {
-        // If it's a number → navigate (route to banner subcommand)
-        // NOTE: numbers take precedence over lazy flags, so `f 1` navigates
-        // to item 1, not --oneline.
-        if arg.parse::<usize>().is_ok() {
-            let mut new_args = vec!["f".to_string(), "banner".to_string()];
-            new_args.extend(args);
-            let cli = cli::Cli::parse_from(new_args);
-            return cli.run();
-        }
-
-        // If it's a known subcommand → let clap handle it
-        if KNOWN_SUBCOMMANDS.contains(&arg.as_str()) {
-            let cli = cli::Cli::parse();
-            return cli.run();
-        }
-
-        // If it's an explicit path (starts with `.`, `/`, or `~`) → path
-        // No fallback: bare words without explicit path indicators are
-        // always lazy-flag chains, never paths.
-        if is_explicit_path(arg) {
-            let mut new_args = vec!["f".to_string(), "banner".to_string()];
-            new_args.extend(args);
-            let cli = cli::Cli::parse_from(new_args);
-            return cli.run();
-        }
-
-        // If it's a single-char lazy flag (e.g. `t` → `-t`) or a chain
-        // of lazy flags (e.g. `trc` → `-t -r -c`) → expand it.
-        // No fallback: `f trc` ALWAYS means time+reverse+compact. Use
-        // `./trc` for a file/dir called `trc`.
-        //
-        // Value-taking flags in the chain consume the next arg as their
-        // value. E.g. `f mL 10 2 path` → `-m 10 -L 2 path`. The values
-        // are assigned in chain order to value-taking flags.
-        //
-        // A `:` immediately after a value-taking flag marks that flag
-        // as an EXPLICIT VALUE-BINDING TARGET. The next arg binds to
-        // that flag. Any non-target value-taking flags that come
-        // before the LAST target in the chain are OMITTED from the
-        // output entirely (clap requires a value for value-taking
-        // flags, so they cannot be pushed without one). E.g.
-        // `f mLf: 10` → `-f 10` (m and L are omitted, f gets 10).
-        // This answers the user's question: "what if we want to give
-        // the argument to the last one?"
-        if let Some(chain) = expand_lazy_flags_with_binding(arg) {
-            let arg_pos = args.iter().position(|a| a == arg).unwrap();
-            let mut new_args: Vec<String> = vec!["f".to_string(), "banner".to_string()];
-
-            // Args before the chain
-            for a in &args[..arg_pos] {
-                new_args.push(a.clone());
-            }
-
-            // Pre-compute: for each position, is there a binding target
-            // later in the chain? Non-target value-taking flags are
-            // omitted from the output if a target comes after them,
-            // because clap requires a value for value-taking flags.
-            let mut has_target_later: Vec<bool> = vec![false; chain.flags.len()];
-            let mut seen_target = false;
-            for i in (0..chain.flags.len()).rev() {
-                if chain.binding_targets[i] {
-                    seen_target = true;
-                }
-                has_target_later[i] = seen_target;
-            }
-
-            // Expand the chain, consuming values per the binding rules.
-            let mut value_idx = arg_pos + 1;
-            for (i, c) in chain.flags.iter().enumerate() {
-                if VALUE_TAKING_FLAGS.contains(c) {
-                    if chain.binding_targets[i] {
-                        // Explicit binding target: MUST consume the next arg.
-                        if value_idx < args.len() {
-                            new_args.push(format!("-{}", c));
-                            new_args.push(args[value_idx].clone());
-                            value_idx += 1;
-                        } else {
-                            eprintln!(
-                                "error: ':' after '{}' in chain '{}' requires a value, \
-                                 but no more arguments were provided.",
-                                c, arg
-                            );
-                            std::process::exit(2);
-                        }
-                    } else if has_target_later[i] {
-                        // Not a target, but a target comes later.
-                        // OMIT this flag entirely (clap would reject
-                        // a value-taking flag without a value, and
-                        // the user explicitly marked a later flag
-                        // as the binding target).
-                    } else if value_idx < args.len() {
-                        // Not a target, no target later, value available:
-                        // chain-order consumption.
-                        new_args.push(format!("-{}", c));
-                        new_args.push(args[value_idx].clone());
-                        value_idx += 1;
-                    } else {
-                        // Not a target, no target later, NO value available.
-                        // Error: the user put a value-taking flag in the
-                        // chain but didn't supply a value.
-                        eprintln!(
-                            "error: flag '-{}' in chain '{}' requires a value, \
-                             but no more arguments were provided. \
-                             Use '{}:' to mark which flag should receive the value, \
-                             or supply a value after the chain.",
-                            c, arg, c
-                        );
-                        std::process::exit(2);
-                    }
-                } else {
-                    // Boolean flag: always push.
-                    new_args.push(format!("-{}", c));
-                }
-            }
-
-            // Args after the consumed values (the path and any remaining args)
-            for a in &args[value_idx..] {
-                new_args.push(a.clone());
-            }
-
-            let cli = cli::Cli::parse_from(new_args);
-            return cli.run();
-        }
-
-        // Bare word that's not a lazy flag chain (e.g. contains a digit
-        // or non-flag char). This is an unusual case — we treat it as
-        // a path. The user should use `./` or `/` for explicit paths.
-        // If the arg looks like it MIGHT have been intended as a lazy
-        // chain (only alpha chars, but with at least one valid flag),
-        // give a helpful error explaining the lazy flag system.
-        if arg.chars().all(|c| c.is_ascii_alphabetic()) {
-            if arg.chars().any(|c| resolve_lazy_flag_char(c).is_some()) {
-                eprintln!(
-                    "error: '{}' is not a valid lazy flag chain. \
-                     Valid flags: a, c, D, e, f, G, L, m, o, r, R, S, t, U, v, x, X. \
-                     Use './{}' to treat it as a path.",
-                    arg, arg
-                );
-            } else {
-                eprintln!(
-                    "error: '{}' is not a valid lazy flag. \
-                     Valid flags: a, c, D, e, f, G, L, m, o, r, R, S, t, U, v, x, X. \
-                     Use './{}' to treat it as a path.",
-                    arg, arg
-                );
-            }
-            std::process::exit(2);
-        }
-        let mut new_args = vec!["f".to_string(), "banner".to_string()];
-        new_args.extend(args);
-        let cli = cli::Cli::parse_from(new_args);
-        return cli.run();
-    }
-
-    // No args or only flags → let clap handle it
-    let cli = cli::Cli::parse();
+    // Expand any built-in aliases in the args. Unknown bare words are
+    // passed through unchanged — the banner subcommand will treat them
+    // as "default banner for cwd" (no path, no flags).
+    let expanded = expand_aliases_in_args(&args);
+    let cli = cli::Cli::parse_from(expanded);
     cli.run()
 }
 
