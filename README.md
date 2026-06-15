@@ -142,6 +142,37 @@ f 3 -x       # force run the file directly
 
 ## CLI Flags (Actions)
 
+### Lazy Flags
+
+Single-character flags can be used without the leading dash.
+**No fallback**: `f t` always means `-t` (sort by time). To show a
+banner for a file or directory named `t`, use `./t` or an absolute
+path.
+
+| Lazy | Equivalent | Description |
+|------|------------|-------------|
+| `f t` | `f -t` | Sort by time modified |
+| `f S` | `f -S` | Sort by size |
+| `f X` | `f -X` | Sort by extension |
+| `f G` | `f -G` | Sort by git status |
+| `f r` | `f -r` | Reverse sort |
+| `f a` | `f -a` | Show hidden files |
+| `f c` | `f -c` | Compact output |
+| `f v` | `f -v` | Verbose output |
+| `f R` | `f -R` | Recurse into subdirectories |
+| `f D` | `f -D` | List only directories |
+| `f 1` | `f -1` | One file per line |
+| `f m` | `f -m` | Maximum items |
+| `f L` | `f -L` | Limit recursion depth |
+| `f f` | `f -f` | Filter by pattern |
+| `f U` | `f -U` | No sort |
+| `f e` | `f -e` | Force open in editor |
+| `f x` | `f -x` | Force run file |
+
+**Precedence**: numbers (`f 1` → navigate to item 1) take
+precedence over lazy flags, so `f 1` navigates rather than
+enabling oneline mode.
+
 ### Sorting
 | Flag | Description |
 |------|-------------|
@@ -260,7 +291,3 @@ MIT
 # live parallel test 1781472248
 # live parallel test 1781472742
 # live parallel test 1781473042
-# live parallel push test 1781480056
-# clean test 1781480418
-# activity label test 1781482126
-# fast test 1781482186

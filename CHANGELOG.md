@@ -1,3 +1,66 @@
+## [0.6.29] - 2026-06-15
+
+### Lazy flags (no fallback)
+
+- **`f t` ≡ `f -t`** — single-character short flags can now be used
+  without the leading dash. This applies to all 17 single-character
+  short flags: `t` (timesort), `S` (sizesort), `X` (extensionsort),
+  `G` (gitsort), `r` (reverse), `a` (hidden), `c` (compact),
+  `v` (verbose), `R` (recursive), `D` (only-dirs), `1` (oneline),
+  `m` (max), `L` (level), `f` (filter), `U` (no-sort), `e` (edit),
+  `x` (run).
+- **No fallback rule** — `f t` ALWAYS means `-t`. To show a banner
+  for a file or directory named `t`, use `./t` or an absolute path.
+  This avoids the ambiguity of "is this a flag or a path?" — the
+  answer is always "flag if it matches a known lazy flag".
+- **Number precedence** — `f 1` still navigates to item 1 (not
+  --oneline). Numbers take precedence over lazy flags because
+  navigation is a core feature.
+- **Subcommand precedence** — `f banner`, `f env`, `f install`,
+  `f config`, `f daemon`, `f help` all work as before.
+- **Path precedence** — multi-character args (e.g. `f Downloads`,
+  `f /home/user`) are treated as paths. Single-character args that
+  don't match a known flag (e.g. `f z`) are also treated as paths.
+
+### Implementation
+
+- Added `LAZY_FLAGS` constant in `src/main.rs` listing the 17
+  single-character short flags.
+- Added `is_lazy_flag(arg: &str) -> Option<char>` helper that
+  returns `Some(c)` if `arg` is exactly one character and matches
+  a known lazy flag, `None` otherwise.
+- Routing logic in `main()` now checks (in order): number → known
+  subcommand → lazy flag → path. The lazy-flag branch prepends
+  `-` to the arg and routes to the banner subcommand.
+- 4 new unit tests in `src/main.rs::tests`:
+  `test_is_lazy_flag_single_char`,
+  `test_is_lazy_flag_rejects_multi_char`,
+  `test_is_lazy_flag_rejects_unknown`,
+  `test_is_lazy_flag_rejects_empty`. All pass.
+
+### Validation
+
+- `cargo fmt --all -- --check`
+- `cargo check --all-targets`
+- `cargo clippy --all-targets --all-features -- -D warnings`
+- `cargo test --all-features` (137 tests, up from 133)
+- `cargo doc --no-deps`
+- `cargo build --release --locked`
+- `cargo publish --dry-run --locked`
+- Manual verification: `f t` ≡ `f --timesort`, `f S` ≡
+  `f --sizesort`, `f c` ≡ `f -c`, `f 1` still navigates,
+  `f Downloads` still works as path, `f /abs/path` still works.
+
+### Preserved behavior
+
+- `f N` (number navigation) unchanged.
+- `f banner <path>` unchanged.
+- `f env`, `f install`, `f config`, `f daemon`, `f help` unchanged.
+- All long flags (`--timesort`, `--sizesort`, etc.) unchanged.
+- All combined flags (e.g. `f -tc`) unchanged.
+- Path with single-char name still works when explicitly prefixed
+  (e.g. `./t` or `/abs/t`).
+
 ## [0.6.28] - 2026-06-15
 
 ### Correctness fixes (disk cache + inotify)
