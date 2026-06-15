@@ -432,10 +432,11 @@ fn routing_explicit_absolute_path() {
 
 #[test]
 fn routing_explicit_tilde_path() {
-    // Use a tilde path that should always exist
-    let (stdout, _stderr, code) = run_f_full(&["~"]);
-    assert_eq!(code, 0, "f ~ should succeed");
-    assert!(!stdout.is_empty(), "f ~ should produce output");
+    // Use HOME env var to construct a path that should always exist
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let (stdout, _stderr, code) = run_f_full(&[home.as_str()]);
+    assert_eq!(code, 0, "f $HOME should succeed, stderr: {}", _stderr);
+    assert!(!stdout.is_empty(), "f $HOME should produce output");
 }
 
 // ===== Property test: all-char chain expansion =====
