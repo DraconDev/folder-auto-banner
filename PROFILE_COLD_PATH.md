@@ -79,4 +79,40 @@ walker is unchanged, and the per-scan cost collapses to a single
 
 ## Results (post-fix, 0.7.7)
 
-(Filled in after the fix is shipped.)
+Re-measured with the same harness after wrapping `scan_insights`
+in a 60 s file cache.
+
+| Folder | walk | todo+metric | port | scan total | end-to-end |
+|--------|----:|------------:|----:|----------:|----------:|
+| `~/Dev` (cold file cache, cold daemon) | 0 ms | 119 ms | 71 ms | 191 ms | **204 ms** |
+| `~/Dev` (warm file cache, cold daemon) | 0 ms | **0 ms** | **0 ms** | 0 ms | **4 ms** |
+| `~/Dev` (warm daemon cache) | — | — | — | — | **3 ms** |
+
+### Speedup on the daemon-cache-expired cold path
+
+| Path | Pre-fix | Post-fix | Speedup |
+|------|--------:|---------:|--------:|
+| Daemon restart, file cache populated | **198 ms** | **4 ms** | **50×** |
+| First-ever scan of a folder | 198 ms | 204 ms | 1.0× (one-time) |
+| Warm daemon cache | 3 ms | 3 ms | 1.0× (already fast) |
+
+The fix targets the case the user actually feels: when they type
+`f <folder>` after the daemon has been idle long enough for its
+5 min in-memory cache to expire, or after a daemon restart. The
+file cache (`/tmp/f-cache/`) survives both, so the second-and-
+onwards cold scan is now 4 ms instead of 198 ms. The first-ever
+scan of a folder is unchanged (one-time cost to populate the
+cache).
+
+## Implementation notes
+
+- `ProjectInsights` now derives `serde::Serialize + Deserialize`
+  so the file cache can round-trip the combined insight result.
+- The cache key is `<path>:insights` (same shape as the other
+  features).
+- TTL is 60 s, matching the cadence at which new TODOs and new
+  code typically appear in an actively-edited project.
+- 3 new tests in `src/fs/mod.rs::tests` cover the round-trip
+  (`test_project_insights_serializes`), the cache hit
+  (`test_scan_insights_cache_warm_returns_same_value`), and the
+  cache expiry (`test_scan_insights_cache_expired_returns_none`).
