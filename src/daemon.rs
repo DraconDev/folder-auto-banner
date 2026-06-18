@@ -1128,7 +1128,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let mut git_info: Option<folder_auto_banner::git::GitInfo> = None;
     if let Some(ref cache) = cache {
         let ck = folder_auto_banner::cache::cache_key(path, "git");
-        if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(10)) {
+        if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
             git_info = Some(cached);
         }
     }
