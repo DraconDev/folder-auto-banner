@@ -115,6 +115,29 @@ mirroring the pattern for `scan_insights`. The cache key is
 | `~/Dev/dracon-platform/web/music` (daemon restart, file cache warm) | **8.3 s** | **61 ms** | **136×** |
 | `~/Dev/dracon-platform/web/music` (warm daemon cache) | 2 ms | 2 ms | 1.0× (already fast) |
 
+### Replace libgit2 with native git (0.7.9)
+
+The 0.7.8 file cache helped for repeated scans, but the root cause
+remained: libgit2's `repo.statuses()` is 500× slower than native
+git on large repos. libgit2 lacks git's index optimization,
+untracked cache, and fsmonitor hook.
+
+**Fix:** Replace the entire `git2` crate (and its `libgit2-sys` C
+dependency) with native `git` subprocess calls in `src/git/mod.rs`.
+All 10 git data fields are collected via `git -C <path>` commands
+spawned in parallel threads. The total cost is dominated by `git
+status --porcelain` (15-33ms).
+
+| Path | libgit2 (0.7.8) | native git (0.7.9) | Speedup |
+|------|----------------:|-------------------:|--------:|
+| `~/Dev/dracon-platform/web/music` (truly cold) | 5-8 s | **104 ms** | **50-80×** |
+| `~/Dev/dracon-platform/web/music` (warm daemon cache) | 2 ms | 2 ms | 1.0× |
+| `~/Dev/dracon-platform/web/music` (daemon restart, file cache warm) | 8+ s | **15 ms** | **500×** |
+| `~/Dev/folder-auto-banner` (cold) | 215 ms | **110 ms** | **2×** |
+
+The `git2` and `libgit2-sys` C dependencies have been removed from
+Cargo.toml, reducing compile time significantly.
+
 ## Implementation notes
 
 - `ProjectInsights` now derives `serde::Serialize + Deserialize`

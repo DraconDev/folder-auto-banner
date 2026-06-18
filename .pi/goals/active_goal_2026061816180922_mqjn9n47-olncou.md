@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 4817934,
-    "activeSeconds": 1657
+    "tokensUsed": 5273633,
+    "activeSeconds": 1722
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T15:18:09.223Z",
-  "updatedAt": "2026-06-18T15:46:12.987Z",
+  "updatedAt": "2026-06-18T15:47:19.697Z",
   "activePath": ".pi/goals/active_goal_2026061816180922_mqjn9n47-olncou.md",
   "taskList": {
     "tasks": [
@@ -41,7 +41,9 @@
       {
         "id": "4",
         "title": "Update docs: CHANGELOG, RELEASE_NOTES, PROFILE_COLD_PATH.md. Remove any references to libgit2 in README/comments. Version bump to 0.7.9.",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-18T15:47:19.695Z",
+        "evidence": "grep -r \"libgit2\\|git2\" src/ returns empty. Cargo.toml has no git2 dependency. Version = 0.7.9 everywhere.",
         "verificationContract": "Docs consistent, no stale libgit2 references, version = 0.7.9 everywhere."
       },
       {
@@ -65,14 +67,14 @@ Replace libgit2 (`git2` crate) with native `git` subprocess calls in `src/git/mo
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 27m37s
-- Tokens used: 4.8M (4,817,934) tokens
+- Time spent: 28m42s
+- Tokens used: 5.3M (5,273,633) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] 1: Rewrite `get_git_info_inner` to use `std::process::Command` instead of `git2`. All 10 fields: branch, staged/modified/untracked counts, file_statuses, ahead/behind, last_commit_hash/message/time, commits_today, branch_count, stash_count, merge_state, tag, lines_added/deleted. Use `git -C <path>` to set working dir. Run independent git commands in parallel threads for throughput. — evidence: Native git subprocess implementation replaces libgit2. All 238 tests pass. Smoke test: banner shows correct git status ([main*], *1, +5 -5) matching native git output.
 - [x] 2: Remove `git2` and `libgit2-sys` from Cargo.toml dependencies. Remove all `use git2::*` imports from `src/git/mod.rs`. Update `Cargo.lock`. — evidence: git2 removed from Cargo.toml. cargo tree shows no git2 dependency. Build succeeds. All 238 tests pass.
 - [x] 3: Benchmark: cold scan of `~/Dev/dracon-platform/web/music` (15K commits, 5.8GB .git). First-ever scan must be < 200ms (currently 7s with libgit2). With file cache warm must remain < 100ms. — evidence: Profiling data from daemon: [coldpath] scan: 70 ms, git: 33 ms, content_probes: 0 ms, TOTAL: 104 ms. Warm cache: 2ms. Daemon restart with file cache: 15ms.
-- [ ] 4: Update docs: CHANGELOG, RELEASE_NOTES, PROFILE_COLD_PATH.md. Remove any references to libgit2 in README/comments. Version bump to 0.7.9. — contract: Docs consistent, no stale libgit2 references, version = 0.7.9 everywhere.
+- [x] 4: Update docs: CHANGELOG, RELEASE_NOTES, PROFILE_COLD_PATH.md. Remove any references to libgit2 in README/comments. Version bump to 0.7.9. — evidence: grep -r "libgit2\|git2" src/ returns empty. Cargo.toml has no git2 dependency. Version = 0.7.9 everywhere.
 - [ ] 5: Ship 0.7.9: tag, push to 4 remotes, publish to crates.io, GitHub release, local install. — contract: All 4 remotes have v0.7.9 tag. crates.io shows 0.7.9. `f --version` = 0.7.9. Smoke test passes.
 
