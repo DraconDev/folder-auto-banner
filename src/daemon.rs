@@ -1109,12 +1109,15 @@ fn persist_banner_data_cache(path: &Path, data: &BannerData) {
 }
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
+    let _t0 = std::time::Instant::now();
     let mut summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
+    eprintln!("[coldpath] scan: {} ms", _t0.elapsed().as_millis());
 
     // Build pathspecs for git status collection. Files use their exact
     // top-level name; directories use `dir/*` so native git status only
     // walks immediate children the banner displays or aggregates.
     let filter_paths = folder_auto_banner::git::status_filter_paths_for_items(&summary.top_items);
+    let _t1 = std::time::Instant::now();
     // Cache git status for 60s. On a large repo (e.g. dracon-platform
     // with 15K commits and a 5.8 GB .git), the first git status call
     // can take 8+ seconds. The daemon's BannerCache (5 min) covers
