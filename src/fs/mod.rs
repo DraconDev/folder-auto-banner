@@ -185,10 +185,7 @@ impl DirSummary {
         check_docker: bool,
         check_metrics: bool,
     ) -> Result<Self> {
-        let _t_pt = std::time::Instant::now();
         let project_type = ProjectType::detect(path);
-        eprintln!("[profile.scan] project_type: {} ms", _t_pt.elapsed().as_millis());
-        let _t_walk = std::time::Instant::now();
         let mut total_size: u64 = 0;
         let mut files = 0;
         let mut dirs = 0;
@@ -392,8 +389,6 @@ impl DirSummary {
             };
         }
 
-        eprintln!("[profile.scan] walk:         {} ms", _t_walk.elapsed().as_millis());
-        let _t_bs = std::time::Instant::now();
         let build_status = cached_check!(
             check_build,
             cache,
