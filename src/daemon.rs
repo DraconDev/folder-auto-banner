@@ -495,7 +495,16 @@ fn watch_loop(
                                 tracing::warn!("Mutex poisoned, recovering");
                                 e.into_inner()
                             });
+                            // Only invalidate if the cache entry is older than
+                            // 10 seconds. This prevents rapid-fire invalidations
+                            // in active directories like /tmp.
+                            const MIN_INVALIDATION_AGE: Duration = Duration::from_secs(10);
                             for path in &invalidated {
+                                if let Some(entry) = cache_guard.get(path) {
+                                    if entry.computed_at.elapsed() < MIN_INVALIDATION_AGE {
+                                        continue;
+                                    }
+                                }
                                 if cache_guard.remove(path).is_some() {
                                     prune_size_cache_for_root(&dir_sizes, &dir_size_mtimes, path);
                                     tracing::info!("Cache invalidated: {}", path.display());
