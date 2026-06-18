@@ -10,6 +10,7 @@ use std::sync::OnceLock;
 
 /// Project type detection
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProjectType {
     Rust,
     Node,
@@ -399,7 +400,7 @@ impl DirSummary {
             crate::build_status::check_build(path, &project_type)
         );
         eprintln!("[scan] build_status: {} ms", _t_scan.elapsed().as_millis());
-        let (todo_info, code_metrics) = if scan_todos || check_metrics {
+        let (todo_info, code_metrics) = if (scan_todos || check_metrics) && project_type != ProjectType::Generic {
             // Cache the combined scan_insights result (TODO counts and
             // code metrics are computed in a single bounded tree walk;
             // there is no benefit to splitting the cache). TTL is 60s:
@@ -408,6 +409,9 @@ impl DirSummary {
             // pre-fix code re-ran scan_insights on every call, which
             // was 60-65% of the cold-path time on /home/dracon/Dev
             // (127 ms of 198 ms total). See PROFILE_COLD_PATH.md.
+            //
+            // Skip for Generic (non-code) directories — scanning
+            // Downloads or temp folders for TODOs/LOC is pure waste.
             let scan_closure = || crate::project_insights::scan_insights(path).ok();
             let insights_opt: Option<crate::project_insights::ProjectInsights> =
                 if let Some(ref cache) = cache {
