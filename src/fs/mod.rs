@@ -406,22 +406,23 @@ impl DirSummary {
             // was 60-65% of the cold-path time on /home/dracon/Dev
             // (127 ms of 198 ms total). See PROFILE_COLD_PATH.md.
             let scan_closure = || crate::project_insights::scan_insights(path).ok();
-            let insights_opt: Option<crate::project_insights::ProjectInsights> = if let Some(ref cache) = cache {
-                let ck = crate::cache::cache_key(path, "insights");
-                if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
-                    Some(cached)
-                } else {
-                    let result = scan_closure();
-                    if let Some(ref r) = result {
-                        if let Err(e) = cache.set(&ck, r.clone()) {
-                            tracing::warn!("Failed to cache insights: {}", e);
+            let insights_opt: Option<crate::project_insights::ProjectInsights> =
+                if let Some(ref cache) = cache {
+                    let ck = crate::cache::cache_key(path, "insights");
+                    if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
+                        Some(cached)
+                    } else {
+                        let result = scan_closure();
+                        if let Some(ref r) = result {
+                            if let Err(e) = cache.set(&ck, r.clone()) {
+                                tracing::warn!("Failed to cache insights: {}", e);
+                            }
                         }
+                        result
                     }
-                    result
-                }
-            } else {
-                scan_closure()
-            };
+                } else {
+                    scan_closure()
+                };
             match insights_opt {
                 Some(insights) => (
                     scan_todos.then_some(insights.todos),
