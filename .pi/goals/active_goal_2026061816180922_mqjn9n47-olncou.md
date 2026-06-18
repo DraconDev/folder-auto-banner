@@ -1,0 +1,72 @@
+{
+  "version": 3,
+  "id": "mqjn9n47-olncou",
+  "objective": "Replace libgit2 (`git2` crate) with native `git` subprocess calls in `src/git/mod.rs`. On a 15K-commit repo with 5.8GB .git, native `git status --porcelain` takes 15ms vs libgit2's 7200ms (500× gap). The git binary has index/untracked-cache/fsmonitor optimizations that libgit2 fundamentally lacks.",
+  "status": "active",
+  "autoContinue": true,
+  "usage": {
+    "tokensUsed": 265530,
+    "activeSeconds": 77
+  },
+  "sisyphus": false,
+  "createdAt": "2026-06-18T15:18:09.223Z",
+  "updatedAt": "2026-06-18T15:19:27.450Z",
+  "activePath": ".pi/goals/active_goal_2026061816180922_mqjn9n47-olncou.md",
+  "taskList": {
+    "tasks": [
+      {
+        "id": "1",
+        "title": "Rewrite `get_git_info_inner` to use `std::process::Command` instead of `git2`. All 10 fields: branch, staged/modified/untracked counts, file_statuses, ahead/behind, last_commit_hash/message/time, commits_today, branch_count, stash_count, merge_state, tag, lines_added/deleted. Use `git -C <path>` to set working dir. Run independent git commands in parallel threads for throughput.",
+        "status": "pending",
+        "verificationContract": "All existing git-related tests pass. `get_git_info` returns identical data for a test repo."
+      },
+      {
+        "id": "2",
+        "title": "Remove `git2` and `libgit2-sys` from Cargo.toml dependencies. Remove all `use git2::*` imports from `src/git/mod.rs`. Update `Cargo.lock`.",
+        "status": "pending",
+        "verificationContract": "`cargo build --release` succeeds with no git2 references. `cargo tree` shows no git2 dependency. Compile time visibly faster."
+      },
+      {
+        "id": "3",
+        "title": "Benchmark: cold scan of `~/Dev/dracon-platform/web/music` (15K commits, 5.8GB .git). First-ever scan must be < 200ms (currently 7s with libgit2). With file cache warm must remain < 100ms.",
+        "status": "pending",
+        "verificationContract": "PROFILE_COLD_PATH.md updated with new before/after numbers. Cold git status < 200ms on dracon-platform."
+      },
+      {
+        "id": "4",
+        "title": "Update docs: CHANGELOG, RELEASE_NOTES, PROFILE_COLD_PATH.md. Remove any references to libgit2 in README/comments. Version bump to 0.7.9.",
+        "status": "pending",
+        "verificationContract": "Docs consistent, no stale libgit2 references, version = 0.7.9 everywhere."
+      },
+      {
+        "id": "5",
+        "title": "Ship 0.7.9: tag, push to 4 remotes, publish to crates.io, GitHub release, local install.",
+        "status": "pending",
+        "verificationContract": "All 4 remotes have v0.7.9 tag. crates.io shows 0.7.9. `f --version` = 0.7.9. Smoke test passes."
+      }
+    ],
+    "blockCompletion": false,
+    "proposedAt": "2026-06-18T15:18:09.225Z"
+  }
+}
+
+# Goal Prompt
+
+Replace libgit2 (`git2` crate) with native `git` subprocess calls in `src/git/mod.rs`. On a 15K-commit repo with 5.8GB .git, native `git status --porcelain` takes 15ms vs libgit2's 7200ms (500× gap). The git binary has index/untracked-cache/fsmonitor optimizations that libgit2 fundamentally lacks.
+
+## Progress
+
+- Status: running
+- Auto-continue: on
+- Sisyphus mode: no
+- Time spent: 1m17s
+- Tokens used: 266K (265,530) tokens
+## Tasks
+
+<!-- blockCompletion: false -->
+- [ ] 1: Rewrite `get_git_info_inner` to use `std::process::Command` instead of `git2`. All 10 fields: branch, staged/modified/untracked counts, file_statuses, ahead/behind, last_commit_hash/message/time, commits_today, branch_count, stash_count, merge_state, tag, lines_added/deleted. Use `git -C <path>` to set working dir. Run independent git commands in parallel threads for throughput. — contract: All existing git-related tests pass. `get_git_info` returns identical data for a test repo.
+- [ ] 2: Remove `git2` and `libgit2-sys` from Cargo.toml dependencies. Remove all `use git2::*` imports from `src/git/mod.rs`. Update `Cargo.lock`. — contract: `cargo build --release` succeeds with no git2 references. `cargo tree` shows no git2 dependency. Compile time visibly faster.
+- [ ] 3: Benchmark: cold scan of `~/Dev/dracon-platform/web/music` (15K commits, 5.8GB .git). First-ever scan must be < 200ms (currently 7s with libgit2). With file cache warm must remain < 100ms. — contract: PROFILE_COLD_PATH.md updated with new before/after numbers. Cold git status < 200ms on dracon-platform.
+- [ ] 4: Update docs: CHANGELOG, RELEASE_NOTES, PROFILE_COLD_PATH.md. Remove any references to libgit2 in README/comments. Version bump to 0.7.9. — contract: Docs consistent, no stale libgit2 references, version = 0.7.9 everywhere.
+- [ ] 5: Ship 0.7.9: tag, push to 4 remotes, publish to crates.io, GitHub release, local install. — contract: All 4 remotes have v0.7.9 tag. crates.io shows 0.7.9. `f --version` = 0.7.9. Smoke test passes.
+
