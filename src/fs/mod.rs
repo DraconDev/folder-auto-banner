@@ -210,17 +210,11 @@ impl DirSummary {
         for entry in entries.flatten() {
             item_count += 1;
             if item_count > MAX_ITEMS {
-                // For the remaining entries, just count files/dirs
-                // without collecting metadata
-                let ft = entry.file_type();
-                let is_dir = ft.as_ref().map(|f| f.is_dir()).unwrap_or(false);
-                let is_file = ft.as_ref().map(|f| f.is_file()).unwrap_or(false);
-                if is_dir {
-                    dirs += 1;
-                } else if is_file {
-                    files += 1;
-                }
-                continue;
+                // Don't even read file_type for remaining entries —
+                // just break out of the loop entirely. The banner
+                // only displays a limited number of items, so walking
+                // 100K+ entries is pure waste.
+                break;
             }
 
             let file_type = entry.file_type();
