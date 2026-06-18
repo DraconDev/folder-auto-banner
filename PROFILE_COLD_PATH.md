@@ -96,13 +96,24 @@ in a 60 s file cache.
 | First-ever scan of a folder | 198 ms | 204 ms | 1.0× (one-time) |
 | Warm daemon cache | 3 ms | 3 ms | 1.0× (already fast) |
 
-The fix targets the case the user actually feels: when they type
-`f <folder>` after the daemon has been idle long enough for its
-5 min in-memory cache to expire, or after a daemon restart. The
-file cache (`/tmp/f-cache/`) survives both, so the second-and-
-onwards cold scan is now 4 ms instead of 198 ms. The first-ever
-scan of a folder is unchanged (one-time cost to populate the
-cache).
+### Speedup for large git repos (0.7.8)
+
+Additional fix: git status on `~/Dev/dracon-platform/web/music`
+(15K commits, 5.8 GB `.git`) was the dominant bottleneck (8+ s
+per cold scan) after the scan_insights fix. The daemon's
+BannerCache (5 min) covers the common case, but after it expires
+or on daemon restart the full `repo.statuses()` call in libgit2
+re-runs.
+
+**Fix:** cache `GitInfo` in the file cache with a 60 s TTL,
+mirroring the pattern for `scan_insights`. The cache key is
+`<path>:git`.
+
+| Path | Pre-fix | Post-fix | Speedup |
+|------|--------:|---------:|--------:|
+| `~/Dev/dracon-platform/web/music` (truly cold) | 8.3 s | 8.3 s | 1.0× (one-time) |
+| `~/Dev/dracon-platform/web/music` (daemon restart, file cache warm) | **8.3 s** | **61 ms** | **136×** |
+| `~/Dev/dracon-platform/web/music` (warm daemon cache) | 2 ms | 2 ms | 1.0× (already fast) |
 
 ## Implementation notes
 
