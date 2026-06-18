@@ -10,7 +10,6 @@ use std::sync::OnceLock;
 
 /// Project type detection
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(Debug, Clone, PartialEq)]
 pub enum ProjectType {
     Rust,
     Node,
