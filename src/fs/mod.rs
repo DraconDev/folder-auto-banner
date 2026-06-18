@@ -185,10 +185,7 @@ impl DirSummary {
         check_docker: bool,
         check_metrics: bool,
     ) -> Result<Self> {
-        let _t_pt = std::time::Instant::now();
         let project_type = ProjectType::detect(path);
-        eprintln!("[profile.scan] project_type: {} ms", _t_pt.elapsed().as_millis());
-        let _t_walk = std::time::Instant::now();
         let mut total_size: u64 = 0;
         let mut files = 0;
         let mut dirs = 0;
@@ -392,8 +389,6 @@ impl DirSummary {
             };
         }
 
-        eprintln!("[profile.scan] walk:         {} ms", _t_walk.elapsed().as_millis());
-        let _t_bs = std::time::Instant::now();
         let build_status = cached_check!(
             check_build,
             cache,
@@ -401,8 +396,6 @@ impl DirSummary {
             30,
             crate::build_status::check_build(path, &project_type)
         );
-        eprintln!("[profile.scan] build:       {} ms", _t_bs.elapsed().as_millis());
-        let _t_todo = std::time::Instant::now();
         let (todo_info, code_metrics) = if scan_todos || check_metrics {
             // Cache the combined scan_insights result (TODO counts and
             // code metrics are computed in a single bounded tree walk;
@@ -440,8 +433,6 @@ impl DirSummary {
             (None, None)
         };
 
-        eprintln!("[profile.scan] todo+metric: {} ms", _t_todo.elapsed().as_millis());
-        let _t_port = std::time::Instant::now();
         let port_info = cached_check!(
             check_ports,
             cache,
@@ -456,7 +447,6 @@ impl DirSummary {
             10,
             crate::docker::detect_docker(path).ok()
         );
-        eprintln!("[profile.scan] port:        {} ms", _t_port.elapsed().as_millis());
 
         Ok(DirSummary {
             total_items: files + dirs,
