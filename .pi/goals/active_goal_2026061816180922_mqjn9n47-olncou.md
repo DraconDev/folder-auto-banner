@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 7037033,
-    "activeSeconds": 2054
+    "tokensUsed": 7279264,
+    "activeSeconds": 2082
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T15:18:09.223Z",
-  "updatedAt": "2026-06-18T15:53:01.262Z",
+  "updatedAt": "2026-06-18T15:53:30.146Z",
   "activePath": ".pi/goals/active_goal_2026061816180922_mqjn9n47-olncou.md",
   "taskList": {
     "tasks": [
@@ -49,7 +49,9 @@
       {
         "id": "5",
         "title": "Ship 0.7.9: tag, push to 4 remotes, publish to crates.io, GitHub release, local install.",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-18T15:53:30.142Z",
+        "evidence": "crates.io shows 0.7.9. GitHub release published. All 4 remotes have v0.7.9 tag at 070932f. Local f --version = 0.7.9. Smoke test passes.",
         "verificationContract": "All 4 remotes have v0.7.9 tag. crates.io shows 0.7.9. `f --version` = 0.7.9. Smoke test passes."
       }
     ],
@@ -67,8 +69,8 @@ Replace libgit2 (`git2` crate) with native `git` subprocess calls in `src/git/mo
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 34m14s
-- Tokens used: 7M (7,037,033) tokens
+- Time spent: 34m42s
+- Tokens used: 7.3M (7,279,264) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -76,5 +78,5 @@ Replace libgit2 (`git2` crate) with native `git` subprocess calls in `src/git/mo
 - [x] 2: Remove `git2` and `libgit2-sys` from Cargo.toml dependencies. Remove all `use git2::*` imports from `src/git/mod.rs`. Update `Cargo.lock`. — evidence: git2 removed from Cargo.toml. cargo tree shows no git2 dependency. Build succeeds. All 238 tests pass.
 - [x] 3: Benchmark: cold scan of `~/Dev/dracon-platform/web/music` (15K commits, 5.8GB .git). First-ever scan must be < 200ms (currently 7s with libgit2). With file cache warm must remain < 100ms. — evidence: Profiling data from daemon: [coldpath] scan: 70 ms, git: 33 ms, content_probes: 0 ms, TOTAL: 104 ms. Warm cache: 2ms. Daemon restart with file cache: 15ms.
 - [x] 4: Update docs: CHANGELOG, RELEASE_NOTES, PROFILE_COLD_PATH.md. Remove any references to libgit2 in README/comments. Version bump to 0.7.9. — evidence: grep -r "libgit2\|git2" src/ returns empty. Cargo.toml has no git2 dependency. Version = 0.7.9 everywhere.
-- [ ] 5: Ship 0.7.9: tag, push to 4 remotes, publish to crates.io, GitHub release, local install. — contract: All 4 remotes have v0.7.9 tag. crates.io shows 0.7.9. `f --version` = 0.7.9. Smoke test passes.
+- [x] 5: Ship 0.7.9: tag, push to 4 remotes, publish to crates.io, GitHub release, local install. — evidence: crates.io shows 0.7.9. GitHub release published. All 4 remotes have v0.7.9 tag at 070932f. Local f --version = 0.7.9. Smoke test passes.
 
