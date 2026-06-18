@@ -206,6 +206,7 @@ impl DirSummary {
         // this limit.
         const MAX_ITEMS: usize = 500;
         let mut item_count = 0;
+        let mut hit_cap = false;
 
         for entry in entries.flatten() {
             item_count += 1;
@@ -214,6 +215,7 @@ impl DirSummary {
                 // just break out of the loop entirely. The banner
                 // only displays a limited number of items, so walking
                 // 100K+ entries is pure waste.
+                hit_cap = true;
                 break;
             }
 
@@ -416,7 +418,7 @@ impl DirSummary {
             crate::build_status::check_build(path, &project_type)
         );
         eprintln!("[scan] build_status: {} ms", _t_scan.elapsed().as_millis());
-        let (todo_info, code_metrics) = if (scan_todos || check_metrics) && project_type != ProjectType::Generic && (files + dirs) <= 1000 {
+        let (todo_info, code_metrics) = if (scan_todos || check_metrics) && project_type != ProjectType::Generic && !hit_cap {
             // Cache the combined scan_insights result (TODO counts and
             // code metrics are computed in a single bounded tree walk;
             // there is no benefit to splitting the cache). TTL is 60s:
