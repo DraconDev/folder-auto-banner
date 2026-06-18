@@ -1109,17 +1109,13 @@ fn persist_banner_data_cache(path: &Path, data: &BannerData) {
 }
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
-    let _t0 = std::time::Instant::now();
     let mut summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
-    eprintln!("[coldpath] scan: {} ms", _t0.elapsed().as_millis());
 
     // Build pathspecs for git status collection. Files use their exact
     // top-level name; directories use `dir/*` so libgit2 only walks immediate
     // children that the banner displays or aggregates.
-    let _t1 = std::time::Instant::now();
     let filter_paths = folder_auto_banner::git::status_filter_paths_for_items(&summary.top_items);
-    let _t2 = std::time::Instant::now();
-    // Cache git_status for 10s. On a large repo (e.g. dracon-platform
+    // Cache git status for 60s. On a large repo (e.g. dracon-platform
     // with 15K commits and a 5.8 GB .git), the first git status call
     // can take 8+ seconds. The daemon's BannerCache (5 min) covers
     // the common case, but when it expires we don't want to re-pay
@@ -1139,9 +1135,6 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
             let _ = cache.set(&ck, gi.clone());
         }
     }
-    let _t3 = std::time::Instant::now();
-    eprintln!("[coldpath] git_prep: {} ms", _t2.duration_since(_t1).as_millis());
-    eprintln!("[coldpath] git_status: {} ms", _t3.duration_since(_t2).as_millis());
 
     if let Some(ref mut gi) = git_info {
         if !gi.file_statuses.is_empty() {
@@ -1164,11 +1157,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     // travel with the BannerData and are cached on the daemon for the
     // configured CACHE_TTL (5 min by default), so the per-file I/O happens
     // at most once per TTL window per directory.
-    let _t4 = std::time::Instant::now();
     populate_content_probes(&mut summary.top_items);
-    let _t5 = std::time::Instant::now();
-    eprintln!("[coldpath] content_probes: {} ms", _t5.duration_since(_t4).as_millis());
-    eprintln!("[coldpath] TOTAL: {} ms", _t0.elapsed().as_millis());
 
     // Return immediately — sizes come from global cache
     Ok(BannerData { summary, git_info })
