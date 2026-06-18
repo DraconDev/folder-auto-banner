@@ -185,7 +185,6 @@ impl DirSummary {
         check_docker: bool,
         check_metrics: bool,
     ) -> Result<Self> {
-        let _t_scan = std::time::Instant::now();
         let project_type = ProjectType::detect(path);
         let mut total_size: u64 = 0;
         let mut files = 0;
@@ -380,7 +379,6 @@ impl DirSummary {
         // `to_lowercase` allocates; cache the key once per item instead of
         // lowercasing on every comparison.
         top_items.sort_by_cached_key(|item| (!item.is_dir, item.name.to_lowercase()));
-        eprintln!("[scan] walk: {} ms", _t_scan.elapsed().as_millis());
 
         // Run optional checks with caching
         let cache = crate::cache::Cache::new().ok();
@@ -417,7 +415,6 @@ impl DirSummary {
             30,
             crate::build_status::check_build(path, &project_type)
         );
-        eprintln!("[scan] build_status: {} ms", _t_scan.elapsed().as_millis());
         let (todo_info, code_metrics) = if (scan_todos || check_metrics) && project_type != ProjectType::Generic && !hit_cap {
             // Cache the combined scan_insights result (TODO counts and
             // code metrics are computed in a single bounded tree walk;
@@ -458,7 +455,6 @@ impl DirSummary {
         } else {
             (None, None)
         };
-        eprintln!("[scan] insights: {} ms", _t_scan.elapsed().as_millis());
 
         let port_info = cached_check!(
             check_ports,
@@ -474,7 +470,6 @@ impl DirSummary {
             10,
             crate::docker::detect_docker(path).ok()
         );
-        eprintln!("[scan] ports+docker: {} ms", _t_scan.elapsed().as_millis());
 
         Ok(DirSummary {
             total_items: files + dirs,
