@@ -38,9 +38,10 @@ pub struct GitInfo {
 
 /// Build git status pathspecs for the banner rows.
 ///
-/// Files use their exact top-level name. Directories use `dir/*` so libgit2
-/// only walks the immediate children that the banner can display or aggregate,
-/// instead of scanning every nested file under large trees.
+/// Files use their exact top-level name. Directories use `dir/*` so the
+/// native `git status` walk only returns immediate children that the banner
+/// can display or aggregate, instead of scanning every nested file under
+/// large trees.
 pub fn status_filter_paths_for_items(items: &[crate::fs::DirEntry]) -> Vec<String> {
     items
         .iter()
@@ -113,6 +114,206 @@ pub fn get_git_info(path: &Path) -> Result<GitInfo> {
 /// Get Git info with optional path filtering for performance.
 pub fn get_git_info_filtered(path: &Path, filter_paths: &[String]) -> Result<GitInfo> {
     get_git_info_inner(path, true, filter_paths)
+}
+
+/// Result of parsing `git status --porcelain`.
+struct StatusResult {
+    staged: usize,
+    modified: usize,
+    untracked: usize,
+    file_statuses: std::collections::HashMap<String, FileStatus>,
+}
+
+impl Default for StatusResult {
+    fn default() -> Self {
+        Self {
+            staged: 0,
+            modified: 0,
+            untracked: 0,
+            file_statuses: std::collections::HashMap::new(),
+        }
+    }
+}
+
+/// Parse `git status --porcelain` output.
+///
+/// Format: `XY filename` where X is index status, Y is worktree status.
+/// X/Y codes: ' ' unmodified, M modified, A added, D deleted, R renamed,
+///            C copied, U unmerged, ? untracked, ! ignored
+fn git_status(
+    path: &Path,
+    collect_file_statuses: bool,
+    filter_paths: &[String],
+) -> StatusResult {
+    let mut args = vec!["status", "--porcelain", "-z"];
+    let filter_args: Vec<String>;
+    if !filter_paths.is_empty() {
+        args.push("--");
+        // Build owned strings so they live long enough
+        filter_args = filter_paths.to_vec();
+        for fp in &filter_args {
+            args.push(fp);
+        }
+    }
+
+    let Some(raw) = git_cmd_raw(path, &args) else {
+        return StatusResult::default();
+    };
+
+    // -z format: entries are NUL-terminated. The format is:
+    //   XY<space>path<NUL>  (for normal entries)
+    //   XY<space>path<NUL>orig_path<NUL>  (for renames)
+    // We split by NUL and parse each entry.
+    let mut staged = 0;
+    let mut modified = 0;
+    let mut untracked = 0;
+    let mut file_statuses = std::collections::HashMap::new();
+
+    let entries: Vec<&[u8]> = raw.split(|&b| b == 0).collect();
+    for entry in &entries {
+        if entry.len() < 3 {
+            continue;
+        }
+        let x = entry[0];
+        let y = entry[1];
+        // entry[2] is a space; path starts at index 3
+        if entry.len() < 4 {
+            continue;
+        }
+        let path_bytes = &entry[3..];
+        let file_path = String::from_utf8_lossy(path_bytes).to_string();
+
+        // X = index status, Y = worktree status
+        let is_staged = x != b' ' && x != b'?' && x != b'!';
+        let is_untracked = x == b'?';
+        let is_worktree_change = y != b' ' && y != b'?' && y != b'!';
+
+        if is_staged {
+            staged += 1;
+            if collect_file_statuses {
+                let fs = match x {
+                    b'D' => FileStatus::Deleted,
+                    b'R' => FileStatus::Renamed,
+                    _ => FileStatus::Added, // A, M, C
+                };
+                file_statuses.insert(file_path, fs);
+            }
+        } else if is_untracked {
+            untracked += 1;
+            if collect_file_statuses {
+                file_statuses.insert(file_path, FileStatus::Untracked);
+            }
+        } else if is_worktree_change {
+            modified += 1;
+            if collect_file_statuses {
+                let fs = match y {
+                    b'D' => FileStatus::Deleted,
+                    b'R' => FileStatus::Renamed,
+                    _ => FileStatus::Modified, // M, C
+                };
+                file_statuses.insert(file_path, fs);
+            }
+        }
+    }
+
+    StatusResult {
+        staged,
+        modified,
+        untracked,
+        file_statuses,
+    }
+}
+
+/// Get ahead/behind counts relative to upstream.
+fn git_ahead_behind(path: &Path) -> (usize, usize) {
+    // Try @{upstream} shorthand first; falls back to origin/<branch>
+    if let Some(out) = git_cmd(path, &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]) {
+        let parts: Vec<&str> = out.trim().split('\t').collect();
+        if parts.len() == 2 {
+            let ahead = parts[0].parse().unwrap_or(0);
+            let behind = parts[1].parse().unwrap_or(0);
+            return (ahead, behind);
+        }
+    }
+    (0, 0)
+}
+
+/// Get last commit message (truncated to 80 chars), short hash, and unix timestamp.
+fn git_last_commit(path: &Path) -> (Option<String>, Option<String>, Option<i64>) {
+    // %H = full hash, %h = short hash, %s = subject, %ct = committer timestamp
+    let Some(out) = git_cmd(path, &["log", "-1", "--format=%H%n%h%n%s%n%ct"]) else {
+        return (None, None, None);
+    };
+    let lines: Vec<&str> = out.trim().splitn(4, '\n').collect();
+    if lines.len() < 4 {
+        return (None, None, None);
+    }
+    let _full_hash = lines[0];
+    let short_hash = lines[1].to_string();
+    let subject = lines[2];
+    let truncated = if subject.len() > 80 {
+        subject[..80].to_string()
+    } else {
+        subject.to_string()
+    };
+    let timestamp = lines[3].parse::<i64>().ok();
+    (Some(truncated), Some(short_hash), timestamp)
+}
+
+/// Count commits made today (since midnight local time).
+fn git_commits_today(path: &Path) -> usize {
+    let now = chrono::Local::now();
+    let midnight = now.date_naive().and_hms_opt(0, 0, 0).unwrap();
+    let midnight_str = midnight.format("%Y-%m-%dT%H:%M:%S").to_string();
+
+    let args = [
+        "log",
+        "--oneline",
+        "--since",
+        &midnight_str,
+        "--",
+    ];
+    let Some(out) = git_cmd(path, &args) else {
+        return 0;
+    };
+    if out.trim().is_empty() {
+        0
+    } else {
+        out.lines().count()
+    }
+}
+
+/// Get diff stats (total lines added/deleted in the working tree).
+fn git_diff_stats(path: &Path) -> (usize, usize) {
+    let Some(out) = git_cmd(path, &["diff", "--numstat"]) else {
+        return (0, 0);
+    };
+    let mut added = 0;
+    let mut deleted = 0;
+    for line in out.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 2 {
+            added += parts[0].parse::<usize>().unwrap_or(0);
+            deleted += parts[1].parse::<usize>().unwrap_or(0);
+        }
+    }
+    (added, deleted)
+}
+
+/// Detect merge/rebase/cherry-pick state by checking .git state files.
+fn git_merge_state(path: &Path) -> Option<String> {
+    let git_dir = git_dir(path)?;
+    if git_dir.join("MERGE_HEAD").exists() {
+        Some("MERGING".to_string())
+    } else if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
+        Some("REBASING".to_string())
+    } else if git_dir.join("CHERRY_PICK_HEAD").exists() {
+        Some("CHERRY-PICKING".to_string())
+    } else if git_dir.join("REVERT_HEAD").exists() {
+        Some("REVERTING".to_string())
+    } else {
+        None
+    }
 }
 
 /// Run a git command in the given directory and return stdout.
