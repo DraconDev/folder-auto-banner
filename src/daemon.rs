@@ -1138,6 +1138,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
             let _ = cache.set(&ck, gi.clone());
         }
     }
+    eprintln!("[coldpath] git: {} ms", _t1.elapsed().as_millis());
 
     if let Some(ref mut gi) = git_info {
         if !gi.file_statuses.is_empty() {
@@ -1152,15 +1153,10 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
         }
     }
 
-    // Pre-populate the per-file content probe (PNG/JPG resolution, ZIP entry
-    // count, MP4/MOV/M4V/WebM/MKV duration, SQLite table count) on each
-    // DirEntry. Doing this on the daemon side means the client (which is a
-    // short-lived process started on every `f` invocation) doesn't have to
-    // re-open each file just to render the contents column. The results
-    // travel with the BannerData and are cached on the daemon for the
-    // configured CACHE_TTL (5 min by default), so the per-file I/O happens
-    // at most once per TTL window per directory.
+    let _t2 = std::time::Instant::now();
     populate_content_probes(&mut summary.top_items);
+    eprintln!("[coldpath] content_probes: {} ms", _t2.elapsed().as_millis());
+    eprintln!("[coldpath] TOTAL: {} ms", _t0.elapsed().as_millis());
 
     // Return immediately — sizes come from global cache
     Ok(BannerData { summary, git_info })
