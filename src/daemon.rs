@@ -1119,7 +1119,26 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let _t1 = std::time::Instant::now();
     let filter_paths = folder_auto_banner::git::status_filter_paths_for_items(&summary.top_items);
     let _t2 = std::time::Instant::now();
-    let mut git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
+    // Cache git_status for 10s. On a large repo (e.g. dracon-platform
+    // with 15K commits and a 5.8 GB .git), the first git status call
+    // can take 8+ seconds. The daemon's BannerCache (5 min) covers
+    // the common case, but when it expires we don't want to re-pay
+    // the full cost. The file cache survives daemon restarts.
+    let cache = folder_auto_banner::cache::Cache::new().ok();
+    let mut git_info: Option<folder_auto_banner::git::GitInfo> = None;
+    if let Some(ref cache) = cache {
+        let ck = folder_auto_banner::cache::cache_key(path, "git");
+        if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(10)) {
+            git_info = Some(cached);
+        }
+    }
+    if git_info.is_none() {
+        git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
+        if let (Some(ref gi), Some(ref cache)) = (&git_info, &cache) {
+            let ck = folder_auto_banner::cache::cache_key(path, "git");
+            let _ = cache.set(&ck, gi.clone());
+        }
+    }
     let _t3 = std::time::Instant::now();
     eprintln!("[coldpath] git_prep: {} ms", _t2.duration_since(_t1).as_millis());
     eprintln!("[coldpath] git_status: {} ms", _t3.duration_since(_t2).as_millis());
