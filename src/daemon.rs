@@ -1112,8 +1112,8 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let mut summary = DirSummary::scan_with_options(path, false, true, true, true, true)?;
 
     // Build pathspecs for git status collection. Files use their exact
-    // top-level name; directories use `dir/*` so libgit2 only walks immediate
-    // children that the banner displays or aggregates.
+    // top-level name; directories use `dir/*` so native git status only
+    // walks immediate children the banner displays or aggregates.
     let filter_paths = folder_auto_banner::git::status_filter_paths_for_items(&summary.top_items);
     // Cache git status for 60s. On a large repo (e.g. dracon-platform
     // with 15K commits and a 5.8 GB .git), the first git status call

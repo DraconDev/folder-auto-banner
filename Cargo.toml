@@ -54,7 +54,6 @@ unicode-width = "0.2"
 ignore = "0.4"
 
 # Git integration
-git2 = "0.21"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 641054,
-    "activeSeconds": 362
+    "tokensUsed": 1252334,
+    "activeSeconds": 647
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T15:18:09.223Z",
-  "updatedAt": "2026-06-18T15:24:15.022Z",
+  "updatedAt": "2026-06-18T15:29:03.603Z",
   "activePath": ".pi/goals/active_goal_2026061816180922_mqjn9n47-olncou.md",
   "taskList": {
     "tasks": [
       {
         "id": "1",
         "title": "Rewrite `get_git_info_inner` to use `std::process::Command` instead of `git2`. All 10 fields: branch, staged/modified/untracked counts, file_statuses, ahead/behind, last_commit_hash/message/time, commits_today, branch_count, stash_count, merge_state, tag, lines_added/deleted. Use `git -C <path>` to set working dir. Run independent git commands in parallel threads for throughput.",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-18T15:28:04.434Z",
+        "evidence": "Native git subprocess implementation replaces libgit2. All 238 tests pass. Smoke test: banner shows correct git status ([main*], *1, +5 -5) matching native git output.",
         "verificationContract": "All existing git-related tests pass. `get_git_info` returns identical data for a test repo."
       },
       {
@@ -59,12 +61,12 @@ Replace libgit2 (`git2` crate) with native `git` subprocess calls in `src/git/mo
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6m02s
-- Tokens used: 641K (641,054) tokens
+- Time spent: 10m47s
+- Tokens used: 1.3M (1,252,334) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] 1: Rewrite `get_git_info_inner` to use `std::process::Command` instead of `git2`. All 10 fields: branch, staged/modified/untracked counts, file_statuses, ahead/behind, last_commit_hash/message/time, commits_today, branch_count, stash_count, merge_state, tag, lines_added/deleted. Use `git -C <path>` to set working dir. Run independent git commands in parallel threads for throughput. — contract: All existing git-related tests pass. `get_git_info` returns identical data for a test repo.
+- [x] 1: Rewrite `get_git_info_inner` to use `std::process::Command` instead of `git2`. All 10 fields: branch, staged/modified/untracked counts, file_statuses, ahead/behind, last_commit_hash/message/time, commits_today, branch_count, stash_count, merge_state, tag, lines_added/deleted. Use `git -C <path>` to set working dir. Run independent git commands in parallel threads for throughput. — evidence: Native git subprocess implementation replaces libgit2. All 238 tests pass. Smoke test: banner shows correct git status ([main*], *1, +5 -5) matching native git output.
 - [ ] 2: Remove `git2` and `libgit2-sys` from Cargo.toml dependencies. Remove all `use git2::*` imports from `src/git/mod.rs`. Update `Cargo.lock`. — contract: `cargo build --release` succeeds with no git2 references. `cargo tree` shows no git2 dependency. Compile time visibly faster.
 - [ ] 3: Benchmark: cold scan of `~/Dev/dracon-platform/web/music` (15K commits, 5.8GB .git). First-ever scan must be < 200ms (currently 7s with libgit2). With file cache warm must remain < 100ms. — contract: PROFILE_COLD_PATH.md updated with new before/after numbers. Cold git status < 200ms on dracon-platform.
 - [ ] 4: Update docs: CHANGELOG, RELEASE_NOTES, PROFILE_COLD_PATH.md. Remove any references to libgit2 in README/comments. Version bump to 0.7.9. — contract: Docs consistent, no stale libgit2 references, version = 0.7.9 everywhere.
