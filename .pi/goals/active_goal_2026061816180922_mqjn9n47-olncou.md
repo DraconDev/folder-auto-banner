@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 5273633,
-    "activeSeconds": 1722
+    "tokensUsed": 5502977,
+    "activeSeconds": 1906
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T15:18:09.223Z",
-  "updatedAt": "2026-06-18T15:47:19.697Z",
+  "updatedAt": "2026-06-18T15:50:24.684Z",
   "activePath": ".pi/goals/active_goal_2026061816180922_mqjn9n47-olncou.md",
   "taskList": {
     "tasks": [
@@ -67,8 +67,8 @@ Replace libgit2 (`git2` crate) with native `git` subprocess calls in `src/git/mo
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 28m42s
-- Tokens used: 5.3M (5,273,633) tokens
+- Time spent: 31m46s
+- Tokens used: 5.5M (5,502,977) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
