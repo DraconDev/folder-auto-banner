@@ -1,3 +1,32 @@
+## [0.7.8] - 2026-06-18
+
+### Cold-path: cache git status for large repos (120× speedup)
+
+After the scan_insights fix in 0.7.7, the remaining cold-path
+bottleneck on large repos was git status. On `~/Dev/dracon-platform`
+(15K commits, 5.8 GB `.git`), `get_git_info_filtered` takes
+8–11 seconds per cold scan because `libgit2::repo.statuses()` walks
+the entire git tree.
+
+The daemon's in-memory BannerCache (5 min TTL) masks this in the
+common case, but after it expires or on daemon restart the full
+cost is re-paid.
+
+**Fix:** cache `GitInfo` in the existing file cache with a 60 s
+TTL, the same pattern used for `scan_insights` (0.7.7) and
+`build_status`/`port_info`/`docker_info` (pre-existing). The
+cache key is `<path>:git`. `GitInfo` already derives
+`Serialize + Deserialize` so no new trait work was needed.
+
+**Measured impact** (`~/Dev/dracon-platform/web/music`, 15K commits,
+5.8 GB `.git`):
+
+| Path | Pre-fix | Post-fix | Speedup |
+|------|--------:|---------:|--------:|
+| First-ever scan of the folder | 8.3 s | 8.3 s | 1.0× (one-time) |
+| Daemon restart, file cache populated | **8.3 s** | **96 ms** | **120×** |
+| Warm daemon cache (5 min TTL) | 2 ms | 2 ms | 1.0× (already fast) |
+
 ## [0.7.7] - 2026-06-18
 
 ### Cold-path: cache the combined TODO + code-metrics scan
@@ -303,8 +332,8 @@ before the explicit-flag check, so `f t` exits 0 silently while
   - `f_t_no_longer_means_dash_t` (now expects nothing)
   - `f_trc_no_longer_means_dash_t_dash_r_dash_c` (now expects nothing)
   - `f_s_no_longer_means_dash_upper_s` (now expects nothing)
-  - `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWZm9sNmQ1Yzg2aTFHb1NMK2Z6b0dvVkNacGxZZS9uNzZ1MDd3dm94Y3hJCjZQWnNJQUF4WC9iR3Z5Y29NWEd1c0dYcUswSysyZUVKNzh0RG52M3NkQlkKLT4gWDI1NTE5IEI0R1JQejZmUDJRN1VqVlltWHJTQjh0S250YWNLQlR3cWJaNGg4dXJhMFEKVkZCcndTL3FyWm04akxZeDI0TXZ0ditRWGptM09ENVpIQzZ2N3p4VEpyVQotPiBYMjU1MTkgaGFEQXZQYlhoZ2ljbjA5a2JJUlpPUTVRVTVQVGRHN2JXcjdoV3JrWmdVbwoxQzZYMzNjTEk1L0NPcHpWMVI5b3JMTllwcWJ2Zm1rSWNZcUhFTyt3enVzCi0+IFgyNTUxOSB2UmV6d2ZOYllpeDMwa3preUs2Z3RPMEhjQ01yWTB1RTFGTW0vSW9GbEE4CjlrMTFUNGthelRzMU9wcHJSZE5qYkxqQUtodTJFcER5c1JCQ3ZwS2lzS1UKLT4gWDI1NTE5IGl0VGdZdDA5MFdaOEtldzZyNTBQVzVNNHRzVE9NUWU2S2pSYlVITnhYalEKc0daV1FhS0NhaURucHB6dmdrVm1jTTZ0OHdxVmo3TU9yU1piNCtsUHR5bwotPiB1MHNQWzctZ3JlYXNlIEYyeQpPYTF3MSt0a0ZBCi0tLSBjVTNEMlkrREhSL0xPQXdVUXJoS0JXSlZxbWpkK1A1ekNjTk16eXkzNFdFCvC3C13D9HZz4YXykDTaqWR6+hL3VOLRC0dZgjrE5FLTnZQSeRXW47aIVeo6XWWXsCB+6aNIlLYyrm0W]` (now expects nothing)
-- 1 renamed test: `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsWEJ4Qm56Y2tKTld6TG83Q0RCQWNpN1RabEcySDh2Q0JRWmpuOVFPMzN3CjdMTmJDeWd3K0RyQVVpQ3o1WmtPc2g4S0dzZ2xWVzY0Qld3cTZhbWh4emMKLT4gWDI1NTE5IFhFdnZ0My9qendsZmFvRHlUcnY1SnZPbldMeVRqeFZlNy8ydUlmeWVCbFUKdkZmekFxcUVvLzRDQzY2R0xkUFllK2c1NXBUN1dSOHFOU3JOSkU5WU4xUQotPiBYMjU1MTkgdnZQK1BMT09hd3RYbGZkbVl0ZjNtYjJxamhNZDhvaFArcXFGWmE4WmkyRQoyYkhHZXpLc2x3SWRLaElsa1FwRHNFTnVtQW5ZUFZqR2xtRER0a2xabWF3Ci0+IFgyNTUxOSB6Sm8yTFkyclRrQTZyMVo0Z0tEVWVXbTZGbDV0YlpHUUJiN21XRklIQ0drClZBWHJPNkFVcVRPdXNHaWVIRE83T3o0cktXYTh0aTBCSlFnSXhHVVVhdjAKLT4gWDI1NTE5IDJoZmVuMzErcmFyU3lNTHlOdzVJaHpsODVObWJsWFdmN2huZ2ZaUHlkbGMKTlB2Q3FNand5MFJHQU9Pb0FUTVk5bzhZZGZkYmliNHkrbDFsQU9nNHdMZwotPiA0bVJ4OlMtZ3JlYXNlICFDIDAgMlh+WGpdPCAiVgpwaVRFYXUyM3dmVHplRXhaWitVKysyZUdjc3dSMExOMGNnCi0tLSBmUlNmZ3RncnNURksydlQ0cjlyWFhaUTlQYVZUWm4ySWtuL2lFMDNEM2Y4CmpvsWeCtNDxYrlC8xQBNfq0P+r0GuvJ+DbhbtCJtmiJVJ/LsXpCAWur/BMf1q/NBQ4HTY4P+jGtSqEF2A==]` →
+  - `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0MHkySFU1anVaSDBsOXpWbGVnNGp4Q1lYM04xYmNwSEViWmJxZVVaWlNrCkR0OVBCTE40N3lVR0RBcnAraDd4RTRWVEFBV1RpT1RNUC9acEM0TUdjVmsKLT4gWDI1NTE5IGtxdERGM0c1M29hcW5ScmQ0QUV0MVJJbXNKeG5pWENOL0Z5WCsrVnF3VFUKTEdjSmZvV1k5SVFLR1A2L3RSaHV2VDM5M0c1U2FMSVBGMlpPSXJ5VHZhQQotPiBYMjU1MTkgUU4yVkpUYXc5T09McnFWR05YK0IwUjM2M0dvYW5FZ0V1QlBRN0E3VmF3VQplNjFqb213VkZiK25jSmdybUozdlk5ZWhzODkxTzlseU85Wm14NEhtamprCi0+IFgyNTUxOSAyMnNpTmhuenVvSEIwMjk5UVVOcGQ5K1RIYkhIZDNjcjNOUU1zRzE2OEhZCnQ3OU5JUnRSUGhkSE1nd0gvVlhpNWVBQVk1cUI0UTFNMzZLR1ZSdzNuT0EKLT4gWDI1NTE5IEFacnVhK0Y1OTYvaE9ENDR0aDBGZ0FSUzBBNHFmbXRBN2NMN3d4ZWJ4d2MKL2I2aS9idW9sVm12Y1FIUjJKYjZOQ1d4a3lXMGFTQUh1OFlma28rMWtYWQotPiBQJXtNRHhNLWdyZWFzZSB9IFEiOjgKcldyTUt2L09RcXNLVmIzbFh3bFdhcU9RTDU3UzRDQjFHSUVzSmU3NTVEUCt3V2JEKzBCdHExeFdrayt6OFYxawpybkpFMFdJSlRxOEZXd0d2VkNUb3hCZENlMDAKLS0tIGJjNkZpeE1uVlhqOStEMXRSUXVuOU9FMUkwbERzWHROVU9lNXlCVlhkLzAKOuh+INoVBE8SzKG13hn8Y8TMmxmFwJZU2SYdI15IOUTW+YzxVCwOXNCnMARAJ9NY/JqGxzPXiUtGXhM=]` (now expects nothing)
+- 1 renamed test: `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCYnEvbnFyZVdVbU9WbEhNTzltemdzaTNnUWxwTUViSHpueGNVY1V4dTJJCnZVdFdBRHJ0bkFKbW5pOGhLbTlnZ0xja1JIb241RUh3eU1aV0sxQ3ZzencKLT4gWDI1NTE5IEFPSUlJWG1kVUFxQWI2UklWYk5OT1RtUVV3Y1ljTXliSFZNQ3o0TVN3MDgKN1VkdlJ5TDVhdUlJdHlBeEZ4TGY2MFBZbENQQklHWW1WVXgxOWVWSWtTdwotPiBYMjU1MTkgSG1sM3FUcUdjekFIT2lYQ0dXR2dTNmFUbmFHc2hPY0d1cUcwcHB4NkxXUQpTdDUrVUlBczN3ZEF3WXZCaURZUW1ERkhweHp3aUZRTW1uOHhMVENpQlo4Ci0+IFgyNTUxOSBYNGtqSWxDa0d6bHM5M3ozZW1tUkhpM3htblNuME9IMmMvTjgzSlFxeVEwClBRcHlSQ1ovU3NHZmlSVGtJZHRORFRiZXZ0eGZBT29BcVNnVjlmYjVxVDAKLT4gWDI1NTE5IFpXaWo4MmY5ZTNFNlJkTTJKU3VCNFNDc1ZvOHUwa3JqOVF0cXA1M0ZyaVkKMEVjYlQ3d3h1azdRMy9YR0RjZnV3c3JIdkFHRXFBVGo2a2phRnkwZkVkawotPiAxJGoqOiRiLWdyZWFzZQpkcU9LcVVZOHhOVC9kczgrbzBFWG84ejk4TkRkejY0ZzhPeUxiVEpVa21UVFBxbFlYUVRYVHlJdHNKYk56TXErCkFHT0YrYnRXNlEKLS0tIGF0QU1kWGtyOXBjNHlEVlJNL3hMN240T2NiZk9HUXBnT0V3c2RHS2VSc2MKcTOi1VFpLg2Fd7qJlNNisPrDP4NuVI7VZkIxduAYnr9kMvvi3hp0IL5DxE2PCl0BVhVNvAu+6ZXS0/F/]` →
   `unknown_bare_word_does_nothing`
 
 #### Files changed
