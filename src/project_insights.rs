@@ -19,7 +19,7 @@ const TODO_PATTERNS: &[&str] = &[
     "- [ ]", "TODO:", "TODO ", "FIXME:", "FIXME ", "HACK:", "HACK ", "XXX:", "XXX ",
 ];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ProjectInsights {
     pub todos: TodoInfo,
     pub metrics: CodeMetrics,
