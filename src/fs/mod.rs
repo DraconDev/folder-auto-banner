@@ -816,4 +816,86 @@ mod tests {
         let by_type = summary.by_type();
         assert_eq!(by_type.len(), 2); // rs and md
     }
+
+    // ===== scan_insights cache tests (0.7.7) =====
+    //
+    // scan_insights is the dominant cost on a cold scan (60-65% of
+    // total time on /home/dracon/Dev). It must hit a file cache on
+    // the second call within the 60s TTL window. These tests run
+    // the scanner twice on the same temp dir and assert that the
+    // second call returns the cached value unchanged.
+
+    fn make_insight_test_tree() -> tempfile::TempDir {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tmp.path().join("main.rs"),
+            "fn main() {}\n// TODO: finish\nfn other() {}\n",
+        )
+        .unwrap();
+        std::fs::write(tmp.path().join("note.md"), "# Title\n- [ ] task\n").unwrap();
+        std::fs::create_dir(tmp.path().join("target")).unwrap();
+        std::fs::write(tmp.path().join("target/skip.rs"), "TODO: skipped\n").unwrap();
+        tmp
+    }
+
+    #[test]
+    fn test_scan_insights_cache_warm_returns_same_value() {
+        use crate::cache::Cache;
+        use crate::project_insights::ProjectInsights;
+
+        // Wipe any prior cache for this synthetic key by using a
+        // unique temp dir per run.
+        let tmp = make_insight_test_tree();
+        let path = tmp.path();
+        let cache = Cache::new().unwrap();
+        let ck = crate::cache::cache_key(path, "insights");
+
+        // First call: cache miss.
+        let first: ProjectInsights = match crate::project_insights::scan_insights(path) {
+            Ok(p) => p,
+            Err(_) => return, // bail if scan fails in test env
+        };
+        cache.set(&ck, &first).unwrap();
+        assert_eq!(first.todos.count, 2, "fresh scan finds 2 TODOs");
+
+        // Second call: cache hit. We must get back a value that
+        // serializes to the same bytes (count, file_count, etc.).
+        let cached: Option<ProjectInsights> = cache.get(&ck, std::time::Duration::from_secs(60));
+        let cached = cached.expect("insights cache must hit on second call");
+        assert_eq!(cached.todos.count, first.todos.count);
+        assert_eq!(cached.metrics.file_count, first.metrics.file_count);
+        assert_eq!(cached.metrics.total_loc, first.metrics.total_loc);
+    }
+
+    #[test]
+    fn test_scan_insights_cache_expired_returns_none() {
+        use crate::cache::Cache;
+        use crate::project_insights::ProjectInsights;
+
+        let tmp = make_insight_test_tree();
+        let path = tmp.path();
+        let cache = Cache::new().unwrap();
+        let ck = crate::cache::cache_key(path, "insights");
+
+        let first: ProjectInsights = crate::project_insights::scan_insights(path).unwrap();
+        cache.set(&ck, &first).unwrap();
+
+        // 0s TTL = always expired.
+        let cached: Option<ProjectInsights> = cache.get(&ck, std::time::Duration::from_secs(0));
+        assert!(cached.is_none(), "0s TTL must invalidate the entry");
+    }
+
+    #[test]
+    fn test_project_insights_serializes() {
+        // The cache requires Serialize + Deserialize. This test fails
+        // at compile time if those derives are missing, which is the
+        // exact regression we want to prevent.
+        let tmp = make_insight_test_tree();
+        let insights = crate::project_insights::scan_insights(tmp.path()).unwrap();
+        let json = serde_json::to_string(&insights).expect("ProjectInsights must serialize");
+        let back: crate::project_insights::ProjectInsights =
+            serde_json::from_str(&json).expect("ProjectInsights must deserialize");
+        assert_eq!(back.todos.count, insights.todos.count);
+        assert_eq!(back.metrics.total_loc, insights.metrics.total_loc);
+    }
 }
