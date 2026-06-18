@@ -416,7 +416,7 @@ impl DirSummary {
             crate::build_status::check_build(path, &project_type)
         );
         eprintln!("[scan] build_status: {} ms", _t_scan.elapsed().as_millis());
-        let (todo_info, code_metrics) = if (scan_todos || check_metrics) && project_type != ProjectType::Generic {
+        let (todo_info, code_metrics) = if (scan_todos || check_metrics) && project_type != ProjectType::Generic && (files + dirs) <= 1000 {
             // Cache the combined scan_insights result (TODO counts and
             // code metrics are computed in a single bounded tree walk;
             // there is no benefit to splitting the cache). TTL is 60s:
