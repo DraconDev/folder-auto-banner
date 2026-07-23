@@ -1816,6 +1816,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_should_skip_dir() {
+        // Agent/tool directories should be skipped
+        assert!(should_skip_dir(Path::new("/home/user/project/.pi")));
+        assert!(should_skip_dir(Path::new("/home/user/project/.opencode")));
+        assert!(should_skip_dir(Path::new("/home/user/project/.claude")));
+        assert!(should_skip_dir(Path::new("/home/user/project/.cursor")));
+        // Build artifacts should be skipped
+        assert!(should_skip_dir(Path::new("/home/user/project/target")));
+        assert!(should_skip_dir(Path::new("/home/user/project/node_modules")));
+        assert!(should_skip_dir(Path::new("/home/user/project/dist")));
+        assert!(should_skip_dir(Path::new("/home/user/project/build")));
+        assert!(should_skip_dir(Path::new("/home/user/project/.git")));
+        // Source directories should NOT be skipped
+        assert!(!should_skip_dir(Path::new("/home/user/project/src")));
+        assert!(!should_skip_dir(Path::new("/home/user/project/tests")));
+        assert!(!should_skip_dir(Path::new("/home/user/project/docs")));
+    }
+
+    #[test]
     fn test_socket_path() {
         let path = directories::ProjectDirs::from("com", "fab", "fab")
             .unwrap()
