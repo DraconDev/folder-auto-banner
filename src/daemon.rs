@@ -663,7 +663,7 @@ fn should_skip_dir(path: &Path) -> bool {
     // Use the shared SKIP_DIRS constant so that agent/tool directories
     // (e.g. .pi, .opencode, .claude) are skipped consistently across
     // the daemon's watcher and size computation.
-    crate::utils::SKIP_DIRS.contains(&name)
+    folder_auto_banner::utils::SKIP_DIRS.contains(&name)
 }
 
 fn can_watch_path(path: &Path) -> bool {
