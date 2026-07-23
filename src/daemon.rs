@@ -660,20 +660,10 @@ fn should_skip_dir(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
         return false;
     };
-    matches!(
-        name,
-        ".git"
-            | ".hg"
-            | ".svn"
-            | "target"
-            | "node_modules"
-            | ".next"
-            | "dist"
-            | "build"
-            | ".cache"
-            | ".parcel-cache"
-            | ".turbo"
-    )
+    // Use the shared SKIP_DIRS constant so that agent/tool directories
+    // (e.g. .pi, .opencode, .claude) are skipped consistently across
+    // the daemon's watcher and size computation.
+    crate::utils::SKIP_DIRS.contains(&name)
 }
 
 fn can_watch_path(path: &Path) -> bool {
