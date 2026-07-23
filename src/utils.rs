@@ -85,6 +85,7 @@ pub fn run_with_timeout_stdout(cmd: &str, args: &[&str], timeout: Duration) -> R
 
 /// Directories to skip when scanning (shared between todo_scanner and code_metrics)
 pub const SKIP_DIRS: &[&str] = &[
+    // Package managers / build artifacts
     "node_modules",
     "target",
     ".git",
@@ -95,6 +96,28 @@ pub const SKIP_DIRS: &[&str] = &[
     "__pycache__",
     ".venv",
     "venv",
+    // SvelteKit / Vite scratch
+    ".svelte-kit",
+    ".vite",
+    // Agent / AI tool directories (large, not source code)
+    ".pi",
+    ".pi-glla",
+    ".opencode",
+    ".claude",
+    ".cursor",
+    ".roo",
+    ".windsurf",
+    ".augment",
+    ".amazonq",
+    ".kiro",
+    ".trae",
+    ".deepseek",
+    ".gemini",
+    ".qwen",
+    ".dracon",
+    // Caches
+    ".cache",
+    ".trash",
 ];
 
 /// Binary file extensions to skip (shared between todo_scanner and code_metrics)
@@ -138,10 +161,20 @@ mod tests {
 
     #[test]
     fn test_skip_dirs_constant() {
+        // Package managers / build artifacts
         assert!(SKIP_DIRS.contains(&"node_modules"));
         assert!(SKIP_DIRS.contains(&"target"));
         assert!(SKIP_DIRS.contains(&".git"));
         assert!(SKIP_DIRS.contains(&"__pycache__"));
+        assert!(SKIP_DIRS.contains(&".svelte-kit"));
+        // Agent / AI tool directories
+        assert!(SKIP_DIRS.contains(&".pi"));
+        assert!(SKIP_DIRS.contains(&".opencode"));
+        assert!(SKIP_DIRS.contains(&".claude"));
+        assert!(SKIP_DIRS.contains(&".cursor"));
+        assert!(SKIP_DIRS.contains(&".dracon"));
+        // Caches
+        assert!(SKIP_DIRS.contains(&".cache"));
     }
 
     #[test]

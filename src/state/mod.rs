@@ -303,6 +303,14 @@ impl Default for Config {
                 ".git".to_string(),
                 "dist".to_string(),
                 "build".to_string(),
+                ".pi".to_string(),
+                ".opencode".to_string(),
+                ".pi-glla".to_string(),
+                ".dracon".to_string(),
+                ".svelte-kit".to_string(),
+                ".claude".to_string(),
+                ".cursor".to_string(),
+                ".cache".to_string(),
             ],
         }
     }
@@ -365,6 +373,8 @@ mod tests {
         assert!(config.ports);
         assert!(config.docker);
         assert!(config.ignore_dirs.contains(&"node_modules".to_string()));
+        assert!(config.ignore_dirs.contains(&".pi".to_string()));
+        assert!(config.ignore_dirs.contains(&".opencode".to_string()));
     }
 
     #[test]

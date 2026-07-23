@@ -173,7 +173,7 @@ impl DirSummary {
     /// Scan a directory and gather metadata
     #[allow(dead_code)]
     pub fn scan(path: &Path) -> Result<Self> {
-        Self::scan_with_options(path, true, true, true, true, true)
+        Self::scan_with_options(path, true, true, true, true, true, &[])
     }
 
     /// Scan a directory with feature flags
@@ -184,6 +184,7 @@ impl DirSummary {
         check_ports: bool,
         check_docker: bool,
         check_metrics: bool,
+        extra_skip_dirs: &[&str],
     ) -> Result<Self> {
         let project_type = ProjectType::detect(path);
         let mut total_size: u64 = 0;
@@ -415,46 +416,48 @@ impl DirSummary {
             30,
             crate::build_status::check_build(path, &project_type)
         );
-        let (todo_info, code_metrics) = if (scan_todos || check_metrics) && project_type != ProjectType::Generic && !hit_cap {
-            // Cache the combined scan_insights result (TODO counts and
-            // code metrics are computed in a single bounded tree walk;
-            // there is no benefit to splitting the cache). TTL is 60s:
-            // both insights are content-derived and don't change often
-            // enough to justify recomputing on every cold scan. The
-            // pre-fix code re-ran scan_insights on every call, which
-            // was 60-65% of the cold-path time on /home/dracon/Dev
-            // (127 ms of 198 ms total). See PROFILE_COLD_PATH.md.
-            //
-            // Skip for Generic (non-code) directories — scanning
-            // Downloads or temp folders for TODOs/LOC is pure waste.
-            let scan_closure = || crate::project_insights::scan_insights(path).ok();
-            let insights_opt: Option<crate::project_insights::ProjectInsights> =
-                if let Some(ref cache) = cache {
-                    let ck = crate::cache::cache_key(path, "insights");
-                    if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
-                        Some(cached)
-                    } else {
-                        let result = scan_closure();
-                        if let Some(ref r) = result {
-                            if let Err(e) = cache.set(&ck, r.clone()) {
-                                tracing::warn!("Failed to cache insights: {}", e);
+        let (todo_info, code_metrics) =
+            if (scan_todos || check_metrics) && project_type != ProjectType::Generic && !hit_cap {
+                // Cache the combined scan_insights result (TODO counts and
+                // code metrics are computed in a single bounded tree walk;
+                // there is no benefit to splitting the cache). TTL is 60s:
+                // both insights are content-derived and don't change often
+                // enough to justify recomputing on every cold scan. The
+                // pre-fix code re-ran scan_insights on every call, which
+                // was 60-65% of the cold-path time on /home/dracon/Dev
+                // (127 ms of 198 ms total). See PROFILE_COLD_PATH.md.
+                //
+                // Skip for Generic (non-code) directories — scanning
+                // Downloads or temp folders for TODOs/LOC is pure waste.
+                let scan_closure =
+                    || crate::project_insights::scan_insights(path, extra_skip_dirs).ok();
+                let insights_opt: Option<crate::project_insights::ProjectInsights> =
+                    if let Some(ref cache) = cache {
+                        let ck = crate::cache::cache_key(path, "insights");
+                        if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
+                            Some(cached)
+                        } else {
+                            let result = scan_closure();
+                            if let Some(ref r) = result {
+                                if let Err(e) = cache.set(&ck, r.clone()) {
+                                    tracing::warn!("Failed to cache insights: {}", e);
+                                }
                             }
+                            result
                         }
-                        result
-                    }
-                } else {
-                    scan_closure()
-                };
-            match insights_opt {
-                Some(insights) => (
-                    scan_todos.then_some(insights.todos),
-                    check_metrics.then_some(insights.metrics),
-                ),
-                None => (None, None),
-            }
-        } else {
-            (None, None)
-        };
+                    } else {
+                        scan_closure()
+                    };
+                match insights_opt {
+                    Some(insights) => (
+                        scan_todos.then_some(insights.todos),
+                        check_metrics.then_some(insights.metrics),
+                    ),
+                    None => (None, None),
+                }
+            } else {
+                (None, None)
+            };
 
         let port_info = cached_check!(
             check_ports,
@@ -874,7 +877,7 @@ mod tests {
         let ck = crate::cache::cache_key(path, "insights");
 
         // First call: cache miss.
-        let first: ProjectInsights = match crate::project_insights::scan_insights(path) {
+        let first: ProjectInsights = match crate::project_insights::scan_insights(path, &[]) {
             Ok(p) => p,
             Err(_) => return, // bail if scan fails in test env
         };
@@ -900,7 +903,7 @@ mod tests {
         let cache = Cache::new().unwrap();
         let ck = crate::cache::cache_key(path, "insights");
 
-        let first: ProjectInsights = crate::project_insights::scan_insights(path).unwrap();
+        let first: ProjectInsights = crate::project_insights::scan_insights(path, &[]).unwrap();
         cache.set(&ck, &first).unwrap();
 
         // 0s TTL = always expired.
@@ -914,7 +917,7 @@ mod tests {
         // at compile time if those derives are missing, which is the
         // exact regression we want to prevent.
         let tmp = make_insight_test_tree();
-        let insights = crate::project_insights::scan_insights(tmp.path()).unwrap();
+        let insights = crate::project_insights::scan_insights(tmp.path(), &[]).unwrap();
         let json = serde_json::to_string(&insights).expect("ProjectInsights must serialize");
         let back: crate::project_insights::ProjectInsights =
             serde_json::from_str(&json).expect("ProjectInsights must deserialize");

@@ -393,7 +393,7 @@ fn navigate_by_number(
         (cached.summary, cached.git_info.unwrap_or_default())
     } else {
         let summary =
-            crate::fs::DirSummary::scan_with_options(path, false, false, false, false, false)?;
+            crate::fs::DirSummary::scan_with_options(path, false, false, false, false, false, &[])?;
         let git_info = crate::git::get_git_info(path).ok().unwrap_or_default();
         (summary, git_info)
     };
@@ -591,6 +591,9 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     let no_docker = std::env::var("FAB_DOCKER").unwrap_or_default() != "1";
     let no_metrics = std::env::var("FAB_METRICS").unwrap_or_default() != "1";
 
+    // Build extra skip dirs from config
+    let extra_skip_dirs: Vec<&str> = config.ignore_dirs.iter().map(|s| s.as_str()).collect();
+
     let summary = DirSummary::scan_with_options(
         &path,
         false, // build check disabled by default - too slow (cargo check = 6.7s)
@@ -598,6 +601,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         !no_ports,
         !no_docker,
         !no_metrics,
+        &extra_skip_dirs,
     )?;
     let git_info = if opts.oneline || opts.raw {
         crate::git::GitInfo::default()

@@ -26,7 +26,10 @@ pub struct ProjectInsights {
 }
 
 /// Scan TODO markers and code metrics in a single bounded pass.
-pub fn scan_insights(path: &Path) -> Result<ProjectInsights> {
+///
+/// `extra_skip_dirs` allows callers (e.g. from config) to add additional
+/// directory names to skip beyond the built-in [`utils::SKIP_DIRS`].
+pub fn scan_insights(path: &Path, extra_skip_dirs: &[&str]) -> Result<ProjectInsights> {
     let start = std::time::Instant::now();
     let mut todo_count = 0;
     let mut todo_by_pattern: HashMap<String, usize> = HashMap::new();
@@ -35,16 +38,28 @@ pub fn scan_insights(path: &Path) -> Result<ProjectInsights> {
     let mut file_count = 0;
     let mut files_scanned = 0;
 
+    // Merge built-in skip dirs with any caller-provided extras.
+    // Use owned Strings so the set can be moved into the WalkBuilder closure
+    // (which requires 'static) and reused for the component check below.
+    let skip_set: std::collections::HashSet<String> = utils::SKIP_DIRS
+        .iter()
+        .map(|s| s.to_string())
+        .chain(extra_skip_dirs.iter().map(|s| s.to_string()))
+        .collect();
+
+    // Clone for the filter_entry closure (which requires 'static ownership)
+    let filter_set = skip_set.clone();
+
     let walker = WalkBuilder::new(path)
         .hidden(false)
         .ignore(true)
         .git_ignore(true)
-        .filter_entry(|entry| {
+        .filter_entry(move |entry| {
             // Skip heavy directories that aren't covered by gitignore when
             // the project root is not itself a git repo. This makes the
             // scan behave the same as projects that have a .gitignore.
             let name = entry.file_name().to_string_lossy();
-            !utils::SKIP_DIRS.contains(&name.as_ref())
+            !filter_set.contains(&name.to_string())
         })
         .build();
 
@@ -70,7 +85,7 @@ pub fn scan_insights(path: &Path) -> Result<ProjectInsights> {
         let components: Vec<_> = rel_path.components().collect();
         if components
             .iter()
-            .any(|c| utils::SKIP_DIRS.contains(&c.as_os_str().to_string_lossy().as_ref()))
+            .any(|c| skip_set.contains(&c.as_os_str().to_string_lossy().to_string()))
         {
             continue;
         }
@@ -174,7 +189,7 @@ mod tests {
         fs::create_dir(tmp.path().join("target")).unwrap();
         fs::write(tmp.path().join("target/skip.rs"), "TODO: skipped\n").unwrap();
 
-        let insights = scan_insights(tmp.path()).unwrap();
+        let insights = scan_insights(tmp.path(), &[]).unwrap();
         assert_eq!(insights.metrics.file_count, 2);
         assert_eq!(insights.metrics.total_loc, 4);
         assert_eq!(insights.todos.count, 2);
