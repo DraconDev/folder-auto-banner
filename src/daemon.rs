@@ -1344,6 +1344,12 @@ fn apply_cached_displayed_dir_sizes(
     });
     let mut needs_refresh = false;
     for item in items.iter_mut().filter(|item| item.is_dir) {
+        // Skip size computation for directories in SKIP_DIRS (e.g. .pi,
+        // .opencode, node_modules). These are large agent/tool directories
+        // whose sizes are not useful to display and expensive to compute.
+        if should_skip_dir(&item.path) {
+            continue;
+        }
         let cached_mtime = mtimes.get(&item.path).copied().flatten();
         match sizes.get(&item.path).copied() {
             Some(size) if cached_dir_size_is_fresh(&item.path, size, cached_mtime) => {
@@ -1504,6 +1510,12 @@ fn refresh_displayed_dir_sizes(
         });
         for (idx, item) in items.iter_mut().enumerate() {
             if !item.is_dir {
+                continue;
+            }
+            // Skip size computation for directories in SKIP_DIRS (e.g. .pi,
+            // .opencode, node_modules). These are large agent/tool directories
+            // whose sizes are not useful to display and expensive to compute.
+            if should_skip_dir(&item.path) {
                 continue;
             }
             let current_mtime = current_dir_mtime(&item.path);
