@@ -1824,7 +1824,9 @@ mod tests {
         assert!(should_skip_dir(Path::new("/home/user/project/.cursor")));
         // Build artifacts should be skipped
         assert!(should_skip_dir(Path::new("/home/user/project/target")));
-        assert!(should_skip_dir(Path::new("/home/user/project/node_modules")));
+        assert!(should_skip_dir(Path::new(
+            "/home/user/project/node_modules"
+        )));
         assert!(should_skip_dir(Path::new("/home/user/project/dist")));
         assert!(should_skip_dir(Path::new("/home/user/project/build")));
         assert!(should_skip_dir(Path::new("/home/user/project/.git")));
