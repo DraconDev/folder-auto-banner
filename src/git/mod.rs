@@ -119,22 +119,12 @@ pub fn get_git_info_filtered(path: &Path, filter_paths: &[String]) -> Result<Git
 }
 
 /// Result of parsing `git status --porcelain`.
+#[derive(Default)]
 struct StatusResult {
     staged: usize,
     modified: usize,
     untracked: usize,
     file_statuses: std::collections::HashMap<String, FileStatus>,
-}
-
-impl Default for StatusResult {
-    fn default() -> Self {
-        Self {
-            staged: 0,
-            modified: 0,
-            untracked: 0,
-            file_statuses: std::collections::HashMap::new(),
-        }
-    }
 }
 
 /// Parse `git status --porcelain` output.
