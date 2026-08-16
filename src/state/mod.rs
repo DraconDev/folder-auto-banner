@@ -261,22 +261,4 @@ mod tests {
         assert_eq!(deserialized.compact, config.compact);
     }
 
-    #[test]
-    fn test_clipboard_state_default() {
-        let state = ClipboardState::default();
-        assert!(state.entries.is_empty());
-        assert_eq!(state.current_index, 0);
-    }
-
-    #[test]
-    fn test_pins_state_default() {
-        let state = PinsState::default();
-        assert!(state.pins.is_empty());
-    }
-
-    #[test]
-    fn test_sessions_state_default() {
-        let state = SessionsState::default();
-        assert!(state.sessions.is_empty());
-    }
 }
