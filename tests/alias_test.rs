@@ -237,7 +237,7 @@ fn f_no_args_still_shows_banner() {
 }
 
 #[test]
-fn unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqajZ6ZjlKVnhvcGlXZUxLWlh6ZHBaTG1OYjNuZHNibXUyYTAxdXNkc0gwCjBPc0RHblFNbnB5a1ZtbzNuNkJkbGNBS1k5Sk5PV1BsM0JXUWdDR2dTK3cKLT4gWDI1NTE5IEpGSzFBK09MM2krY0VnSmx6SnhGTHFHdWZyZ01SVjVlY2N3NUpBb3o4UzQKRmtWekFiWWhKdC9WMHlORFBWZ3lETkJTOXp0c2g0a2lYQVpZb0c3OTBicwotPiBYMjU1MTkgZmtZdFpTdW1XVGN4NnRzaGgxRnVaNGc4QnlpcTQ4Mk1WR0piK1VNbkdVZwpIMnR1WUdPemN2OGZmNjRUWHhSMS8zV1VQQkhpSzFIY0krSXJDL0Z5c3lVCi0+IFgyNTUxOSBjTGJzSTE4cE83dzJrVWhSTmNCRFdNcnF5QVk1NnV5RFIya214OXczREZ3CmZsTUhyOTV3VTFBRzhWcUhKcXAxNVdHTlRyQmI0RmRjbjRwWUw3MktQMzgKLT4gWDI1NTE5IDdFNjBBS2w0S0xVaHQvMm01OUNVWkVVOXhnMDFJWnJFdm11eTFBK1J1RzgKRDY1NGZjOTVoTmh3alhHOStHeTRMTW9aK2NMVmx4MTQrZWcvNmlNRlJTbwotPiBsN0s2QC1ncmVhc2UgV3t2NjMgSi5NIDFuSXFnVX5gIFZ2d3xyCitmZWNzWTZPNGxMMkNoeGQ4cUlYbDNZcWt3OUFHa2VQQVBFQmN2LzhFTitnYTBUWXBPMDd2M1ZqbUphSXZqbwotLS0gWkxrTTEydUk3TG9abnlLS1U0ZkNpNXRFenNYSEZZcWdYcFdrbUF3VHBTdwosoAKA888YTxQqehEoZ/yC1qrQgBh3rZUNVPJk9IbzCE3cXVPDN9ycv8AxUncNeGohnH/kIhsUFnS+bg==]() {
+fn unknown_bare_word_does_not_match_path() {
     // `f Downloads` (no ./ prefix) is NOT treated as a path. It is an
     // unknown bare word and produces no output (the "nothing happens" rule).
     let (stdout, _stderr, code) = run_f_full(&["Downloads"]);
@@ -296,11 +296,17 @@ fn explicit_path_with_tilde_does_nothing() {
 #[test]
 fn b_flag_alone_shows_default_banner() {
     // `f -b` is equivalent to `f` (no args) — default banner for cwd.
-    let (_stdout, _stderr, code) = run_f_full(&["-b"]);
-    assert_eq!(code, 0, "f -b should not error, got: {}", _stderr);
-    // Should show banner output (not empty).
+    let (stdout, stderr, code) = run_f_full(&["-b"]);
+    assert_eq!(code, 0, "f -b should not error, got: {}", stderr);
+    // Should show banner output (not empty) and match the default banner.
     let default_out = run_f(&[]);
-    let _ = default_out;
+    assert!(!stdout.trim().is_empty(), "f -b should show the banner");
+    assert!(!default_out.trim().is_empty(), "default banner should not be empty");
+    assert_eq!(
+        first_line_header(&stdout),
+        first_line_header(&default_out),
+        "f -b should render the same header as the default banner"
+    );
 }
 
 #[test]

@@ -14,51 +14,67 @@ fn test_env_help() {
     cmd.arg("env").arg("--help").assert().success();
 }
 
+
+
+
+
+
+
 #[test]
-fn test_pins_help() {
-    // NOTE: `pins` is not an actual subcommand. The test is disabled
-    // because there is no `f pins` command. Re-enable when/if `pins`
-    // is added as a real subcommand.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("pins").arg("--help").assert().success();
+fn test_install_help() {
+    let mut cmd = Command::cargo_bin("f").unwrap();
+    cmd.arg("install").arg("--help").assert().success();
 }
 
 #[test]
-fn test_stats_help() {
-    // NOTE: `stats` is composed entirely of lazy flag chars (s,t,a,t,s)
-    // and expands to `-S -t -a -t -S` (sizesort+timesort+hidden+...).
-    // It is NOT a subcommand. This test is disabled because `stats`
-    // is not an actual subcommand. Re-enable when/if `stats` is added.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("stats").arg("--help").assert().success();
+fn test_uninstall_help() {
+    let mut cmd = Command::cargo_bin("f").unwrap();
+    cmd.arg("uninstall").arg("--help").assert().success();
 }
 
 #[test]
-fn test_clipboard_help() {
-    // NOTE: `clipboard` is not an actual subcommand. Disabled.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("clipboard").arg("--help").assert().success();
+fn test_version_flag() {
+    let mut cmd = Command::cargo_bin("f").unwrap();
+    cmd.arg("-V").assert().success();
 }
 
 #[test]
-fn test_sessions_help() {
-    // NOTE: `sessions` is not an actual subcommand. Disabled.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("sessions").arg("--help").assert().success();
-}
+fn test_uninstall_roundtrip() {
+    // `f install` then `f uninstall` must leave the rc file and bin dir
+    // exactly as they were (the phantom subcommands removed in v0.3.0
+    // previously had no removal path at all).
+    use std::fs;
+    let home = std::env::temp_dir().join(format!("fab-it-{}", std::process::id()));
+    fs::create_dir_all(home.join(".local/bin")).unwrap();
+    fs::write(home.join(".zshrc"), "export FOO=bar\n").unwrap();
 
-#[test]
-fn test_diff_help() {
-    // NOTE: `diff` is not an actual subcommand. Disabled.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("diff").arg("--help").assert().success();
-}
+    let install_cmd = || {
+        let mut cmd = Command::cargo_bin("f").unwrap();
+        cmd.env("HOME", &home);
+        cmd.arg("install")
+    };
+    let uninstall_cmd = || {
+        let mut cmd = Command::cargo_bin("f").unwrap();
+        cmd.env("HOME", &home);
+        cmd.arg("uninstall")
+    };
 
-#[test]
-fn test_completion_help() {
-    // NOTE: `completion` is not an actual subcommand. Disabled.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("completion").arg("--help").assert().success();
+    install_cmd().assert().success();
+    let rc = fs::read_to_string(home.join(".zshrc")).unwrap();
+    assert!(rc.contains("fab-shell.zsh"), "install should add the source line");
+    assert!(home.join(".local/bin/fab-shell.zsh").exists());
+
+    uninstall_cmd().assert().success();
+    let rc = fs::read_to_string(home.join(".zshrc")).unwrap();
+    assert!(
+        !rc.contains("fab-shell"),
+        "uninstall should remove the source line, got: {rc}"
+    );
+    assert!(!home.join(".local/bin/fab-shell.zsh").exists());
+
+    // Idempotent second uninstall.
+    uninstall_cmd().assert().success();
+    fs::remove_dir_all(home).ok();
 }
 
 #[test]
@@ -67,69 +83,13 @@ fn test_config_help() {
     cmd.arg("config").arg("--help").assert().success();
 }
 
-#[test]
-fn test_mv_help() {
-    // NOTE: `mv` is composed entirely of lazy flag chars (m,v) and
-    // expands to `-m -v` (max+verbose). It is NOT a subcommand.
-    // This test is disabled. Re-enable when/if `mv` is added.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("mv").arg("--help").assert().success();
-}
 
-#[test]
-fn test_cp_help() {
-    // NOTE: `cp` is not an actual subcommand. Disabled.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("cp").arg("--help").assert().success();
-}
 
-#[test]
-fn test_rm_help() {
-    // NOTE: `rm` is composed entirely of lazy flag chars (r,m) and
-    // expands to `-r -m` (reverse+max). It is NOT a subcommand.
-    // This test is disabled. Re-enable when/if `rm` is added.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("rm").arg("--help").assert().success();
-}
 
-#[test]
-fn test_trash_help() {
-    // NOTE: `trash` is not an actual subcommand. Disabled.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("trash").arg("--help").assert().success();
-}
 
-#[test]
-fn test_open_help() {
-    // NOTE: `open` is not an actual subcommand. Disabled.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("open").arg("--help").assert().success();
-}
 
-#[test]
-fn test_do_help() {
-    // NOTE: `do` is composed entirely of lazy flag chars (d,o) and
-    // expands to `-D -o` (only-dirs+oneline). It is NOT a subcommand.
-    // This test is disabled. Re-enable when/if `do` is added.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("do").arg("--help").assert().success();
-}
 
-#[test]
-fn test_peek_help() {
-    // NOTE: `peek` is not an actual subcommand. Disabled.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("peek").arg("--help").assert().success();
-}
 
-#[test]
-fn test_root_help() {
-    // NOTE: `root` is composed entirely of lazy flag chars (r,o,o,t)
-    // and expands to `-r -o -o -t` (reverse+oneline+...). It is NOT
-    // a subcommand. This test is disabled. Re-enable when/if `root` is added.
-    // let mut cmd = Command::cargo_bin("f").unwrap();
-    // cmd.arg("root").arg("--help").assert().success();
-}
 
 #[test]
 fn test_daemon_help() {
