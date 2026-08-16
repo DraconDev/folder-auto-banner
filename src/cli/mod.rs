@@ -289,6 +289,9 @@ pub enum Commands {
     /// Install shell wrappers for cd support (f N → cd)
     Install,
 
+    /// Remove shell wrapper source lines and fab-shell files installed by `f install`
+    Uninstall,
+
     /// Open configuration file in editor
     Config,
 
