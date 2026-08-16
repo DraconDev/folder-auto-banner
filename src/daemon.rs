@@ -21,7 +21,6 @@ struct CacheEntry {
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
-const SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_millis(750);
 const BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT: Duration = Duration::from_secs(5);
 const ACTIVE_SIZE_REFRESH_TIMEOUT: Duration = Duration::from_secs(10);
 const ACTIVE_SIZE_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
@@ -1462,7 +1461,7 @@ fn schedule_size_refresh(
             // client's fast path reads those files and would otherwise keep
             // seeing pre-refresh sizes until the next full request.
             if let Some(entry) = c.get(&path) {
-                folder_auto_banner::cmd::banner_data_cache::write_cache(&path, &entry.data);
+                let _ = folder_auto_banner::cmd::banner_data_cache::write_cache(&path, &entry.data);
             }
             touch_active_root(&ctx.active_roots, &ctx.active_order, path);
         }
