@@ -849,15 +849,15 @@ fn handle_client(
             if let Some(entry) = cached_entry {
                 let t0 = std::time::Instant::now();
                 let root_fresh = cache_entry_root_is_fresh(&entry, &path);
-                let expired = entry.computed_at.elapsed() >= CACHE_TTL;
+                // The cache filter above already guarantees the entry is
+                // unexpired, so only the root-mtime check is needed here.
                 let mut data = entry.data;
                 let t1 = std::time::Instant::now();
                 let _t_root_done = t1;
-                if expired || !root_fresh {
+                if !root_fresh {
                     tracing::debug!(
-                        "Cache miss/recompute: path={} expired={} root_fresh={} root_mtime={:?} current_mtime={:?}",
+                        "Cache recompute: path={} root_fresh={} root_mtime={:?} current_mtime={:?}",
                         path.display(),
-                        expired,
                         root_fresh,
                         entry.root_mtime,
                         current_dir_mtime(&path),
@@ -1036,35 +1036,6 @@ fn handle_client(
             });
             return Ok(()); // No response needed — fire and forget
         }
-        Request::DirSize { path } => {
-            let mut sizes = dir_sizes.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            let mut mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
-                tracing::warn!("Mutex poisoned, recovering");
-                e.into_inner()
-            });
-            let size = match sizes.get(path).copied() {
-                Some(size) if mtimes.get(path).copied().flatten() == current_dir_mtime(path) => {
-                    size
-                }
-                _ => {
-                    let computed = compute_dir_size_with_status(path, SIZE_CACHE_REFRESH_TIMEOUT);
-                    sizes.insert(path.clone(), computed.size);
-                    if computed.measured {
-                        mtimes.insert(path.clone(), current_dir_mtime(path));
-                    } else {
-                        mtimes.insert(path.clone(), None);
-                    }
-                    computed.size
-                }
-            };
-            Response::DirSize {
-                path: path.clone(),
-                size,
-            }
-        }
         Request::Ping => Response::Pong,
         Request::Shutdown => {
             tracing::info!("Shutdown requested");
@@ -1090,10 +1061,6 @@ fn handle_client(
             std::process::exit(0);
         }
     };
-
-    if matches!(request, Request::Warm { .. }) {
-        return Ok(());
-    }
 
     send_response(&mut stream, &response)?;
     tracing::trace!("Sent response successfully");
@@ -1491,6 +1458,12 @@ fn schedule_size_refresh(
                     root_mtime: current_dir_mtime(&path),
                 },
             );
+            // Persist the refreshed sizes to the per-path disk cache: the
+            // client's fast path reads those files and would otherwise keep
+            // seeing pre-refresh sizes until the next full request.
+            if let Some(entry) = c.get(&path) {
+                folder_auto_banner::cmd::banner_data_cache::write_cache(&path, &entry.data);
+            }
             touch_active_root(&ctx.active_roots, &ctx.active_order, path);
         }
     });
