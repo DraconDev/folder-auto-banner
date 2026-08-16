@@ -77,13 +77,11 @@ fn try_ss_with_cwd_check(project_path: &Path) -> Result<Vec<u16>> {
         // "users:("node",pid=12345,fd=10)") — SO_REUSEPORT sockets can list
         // several processes, so take all of them and match any cwd.
         let process_info = parts.last().unwrap_or(&"");
-        if let Some(pid) = extract_pids(process_info)
+        let project_holds_socket = extract_pids(process_info)
             .iter()
-            .find(|pid| pid_cwd_matches(**pid, project_path))
-        {
-            if !ports.contains(&port) {
-                ports.push(port);
-            }
+            .any(|pid| pid_cwd_matches(*pid, project_path));
+        if project_holds_socket && !ports.contains(&port) {
+            ports.push(port);
         }
     }
 
