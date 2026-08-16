@@ -199,11 +199,13 @@ impl DirSummary {
 
         let entries = std::fs::read_dir(path)?;
 
-        // Cap the number of entries we process. The banner only displays a
-        // limited number of items, so walking 100K+ entries in /tmp or
-        // other huge directories is pure waste. We still count all entries
-        // for total_size/files/dirs, but stop collecting metadata after
-        // this limit.
+        // Cap the number of entries we collect metadata for. The banner only
+        // displays a limited number of items, so stat-ing 100K+ entries in
+        // /tmp or other huge directories is pure waste. Aggregate counts
+        // (files/dirs) stay exact after the cap — the loop keeps counting them
+        // via the cheap file_type read — but stat-based fields (total_size,
+        // last_modified, owner/group, symlinks) cover only the first
+        // MAX_ITEMS entries.
         const MAX_ITEMS: usize = 500;
         let mut item_count = 0;
         let mut hit_cap = false;
@@ -211,12 +213,16 @@ impl DirSummary {
         for entry in entries.flatten() {
             item_count += 1;
             if item_count > MAX_ITEMS {
-                // Don't even read file_type for remaining entries —
-                // just break out of the loop entirely. The banner
-                // only displays a limited number of items, so walking
-                // 100K+ entries is pure waste.
+                // Past the display cap: keep the aggregate totals exact using
+                // only the readdir d_type (no stat syscall per entry), and
+                // skip the expensive metadata work below.
                 hit_cap = true;
-                break;
+                match entry.file_type() {
+                    Ok(ft) if ft.is_dir() => dirs += 1,
+                    Ok(ft) if ft.is_file() => files += 1,
+                    _ => {}
+                }
+                continue;
             }
 
             let file_type = entry.file_type();

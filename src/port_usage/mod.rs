@@ -129,11 +129,16 @@ fn pid_cwd_matches(pid: u32, project_path: &Path) -> bool {
     }
 }
 
-/// Fallback: use `lsof +D <path>` to find processes with cwd in project dir
+/// Fallback: use `lsof +D <path>` to list open files under the project dir
+/// and report the LISTEN ports of any process whose cwd is inside it.
 fn try_lsof_with_dir(project_path: &Path) -> Result<Vec<u16>> {
     let path_str = project_path.to_string_lossy().to_string();
 
-    // lsof +D finds processes with cwd or open files in the directory
+    // NOTE: no `-a` here on purpose. `lsof -a -i +D dir` would AND the
+    // network-file and directory selections, which never matches (socket
+    // files have no path under dir). Instead we take the union and filter by
+    // pid cwd below, so only processes actually running inside the project
+    // count — not every network file on the system.
     let output = utils::run_with_timeout_stdout(
         "lsof",
         &["-i", "-P", "-n", "-F", "pcftn", "+D", &path_str],
@@ -141,27 +146,59 @@ fn try_lsof_with_dir(project_path: &Path) -> Result<Vec<u16>> {
     )?;
 
     let mut ports = Vec::new();
-    let mut _current_pid: Option<u32> = None;
-    let mut _current_name: Option<String> = None;
+    let mut current_pid: Option<u32> = None;
+    let mut current_conns: Vec<u16> = Vec::new();
 
     for line in output.lines() {
-        let field = &line[..1.min(line.len())];
-        let value = &line[1.min(line.len())..];
+        if line.is_empty() {
+            continue;
+        }
+        let field = &line[..1];
+        let value = &line[1..];
 
         match field {
-            "p" => _current_pid = value.parse().ok(),
-            "c" => _current_name = Some(value.to_string()),
+            "p" => {
+                // New process record: flush the previous one if its cwd is
+                // inside the project dir.
+                if let Some(pid) = current_pid {
+                    if pid_cwd_matches(pid, project_path) {
+                        for port in &current_conns {
+                            if !ports.contains(port) {
+                                ports.push(*port);
+                            }
+                        }
+                    }
+                }
+                current_conns.clear();
+                current_pid = value.parse().ok();
+            }
             "n" => {
-                // Network connection: "*:3000" or "127.0.0.1:8080"
+                // Skip `local->remote` entries: those are client connections
+                // whose remote port is not project-relevant. Remaining entries
+                // are LISTEN sockets (`*:3000`, `[::]:8080`, `127.0.0.1:631`).
+                if value.contains("->") {
+                    continue;
+                }
                 if let Some(port_str) = value.rsplit(':').next() {
                     if let Ok(port) = port_str.parse::<u16>() {
-                        if !ports.contains(&port) {
-                            ports.push(port);
+                        if !current_conns.contains(&port) {
+                            current_conns.push(port);
                         }
                     }
                 }
             }
             _ => {}
+        }
+    }
+
+    // Flush the last process record.
+    if let Some(pid) = current_pid {
+        if pid_cwd_matches(pid, project_path) {
+            for port in &current_conns {
+                if !ports.contains(port) {
+                    ports.push(*port);
+                }
+            }
         }
     }
 

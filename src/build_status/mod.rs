@@ -168,9 +168,13 @@ fn count_matches(output: &utils::CommandOutput, pattern: &str) -> usize {
 }
 
 fn truncate_output(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
+    if s.chars().count() <= max_len {
         s.to_string()
     } else {
-        format!("{}…", &s[..max_len])
+        // char-boundary-safe: byte-slicing at max_len could split a multibyte
+        // UTF-8 sequence and panic on non-ASCII build output.
+        let mut truncated: String = s.chars().take(max_len).collect();
+        truncated.push('…');
+        truncated
     }
 }
