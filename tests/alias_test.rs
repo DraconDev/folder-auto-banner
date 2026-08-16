@@ -301,7 +301,10 @@ fn b_flag_alone_shows_default_banner() {
     // Should show banner output (not empty) and match the default banner.
     let default_out = run_f(&[]);
     assert!(!stdout.trim().is_empty(), "f -b should show the banner");
-    assert!(!default_out.trim().is_empty(), "default banner should not be empty");
+    assert!(
+        !default_out.trim().is_empty(),
+        "default banner should not be empty"
+    );
     assert_eq!(
         first_line_header(&stdout),
         first_line_header(&default_out),

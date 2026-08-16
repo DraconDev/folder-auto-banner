@@ -108,7 +108,15 @@ fn is_path_like(arg: &str) -> bool {
 /// Known subcommands that clap should parse. When the first non-flag
 /// arg is one of these, we skip alias expansion and let clap handle
 /// the invocation directly.
-const KNOWN_SUBCOMMANDS: &[&str] = &["banner", "env", "install", "uninstall", "config", "daemon", "help"];
+const KNOWN_SUBCOMMANDS: &[&str] = &[
+    "banner",
+    "env",
+    "install",
+    "uninstall",
+    "config",
+    "daemon",
+    "help",
+];
 
 /// Returns true if the user-provided args contain an alias, number,
 /// or flag (i.e., anything the banner subcommand should act on).

@@ -75,7 +75,10 @@ pub fn run_uninstall() -> Result<()> {
         if kept.len() != content.lines().count() {
             fs::write(&rc_path, format!("{}\n", kept.join("\n")))
                 .with_context(|| format!("Failed to write {}", rc_path.display()))?;
-            println!("🗑  Removed fab shell function lines from {}", rc_path.display());
+            println!(
+                "🗑  Removed fab shell function lines from {}",
+                rc_path.display()
+            );
             removed_any = true;
         }
     }

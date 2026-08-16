@@ -14,12 +14,6 @@ fn test_env_help() {
     cmd.arg("env").arg("--help").assert().success();
 }
 
-
-
-
-
-
-
 #[test]
 fn test_install_help() {
     let mut cmd = Command::cargo_bin("f").unwrap();
@@ -51,7 +45,10 @@ fn test_uninstall_roundtrip() {
     let mut cmd = Command::cargo_bin("f").unwrap();
     cmd.env("HOME", &home).arg("install").assert().success();
     let rc = fs::read_to_string(home.join(".zshrc")).unwrap();
-    assert!(rc.contains("fab-shell.zsh"), "install should add the source line");
+    assert!(
+        rc.contains("fab-shell.zsh"),
+        "install should add the source line"
+    );
     assert!(home.join(".local/bin/fab-shell.zsh").exists());
 
     let mut cmd = Command::cargo_bin("f").unwrap();
@@ -74,14 +71,6 @@ fn test_config_help() {
     let mut cmd = Command::cargo_bin("f").unwrap();
     cmd.arg("config").arg("--help").assert().success();
 }
-
-
-
-
-
-
-
-
 
 #[test]
 fn test_daemon_help() {

@@ -189,4 +189,3 @@ fn truncate_output(s: &str, max_len: usize) -> String {
         truncated
     }
 }
-

@@ -158,10 +158,8 @@ impl Daemon {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(
-                &self.socket_path,
-                std::fs::Permissions::from_mode(0o600),
-            );
+            let _ =
+                std::fs::set_permissions(&self.socket_path, std::fs::Permissions::from_mode(0o600));
         }
 
         tracing::info!("fabd listening on {}", self.socket_path.display());
@@ -1108,15 +1106,8 @@ fn persist_banner_data_cache(path: &Path, data: &BannerData) {
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let config = folder_auto_banner::state::Config::load().unwrap_or_default();
-    let mut summary = DirSummary::scan_with_options(
-        path,
-        config.build_status,
-        true,
-        true,
-        true,
-        true,
-        &[],
-    )?;
+    let mut summary =
+        DirSummary::scan_with_options(path, config.build_status, true, true, true, true, &[])?;
 
     // Build pathspecs for git status collection. Files use their exact
     // top-level name; directories use `dir/*` so native git status only

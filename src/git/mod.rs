@@ -142,11 +142,7 @@ impl Default for StatusResult {
 /// Format: `XY filename` where X is index status, Y is worktree status.
 /// X/Y codes: ' ' unmodified, M modified, A added, D deleted, R renamed,
 ///            C copied, U unmerged, ? untracked, ! ignored
-fn git_status(
-    path: &Path,
-    collect_file_statuses: bool,
-    filter_paths: &[String],
-) -> StatusResult {
+fn git_status(path: &Path, collect_file_statuses: bool, filter_paths: &[String]) -> StatusResult {
     let mut args = vec!["status", "--porcelain", "-z"];
     let filter_args: Vec<String>;
     if !filter_paths.is_empty() {
@@ -240,7 +236,10 @@ fn git_status(
 fn git_ahead_behind(path: &Path) -> (usize, usize) {
     // Prefer the configured upstream; fall back to origin/<branch> when the
     // branch has no upstream configured.
-    if let Some(out) = git_cmd(path, &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]) {
+    if let Some(out) = git_cmd(
+        path,
+        &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
+    ) {
         let parts: Vec<&str> = out.trim().split('\t').collect();
         if parts.len() == 2 {
             let ahead = parts[0].parse().unwrap_or(0);
@@ -296,13 +295,7 @@ fn git_commits_today(path: &Path) -> usize {
     let midnight = now.date_naive().and_hms_opt(0, 0, 0).unwrap();
     let midnight_str = midnight.format("%Y-%m-%dT%H:%M:%S").to_string();
 
-    let args = [
-        "log",
-        "--oneline",
-        "--since",
-        &midnight_str,
-        "--",
-    ];
+    let args = ["log", "--oneline", "--since", &midnight_str, "--"];
     let Some(out) = git_cmd(path, &args) else {
         return 0;
     };
@@ -422,7 +415,8 @@ fn get_git_info_inner(
     });
 
     let path_clone = path_owned.clone();
-    let branch_handle = std::thread::spawn(move || git_cmd(&path_clone, &["rev-parse", "--abbrev-ref", "HEAD"]));
+    let branch_handle =
+        std::thread::spawn(move || git_cmd(&path_clone, &["rev-parse", "--abbrev-ref", "HEAD"]));
 
     let path_clone = path_owned.clone();
     let ahead_behind_handle = std::thread::spawn(move || git_ahead_behind(&path_clone));
