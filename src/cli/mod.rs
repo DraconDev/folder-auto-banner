@@ -214,6 +214,18 @@ pub enum Commands {
         #[arg(long = "only-files")]
         only_files: bool,
 
+        /// Respect .gitignore
+        #[arg(long = "git-ignore")]
+        git_ignore: bool,
+
+        /// Background highlight for recent files (e.g., "22", "green", "none")
+        #[arg(long = "highlight-recent")]
+        highlight_recent: Option<String>,
+
+        /// Background highlight for old files (e.g., "236", "gray", "none")
+        #[arg(long = "highlight-old")]
+        highlight_old: Option<String>,
+
         /// Group items by type (dirs, files, symlinks)
         #[arg(long)]
         group: bool,
@@ -339,6 +351,9 @@ impl Cli {
                 recursive,
                 only_dirs,
                 only_files,
+                git_ignore,
+                highlight_recent,
+                highlight_old,
                 group,
                 classify,
                 blocks,
@@ -376,6 +391,9 @@ impl Cli {
                     recursive: *recursive,
                     only_dirs: *only_dirs,
                     only_files: *only_files,
+                    git_ignore: *git_ignore,
+                    highlight_recent: highlight_recent.clone(),
+                    highlight_old: highlight_old.clone(),
                     group: *group,
                     classify: *classify,
                     blocks: blocks.as_deref(),

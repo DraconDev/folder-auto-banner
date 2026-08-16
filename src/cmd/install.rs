@@ -53,8 +53,10 @@ fn ensure_source_line(rc_path: &Path, bin_dir: &Path, wrapper_name: &str) -> Res
         return Ok(false);
     }
 
-    let source_line = format!("source {}/{}", bin_dir.display(), wrapper_name);
-    if !file_contains(rc_path, &source_line)? {
+    let plain = format!("source {}/{}", bin_dir.display(), wrapper_name);
+    // Quote the path so a $HOME containing spaces doesn't break the source line.
+    let source_line = format!("source '{}/{}'", bin_dir.display(), wrapper_name);
+    if !file_contains(rc_path, &plain)? && !file_contains(rc_path, &source_line)? {
         fs::write(
             rc_path,
             format!(

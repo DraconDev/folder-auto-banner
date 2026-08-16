@@ -15,7 +15,7 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
                 if daemon_client::is_daemon_running() {
                     println!("Daemon started");
                 } else {
-                    println!("Failed to start daemon");
+                    anyhow::bail!("Failed to start daemon");
                 }
             }
         }
@@ -43,7 +43,7 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
             if daemon_client::is_daemon_running() {
                 println!("Daemon restarted");
             } else {
-                println!("Failed to restart daemon");
+                anyhow::bail!("Failed to restart daemon");
             }
         }
         DaemonAction::ClearCache => {
@@ -56,6 +56,15 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("Cannot determine data directory"))?;
             let data_dir = project_dir.data_dir();
             let mut cleared = Vec::new();
+
+            // Per-path banner data cache (written by banner_data_cache.rs) is
+            // served by the client disk fast path — it must be cleared too,
+            // otherwise stale banners survive a "clear-cache".
+            let banner_data_dir = data_dir.join("banner_data");
+            if banner_data_dir.exists() {
+                std::fs::remove_dir_all(&banner_data_dir)?;
+                cleared.push(banner_data_dir);
+            }
 
             for file_name in ["banner_cache.json", "dir_sizes.json", "fabd.sock"] {
                 let path = data_dir.join(file_name);

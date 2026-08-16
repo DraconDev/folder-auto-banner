@@ -8,15 +8,23 @@ use std::path::Path;
 use crate::fs::ProjectType;
 
 /// Run env command
-pub fn run_env(path: Option<&Path>, _format: Option<&str>) -> Result<()> {
+pub fn run_env(path: Option<&Path>, format: Option<&str>) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let path = path.unwrap_or(cwd.as_path());
     let project_type = ProjectType::detect(path);
 
     let aliases = generate_aliases(&project_type);
 
-    for alias in aliases {
-        println!("{}", alias);
+    match format {
+        Some("json") => {
+            let output = serde_json::json!({ "aliases": aliases });
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+        _ => {
+            for alias in aliases {
+                println!("{}", alias);
+            }
+        }
     }
 
     Ok(())
@@ -32,7 +40,7 @@ fn generate_aliases(project_type: &ProjectType) -> Vec<String> {
             aliases.push("alias build='cargo build'".to_string());
             aliases.push("alias check='cargo check'".to_string());
             aliases.push("alias clippy='cargo clippy -- -W clippy::all'".to_string());
-            aliases.push("alias fab_clean='cargo clean && fm banner'".to_string());
+            aliases.push("alias fab_clean='cargo clean && f banner'".to_string());
         }
         ProjectType::Node => {
             aliases.push("alias run='npm run dev'".to_string());

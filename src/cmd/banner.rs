@@ -472,7 +472,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     // Load config and apply env var overrides
     let config = crate::state::Config::load().unwrap_or_default();
     let icons = std::env::var("FAB_ICONS")
-        .map(|v| v == "1")
+        .map(|v| v == "1" || v == "nerd")
         .unwrap_or(config.icons);
     let no_color = std::env::var("NO_COLOR").is_ok();
     let colors = if no_color {
