@@ -49,7 +49,7 @@ or (2) `f banner <path>` to bypass the alias routing. Unknown bare
 words, paths, and any other unrecognized input exit 0 with no
 output.
 
-## Built-in aliases (19)
+## Built-in aliases (18)
 
 | Alias     | Expands to        | What it does                          |
 |-----------|-------------------|---------------------------------------|

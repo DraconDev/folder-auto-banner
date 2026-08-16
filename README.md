@@ -77,7 +77,7 @@ f -S                 # Sort by size
 f -t                 # Sort by time
 f -X                 # Sort by extension
 f -G                 # Sort by git status
-f --versionsort      # Natural sort (file1, file2, file10)
+f banner --versionsort  # Natural sort (file1, file2, file10)
 f -a                 # Show dotfiles
 f --tree             # Tree view
 f --json             # JSON output
