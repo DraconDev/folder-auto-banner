@@ -509,24 +509,6 @@ impl DirSummary {
     }
 }
 
-/// Human-readable size — compact
-#[allow(dead_code)]
-pub fn format_size(bytes: u64) -> String {
-    use byte_unit::{Byte, UnitType};
-    let byte = Byte::from_u64(bytes);
-    let adjusted = byte.get_appropriate_unit(UnitType::Binary);
-    // Truncate to 1 decimal place for compactness
-    let s = format!("{}", adjusted);
-    if let Some(dot) = s.find('.') {
-        let after_dot = &s[dot + 1..];
-        if after_dot.len() > 1 {
-            let truncated: String = s.chars().take(dot + 2).collect();
-            return truncated;
-        }
-    }
-    s
-}
-
 /// Human-readable size — very compact (like exa: 4.3k, 1.1k, 983)
 pub fn format_size_compact(bytes: u64) -> String {
     if bytes == 0 {
@@ -686,19 +668,6 @@ fn load_gid_cache_inner() -> std::collections::HashMap<u32, String> {
 mod tests {
     use super::*;
     use chrono::TimeZone;
-
-    #[test]
-    fn test_format_size() {
-        let result_0 = format_size(0);
-        let result_1023 = format_size(1023);
-        let result_1024 = format_size(1024);
-        eprintln!("format_size(0) = {:?}", result_0);
-        eprintln!("format_size(1023) = {:?}", result_1023);
-        eprintln!("format_size(1024) = {:?}", result_1024);
-        assert!(result_0.contains("0"));
-        assert!(result_1023.contains("1023"));
-        assert!(result_1024.contains("1"));
-    }
 
     #[test]
     fn test_format_size_compact() {
