@@ -466,6 +466,9 @@ impl Cli {
             // Install
             Some(Install) => crate::cmd::install::run_install(),
 
+            // Uninstall
+            Some(Uninstall) => crate::cmd::install::run_uninstall(),
+
             // Config
             Some(Config) => {
                 let config_path = crate::state::Config::config_path()

@@ -45,6 +45,58 @@ pub fn run_install() -> Result<()> {
     Ok(())
 }
 
+/// Run the uninstall command: remove the source lines added by
+/// `f install` from the rc files and delete the fab-shell wrappers.
+/// Idempotent — safe to run even if nothing was installed.
+pub fn run_uninstall() -> Result<()> {
+    let home = dirs_home()?;
+    let mut removed_any = false;
+
+    // Strip our marker line and any fab-shell source line (quoted or
+    // unquoted, zsh or bash) from both rc files.
+    for name in [".zshrc", ".bashrc"] {
+        let rc_path = home.join(name);
+        if !rc_path.exists() {
+            continue;
+        }
+        let content = fs::read_to_string(&rc_path)?;
+        let kept: Vec<&str> = content
+            .lines()
+            .filter(|line| {
+                let trimmed = line.trim();
+                let is_marker = trimmed == "# f shell function (for cd support)";
+                let is_source = (trimmed.starts_with("source ") || trimmed.starts_with("source '"))
+                    && trimmed.contains("fab-shell.zsh")
+                    || (trimmed.starts_with("source ") || trimmed.starts_with("source '"))
+                        && trimmed.contains("fab-shell.bash");
+                !is_marker && !is_source
+            })
+            .collect();
+        if kept.len() != content.lines().count() {
+            fs::write(&rc_path, format!("{}\n", kept.join("\n")))??;
+            println!("🗑  Removed fab shell function lines from {}", rc_path.display());
+            removed_any = true;
+        }
+    }
+
+    // Remove the wrapper files.
+    let bin_dir = get_bin_dir()?;
+    for wrapper in ["fab-shell.zsh", "fab-shell.bash"] {
+        let path = bin_dir.join(wrapper);
+        if path.exists() {
+            fs::remove_file(&path)?;
+            println!("🗑  Removed {}", path.display());
+            removed_any = true;
+        }
+    }
+
+    if !removed_any {
+        println!("ℹ️  Nothing to remove — fab shell function was not installed.");
+    }
+
+    Ok(())
+}
+
 /// Ensure `~/.zshrc` (or `~/.bashrc`) contains a `source .../fab-shell.{zsh,bash}`
 /// line. Returns `true` if the rc file exists and was processed (whether or
 /// not we added a new line).
