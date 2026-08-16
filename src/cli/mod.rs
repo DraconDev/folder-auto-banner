@@ -122,6 +122,10 @@ pub struct Cli {
     pub highlight_old: Option<String>,
 }
 
+// Banner carries ~30 option fields (~290 bytes), dwarfing the other
+// variants. Boxing them all would complicate clap parsing for little
+// real gain (the enum is constructed once per CLI invocation).
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Print the contextual directory dashboard
@@ -264,7 +268,7 @@ pub enum Commands {
 
         /// Open file with this program instead of editor (e.g., "cat", "krita", "ranger")
         #[arg(value_name = "ACTION")]
-        action: Box<Option<String>>,
+        action: Option<String>,
 
         /// Force open in editor (overrides default behavior)
         #[arg(short = 'e', long = "edit")]
@@ -406,7 +410,7 @@ impl Cli {
                     ignore_glob: ignore_glob.clone(),
                     no_symlink: *no_symlink,
                     hyperlink: *hyperlink,
-                    action: action.as_ref().clone(),
+                    action: action.clone(),
                     force_edit: *force_edit,
                     force_run: *force_run,
                     ..Default::default()
