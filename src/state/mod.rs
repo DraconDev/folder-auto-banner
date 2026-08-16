@@ -222,43 +222,4 @@ mod tests {
         assert_eq!(deserialized.colors, config.colors);
         assert_eq!(deserialized.compact, config.compact);
     }
-
-    #[test]
-    fn test_config_default() {
-        let config = Config::default();
-        assert!(config.icons);
-        assert!(config.colors);
-        assert!(!config.compact);
-        assert_eq!(config.max_display_items, 0);
-        assert_eq!(config.permission, "rwx");
-        assert_eq!(config.size, "default");
-        assert_eq!(config.date, "date");
-        assert!(!config.classify);
-        assert!(!config.no_symlink);
-        assert!(!config.total_size);
-        assert!(config.git_status);
-        assert!(!config.build_status); // opt-in feature, see Default
-        assert!(config.todo_count);
-        assert!(config.languages);
-        assert!(config.ports);
-        assert!(config.docker);
-        assert!(config.ignore_dirs.contains(&"node_modules".to_string()));
-        assert!(config.ignore_dirs.contains(&".pi".to_string()));
-        assert!(config.ignore_dirs.contains(&".opencode".to_string()));
-    }
-
-    #[test]
-    fn test_config_serialization() {
-        let config = Config::default();
-        let toml_str = toml::to_string_pretty(&config).unwrap();
-        assert!(toml_str.contains("icons = true"));
-        assert!(toml_str.contains("colors = true"));
-        assert!(toml_str.contains("compact = false"));
-
-        let deserialized: Config = toml::from_str(&toml_str).unwrap();
-        assert_eq!(deserialized.icons, config.icons);
-        assert_eq!(deserialized.colors, config.colors);
-        assert_eq!(deserialized.compact, config.compact);
-    }
-
 }
