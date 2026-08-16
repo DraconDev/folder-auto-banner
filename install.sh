@@ -140,8 +140,8 @@ fi
 # `f install` reads the embedded ZSH_WRAPPER / BASH_WRAPPER from
 # src/shell_wrapper.rs (the single source of truth), writes them to
 # $BIN_DIR, and adds the source line to ~/.zshrc and ~/.bashrc with
-# idempotency. This avoids drift with the standalone fab-shell.{zsh,bash}
-# files in the repo root.
+# idempotency. (The standalone fab-shell.{zsh,bash} copies that used to live in
+# the repo root were removed — the embedded constants are the only source.)
 echo "   Installing shell function via f install..."
 "$BIN_PATH" install
 
