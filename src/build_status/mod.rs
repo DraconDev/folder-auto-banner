@@ -143,11 +143,23 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
     }
 
     let output = utils::run_with_timeout("python3", &["-m", "py_compile"], path, BUILD_TIMEOUT)?;
-    let errors = if output.status.success() { 0 } else { 1 };
+    // `python3 -m py_compile` without file arguments exits 2 with a usage
+    // error, so every Python project used to report ok=false. Pass the
+    // collected files explicitly (cap 50 keeps argv bounded).
+    let mut args: Vec<String> = vec!["-m".to_string(), "py_compile".to_string()];
+    args.extend(py_files);
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let output = utils::run_with_timeout("python3", &arg_refs, path, BUILD_TIMEOUT)?;
+    // py_compile prints one "Error" line per file that fails to compile.
+    let errors = if output.status.success() {
+        0
+    } else {
+        count_matches(&output, "error").max(1)
+    };
 
     Ok(BuildStatus {
         duration_ms: 0,
-        ok: output.status.success(),
+        ok: errors == 0,
         errors,
         warnings: 0,
         output: truncate_output(&output.stderr, 500),
@@ -179,17 +191,3 @@ fn truncate_output(s: &str, max_len: usize) -> String {
     }
 }
 
-#[cfg(test)]
-mod probe {
-    use super::*;
-    use crate::fs::ProjectType;
-    #[test]
-    fn probe_py() {
-        std::fs::create_dir_all("/tmp/pyt").unwrap();
-        std::fs::write("/tmp/pyt/bad.py", "x = 1\n").unwrap();
-        let r = check_python_build(std::path::Path::new("/tmp/pyt"));
-        eprintln!("PROBE result: {:?}", r);
-        let r2 = check_build(std::path::Path::new("/tmp/pyt"), &crate::fs::ProjectType::Python);
-        eprintln!("PROBE2 via check_build: {:?}", r2);
-    }
-}
