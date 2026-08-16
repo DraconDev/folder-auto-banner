@@ -17,6 +17,14 @@ impl Cache {
     pub fn new() -> Result<Self> {
         let dir = std::env::temp_dir().join("f-cache");
         std::fs::create_dir_all(&dir)?;
+        // The cache holds per-project git status and build data; restrict
+        // it to this user. create_dir_all applies the umask (could leave
+        // the dir world-readable/listable), so pin 0o700 explicitly.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+        }
         Ok(Cache { dir })
     }
 

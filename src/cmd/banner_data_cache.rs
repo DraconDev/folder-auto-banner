@@ -228,6 +228,15 @@ pub fn read_cache(path: &Path) -> Option<BannerData> {
     serde_json::from_slice(&bytes).ok()
 }
 
+/// Remove the per-path disk cache file. Called when the daemon invalidates
+/// a banner: the file's mtime is the client's freshness signal, so a stale
+/// file would keep serving pre-invalidation data on the client fast path.
+pub fn remove_cache(path: &Path) {
+    if let Some(file) = cache_file_path(path) {
+        let _ = std::fs::remove_file(file);
+    }
+}
+
 /// Serialize `data` and write it to the cache file for `path`. Sets
 /// the file's mtime to `now`. Returns `Ok(())` on success.
 ///
@@ -258,8 +267,17 @@ pub fn write_cache(path: &Path, data: &BannerData) -> std::io::Result<()> {
             let _ = std::fs::remove_dir(&file);
         }
     }
-    if let Err(e) = std::fs::write(&file, &bytes) {
+    // Atomic write: temp file + rename in the same directory, so a
+    // concurrent reader (client fast path) never observes a partially
+    // written file.
+    let tmp = file.with_extension("json.tmp");
+    if let Err(e) = std::fs::write(&tmp, &bytes) {
         tracing::warn!("Failed to write banner data cache: {}", e);
+        return Ok(());
+    }
+    if let Err(e) = std::fs::rename(&tmp, &file) {
+        let _ = std::fs::remove_file(&tmp);
+        tracing::warn!("Failed to rename banner data cache: {}", e);
         return Ok(());
     }
     // The mtime is implicitly set to "now" by the write. No need to

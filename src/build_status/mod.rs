@@ -142,7 +142,6 @@ fn check_python_build(path: &Path) -> Result<BuildStatus> {
         });
     }
 
-    let output = utils::run_with_timeout("python3", &["-m", "py_compile"], path, BUILD_TIMEOUT)?;
     // `python3 -m py_compile` without file arguments exits 2 with a usage
     // error, so every Python project used to report ok=false. Pass the
     // collected files explicitly (cap 50 keeps argv bounded).

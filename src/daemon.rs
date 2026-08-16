@@ -119,8 +119,18 @@ impl Daemon {
 
         let socket_path = socket_dir.join(SOCKET_NAME);
 
-        // Remove stale socket
+        // If a socket file exists, check whether a live daemon is behind it.
+        // Blindly unlinking would orphan a running daemon's listener and let
+        // two daemons run concurrently (split-brain caches + duplicate
+        // inotify watchers).
         if socket_path.exists() {
+            if std::os::unix::net::UnixStream::connect(&socket_path).is_ok() {
+                anyhow::bail!(
+                    "daemon already running (socket {} is live)",
+                    socket_path.display()
+                );
+            }
+            // Stale socket from a crashed daemon — safe to remove.
             std::fs::remove_file(&socket_path)?;
         }
 
@@ -141,6 +151,19 @@ impl Daemon {
     fn run(&self) -> Result<()> {
         let listener = UnixListener::bind(&self.socket_path)?;
         listener.set_nonblocking(true)?;
+
+        // Restrict the IPC socket to this user. The default bind mode
+        // (0777 & umask) makes it world-connectable, and the socket carries
+        // no authentication — any local user could query or shut down the
+        // daemon.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(
+                &self.socket_path,
+                std::fs::Permissions::from_mode(0o600),
+            );
+        }
 
         tracing::info!("fabd listening on {}", self.socket_path.display());
 
@@ -507,6 +530,11 @@ fn watch_loop(
                                 }
                                 if cache_guard.remove(path).is_some() {
                                     prune_size_cache_for_root(&dir_sizes, &dir_size_mtimes, path);
+                                    // The client's fast path trusts the on-disk
+                                    // banner cache file's mtime; a stale file
+                                    // would keep serving the pre-event banner,
+                                    // so drop it together with the memory entry.
+                                    folder_auto_banner::cmd::banner_data_cache::remove_cache(path);
                                     tracing::info!("Cache invalidated: {}", path.display());
                                 }
                             }
@@ -557,12 +585,15 @@ fn refresh_active_watchers(
         if watched
             .values()
             .any(|regs| regs.iter().any(|reg| reg.watched_path == target))
-            || failed_watches.contains(&target)
         {
             continue;
         }
 
         if !can_watch_path(&target) {
+            // Failed paths are retried on the next refresh pass (which runs
+            // whenever the active root set changes) instead of being skipped
+            // forever — a transient failure (inotify limit, path not yet
+            // created, permissions) would otherwise never recover.
             failed_watches.insert(target);
             continue;
         }
@@ -579,6 +610,7 @@ fn refresh_active_watchers(
                 | WatchMask::MOVE_SELF,
         ) {
             Ok(wd) => {
+                failed_watches.remove(&target);
                 let owner = find_owner_for_watch(&target, roots);
                 let regs = watched.entry(wd).or_default();
                 if !regs.iter().any(|reg| reg.owner == owner) {
@@ -1625,9 +1657,10 @@ fn compute_dir_size_with_status(path: &Path, timeout: Duration) -> SizeComputati
     // sizes for normal files, so displayed sizes can be populated from cache
     // instead of falling back to the 4 KiB directory inode size.
     let path_arg = path.to_string_lossy();
+    // `--` so a directory whose name starts with `-` is not parsed as a flag.
     if let Ok(stdout) = folder_auto_banner::utils::run_with_timeout_stdout(
         "du",
-        &["-s", "-b", path_arg.as_ref()],
+        &["-s", "-b", "--", path_arg.as_ref()],
         timeout,
     ) {
         let stdout = stdout.trim();
