@@ -38,16 +38,18 @@ pub struct GitInfo {
 
 /// Build git status pathspecs for the banner rows.
 ///
-/// Files use their exact top-level name. Directories use `dir/*` so the
-/// native `git status` walk only returns immediate children that the banner
-/// can display or aggregate, instead of scanning every nested file under
-/// large trees.
+/// Files use their exact top-level name. Directories use `:(glob)dir/*` —
+/// the `:(glob)` magic makes `*` match only within one path segment, so the
+/// `git status` walk is limited to immediate children of the directory that
+/// the banner can display or aggregate. (Plain `dir/*` pathspecs match
+/// recursively, scanning every nested file under large trees — e.g. tens of
+/// thousands of untracked entries under `target/`.)
 pub fn status_filter_paths_for_items(items: &[crate::fs::DirEntry]) -> Vec<String> {
     items
         .iter()
         .map(|item| {
             if item.is_dir {
-                format!("{}/*", item.name)
+                format!(":(glob){}/*", item.name)
             } else {
                 item.name.clone()
             }
@@ -171,17 +173,27 @@ fn git_status(
 
     let entries: Vec<&[u8]> = raw.split(|&b| b == 0).collect();
     for entry in &entries {
-        if entry.len() < 3 {
+        // -z status records always start with "XY " (two codes + space). The
+        // bare NUL-terminated chunks that follow rename/copy records are the
+        // original path names — they must not be parsed as status records.
+        if entry.len() < 4 || entry[2] != b' ' {
             continue;
         }
         let x = entry[0];
         let y = entry[1];
-        // entry[2] is a space; path starts at index 3
-        if entry.len() < 4 {
-            continue;
-        }
         let path_bytes = &entry[3..];
         let file_path = String::from_utf8_lossy(path_bytes).to_string();
+
+        // Unmerged entries (X and/or Y is 'U') are conflicts: neither staged
+        // additions nor plain worktree modifications. Surface them so the
+        // banner's conflict handling (priority 5, red) actually fires.
+        if x == b'U' || y == b'U' {
+            modified += 1;
+            if collect_file_statuses {
+                file_statuses.insert(file_path, FileStatus::Conflict);
+            }
+            continue;
+        }
 
         // X = index status, Y = worktree status
         let is_staged = x != b' ' && x != b'?' && x != b'!';
@@ -226,13 +238,29 @@ fn git_status(
 
 /// Get ahead/behind counts relative to upstream.
 fn git_ahead_behind(path: &Path) -> (usize, usize) {
-    // Try @{upstream} shorthand first; falls back to origin/<branch>
+    // Prefer the configured upstream; fall back to origin/<branch> when the
+    // branch has no upstream configured.
     if let Some(out) = git_cmd(path, &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]) {
         let parts: Vec<&str> = out.trim().split('\t').collect();
         if parts.len() == 2 {
             let ahead = parts[0].parse().unwrap_or(0);
             let behind = parts[1].parse().unwrap_or(0);
             return (ahead, behind);
+        }
+    }
+    if let Some(branch) = git_cmd(path, &["rev-parse", "--abbrev-ref", "HEAD"]) {
+        let branch = branch.trim().to_string();
+        if !branch.is_empty() && branch != "HEAD" {
+            let upstream = format!("origin/{}", branch);
+            let args: Vec<&str> = vec!["rev-list", "--left-right", "--count", "HEAD...", &upstream];
+            if let Some(out) = git_cmd(path, &args) {
+                let parts: Vec<&str> = out.trim().split('\t').collect();
+                if parts.len() == 2 {
+                    let ahead = parts[0].parse().unwrap_or(0);
+                    let behind = parts[1].parse().unwrap_or(0);
+                    return (ahead, behind);
+                }
+            }
         }
     }
     (0, 0)
@@ -251,8 +279,10 @@ fn git_last_commit(path: &Path) -> (Option<String>, Option<String>, Option<i64>)
     let _full_hash = lines[0];
     let short_hash = lines[1].to_string();
     let subject = lines[2];
-    let truncated = if subject.len() > 80 {
-        subject[..80].to_string()
+    let truncated = if subject.chars().count() > 80 {
+        // char-boundary-safe truncation: byte-slicing at 80 could split a
+        // multibyte UTF-8 char and panic.
+        subject.chars().take(80).collect()
     } else {
         subject.to_string()
     };

@@ -1129,8 +1129,18 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     }
     if git_info.is_none() {
         git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
-        if let (Some(ref gi), Some(ref cache)) = (&git_info, &cache) {
-            let ck = folder_auto_banner::cache::cache_key(path, "git");
+        if let (Some(ref mut gi), Some(ref cache)) = (&mut git_info, &cache) {
+            // Trim to displayable paths BEFORE caching: the unfiltered map can
+            // hold tens of thousands of deep untracked entries under large
+            // trees (e.g. target/), which bloated the cached payload and IPC.
+            let keep: HashSet<_> = summary
+                .top_items
+                .iter()
+                .map(|item| item.name.clone())
+                .collect();
+            gi.file_statuses.retain(|path_str, _| {
+                folder_auto_banner::git::is_displayed_git_status_path(path_str, &keep)
+            });
             let _ = cache.set(&ck, gi.clone());
         }
     }

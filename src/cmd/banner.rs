@@ -394,7 +394,11 @@ fn navigate_by_number(
     } else {
         let summary =
             crate::fs::DirSummary::scan_with_options(path, false, false, false, false, false, &[])?;
-        let git_info = crate::git::get_git_info(path).ok().unwrap_or_default();
+        // Filtered, like run_banner: an unfiltered get_git_info collects every
+        // deep untracked path (tens of thousands of entries, e.g. target/).
+        let git_filter_paths = crate::git::status_filter_paths_for_items(&summary.top_items);
+        let git_info =
+            crate::git::get_git_info_filtered(path, &git_filter_paths).unwrap_or_default();
         (summary, git_info)
     };
 
