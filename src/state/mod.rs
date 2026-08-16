@@ -23,174 +23,6 @@ pub fn get_data_dir() -> Result<PathBuf> {
     Ok(data_dir)
 }
 
-// === Clipboard ===
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[allow(dead_code)]
-pub struct ClipboardEntry {
-    pub paths: Vec<PathBuf>,
-    pub source_dir: PathBuf,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[allow(dead_code)]
-pub struct ClipboardState {
-    pub entries: Vec<ClipboardEntry>,
-    pub current_index: usize,
-}
-
-#[allow(dead_code)]
-impl ClipboardState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn clipboard_path() -> Result<PathBuf> {
-        Ok(get_data_dir()?.join("clipboard.json"))
-    }
-
-    pub fn load() -> Result<Self> {
-        let path = Self::clipboard_path();
-        if let Ok(path) = path {
-            if path.exists() {
-                let content = fs::read_to_string(&path).context("Failed to read clipboard")?;
-                return serde_json::from_str(&content).context("Failed to parse clipboard JSON");
-            }
-        }
-        Ok(Self::new())
-    }
-
-    pub fn save(&self) -> Result<()> {
-        let path = Self::clipboard_path()?;
-        let content =
-            serde_json::to_string_pretty(self).context("Failed to serialize clipboard")?;
-        fs::write(&path, content).context(format!("Failed to write clipboard to {:?}", path))?;
-        Ok(())
-    }
-}
-
-// === Pins ===
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct Pin {
-    pub name: String,
-    pub path: PathBuf,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub last_accessed: Option<chrono::DateTime<chrono::Utc>>,
-    pub access_count: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[allow(dead_code)]
-pub struct PinsState {
-    pub pins: Vec<Pin>,
-}
-
-#[allow(dead_code)]
-impl PinsState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn pins_path() -> Result<PathBuf> {
-        Ok(get_data_dir()?.join("pins.json"))
-    }
-
-    pub fn load() -> Result<Self> {
-        let path = Self::pins_path();
-        if let Ok(path) = path {
-            if path.exists() {
-                let content = fs::read_to_string(&path).context("Failed to read pins")?;
-                return serde_json::from_str(&content).context("Failed to parse pins JSON");
-            }
-        }
-        Ok(Self::new())
-    }
-
-    pub fn save(&self) -> Result<()> {
-        let path = Self::pins_path()?;
-        let content = serde_json::to_string_pretty(self).context("Failed to serialize pins")?;
-        fs::write(&path, content).context(format!("Failed to write pins to {:?}", path))?;
-        Ok(())
-    }
-}
-
-// === Sessions ===
-
-/// Canonical session type used across all session operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct Session {
-    pub name: String,
-    #[serde(alias = "path")]
-    pub cwd: PathBuf,
-    #[serde(alias = "timestamp")]
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    #[serde(default)]
-    pub last_accessed: Option<chrono::DateTime<chrono::Utc>>,
-    #[serde(default)]
-    pub git_branch: Option<String>,
-    #[serde(default)]
-    pub description: Option<String>,
-}
-
-impl Session {
-    /// Create a new session
-    #[allow(dead_code)]
-    pub fn new(name: &str, cwd: PathBuf) -> Self {
-        Self {
-            name: name.to_string(),
-            cwd,
-            created_at: Some(chrono::Utc::now()),
-            last_accessed: None,
-            git_branch: None,
-            description: None,
-        }
-    }
-
-    /// Get the sessions directory
-    #[allow(dead_code)]
-    pub fn sessions_dir() -> Result<PathBuf> {
-        Ok(get_data_dir()?.join("sessions"))
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SessionsState {
-    pub sessions: Vec<Session>,
-}
-
-#[allow(dead_code)]
-impl SessionsState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn sessions_path() -> Result<PathBuf> {
-        Ok(get_data_dir()?.join("sessions.json"))
-    }
-
-    pub fn load() -> Result<Self> {
-        let path = Self::sessions_path();
-        if let Ok(path) = path {
-            if path.exists() {
-                let content = fs::read_to_string(&path).context("Failed to read sessions")?;
-                return serde_json::from_str(&content).context("Failed to parse sessions JSON");
-            }
-        }
-        Ok(Self::new())
-    }
-
-    pub fn save(&self) -> Result<()> {
-        let path = Self::sessions_path()?;
-        let content = serde_json::to_string_pretty(self).context("Failed to serialize sessions")?;
-        fs::write(&path, content).context(format!("Failed to write sessions to {:?}", path))?;
-        Ok(())
-    }
-}
-
 // === Config ===
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -367,7 +199,45 @@ mod tests {
         assert!(!config.no_symlink);
         assert!(!config.total_size);
         assert!(config.git_status);
-        assert!(config.build_status);
+        assert!(!config.build_status); // opt-in feature, see Default
+        assert!(config.todo_count);
+        assert!(config.languages);
+        assert!(config.ports);
+        assert!(config.docker);
+        assert!(config.ignore_dirs.contains(&"node_modules".to_string()));
+        assert!(config.ignore_dirs.contains(&".pi".to_string()));
+        assert!(config.ignore_dirs.contains(&".opencode".to_string()));
+    }
+
+    #[test]
+    fn test_config_serialization() {
+        let config = Config::default();
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        assert!(toml_str.contains("icons = true"));
+        assert!(toml_str.contains("colors = true"));
+        assert!(toml_str.contains("compact = false"));
+
+        let deserialized: Config = toml::from_str(&toml_str).unwrap();
+        assert_eq!(deserialized.icons, config.icons);
+        assert_eq!(deserialized.colors, config.colors);
+        assert_eq!(deserialized.compact, config.compact);
+    }
+
+    #[test]
+    fn test_config_default() {
+        let config = Config::default();
+        assert!(config.icons);
+        assert!(config.colors);
+        assert!(!config.compact);
+        assert_eq!(config.max_display_items, 0);
+        assert_eq!(config.permission, "rwx");
+        assert_eq!(config.size, "default");
+        assert_eq!(config.date, "date");
+        assert!(!config.classify);
+        assert!(!config.no_symlink);
+        assert!(!config.total_size);
+        assert!(config.git_status);
+        assert!(!config.build_status); // opt-in feature, see Default
         assert!(config.todo_count);
         assert!(config.languages);
         assert!(config.ports);
