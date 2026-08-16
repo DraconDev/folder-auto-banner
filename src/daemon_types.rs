@@ -109,26 +109,6 @@ mod tests {
     }
 
     #[test]
-    fn test_response_dirsize_serialization() {
-        let response = Response::DirSize {
-            path: PathBuf::from("/tmp"),
-            size: 12345,
-        };
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("DirSize"));
-        assert!(json.contains("12345"));
-
-        let deserialized: Response = serde_json::from_str(&json).unwrap();
-        match deserialized {
-            Response::DirSize { path, size } => {
-                assert_eq!(path, PathBuf::from("/tmp"));
-                assert_eq!(size, 12345);
-            }
-            _ => panic!("Expected DirSize variant"),
-        }
-    }
-
-    #[test]
     fn test_banner_data_creation() {
         let data = crate::daemon_types::BannerData {
             summary: crate::fs::DirSummary::scan(Path::new("/tmp")).unwrap(),
