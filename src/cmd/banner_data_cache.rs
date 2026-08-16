@@ -101,12 +101,12 @@ pub fn directory_mtime(path: &Path) -> Option<SystemTime> {
     meta.modified().ok()
 }
 
-/// Returns true if the file name has an extension that the daemon
-/// runs a content probe on (text files, images, archives, etc.).
-/// Used to limit the per-file mtime staleness check to files that
-/// could actually have changed banner metadata.
-fn has_content_probe_ext(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
+/// Returns true if the (lower-cased) file name has an extension that the
+/// daemon runs a content probe on (text files, images, archives, etc.).
+/// Used to limit the per-file mtime staleness check to files that could
+/// actually have changed banner metadata. This is the canonical list —
+/// the daemon's inotify watcher delegates to it.
+pub fn is_content_probe_ext(lower_name: &str) -> bool {
     lower.ends_with(".txt")
         || lower.ends_with(".md")
         || lower.ends_with(".json")
@@ -149,30 +149,53 @@ fn has_content_probe_ext(name: &str) -> bool {
 }
 
 /// Returns the maximum mtime of all files with content-probe
-/// extensions in the directory at `path` (one level deep, not
-/// recursive). Used to detect file content changes that don't
-/// advance the directory's own mtime (e.g., editing a text file
-/// in-place). Only files with extensions the daemon runs a content
-/// probe on are checked, to keep the cost low for directories with
-/// many files (e.g., a build directory with thousands of .o files).
+/// extensions under `path`, recursing into subdirectories with a
+/// bounded walk (depth ≤ 8, ≤ 8192 entries visited, heavy dirs
+/// skipped). Used to detect file content changes that don't advance
+/// the directory's own mtime (e.g., editing a file in place). A
+/// flat, one-level scan missed nested edits at depth ≥ 2, which
+/// could keep banners stale for the full 300s cache TTL.
 pub fn max_descendant_mtime(path: &Path) -> Option<SystemTime> {
-    let entries = std::fs::read_dir(path).ok()?;
-    let mut max: Option<SystemTime> = None;
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-        if !has_content_probe_ext(&name_str) {
-            continue;
+    fn walk(path: &Path, depth: usize, visited: &mut usize) -> Option<SystemTime> {
+        if depth > 8 || *visited >= 8192 {
+            return None;
         }
-        if let Ok(meta) = entry.metadata() {
-            if meta.is_file() {
-                if let Ok(mtime) = meta.modified() {
-                    max = Some(max.map_or(mtime, |m| m.max(mtime)));
+        let entries = std::fs::read_dir(path).ok()?;
+        let mut max: Option<SystemTime> = None;
+        for entry in entries.flatten() {
+            if *visited >= 8192 {
+                break;
+            }
+            *visited += 1;
+            let name_str = entry.file_name().to_string_lossy();
+            if !is_content_probe_ext(&name_str.to_ascii_lowercase()) {
+                continue;
+            }
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    if let Ok(mtime) = meta.modified() {
+                        max = Some(max.map_or(mtime, |m| m.max(mtime)));
+                    }
+                } else if meta.is_dir() {
+                    // Skip heavyweight subtrees: probe-relevant content under
+                    // them is not shown by the banner anyway.
+                    if matches!(
+                        name_str.as_ref(),
+                        ".git" | "target" | "node_modules" | ".cache" | ".venv" | "build"
+                    ) {
+                        continue;
+                    }
+                    if let Some(mtime) = walk(&entry.path(), depth + 1, visited) {
+                        max = Some(max.map_or(mtime, |m| m.max(mtime)));
+                    }
                 }
             }
         }
+        max
     }
-    max
+
+    let mut visited = 0usize;
+    walk(path, 0, &mut visited)
 }
 
 /// Returns `true` if the cache file for `path` exists, is younger than
