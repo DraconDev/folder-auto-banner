@@ -1108,7 +1108,16 @@ fn persist_banner_data_cache(path: &Path, data: &BannerData) {
 }
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
-    let mut summary = DirSummary::scan_with_options(path, false, true, true, true, true, &[])?;
+    let config = folder_auto_banner::state::Config::load().unwrap_or_default();
+    let mut summary = DirSummary::scan_with_options(
+        path,
+        config.build_status,
+        true,
+        true,
+        true,
+        true,
+        &[],
+    )?;
 
     // Build pathspecs for git status collection. Files use their exact
     // top-level name; directories use `dir/*` so native git status only

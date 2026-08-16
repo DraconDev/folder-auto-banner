@@ -600,7 +600,9 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
 
     let summary = DirSummary::scan_with_options(
         &path,
-        false, // build check disabled by default - too slow (cargo check = 6.7s)
+        // Build checks spawn subprocesses (cargo check ≈ 6.7s) — opt-in via
+        // `f config` (build_status), off by default.
+        config.build_status,
         !no_todos,
         !no_ports,
         !no_docker,

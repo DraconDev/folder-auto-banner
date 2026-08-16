@@ -287,7 +287,7 @@ impl Default for Config {
             highlight_recent: "bold".to_string(), // bold text for recent files
             highlight_old: "".to_string(),        // no highlight
             git_status: true,
-            build_status: true,
+            build_status: false, // opt-in: build checks spawn subprocesses (cargo check ≈ 6.7s)
             todo_count: true,
             languages: true,
             ports: true,
