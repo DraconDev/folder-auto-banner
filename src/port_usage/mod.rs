@@ -73,11 +73,15 @@ fn try_ss_with_cwd_check(project_path: &Path) -> Result<Vec<u16>> {
             Err(_) => continue,
         };
 
-        // Extract PID from the last field (e.g., "users:(\"node\",pid=12345,fd=10)")
+        // Extract PIDs from the last field (e.g.,
+        // "users:("node",pid=12345,fd=10)") — SO_REUSEPORT sockets can list
+        // several processes, so take all of them and match any cwd.
         let process_info = parts.last().unwrap_or(&"");
-        if let Some(pid) = extract_pid(process_info) {
-            // Check if this process's cwd is in the project directory
-            if pid_cwd_matches(pid, project_path) && !ports.contains(&port) {
+        if let Some(pid) = extract_pids(process_info)
+            .iter()
+            .find(|pid| pid_cwd_matches(**pid, project_path))
+        {
+            if !ports.contains(&port) {
                 ports.push(port);
             }
         }
@@ -109,12 +113,28 @@ fn ss_output_cached() -> Result<String> {
     Ok(fresh)
 }
 
-/// Extract PID from ss process info string like `users:(\"node\",pid=12345,fd=10)`
-fn extract_pid(info: &str) -> Option<u32> {
-    let pid_start = info.find("pid=")?;
-    let pid_str = &info[pid_start + 4..];
-    let pid_end = pid_str.find(|c: char| !c.is_ascii_digit())?;
-    pid_str[..pid_end].parse().ok()
+/// Extract all PIDs from an ss process info string like
+/// `users:("node",pid=12345,fd=10)` — SO_REUSEPORT sockets emit one entry per
+/// process, e.g. `users:(("node",pid=111,fd=7),("node",pid=222,fd=7))`, and
+/// the previous first-match-only parse missed every process after the first.
+fn extract_pids(info: &str) -> Vec<u32> {
+    let mut pids = Vec::new();
+    let mut rest = info;
+    while let Some(pid_start) = rest.find("pid=") {
+        let pid_str = &rest[pid_start + 4..];
+        let pid_end = pid_str
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(pid_str.len());
+        if pid_end > 0 {
+            if let Ok(pid) = pid_str[..pid_end].parse::<u32>() {
+                if !pids.contains(&pid) {
+                    pids.push(pid);
+                }
+            }
+        }
+        rest = &pid_str[pid_end..];
+    }
+    pids
 }
 
 /// Check if a process's working directory matches or is inside the project directory
