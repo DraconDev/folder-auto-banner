@@ -35,45 +35,11 @@ impl TestResults {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64;
-        if now - results.timestamp > 300 {
+        if now.saturating_sub(results.timestamp) > 300 {
             return None; // Expired
         }
 
         Some(results)
-    }
-
-    /// Save test results to cache
-    #[allow(dead_code)]
-    pub fn save(passed: usize, failed: usize, ignored: usize, duration_ms: u64) {
-        let results = TestResults {
-            passed,
-            failed,
-            ignored,
-            duration_ms,
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs() as i64,
-        };
-
-        if let Some(path) = Self::cache_path() {
-            if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            if let Ok(content) = serde_json::to_string_pretty(&results) {
-                let _ = std::fs::write(&path, content);
-            }
-        }
-    }
-
-    /// Format duration as human-readable string
-    #[allow(dead_code)]
-    pub fn format_duration(&self) -> String {
-        if self.duration_ms < 1000 {
-            format!("{}ms", self.duration_ms)
-        } else {
-            format!("{:.1}s", self.duration_ms as f64 / 1000.0)
-        }
     }
 
     /// Format time ago as human-readable string
