@@ -1141,6 +1141,7 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
             gi.file_statuses.retain(|path_str, _| {
                 folder_auto_banner::git::is_displayed_git_status_path(path_str, &keep)
             });
+            let ck = folder_auto_banner::cache::cache_key(path, "git");
             let _ = cache.set(&ck, gi.clone());
         }
     }

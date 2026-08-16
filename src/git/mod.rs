@@ -553,7 +553,10 @@ mod tests {
         ];
 
         let paths = status_filter_paths_for_items(&items);
-        assert_eq!(paths, vec!["src/*".to_string(), "Cargo.toml".to_string()]);
+        assert_eq!(
+            paths,
+            vec![":(glob)src/*".to_string(), "Cargo.toml".to_string()]
+        );
     }
 
     #[test]
