@@ -48,23 +48,14 @@ fn test_uninstall_roundtrip() {
     fs::create_dir_all(home.join(".local/bin")).unwrap();
     fs::write(home.join(".zshrc"), "export FOO=bar\n").unwrap();
 
-    let install_cmd = || {
-        let mut cmd = Command::cargo_bin("f").unwrap();
-        cmd.env("HOME", &home);
-        cmd.arg("install")
-    };
-    let uninstall_cmd = || {
-        let mut cmd = Command::cargo_bin("f").unwrap();
-        cmd.env("HOME", &home);
-        cmd.arg("uninstall")
-    };
-
-    install_cmd().assert().success();
+    let mut cmd = Command::cargo_bin("f").unwrap();
+    cmd.env("HOME", &home).arg("install").assert().success();
     let rc = fs::read_to_string(home.join(".zshrc")).unwrap();
     assert!(rc.contains("fab-shell.zsh"), "install should add the source line");
     assert!(home.join(".local/bin/fab-shell.zsh").exists());
 
-    uninstall_cmd().assert().success();
+    let mut cmd = Command::cargo_bin("f").unwrap();
+    cmd.env("HOME", &home).arg("uninstall").assert().success();
     let rc = fs::read_to_string(home.join(".zshrc")).unwrap();
     assert!(
         !rc.contains("fab-shell"),
@@ -73,7 +64,8 @@ fn test_uninstall_roundtrip() {
     assert!(!home.join(".local/bin/fab-shell.zsh").exists());
 
     // Idempotent second uninstall.
-    uninstall_cmd().assert().success();
+    let mut cmd = Command::cargo_bin("f").unwrap();
+    cmd.env("HOME", &home).arg("uninstall").assert().success();
     fs::remove_dir_all(home).ok();
 }
 
