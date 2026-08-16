@@ -178,3 +178,16 @@ fn truncate_output(s: &str, max_len: usize) -> String {
         truncated
     }
 }
+
+#[cfg(test)]
+mod probe {
+    use super::*;
+    use crate::fs::ProjectType;
+    #[test]
+    fn probe_py() {
+        std::fs::create_dir_all("/tmp/pyt").unwrap();
+        std::fs::write("/tmp/pyt/bad.py", "x = 1\n").unwrap();
+        let r = check_python_build(std::path::Path::new("/tmp/pyt"));
+        eprintln!("PROBE result: {:?}", r);
+    }
+}
