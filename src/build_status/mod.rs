@@ -189,5 +189,7 @@ mod probe {
         std::fs::write("/tmp/pyt/bad.py", "x = 1\n").unwrap();
         let r = check_python_build(std::path::Path::new("/tmp/pyt"));
         eprintln!("PROBE result: {:?}", r);
+        let r2 = check_build(std::path::Path::new("/tmp/pyt"), &crate::fs::ProjectType::Python);
+        eprintln!("PROBE2 via check_build: {:?}", r2);
     }
 }
