@@ -83,16 +83,27 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
 
     let socket = socket_path().ok()?;
 
-    // Try connecting — if it fails, start daemon and retry once
+    // Try connecting — if it fails, start daemon and poll for readiness.
     let mut stream = match UnixStream::connect(&socket) {
         Ok(s) => s,
         Err(_) => {
-            // Socket missing or stale — clean up and start daemon
+            // Nobody listening behind the file — stale, safe to remove.
             let _ = std::fs::remove_file(&socket);
             ensure_daemon_running();
-            // Wait for daemon to be ready
-            std::thread::sleep(Duration::from_millis(50));
-            UnixStream::connect(&socket).ok()?
+            // Poll for the listener (up to 2s) instead of a single fixed
+            // 50ms sleep: a cold daemon can take longer to bind, and the
+            // old code silently fell back to a local scan.
+            let mut connected = None;
+            for _ in 0..40 {
+                match UnixStream::connect(&socket) {
+                    Ok(s) => {
+                        connected = Some(s);
+                        break;
+                    }
+                    Err(_) => std::thread::sleep(Duration::from_millis(50)),
+                }
+            }
+            connected?
         }
     };
     let t1 = std::time::Instant::now();
@@ -153,8 +164,11 @@ pub fn is_daemon_running() -> bool {
     match send_and_recv(&mut stream, &request) {
         Ok(Response::Pong) => true,
         _ => {
-            // Socket connected but daemon is unresponsive — remove stale socket
-            let _ = std::fs::remove_file(&socket);
+            // Unresponsive daemon. NOTE: do NOT unlink the socket here — a
+            // live-but-busy daemon may simply be slow to answer (10s timeout
+            // while it computes a banner for a huge directory). Unlinking a
+            // live daemon's socket orphans it and lets a second daemon start
+            // (two daemons writing caches concurrently).
             false
         }
     }
