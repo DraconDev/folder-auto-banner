@@ -171,12 +171,14 @@ impl Config {
     pub fn save(&self) -> Result<()> {
         let path = Self::config_path()?;
         if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
+            fs::create_dir_all(parent)?;
         }
         let content = toml::to_string_pretty(self).context("Failed to serialize config")?;
-        fs::write(&path, content).context(format!("Failed to write config to {:?}", path))?;
+        // Atomic write (temp + rename): a torn write or crash mid-write
+        // would leave an unparseable config that silently resets to default.
+        let tmp = path.with_extension("toml.tmp");
+        fs::write(&tmp, &content).context(format!("Failed to write config to {:?}", tmp))?;
+        fs::rename(&tmp, &path).context(format!("Failed to write config to {:?}", path))?;
         Ok(())
     }
 }
