@@ -264,7 +264,7 @@ pub enum Commands {
 
         /// Open file with this program instead of editor (e.g., "cat", "krita", "ranger")
         #[arg(value_name = "ACTION")]
-        action: Option<String>,
+        action: Box<Option<String>>,
 
         /// Force open in editor (overrides default behavior)
         #[arg(short = 'e', long = "edit")]
@@ -406,7 +406,7 @@ impl Cli {
                     ignore_glob: ignore_glob.clone(),
                     no_symlink: *no_symlink,
                     hyperlink: *hyperlink,
-                    action: action.clone(),
+                    action: action.as_ref().clone(),
                     force_edit: *force_edit,
                     force_run: *force_run,
                     ..Default::default()
