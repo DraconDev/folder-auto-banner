@@ -127,7 +127,7 @@ source ~/.local/bin/fab-shell.zsh   # for zsh
 source ~/.local/bin/fab-shell.bash  # for bash
 ```
 
-The shell wrapper is the source of truth for `f N` navigation. It calls the installed `f` binary; the checked-in `fab-shell.zsh` and `fab-shell.bash` files are generated from the compiled-in `src/shell_wrapper.rs` constants.
+The shell wrapper is the source of truth for `f N` navigation. It calls the installed `f` binary; `f install` writes the wrappers to `~/.local/bin/fab-shell.zsh` (zsh) and `~/.local/bin/fab-shell.bash` (bash), generated from the compiled-in `src/shell_wrapper.rs` constants.
 
 ## Numbered Navigation
 

@@ -108,3 +108,7 @@ test_banner/
 !rustfmt.toml
 !state/events/*.jsonl
 # --- END DRACON MANAGED BLOCK ---
+
+# Scratch/junk files (audit pass 2026-08-16)
+/micro
+/1.txt
