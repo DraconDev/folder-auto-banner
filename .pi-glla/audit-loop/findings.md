@@ -66,3 +66,4 @@ Audit pass 1 — 2026-08-16 (4 parallel Explore agents: daemon/state, cli/cmd, f
 ## DECIDE findings
 
 None this pass — every finding above has one unambiguous durable fix (the removed command set was an intentional v0.3.0 simplification per tasks.md; no direction questions arose).
+- [ ] FIX: med: build-status feature dead in production — `config.build_status` (default true, state/mod.rs:243,290) never read; `check_build` hardcoded false at both call sites, so the "✓ builds" pod can never render (src/cmd/banner.rs:592, src/daemon.rs:1111)
