@@ -49,9 +49,11 @@ f() {
             elif [[ -d "$target_path" ]]; then
                 cd "$target_path"
             else
-                # File: open in editor
-                local editor="${EDITOR:-micro}"
-                "$editor" "$target_path"
+                # File: open in editor. Prefer $EDITOR; fall back to the first
+                # available editor so `f N` never dies with "command not
+                # found" on installs that lack micro.
+                local editor="${EDITOR:-$(command -v micro || command -v nano || command -v vim || command -v vi)}"
+                "${editor:-vi}" "$target_path"
             fi
         fi
     else
@@ -107,9 +109,11 @@ f() {
             elif [[ -d "$target_path" ]]; then
                 cd "$target_path"
             else
-                # File: open in editor
-                local editor="${EDITOR:-micro}"
-                "$editor" "$target_path"
+                # File: open in editor. Prefer $EDITOR; fall back to the first
+                # available editor so `f N` never dies with "command not
+                # found" on installs that lack micro.
+                local editor="${EDITOR:-$(command -v micro || command -v nano || command -v vim || command -v vi)}"
+                "${editor:-vi}" "$target_path"
             fi
         fi
     else
