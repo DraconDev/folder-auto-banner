@@ -35,7 +35,7 @@ impl TestResults {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64;
-        if now.saturating_sub(results.timestamp) > 300 {
+        if now.abs_diff(results.timestamp) > 300 {
             return None; // Expired
         }
 
