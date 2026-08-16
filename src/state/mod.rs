@@ -19,6 +19,13 @@ pub fn get_data_dir() -> Result<PathBuf> {
         fs::create_dir_all(&data_dir)
             .context(format!("Failed to create data directory: {:?}", data_dir))?;
     }
+    // The data dir holds per-path banner caches (listings, git status) —
+    // restrict it to this user.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o700));
+    }
 
     Ok(data_dir)
 }
