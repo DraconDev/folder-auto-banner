@@ -248,36 +248,43 @@ f -b 5                 # navigate to item 5
 Unknown words in banner mode are dropped (e.g. `f -b foo` runs the
 default banner, ignoring `foo`).
 
-### Sorting
+All flags below are banner flags. They work as `f banner --flag …` (or as
+`f -b …` for flags the top-level CLI also exposes). Rows marked ‡ exist only
+on the banner subcommand — `f --sort name` / `f --versionsort` are clap
+errors (exit 2); use `f banner --sort name` etc.
+
+### Sorting (banner flags)
 | Flag | Description |
 |------|-------------|
-| `--sort name\|size\|date\|type\|git\|extension\|version` | Sort by field |
+| `--sort name\|size\|date\|type\|git\|extension\|version` ‡ | Sort by field |
 | `-t`, `--timesort` | Sort by time modified |
 | `-S`, `--sizesort` | Sort by size |
 | `-X`, `--extensionsort` | Sort by extension |
 | `-G`, `--gitsort` | Sort by git status |
-| `--versionsort` | Natural sort (version numbers) |
+| `--versionsort` ‡ | Natural sort (version numbers) |
 | `--no-sort` | No sort, directory order |
 | `--reverse` | Reverse sort |
-| `--group-dirs first\|last` | Group directories |
+| `--group-dirs first\|last` ‡ | Group directories |
 
-### Display
+### Display (banner flags)
 | Flag | Description |
 |------|-------------|
 | `-a`, `--hidden` | Show dotfiles |
 | `--tree [depth]` | Tree view (0 = unlimited) |
-| `--group` | Group by type (dirs, files, symlinks) |
+| `--group` ‡ | Group by type (dirs, files, symlinks) |
 | `--filter <pattern>` | Filter by name |
 | `--max <N>` | Limit items |
 | `--compact` | Less info |
 | `-R`, `--recursive` | Recurse into subdirectories |
 | `--verbose` | More info |
 
-### Output
+### Output (banner flags)
 | Flag | Description |
 |------|-------------|
 | `--json` | JSON output |
 | `--raw` | Plain text output |
+
+‡ Banner-subcommand-only: `f banner --flag …` (not top-level `f --flag …`).
 
 ## Config File
 
