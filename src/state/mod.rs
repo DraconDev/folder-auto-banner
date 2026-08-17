@@ -120,7 +120,7 @@ impl Default for Config {
             hide_columns: vec![],
             sort: "name".to_string(),
             reverse: false,
-            group_dirs: "first".to_string(),
+            group_dirs: "last".to_string(),
             hyperlink: false,
             hidden: false,
             highlight_recent: "bold".to_string(), // bold text for recent files

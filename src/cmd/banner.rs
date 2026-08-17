@@ -259,7 +259,7 @@ fn build_display_items<'a>(
         dirs.sort_by_cached_key(|i| i.name.to_lowercase());
         files.sort_by_cached_key(|i| i.name.to_lowercase());
         symlinks.sort_by_cached_key(|i| i.name.to_lowercase());
-        display_items = dirs.into_iter().chain(files).chain(symlinks).collect();
+        display_items = files.into_iter().chain(symlinks).chain(dirs).collect();
     }
 
     // Sort based on --sort flag or short flags
@@ -280,7 +280,7 @@ fn build_display_items<'a>(
             "name"
         };
 
-        let group_dirs_mode = opts.group_dirs.unwrap_or("first");
+        let group_dirs_mode = opts.group_dirs.unwrap_or("last");
 
         // Pre-compute lowercase names, extensions, and date keys once so the
         // per-comparison sort callback does no allocation. This converts the
@@ -940,7 +940,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         .count();
 
     // Deferred header: compute only when about to display
-    let sep = format!(" {}│{} ", color(DIM), color(RESET));
+    let sep = format!(" {}·{} ", color(DIM), color(RESET));
     let header = {
         let size_str = format_size_compact(summary.total_size);
         let branch_display = build_branch_display(git_info);
