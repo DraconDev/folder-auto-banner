@@ -422,7 +422,27 @@ fn build_display_items<'a>(
                         ka.lower.cmp(&kb.lower)
                     }
                 }
-                "git" => kb.git.cmp(&ka.git),
+                "git" => {
+                    if kb.git != ka.git {
+                        kb.git.cmp(&ka.git)
+                    } else {
+                        let churn_a = git_info
+                            .file_churn
+                            .get(a.name.as_str())
+                            .copied()
+                            .unwrap_or(0);
+                        let churn_b = git_info
+                            .file_churn
+                            .get(b.name.as_str())
+                            .copied()
+                            .unwrap_or(0);
+                        if churn_b != churn_a {
+                            churn_b.cmp(&churn_a)
+                        } else {
+                            kb.date.cmp(&ka.date)
+                        }
+                    }
+                }
                 "version" => natural_cmp(&a.name, &b.name),
                 _ => ka.lower.cmp(&kb.lower),
             };
