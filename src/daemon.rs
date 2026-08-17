@@ -1717,6 +1717,19 @@ fn save_banner_cache(socket_dir: &Path, cache: &HashMap<PathBuf, CacheEntry>) {
 }
 
 fn main() -> Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("fabd {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!(
+            "fabd {}\nBackground daemon for folder-auto-banner\n\nUsage: fabd [OPTIONS]\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version",
+            env!("CARGO_PKG_VERSION")
+        );
+        return Ok(());
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
