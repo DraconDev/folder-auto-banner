@@ -2737,4 +2737,54 @@ mod tests {
         let width = get_terminal_width();
         assert!(width <= 1000); // Reasonable upper bound
     }
+
+    #[test]
+    fn test_fold_repetitive_patterns() {
+        let mut entries = Vec::new();
+        // Create 25 entries where 10 share the prefix "release_notes_"
+        for i in 1..=10 {
+            entries.push(crate::fs::DirEntry {
+                name: format!("release_notes_{}.md", i),
+                path: std::path::PathBuf::from(format!("/tmp/release_notes_{}.md", i)),
+                is_dir: false,
+                is_file: true,
+                is_symlink: false,
+                is_exec: false,
+                size: 100,
+                modified: Some(chrono::DateTime::from_timestamp(i as i64 * 100, 0).unwrap()),
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                symlink_target: None,
+                symlink_valid: true,
+                content_probe: None,
+            });
+        }
+        for i in 1..=15 {
+            entries.push(crate::fs::DirEntry {
+                name: format!("other_file_{}.rs", i),
+                path: std::path::PathBuf::from(format!("/tmp/other_file_{}.rs", i)),
+                is_dir: false,
+                is_file: true,
+                is_symlink: false,
+                is_exec: false,
+                size: 200,
+                modified: Some(chrono::DateTime::from_timestamp(i as i64 * 50, 0).unwrap()),
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                symlink_target: None,
+                symlink_valid: true,
+                content_probe: None,
+            });
+        }
+
+        let mut item_refs: Vec<&crate::fs::DirEntry> = entries.iter().collect();
+        assert_eq!(item_refs.len(), 25);
+        fold_repetitive_patterns(&mut item_refs, 2);
+
+        // From 10 release notes, only 2 kept (8 dropped). From 15 other files with prefix "other_file_", 2 kept (13 dropped).
+        // Total should be 4 (2 + 2)
+        assert_eq!(item_refs.len(), 4);
+    }
 }
