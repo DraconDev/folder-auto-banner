@@ -9,7 +9,7 @@ Audit pass 1 — 2026-08-16 (4 parallel Explore agents: daemon/state, cli/cmd, f
 - [x] FIX: high: 12.1MB ELF `micro` committed at repo root, never installed or referenced by any build/install path (micro, added 57d0ca1 2026-05-28) — fixed in 620383c
 - [x] FIX: med: scripts/test_lazy_flags.sh tests the lazy-flag DSL removed in v0.7.0; passes spuriously (compares only exit codes) (scripts/test_lazy_flags.sh:6-8) — fixed in 620383c
 - [x] FIX: med: repo-root fab-shell.bash/.zsh are stale copies vs the compiled-in src/shell_wrapper.rs constants that `f install` ships; zsh copy uses bash 0-indexing on args (breaks `f N` cd); README claims they are generated from the constants (fab-shell.zsh:48-53, README.md:125) — fixed in 620383c, 2ee24f8
-- [x] FIX: med: README flag tables document top-level flags that only exist on the banner subcommand — `f --versionsort` exits 2 (README.md:80,251-289 vs src/cli/mod.rs) — fixed in 49bc669
+- [x] FIX: med: README flag tables document top-level flags that only exist on the banner subcommand — `f --versionsort` exits 2 (README.md:80,251-289 vs src/cli/mod.rs) — fixed in 49bc669, cbf9085 (tables qualified as banner flags; ‡ marks subcommand-only rows)
 - [x] FIX: med: shell wrapper defaults EDITOR to `micro` but install.sh/`f install` never install micro — file open dies "command not found: micro" on fresh installs (src/shell_wrapper.rs:53,111) — fixed in ef84ff7
 - [x] FIX: med: 14 no-op tests in tests/integration_test.rs with fully commented-out bodies, NOTE comments describe the removed lazy-flag system as current (tests/integration_test.rs:16-137) — fixed in 6187365, c857167, c5323d5
 - [x] FIX: low: man page documents `-1, --oneline`; actual flag is `-o/--oneline` (f.1:79) — fixed in 49bc669
@@ -44,7 +44,7 @@ Audit pass 1 — 2026-08-16 (4 parallel Explore agents: daemon/state, cli/cmd, f
 - [x] FIX: low: redundant `expired` filter makes its log branch dead (src/daemon.rs:797-821) — fixed in 1ce7b80
 - [x] FIX: low: failed_watches entries never retried — a path that becomes watchable stays unwatched until restart (src/daemon.rs:560,618-620) — fixed in 1ce7b80
 - [x] FIX: low: du invocation lacks `--` separator (dir starting with `-` misparsed); non-UTF8 paths lossy-converted (src/daemon.rs:1608-1611) — fixed in 1ce7b80
-- [x] FIX: low: cache uses world-writable /tmp/f-cache with predictable DefaultHasher keys — pre-create/symlink redirection attack on daemon writes (src/cache/mod.rs:18-32) — fixed in 1ce7b80
+- [x] FIX: low: cache uses world-writable /tmp/f-cache with predictable DefaultHasher keys — pre-create/symlink redirection attack on daemon writes (src/cache/mod.rs:18-32) — fixed in 1ce7b80, 0bd8287, b5e74e9 (moved to per-user ~/.cache/fab 0700 w/ atomic temp+rename; symlink refusal)
 - [x] FIX: low: state persistence is non-atomic fs::write with no locking — torn JSON on crash, lost updates on concurrent invocations (src/state/mod.rs:68,115,189,347) — fixed in 7cec5f6
 - [x] FIX: low: clipboard/pins/sessions public API entirely dead, all #[allow(dead_code)] (src/state/mod.rs:26-165) — fixed in b22afa9, 6d5cf7c, 592bec4
 - [x] FIX: low: TestResults::save/format_duration dead; load expiry `now - timestamp > 300` never expires future timestamps (src/test_cache.rs:43-63) — fixed in 81e8ede, 31eca32
