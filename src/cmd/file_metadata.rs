@@ -171,7 +171,7 @@ fn count_zip_entries(bytes: &[u8]) -> Option<usize> {
 
 /// Count SQLite tables by reading schema
 fn count_sqlite_tables(path: &Path) -> Option<usize> {
-    let bytes = std::fs::read(path).ok()?;
+    let bytes = read_file_header(path)?;
     if bytes.len() < 16 {
         return None;
     }
@@ -233,6 +233,12 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                     && buf[j + 7] == 0x64
                 {
                     let version = buf[j + 8];
+
+                    if (version == 0 && j + 28 > buf.len())
+                        || (version != 0 && j + 40 > buf.len())
+                    {
+                        return None;
+                    }
 
                     let (timescale, duration) = if version == 0 {
                         let ts = u32::from_be_bytes([
@@ -449,5 +455,21 @@ mod tests {
 
         let contents = get_file_contents(&entry);
         assert_eq!(contents, "");
+    }
+
+    #[test]
+    fn test_parse_mp4_duration_truncated() {
+        // Construct a buffer with a moov + mvhd header that truncates before the timestamp fields
+        let mut truncated_buf = Vec::new();
+        // moov atom header (size 32, type "moov")
+        truncated_buf.extend_from_slice(&32u32.to_be_bytes());
+        truncated_buf.extend_from_slice(b"moov");
+        // mvhd atom header (size 24, type "mvhd", version 0)
+        truncated_buf.extend_from_slice(&24u32.to_be_bytes());
+        truncated_buf.extend_from_slice(b"mvhd");
+        truncated_buf.push(0); // version 0
+        // truncated right here — only 17 bytes total, well short of the required 28 bytes for version 0
+
+        assert_eq!(parse_mp4_duration(&truncated_buf), None);
     }
 }

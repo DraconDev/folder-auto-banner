@@ -407,12 +407,11 @@ fn navigate_by_number(
         build_display_items(path, &summary, &git_info, opts, &config);
 
     if num == 0 || num > display_items.len() {
-        eprintln!(
+        anyhow::bail!(
             "Error: number {} out of range (1-{}). Use 'f' to see available items.",
             num,
             display_items.len()
         );
-        std::process::exit(1);
     }
 
     let entry = &display_items[num - 1];
@@ -589,7 +588,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
 
     // Daemon not available or cache miss - try direct scan.
     // Todos/ports/docker/metrics are disabled by default for speed; set FAB_*=1 to enable.
-    eprintln!("f daemon not available, falling back to direct scan");
+    tracing::debug!("f daemon not available, falling back to direct scan");
     let no_todos = std::env::var("FAB_TODOS").unwrap_or_default() != "1";
     let no_ports = std::env::var("FAB_PORTS").unwrap_or_default() != "1";
     let no_docker = std::env::var("FAB_DOCKER").unwrap_or_default() != "1";

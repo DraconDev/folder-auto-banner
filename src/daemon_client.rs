@@ -122,7 +122,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let response = match result {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("[FAB_DEBUG] send_and_recv error: {} (kind: {:?})", e, e);
+            tracing::debug!("send_and_recv error: {}", e);
             return None;
         }
     };

@@ -362,6 +362,26 @@ fn git_cmd_raw(path: &Path, args: &[&str]) -> Option<Vec<u8>> {
 
 /// Check if a path is inside a git repository at all.
 fn is_git_repo(path: &Path) -> bool {
+    // Quick filesystem check: walk up parent directories looking for a `.git`
+    // entry (directory for normal repos, file for worktrees/submodules).
+    // If no ancestor has `.git`, avoid spawning `git rev-parse` entirely.
+    let has_git_ancestor = {
+        let mut curr = Some(path);
+        let mut found = false;
+        while let Some(dir) = curr {
+            if dir.join(".git").exists() {
+                found = true;
+                break;
+            }
+            curr = dir.parent();
+        }
+        found
+    };
+
+    if !has_git_ancestor {
+        return false;
+    }
+
     Command::new("git")
         .arg("-C")
         .arg(path)
