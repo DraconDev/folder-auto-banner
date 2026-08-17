@@ -479,6 +479,9 @@ fn get_git_info_inner(
     let path_clone = path_owned.clone();
     let diff_stats_handle = std::thread::spawn(move || git_diff_stats(&path_clone));
 
+    let path_clone = path_owned.clone();
+    let file_churn_handle = std::thread::spawn(move || git_file_churn(&path_clone));
+
     let merge_state_handle = std::thread::spawn(move || git_merge_state(&path_owned));
 
     // --- Collect results ---
@@ -515,6 +518,7 @@ fn get_git_info_inner(
     let tag = tag_handle.join().unwrap_or_default();
     let (lines_added, lines_deleted) = diff_stats_handle.join().unwrap_or((0, 0));
     let merge_state = merge_state_handle.join().unwrap_or_default();
+    let file_churn = file_churn_handle.join().unwrap_or_default();
 
     let is_dirty = staged > 0 || modified > 0 || untracked > 0;
 
@@ -538,6 +542,7 @@ fn get_git_info_inner(
         lines_deleted,
         is_dirty,
         file_statuses,
+        file_churn,
     })
 }
 

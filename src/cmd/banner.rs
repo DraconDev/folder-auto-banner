@@ -143,6 +143,59 @@ fn apply_row_tint(row: &str, tint: &str) -> String {
     format!("{}{}{}", tint, highlighted, RESET)
 }
 
+/// Collapse repetitive files sharing common prefix/suffix patterns (e.g. RELEASE_NOTES_*.md)
+/// keeping the top N newest files and folding older ones to preserve screen real estate.
+fn fold_repetitive_patterns<'a>(items: &mut Vec<&'a crate::fs::DirEntry>, max_per_pattern: usize) {
+    if items.len() <= 20 {
+        return;
+    }
+    let mut prefix_groups: std::collections::HashMap<String, Vec<usize>> =
+        std::collections::HashMap::new();
+
+    for (idx, item) in items.iter().enumerate() {
+        if item.is_dir {
+            continue;
+        }
+        let name = &item.name;
+        if let Some(pos) = name.rfind(|c: char| c == '_' || c == '-') {
+            if pos >= 3 {
+                let ext = name.rfind('.').map(|p| &name[p..]).unwrap_or("");
+                let prefix = format!("{}{}", &name[..=pos], ext);
+                prefix_groups.entry(prefix).or_default().push(idx);
+            }
+        }
+    }
+
+    let mut to_drop: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    for (_prefix, indices) in prefix_groups {
+        if indices.len() >= 4 {
+            let mut sorted_indices = indices.clone();
+            sorted_indices.sort_by(|&a, &b| {
+                let time_a = items[a]
+                    .modified
+                    .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
+                let time_b = items[b]
+                    .modified
+                    .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap_or_default());
+                time_b.cmp(&time_a)
+            });
+            for &idx in sorted_indices.iter().skip(max_per_pattern) {
+                to_drop.insert(idx);
+            }
+        }
+    }
+
+    if !to_drop.is_empty() {
+        let mut new_items = Vec::with_capacity(items.len() - to_drop.len());
+        for (idx, item) in items.drain(..).enumerate() {
+            if !to_drop.contains(&idx) {
+                new_items.push(item);
+            }
+        }
+        *items = new_items;
+    }
+}
+
 /// Build the display items list using the exact same pipeline as output_rich.
 /// This ensures navigate_by_number uses the same ordering as the banner display.
 /// Returns (display_items, hidden_count).
@@ -203,6 +256,11 @@ fn build_display_items<'a>(
     // Apply git-ignore filter
     if opts.git_ignore {
         display_items.retain(|item| !is_git_ignored(&item.path));
+    }
+
+    // Apply smart pattern folding for repetitive version/log files
+    if config.smart_truncation && opts.max.is_none() {
+        fold_repetitive_patterns(&mut display_items, 2);
     }
 
     // Apply max limit if specified (smart truncation for big folders)
