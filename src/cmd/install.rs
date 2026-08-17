@@ -12,16 +12,34 @@ pub fn run_install() -> Result<()> {
     // Write shell wrappers
     let zsh_path = bin_dir.join("fab-shell.zsh");
     let bash_path = bin_dir.join("fab-shell.bash");
+    let fish_path = bin_dir.join("fab-shell.fish");
 
     fs::write(&zsh_path, crate::shell_wrapper::ZSH_WRAPPER)
         .context("Failed to write fab-shell.zsh")?;
     fs::write(&bash_path, crate::shell_wrapper::BASH_WRAPPER)
         .context("Failed to write fab-shell.bash")?;
+    fs::write(&fish_path, crate::shell_wrapper::FISH_WRAPPER)
+        .context("Failed to write fab-shell.fish")?;
 
     println!("✅ Wrote shell wrappers to {}", bin_dir.display());
 
     // Add source lines to rc files
     let home = dirs_home()?;
+
+    // fish function
+    let fish_funcs_dir = home.join(".config").join("fish").join("functions");
+    let fish_relevant = if home.join(".config").join("fish").exists() || fish_funcs_dir.exists() {
+        let _ = fs::create_dir_all(&fish_funcs_dir);
+        let fish_func_file = fish_funcs_dir.join("f.fish");
+        if fs::write(&fish_func_file, crate::shell_wrapper::FISH_WRAPPER).is_ok() {
+            println!("✅ Installed fish function to {}", fish_func_file.display());
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    };
 
     // zsh
     let zshrc = home.join(".zshrc");
@@ -36,10 +54,10 @@ pub fn run_install() -> Result<()> {
     // install — the source line in the rc file only affects NEW shells, so
     // the user must paste the source command into their current terminal to
     // activate folder navigation (`f N` → `cd`).
-    if zsh_relevant || bash_relevant {
-        print_reload_hint(&bin_dir, zsh_relevant, bash_relevant);
+    if zsh_relevant || bash_relevant || fish_relevant {
+        print_reload_hint(&bin_dir, zsh_relevant, bash_relevant, fish_relevant);
     } else {
-        println!("\nℹ️  No ~/.zshrc or ~/.bashrc found. To use the shell function, add a source line to your shell config manually.");
+        println!("\nℹ️  No ~/.zshrc, ~/.bashrc, or ~/.config/fish found. To use the shell function, add a source line to your shell config manually.");
     }
 
     Ok(())
@@ -83,9 +101,17 @@ pub fn run_uninstall() -> Result<()> {
         }
     }
 
+    // Remove fish function if present.
+    let fish_func_file = home.join(".config").join("fish").join("functions").join("f.fish");
+    if fish_func_file.exists() {
+        let _ = fs::remove_file(&fish_func_file);
+        println!("🗑  Removed {}", fish_func_file.display());
+        removed_any = true;
+    }
+
     // Remove the wrapper files.
     let bin_dir = get_bin_dir()?;
-    for wrapper in ["fab-shell.zsh", "fab-shell.bash"] {
+    for wrapper in ["fab-shell.zsh", "fab-shell.bash", "fab-shell.fish"] {
         let path = bin_dir.join(wrapper);
         if path.exists() {
             fs::remove_file(&path)?;
@@ -132,7 +158,7 @@ fn ensure_source_line(rc_path: &Path, bin_dir: &Path, wrapper_name: &str) -> Res
 /// Print a copy-pasteable hint telling the user how to activate the shell
 /// function in their CURRENT terminal. The source line in the rc file only
 /// affects new shells.
-fn print_reload_hint(bin_dir: &Path, include_zsh: bool, include_bash: bool) {
+fn print_reload_hint(bin_dir: &Path, include_zsh: bool, include_bash: bool, include_fish: bool) {
     println!();
     println!("🔄 Activate the shell function in your CURRENT terminal:");
     if include_zsh {
@@ -140,6 +166,9 @@ fn print_reload_hint(bin_dir: &Path, include_zsh: bool, include_bash: bool) {
     }
     if include_bash {
         println!("    source {}/fab-shell.bash", bin_dir.display());
+    }
+    if include_fish {
+        println!("    source {}/fab-shell.fish", bin_dir.display());
     }
     println!();
     println!("(The source line in your rc file only affects new shells.)");

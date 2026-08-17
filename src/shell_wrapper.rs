@@ -122,3 +122,60 @@ f() {
     fi
 }
 "#;
+
+pub const FISH_WRAPPER: &str = r#"# f shell function - enables `f N` to cd into directories
+# Installed by: f install
+
+function f --description "Folder Auto Banner with numeric navigation"
+    set -l edit_mode false
+    set -l run_mode false
+    set -l remaining_args
+
+    for arg in $argv
+        switch $arg
+            case --edit -e
+                set edit_mode true
+            case --run -x
+                set run_mode true
+            case '*'
+                set -a remaining_args $arg
+        end
+    end
+
+    if test (count $remaining_args) -gt 0; and string match -qr '^[0-9]+$' -- $remaining_args[1]
+        set -l num $remaining_args[1]
+        set -l action $remaining_args[2]
+
+        if test -n "$action"
+            command f banner "$num" "$action"
+        else if test "$edit_mode" = true
+            command f banner --edit "$num"
+        else if test "$run_mode" = true
+            command f banner --run "$num"
+        else
+            set -l target_path (command f banner "$num")
+            if test -z "$target_path"
+                return
+            else if test -d "$target_path"
+                cd "$target_path"
+            else
+                set -l editor $EDITOR
+                if test -z "$editor"
+                    if type -q micro
+                        set editor micro
+                    else if type -q nano
+                        set editor nano
+                    else if type -q vim
+                        set editor vim
+                    else
+                        set editor vi
+                    end
+                end
+                $editor "$target_path"
+            end
+        end
+    else
+        command f $argv
+    end
+end
+"#;

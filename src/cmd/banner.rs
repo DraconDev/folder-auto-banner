@@ -338,8 +338,8 @@ fn build_display_items<'a>(
             }
 
             let ordering = match sort_mode {
-                "size" => a.size.cmp(&b.size),
-                "date" => ka.date.cmp(&kb.date),
+                "size" => b.size.cmp(&a.size),
+                "date" => kb.date.cmp(&ka.date),
                 "type" => {
                     if ka.ext != kb.ext {
                         ka.ext.cmp(&kb.ext)
@@ -354,7 +354,7 @@ fn build_display_items<'a>(
                         ka.lower.cmp(&kb.lower)
                     }
                 }
-                "git" => ka.git.cmp(&kb.git),
+                "git" => kb.git.cmp(&ka.git),
                 "version" => natural_cmp(&a.name, &b.name),
                 _ => ka.lower.cmp(&kb.lower),
             };

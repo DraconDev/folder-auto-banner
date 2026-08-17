@@ -448,15 +448,26 @@ fn get_git_info_inner(
         file_statuses,
     } = status_handle.join().unwrap_or_default();
 
-    let branch = branch_handle
+    let (last_commit_msg, last_commit_hash, last_commit_time) =
+        last_commit_handle.join().unwrap_or((None, None, None));
+    let raw_branch = branch_handle
         .join()
         .unwrap_or_default()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
+    let branch = raw_branch.map(|b| {
+        if b == "HEAD" {
+            if let Some(ref hash) = last_commit_hash {
+                format!("HEAD@{}", hash)
+            } else {
+                "HEAD (detached)".to_string()
+            }
+        } else {
+            b
+        }
+    });
 
     let (ahead, behind) = ahead_behind_handle.join().unwrap_or((0, 0));
-    let (last_commit_msg, last_commit_hash, last_commit_time) =
-        last_commit_handle.join().unwrap_or((None, None, None));
     let stash_count = stash_handle.join().unwrap_or(0);
     let commits_today = commits_today_handle.join().unwrap_or(0);
     let branch_count = branch_count_handle.join().unwrap_or(0);

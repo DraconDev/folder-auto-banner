@@ -50,6 +50,7 @@ fn test_uninstall_roundtrip() {
         "install should add the source line"
     );
     assert!(home.join(".local/bin/fab-shell.zsh").exists());
+    assert!(home.join(".local/bin/fab-shell.fish").exists());
 
     let mut cmd = Command::cargo_bin("f").unwrap();
     cmd.env("HOME", &home).arg("uninstall").assert().success();
@@ -59,6 +60,7 @@ fn test_uninstall_roundtrip() {
         "uninstall should remove the source line, got: {rc}"
     );
     assert!(!home.join(".local/bin/fab-shell.zsh").exists());
+    assert!(!home.join(".local/bin/fab-shell.fish").exists());
 
     // Idempotent second uninstall.
     let mut cmd = Command::cargo_bin("f").unwrap();

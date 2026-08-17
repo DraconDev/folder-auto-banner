@@ -133,14 +133,14 @@ fn alias_nosort_matches_explicit() {
 #[test]
 fn alias_top_matches_explicit() {
     let lazy = run_f(&["top"]);
-    let explicit = run_f(&["-S", "-r", "-m", "20"]);
+    let explicit = run_f(&["-S", "-m", "20"]);
     assert_eq!(first_line_header(&lazy), first_line_header(&explicit));
 }
 
 #[test]
 fn alias_newest_matches_explicit() {
     let lazy = run_f(&["newest"]);
-    let explicit = run_f(&["-t", "-r", "-m", "20"]);
+    let explicit = run_f(&["-t", "-m", "20"]);
     assert_eq!(first_line_header(&lazy), first_line_header(&explicit));
 }
 
