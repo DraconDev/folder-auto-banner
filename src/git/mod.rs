@@ -34,6 +34,8 @@ pub struct GitInfo {
     pub is_dirty: bool,
     #[serde(skip_serializing_if = "std::collections::HashMap::is_empty", default)]
     pub file_statuses: std::collections::HashMap<String, FileStatus>,
+    #[serde(skip_serializing_if = "std::collections::HashMap::is_empty", default)]
+    pub file_churn: std::collections::HashMap<String, usize>,
 }
 
 /// Build git status pathspecs for the banner rows.
@@ -327,6 +329,25 @@ fn git_merge_state(path: &Path) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Query the last 100 commits to count recent file change frequencies (hotspots).
+fn git_file_churn(path: &Path) -> std::collections::HashMap<String, usize> {
+    let mut churn = std::collections::HashMap::new();
+    let Some(out) = git_cmd(path, &["log", "--name-only", "--format=", "-n", "100"]) else {
+        return churn;
+    };
+    for line in out.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        *churn.entry(trimmed.to_string()).or_insert(0) += 1;
+        if let Some((first, _)) = trimmed.split_once('/') {
+            *churn.entry(first.to_string()).or_insert(0) += 1;
+        }
+    }
+    churn
 }
 
 /// Run a git command in the given directory and return stdout.
