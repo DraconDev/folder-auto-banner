@@ -1,9 +1,9 @@
 //! Cache module — TTL-based file cache for expensive operations
 //!
-//! Stores cached values as JSON files in a temp directory keyed by project path.
-//! Each entry has a timestamp; expired entries are ignored.
+//! Stores cached values as JSON files in a per-user cache directory keyed by
+//! project path. Each entry has a timestamp; expired entries are ignored.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -13,18 +13,23 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// Create a new cache instance
+    /// Create a new cache instance.
+    ///
+    /// Lives under the per-user cache dir (XDG: `$XDG_CACHE_HOME/fab` or
+    /// `~/.cache/fab`), created with 0700 so another local user or a
+    /// pre-created symlink in the world-writable `/tmp` cannot redirect or
+    /// read the daemon's cache writes. Falls back to the per-user data dir
+    /// if no cache dir can be resolved.
     pub fn new() -> Result<Self> {
-        let dir = std::env::temp_dir().join("f-cache");
-        std::fs::create_dir_all(&dir)?;
-        // The cache holds per-project git status and build data; restrict
-        // it to this user. create_dir_all applies the umask (could leave
-        // the dir world-readable/listable), so pin 0o700 explicitly.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+        let dir = cache_dir()?;
+        std::fs::create_dir_all(&dir)
+            .with_context(|| format!("Failed to create cache dir: {:?}", dir))?;
+        // If a stale attacker-owned entry exists (e.g. a symlink), refuse to
+        // write through it rather than silently chmodding the target.
+        if std::fs::symlink_metadata(&dir)?.file_type().is_symlink() {
+            anyhow::bail!("cache dir {:?} is a symlink; refusing to use it", dir);
         }
+        set_private(&dir)?;
         Ok(Cache { dir })
     }
 
@@ -79,7 +84,20 @@ impl Cache {
 
         let path = self.path_for(key);
         let content = serde_json::to_string(&entry)?;
-        std::fs::write(&path, content)?;
+        // Atomic write: temp file in the same dir + rename, so a crash or a
+        // concurrent reader never observes a torn JSON file.
+        let tmp = self
+            .dir
+            .join(format!("{}.{}.tmp", self.path_for(key).file_name().unwrap_or_default().to_string_lossy(), std::process::id()));
+        let write_result = std::fs::write(&tmp, content);
+        if let Err(e) = write_result {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(e.into());
+        }
+        if let Err(e) = std::fs::rename(&tmp, &path) {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(e.into());
+        }
         Ok(())
     }
 
@@ -110,6 +128,38 @@ impl Cache {
 /// Build a cache key from a path and a feature name
 pub fn cache_key(path: &std::path::Path, feature: &str) -> String {
     format!("{}:{}", path.to_string_lossy(), feature)
+}
+
+/// Resolve the per-user cache directory: XDG cache, else per-user data dir,
+/// else error (callers treat a missing cache as "no caching").
+fn cache_dir() -> Result<PathBuf> {
+    if let Some(proj_dirs) = directories::ProjectDirs::from("com", "fab", "fab") {
+        if let Some(cache_dir) = proj_dirs.cache_dir().to_path_buf().to_str() {
+            if !cache_dir.is_empty() {
+                let _ = cache_dir;
+            }
+        }
+        let cache = proj_dirs.cache_dir().to_path_buf();
+        if !cache.as_os_str().is_empty() {
+            return Ok(cache);
+        }
+        return Ok(proj_dirs.data_dir().join("cache"));
+    }
+    anyhow::bail!("could not determine a per-user cache directory")
+}
+
+/// Pin directory permissions to 0700 (create_dir_all applies the umask,
+/// which could leave the dir world-readable).
+#[cfg(unix)]
+fn set_private(dir: &std::path::Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn set_private(_dir: &std::path::Path) -> Result<()> {
+    Ok(())
 }
 
 #[cfg(test)]
