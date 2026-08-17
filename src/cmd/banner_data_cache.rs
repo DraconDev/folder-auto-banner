@@ -168,15 +168,8 @@ pub fn max_descendant_mtime(path: &Path) -> Option<SystemTime> {
             }
             *visited += 1;
             let name_str = entry.file_name().to_string_lossy().to_string();
-            if !is_content_probe_ext(&name_str.to_ascii_lowercase()) {
-                continue;
-            }
             if let Ok(meta) = entry.metadata() {
-                if meta.is_file() {
-                    if let Ok(mtime) = meta.modified() {
-                        max = Some(max.map_or(mtime, |m| m.max(mtime)));
-                    }
-                } else if meta.is_dir() {
+                if meta.is_dir() {
                     // Skip heavyweight subtrees: probe-relevant content under
                     // them is not shown by the banner anyway.
                     if matches!(
@@ -186,6 +179,13 @@ pub fn max_descendant_mtime(path: &Path) -> Option<SystemTime> {
                         continue;
                     }
                     if let Some(mtime) = walk(&entry.path(), depth + 1, visited) {
+                        max = Some(max.map_or(mtime, |m| m.max(mtime)));
+                    }
+                } else if meta.is_file() {
+                    if !is_content_probe_ext(&name_str.to_ascii_lowercase()) {
+                        continue;
+                    }
+                    if let Ok(mtime) = meta.modified() {
                         max = Some(max.map_or(mtime, |m| m.max(mtime)));
                     }
                 }
@@ -574,6 +574,20 @@ mod tests {
 
         // Directory at cache path should not be fresh
         assert!(!is_cache_fresh(&test_path));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_max_descendant_mtime_finds_nested_files() {
+        let tmp = std::env::temp_dir().join(format!("fab-test-nested-{}", std::process::id()));
+        let nested_dir = tmp.join("src").join("nested");
+        let _ = fs::create_dir_all(&nested_dir);
+        let nested_file = nested_dir.join("test.rs");
+        fs::write(&nested_file, "fn main() {}").unwrap();
+
+        let mtime = max_descendant_mtime(&tmp);
+        assert!(mtime.is_some(), "should find nested .rs file");
 
         let _ = fs::remove_dir_all(&tmp);
     }

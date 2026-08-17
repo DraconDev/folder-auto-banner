@@ -1623,50 +1623,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         // Colorize permissions based on config
         let perm_colored = match config.permission.as_str() {
             "octal" => {
-                // Convert rwx string to octal
-                let perms = &item.perms;
-                if perms.len() >= 9 {
-                    let user = if perms.len() > 2 && perms.as_bytes()[2] == b'x' {
-                        4
-                    } else {
-                        0
-                    } + if perms.len() > 1 && perms.as_bytes()[1] == b'w' {
-                        2
-                    } else {
-                        0
-                    } + if !perms.is_empty() && perms.as_bytes()[0] == b'r' {
-                        1
-                    } else {
-                        0
-                    };
-                    let group = if perms.len() > 5 && perms.as_bytes()[5] == b'x' {
-                        4
-                    } else {
-                        0
-                    } + if perms.len() > 4 && perms.as_bytes()[4] == b'w' {
-                        2
-                    } else {
-                        0
-                    } + if perms.len() > 3 && perms.as_bytes()[3] == b'r' {
-                        1
-                    } else {
-                        0
-                    };
-                    let other = if perms.len() > 8 && perms.as_bytes()[8] == b'x' {
-                        4
-                    } else {
-                        0
-                    } + if perms.len() > 7 && perms.as_bytes()[7] == b'w' {
-                        2
-                    } else {
-                        0
-                    } + if perms.len() > 6 && perms.as_bytes()[6] == b'r' {
-                        1
-                    } else {
-                        0
-                    };
-                    let octal = user * 100 + group * 10 + other;
-                    format!("{}{:03}{}", color(DIM), octal, color(RESET))
+                if let Some(octal) = perms_to_octal(&item.perms) {
+                    format!("{}{}{}", color(DIM), octal, color(RESET))
                 } else {
                     colorize_perms(&item.perms)
                 }
@@ -2297,6 +2255,37 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     }
 }
 
+/// Convert formatted permission string (e.g. "-rwxr-xr-x" or "drwxr-xr-x" or "rwxr-xr-x") to octal string (e.g. "755")
+pub fn perms_to_octal(perms: &str) -> Option<String> {
+    let bytes = perms.as_bytes();
+    let p = if bytes.len() >= 10 {
+        &bytes[1..10]
+    } else if bytes.len() >= 9 {
+        &bytes[0..9]
+    } else {
+        return None;
+    };
+
+    let parse_triplet = |r: u8, w: u8, x: u8| -> u32 {
+        let mut val = 0;
+        if r == b'r' {
+            val += 4;
+        }
+        if w == b'w' {
+            val += 2;
+        }
+        if x == b'x' || x == b's' || x == b'S' || x == b't' || x == b'T' {
+            val += 1;
+        }
+        val
+    };
+
+    let user = parse_triplet(p[0], p[1], p[2]);
+    let group = parse_triplet(p[3], p[4], p[5]);
+    let other = parse_triplet(p[6], p[7], p[8]);
+    Some(format!("{}{}{}", user, group, other))
+}
+
 /// Colorize permission string like exa - each char colored by meaning
 /// d=blue, l=magenta, r=green, w=yellow, x=red, -=dim
 fn colorize_perms(perms: &str) -> String {
@@ -2494,6 +2483,19 @@ mod tests {
         assert_eq!(natural_cmp("file2", "file10"), std::cmp::Ordering::Less);
         assert_eq!(natural_cmp("file10", "file2"), std::cmp::Ordering::Greater);
         assert_eq!(natural_cmp("file1", "file1"), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn test_perms_to_octal() {
+        assert_eq!(perms_to_octal("-rwxr-xr-x").as_deref(), Some("755"));
+        assert_eq!(perms_to_octal("drwxr-xr-x").as_deref(), Some("755"));
+        assert_eq!(perms_to_octal("-rw-r--r--").as_deref(), Some("644"));
+        assert_eq!(perms_to_octal("-rwx------").as_deref(), Some("700"));
+        assert_eq!(perms_to_octal("lrwxrwxrwx").as_deref(), Some("777"));
+        assert_eq!(perms_to_octal("-r-xr-xr-x").as_deref(), Some("555"));
+        assert_eq!(perms_to_octal("-rwsr-xr-x").as_deref(), Some("755"));
+        assert_eq!(perms_to_octal("rwxr-xr-x").as_deref(), Some("755"));
+        assert_eq!(perms_to_octal("short"), None);
     }
 
     #[test]

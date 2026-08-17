@@ -46,10 +46,12 @@ pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     // returned extension is already ASCII-lower (per std::path docs), so we
     // don't need to lowercase the name to compare. This drops one String
     // allocation per file in directories with many different extensions.
-    let ext = std::path::Path::new(&entry.name)
+    let raw_ext = std::path::Path::new(&entry.name)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
+    let ext_lower = raw_ext.to_ascii_lowercase();
+    let ext = ext_lower.as_str();
 
     let result = match ext {
         "png" | "jpg" | "jpeg" => read_file_header(&entry.path)
