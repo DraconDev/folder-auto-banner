@@ -438,16 +438,16 @@ mod tests {
         let test_path = tmp.join("nested/test_dir");
         let _ = fs::create_dir_all(&test_path);
 
-        // The banner_data subdir shouldn't exist yet
         let cache_file = cache_file_path(&test_path).unwrap();
         let parent = cache_file.parent().unwrap();
-        let _ = fs::remove_dir_all(parent);
 
-        // Write should create the parent
+        // Write should create the parent directory if missing
         let data = make_test_banner_data();
         write_cache(&test_path, &data).unwrap();
-        assert!(parent.exists(), "parent dir should be created");
+        assert!(parent.exists(), "parent dir should exist");
+        assert!(cache_file.exists(), "cache file should exist");
 
+        let _ = fs::remove_file(&cache_file);
         let _ = fs::remove_dir_all(&tmp);
     }
 

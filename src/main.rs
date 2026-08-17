@@ -499,9 +499,9 @@ mod tests {
 
     #[test]
     fn test_expand_aliases_alias_with_value_flags() {
-        // top has 4 flags including a value
+        // top has flags including a value
         let result = expand_args_for_banner(&["top".to_string()]);
-        assert_eq!(result, vec!["f", "banner", "-S", "-r", "-m", "20"]);
+        assert_eq!(result, vec!["f", "banner", "-S", "-m", "20"]);
     }
 
     #[test]

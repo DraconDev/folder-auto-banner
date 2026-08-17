@@ -1564,13 +1564,27 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             String::new()
         };
 
+        let item_name_str = if opts.hyperlink {
+            let canonical = item
+                .path
+                .canonicalize()
+                .unwrap_or_else(|_| item.path.clone());
+            format!(
+                "\x1b]8;;file://{}\x1b\\{}\x1b]8;;\x1b\\",
+                canonical.display(),
+                item.name
+            )
+        } else {
+            item.name.clone()
+        };
+
         let name_display = if item.is_symlink {
             if let Some(target) = &item.symlink_target {
                 let indicator = if item.symlink_valid { "→" } else { "✗→" };
                 format!(
                     "{}{}{}{} {}{}{} {}",
                     name_prefix,
-                    item.name,
+                    item_name_str,
                     classify_suffix,
                     name_suffix,
                     color(DIM),
@@ -1581,13 +1595,13 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             } else {
                 format!(
                     "{}{}{}{}",
-                    name_prefix, item.name, classify_suffix, name_suffix
+                    name_prefix, item_name_str, classify_suffix, name_suffix
                 )
             }
         } else {
             format!(
                 "{}{}{}{}",
-                name_prefix, item.name, classify_suffix, name_suffix
+                name_prefix, item_name_str, classify_suffix, name_suffix
             )
         };
 
@@ -2383,11 +2397,32 @@ fn strip_ansi(s: &str) -> String {
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
         if c == '\x1b' {
-            // Skip until 'm' or end
-            while let Some(&next) = chars.peek() {
-                chars.next();
-                if next == 'm' {
-                    break;
+            match chars.peek() {
+                Some(&'[') => {
+                    chars.next();
+                    // CSI sequence: consume until final byte (0x40-0x7E, e.g. 'm', 'H', etc.)
+                    while let Some(&next) = chars.peek() {
+                        chars.next();
+                        if (0x40..=0x7e).contains(&(next as u32)) {
+                            break;
+                        }
+                    }
+                }
+                Some(&']') => {
+                    chars.next();
+                    // OSC sequence: consume until ST (\x1b\\ or \x07)
+                    while let Some(next) = chars.next() {
+                        if next == '\x07' {
+                            break;
+                        }
+                        if next == '\x1b' && chars.peek() == Some(&'\\') {
+                            chars.next();
+                            break;
+                        }
+                    }
+                }
+                _ => {
+                    let _ = chars.next();
                 }
             }
         } else {
@@ -2475,6 +2510,10 @@ mod tests {
         assert_eq!(strip_ansi("hello"), "hello");
         assert_eq!(strip_ansi("\x1b[31mred\x1b[0m"), "red");
         assert_eq!(strip_ansi("a\x1b[1mb\x1b[0mc"), "abc");
+        assert_eq!(
+            strip_ansi("\x1b]8;;file:///tmp/file.txt\x1b\\file.txt\x1b]8;;\x1b\\"),
+            "file.txt"
+        );
     }
 
     #[test]
