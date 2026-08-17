@@ -86,9 +86,7 @@ impl Cache {
         let content = serde_json::to_string(&entry)?;
         // Atomic write: temp file in the same dir + rename, so a crash or a
         // concurrent reader never observes a torn JSON file.
-        let tmp = self
-            .dir
-            .join(format!("{}.{}.tmp", self.path_for(key).file_name().unwrap_or_default().to_string_lossy(), std::process::id()));
+        let tmp = self.dir.join(format!("{}.{}.tmp", path.file_name().unwrap_or_default().to_string_lossy(), std::process::id()));
         let write_result = std::fs::write(&tmp, content);
         if let Err(e) = write_result {
             let _ = std::fs::remove_file(&tmp);
@@ -134,11 +132,6 @@ pub fn cache_key(path: &std::path::Path, feature: &str) -> String {
 /// else error (callers treat a missing cache as "no caching").
 fn cache_dir() -> Result<PathBuf> {
     if let Some(proj_dirs) = directories::ProjectDirs::from("com", "fab", "fab") {
-        if let Some(cache_dir) = proj_dirs.cache_dir().to_path_buf().to_str() {
-            if !cache_dir.is_empty() {
-                let _ = cache_dir;
-            }
-        }
         let cache = proj_dirs.cache_dir().to_path_buf();
         if !cache.as_os_str().is_empty() {
             return Ok(cache);
