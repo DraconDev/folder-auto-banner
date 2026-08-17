@@ -1,3 +1,15 @@
+## [0.7.11] - 2026-08-17
+
+### Recency-first ordering, smart pattern folding, Git badges, and safety hardening
+
+- **Recency-First Flow:** Date sorting is ascending so the most recently modified files and active directories are displayed right at the bottom next to the terminal prompt.
+- **Folders at Bottom (`group_dirs = "last"`):** Subdirectories are grouped at the very bottom, keeping navigation indexes (`f N`) immediately accessible.
+- **Smart Pattern Folding:** Automatically collapses repetitive version/log/migration files (e.g. `RELEASE_NOTES_*.md`), retaining the newest 2 entries and keeping the view compact on 1 screen.
+- **Expressive Git Badges:** Distinct glyphs for `~` (modified), `+` (staged), `-` (deleted), `?` (untracked), `!` (conflict), and `●` (clean).
+- **Git Commit Churn:** Background log analysis tracks per-file commit frequency and integrates with `git` sort mode.
+- **Visual Polish:** Header separators updated to modern middle dots (` · `), `zebra_rows` configurable option.
+- **Safety Hardening:** Bounds checking on MP4 atoms, bounded SQLite header reads, ancestor `.git` checks.
+
 ## [0.7.10] - 2026-06-18
 
 ### Fix cold-path slowdown on non-project directories
@@ -378,8 +390,8 @@ before the explicit-flag check, so `f t` exits 0 silently while
   - `f_t_no_longer_means_dash_t` (now expects nothing)
   - `f_trc_no_longer_means_dash_t_dash_r_dash_c` (now expects nothing)
   - `f_s_no_longer_means_dash_upper_s` (now expects nothing)
-  - `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHOVFPTGVRYmF5WU52OEloNGdESjkyL2U3Y0RKSE9qcVRzNFVNZ1F1dHdBCjZaUGdVYVJSTVNYVlM4NlpLVmYwNWp2YUZWQ3ZTamI0Mi82dnNyeWc0TFEKLT4gWDI1NTE5IGhobTJJV1NSUVh4TDRqL2NYeHhrSmJSTE9hNVk3cWpHU1crWVJTYnBIaTQKb1R1VFRlL0NnVlpxMlUvMkIyazl4Nnd2aCt3VmFpSnhFdG1EL0xadkVwVQotPiBYMjU1MTkgYUxudUs2c3M2OHcyQjlUeWRIb2E5VTVaZkptNFphRllseWdlOFZLdEVGMAp3dnRKVnQxN3lERzk5aDNYNXBObW9LbGhBSDJkVERZeFZBMjdRakRmUENFCi0+IFgyNTUxOSBhKzZLOVU4akpQVUN1cUJ3Z2pXYXlBa3grTVg4Y214MWtzY2x1UG5YdERvCk1BdWFrM0VXMHI5VzNkbERPZDdaSXFNdjFiTTRYZVQrY2dFbTNCamlFQzgKLT4gWDI1NTE5IDJRSTU1UjFNRFR5SkkwUkJWUEsreEUvZHRweUczdGV2MVNsendjUDZEeFkKSDdLOENpWVkxUWdEb0REQURCTWI3SmJjVnYzLzlPTDFUWkQvMG1ud1RzTQotPiBKN1M1T0t3LWdyZWFzZSBFOnogclgyYmdsXiBzcyBwbwpSV2ludHE3cG5iV1B4YkJmT0FveVRDQzBGeTYxWEtMbHQwRmpUZTA0K1JmSUwzN3p4RE1YUlUxa0J6TFBhZ0h3CkVmSnI5YkN2b1oyaFQyNnd3UjhXNjFjWGoxTi9SOURmc3UxVGk2SDhERzNMOWlhcTdsa01lYTR2UUhFdE1aK1kKNnF0aQotLS0gcnByckhYZXJzVmtGemQ4VTJLZlVYdjBnTlRtSkFZcURDQWgrNXFJVW5oUQpeW5uQLO12hKJUszm7HjLJBJIgZCVqlAgVmaMoCjI0QEhpS6urcfbZwuOXuXo5I81YDUWemUpzV+u7rg==]` (now expects nothing)
-- 1 renamed test: `unknown_ba[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWN1lOSHBxOGJYaVRVYTRlb25XNjRPcUI0TFV5UFZsZFRTd0lLUFJua0I0CkZvQUd4eGhJQzFzTTVrdGo5Wk85bmZ5YmRCdUFVSlJKMTRkMVQ2MG5xN2MKLT4gWDI1NTE5IHdEY0RnOWlncGUrbU9iRjhyWTc3S0RZT2dJaU5qYkg0ckM5dDVuanFFQlkKSnNBS1VUalhldDRCcFAwUVpuRkU4djdnU3htWUM3S1JzMUhyZzhNTDFVTQotPiBYMjU1MTkgN1d3bnROaGVJR3NNc040dVVvUDVPUTJqV3g2QUY4d0RvQjlDcE85WWlobwpJcWo4eXYra05Sc1BSK2E5ZXRIL3RUZ0dxd1RxbWZWRGtycHlKZUc5MVhjCi0+IFgyNTUxOSBNb3FuM2NlM3NVNWNSVk1SSGpYUmIyWEhqNmpicnpoOVZ2aWVNM3pObXpZCmFNRW42ZDU5ZDZtUWlTN25qeDNaK2t4d0x1MWE5dzAvQ1hyT1h6QlFZdG8KLT4gWDI1NTE5IEVhWmlOc0VDQTFOVUJ0K3J5WW5KT2lML0pVUGhKTjRuZjdCNnhsY3I2SDQKUmlUcEJnTlczanJEaDZ3aHpsUmVHcW9jZ0RRS3hHRmdtd1k4Q0FrWllTUQotPiBlYHBbRkAtZ3JlYXNlIG1SOTQ7bUMgLnMrQkRBPDIgW0tWRy05RCA5ay0Ka3dnUUQxelVJdlFzdWsraS83YUN3MXRnVG4wdDg1dlFBQk5XNG9kYUpudlVnMlJHeVZkd1BackVxMS8rVEVOQwpsbVpOMTgwY3czNnNGQ0tXUm5FMmNYNUpNZEEvcTBiQwotLS0gQU96a2cyQWQ0QVp3UHpqUlF1N25YRFdTK1hGUUlrZmZjT1FpalNSLzFxOAoSpwqIcaLbNF4NK9LdnSuWDbrH3x+Wvf4f3FTkfxk37Kq9xbIuABSh1OoKr8r/lpgk/IGv6Ueij49O/0A=]` →
+  - `unknown_bare_word_does_not_match_path` (now expects nothing)
+- 1 renamed test: `unknown_bare_word_shows_default_banner` →
   `unknown_bare_word_does_nothing`
 
 #### Files changed

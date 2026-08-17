@@ -328,12 +328,14 @@ numbered = true          # Show item numbers for f N navigation
 open_command = "micro"   # Default editor for f N (overridden by $EDITOR)
 ```
 
-### Sorting
+### Sorting & Layout
 ```toml
 [sort]
 default = "name"
 reverse = false
-group_dirs = "first"
+group_dirs = "last"      # "last" (default, folders at bottom near prompt), "first", or "none"
+smart_truncation = true  # Fold repetitive archival/log files and cap huge folders
+zebra_rows = false       # Alternating row background tint
 ```
 
 ### Recency Gradient
