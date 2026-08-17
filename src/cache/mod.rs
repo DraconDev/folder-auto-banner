@@ -86,7 +86,11 @@ impl Cache {
         let content = serde_json::to_string(&entry)?;
         // Atomic write: temp file in the same dir + rename, so a crash or a
         // concurrent reader never observes a torn JSON file.
-        let tmp = self.dir.join(format!("{}.{}.tmp", path.file_name().unwrap_or_default().to_string_lossy(), std::process::id()));
+        let tmp = self.dir.join(format!(
+            "{}.{}.tmp",
+            path.file_name().unwrap_or_default().to_string_lossy(),
+            std::process::id()
+        ));
         let write_result = std::fs::write(&tmp, content);
         if let Err(e) = write_result {
             let _ = std::fs::remove_file(&tmp);
