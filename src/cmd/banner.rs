@@ -1266,7 +1266,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 color(RESET)
             ));
             details.push(format!(
-                "{}{}{} {}{}",
+                "{}{}{} {}{}{}",
                 color(BRIGHT_WHITE),
                 summary.dirs,
                 color(RESET),
