@@ -1,7 +1,7 @@
 # f — Folder Auto Banner
 
 <p align="center">
-  <img src="public/fab_thumb.png" alt="f — Folder Auto Banner" width="800">
+  <img src="https://raw.githubusercontent.com/DraconDev/folder-auto-banner-fab/main/public/fab_thumb.png" alt="f — Folder Auto Banner" width="800">
 </p>
 
 A contextual directory dashboard that combines a file listing with project signals such as git status, TODOs, code metrics, build status, ports, Docker state, and cached directory sizes.
