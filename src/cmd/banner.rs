@@ -38,7 +38,7 @@ const RED: &str = "\x1b[31m";
 const CYAN: &str = "\x1b[36m";
 const BRIGHT_WHITE: &str = "\x1b[97m";
 const ORANGE: &str = "\x1b[38;5;214m";
-const ROW_TINT: &str = "\x1b[48;5;236m"; // subtle dark gray for alternating rows
+const ROW_TINT: &str = "\x1b[48;5;234m"; // ultra-subtle dark charcoal for alternating rows
 
 /// Options for the banner command
 #[derive(Default)]
@@ -904,15 +904,32 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     let project_label = summary.project_type.label();
 
     let home = std::env::var("HOME").unwrap_or_default();
-    let path_display = if path_str.starts_with(&home) {
+    let (path_prefix, path_leaf) = if path_str.starts_with(&home) {
         let relative = &path_str[home.len()..];
         if relative.is_empty() || relative == "/" {
-            "~".to_string()
+            ("".to_string(), "~".to_string())
+        } else if let Some(pos) = relative.rfind('/') {
+            (format!("~{}/", &relative[..pos]), relative[pos + 1..].to_string())
         } else {
-            format!("~{}", relative)
+            ("~".to_string(), relative.to_string())
         }
+    } else if let Some(pos) = path_str.rfind('/') {
+        (format!("{}/", &path_str[..pos]), path_str[pos + 1..].to_string())
     } else {
-        path_str.to_string()
+        ("".to_string(), path_str.to_string())
+    };
+
+    let path_display = if path_prefix.is_empty() {
+        format!("{}{}{}", color(BOLD), path_leaf, color(RESET))
+    } else {
+        format!(
+            "{}{}{}{}{}",
+            color(DIM),
+            path_prefix,
+            color(RESET),
+            color(BOLD),
+            path_leaf
+        )
     };
 
     let _git_branch = git_info.branch.as_deref().unwrap_or("");
@@ -923,8 +940,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         .count();
 
     // Deferred header: compute only when about to display
-    // Deferred header: compute only when about to display
-    // This moves header construction closer to display, avoiding work if early return occurs
+    let sep = format!(" {}│{} ", color(DIM), color(RESET));
     let header = {
         let size_str = format_size_compact(summary.total_size);
         let branch_display = build_branch_display(git_info);
@@ -999,28 +1015,35 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     color(RESET)
                 ));
             }
-            let row1 = parts.join(" │ ");
+            let row1 = parts.join(&sep);
 
             // Row 2: Stats with labels
             let mut details = Vec::new();
 
             // File stats
             details.push(format!(
-                "{}💾 {} total{}",
+                "{}{}{} {}total{}",
                 color(CYAN),
                 size_str,
+                color(RESET),
+                color(DIM),
                 color(RESET)
             ));
             details.push(format!(
-                "{}📄 {} files{}",
-                color(DIM),
+                "{}{}{} {}files{}",
+                color(BRIGHT_WHITE),
                 summary.files,
+                color(RESET),
+                color(DIM),
                 color(RESET)
             ));
             details.push(format!(
-                "{}📂 {} dirs{}",
-                color(DIM),
+                "{}{}{} {}{}{}",
+                color(BRIGHT_WHITE),
                 summary.dirs,
+                color(RESET),
+                color(DIM),
+                if summary.dirs == 1 { "dir" } else { "dirs" },
                 color(RESET)
             ));
 
@@ -1028,9 +1051,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             if let Some(ref todos) = summary.todo_info {
                 if todos.count > 0 {
                     details.push(format!(
-                        "{}📝 {} TODOs{}",
+                        "{}{}{} {}TODOs{}",
                         color(YELLOW),
                         todos.count,
+                        color(RESET),
+                        color(DIM),
                         color(RESET)
                     ));
                 }
@@ -1039,14 +1064,16 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
                     details.push(format!(
-                        "{}📊 {} lines{}",
+                        "{}{}{} {}lines{}",
                         color(GREEN),
                         loc_str,
+                        color(RESET),
+                        color(DIM),
                         color(RESET)
                     ));
                     // Show top 3 languages (skip non-language extensions like man pages and no-ext)
                     if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                        let mut lang_parts: Vec<String> = metrics
+                        let lang_parts: Vec<String> = metrics
                             .by_extension
                             .iter()
                             .filter(|(ext, _)| {
@@ -1065,6 +1092,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                                     "py" => "Python",
                                     "js" | "mjs" => "JavaScript",
                                     "ts" | "tsx" => "TypeScript",
+                                    "svelte" => "Svelte",
                                     "go" => "Go",
                                     "c" | "h" => "C",
                                     "cpp" | "cc" | "cxx" | "hpp" => "C++",
@@ -1080,14 +1108,18 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                                     "el" => "Emacs Lisp",
                                     _ => ext,
                                 };
-                                format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
+                                format!("{}% {}{}{}", pct, color(DIM), name, color(RESET))
                             })
                             .collect();
-                        // Add crab icon before first language
                         if !lang_parts.is_empty() {
-                            lang_parts[0] = format!("{} {}", project_icon, lang_parts[0]);
+                            details.push(format!(
+                                "{} {}{}{}",
+                                project_icon,
+                                color(DIM),
+                                lang_parts.join(", "),
+                                color(RESET)
+                            ));
                         }
-                        details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
                     }
                 }
             }
@@ -1185,7 +1217,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             if details.is_empty() {
                 row1
             } else {
-                let details_str = details.join(" │ ");
+                let details_str = details.join(&sep);
                 let term_width = get_terminal_width();
                 let row1_width = display_width(&row1);
                 let details_width = display_width(&details_str);
@@ -1204,28 +1236,44 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
         } else {
             // Row 1: Core info
-            let mut parts = vec![format!("{}{}", path_display, color(BOLD))];
-            parts.push(format!("{} │", project_label));
-            parts.push(format!("{}💾 {}{} │", color(CYAN), size_str, color(RESET)));
-            parts.push(format!(
-                "{}📄 {} files{} │",
-                color(DIM),
-                summary.files,
-                color(RESET)
-            ));
-            parts.push(format!(
-                "{}📂 {} dirs{}",
-                color(DIM),
-                summary.dirs,
-                color(RESET)
-            ));
-            if hidden_count > 0 {
-                parts.push(format!("│ {} hidden", hidden_count));
+            let mut parts = vec![path_display.clone()];
+            if !project_label.is_empty() {
+                parts.push(format!("{}{}{}", color(DIM), project_label, color(RESET)));
             }
-            let row1 = parts.join(" ");
+            if hidden_count > 0 {
+                parts.push(format!("{}{} hidden{}", color(DIM), hidden_count, color(RESET)));
+            }
+            let row1 = parts.join(&sep);
 
             // Row 2: Details
             let mut details = Vec::new();
+
+            // File stats
+            details.push(format!(
+                "{}{}{} {}total{}",
+                color(CYAN),
+                size_str,
+                color(RESET),
+                color(DIM),
+                color(RESET)
+            ));
+            details.push(format!(
+                "{}{}{} {}files{}",
+                color(BRIGHT_WHITE),
+                summary.files,
+                color(RESET),
+                color(DIM),
+                color(RESET)
+            ));
+            details.push(format!(
+                "{}{}{} {}{}",
+                color(BRIGHT_WHITE),
+                summary.dirs,
+                color(RESET),
+                color(DIM),
+                if summary.dirs == 1 { "dir" } else { "dirs" },
+                color(RESET)
+            ));
 
             // Build status
             if let Some(ref build) = summary.build_status {
@@ -1254,9 +1302,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             if let Some(ref todos) = summary.todo_info {
                 if todos.count > 0 {
                     details.push(format!(
-                        "{}📝 {} TODOs{}",
+                        "{}{}{} {}TODOs{}",
                         color(YELLOW),
                         todos.count,
+                        color(RESET),
+                        color(DIM),
                         color(RESET)
                     ));
                 }
@@ -1267,18 +1317,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
                     details.push(format!(
-                        "{}📊 {} lines{}",
+                        "{}{}{} {}lines{}",
                         color(GREEN),
                         loc_str,
+                        color(RESET),
+                        color(DIM),
                         color(RESET)
                     ));
-                    // Show top 3 languages with percentages (skip non-language extensions like man pages and no-ext)
+                    // Show top 3 languages with percentages
                     if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
                         let lang_parts: Vec<String> = metrics
                             .by_extension
                             .iter()
                             .filter(|(ext, _)| {
-                                // Skip man page extensions (1, 2, 3, etc.), no-ext, and empty
                                 !ext.chars().all(|c| c.is_numeric())
                                     && ext != "no-ext"
                                     && !ext.is_empty()
@@ -1293,6 +1344,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                                     "py" => "Python",
                                     "js" | "mjs" => "JavaScript",
                                     "ts" | "tsx" => "TypeScript",
+                                    "svelte" => "Svelte",
                                     "go" => "Go",
                                     "c" | "h" => "C",
                                     "cpp" | "cc" | "cxx" | "hpp" => "C++",
@@ -1308,10 +1360,18 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                                     "el" => "Emacs Lisp",
                                     _ => ext,
                                 };
-                                format!("{}{} {}%{}", color(DIM), name, pct, color(RESET))
+                                format!("{}% {}{}{}", pct, color(DIM), name, color(RESET))
                             })
                             .collect();
-                        details.push(format!("{}{}", color(DIM), lang_parts.join(" ")));
+                        if !lang_parts.is_empty() {
+                            details.push(format!(
+                                "{} {}{}{}",
+                                project_icon,
+                                color(DIM),
+                                lang_parts.join(", "),
+                                color(RESET)
+                            ));
+                        }
                     }
                 }
             }
@@ -1354,18 +1414,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 }
             }
 
-            details.push(format!(
-                "{}{} total{}",
-                color(DIM),
-                summary.total_items,
-                color(RESET)
-            ));
-
             // Combine rows with dynamic truncation
             if details.is_empty() {
                 row1
             } else {
-                let details_str = details.join(" │ ");
+                let details_str = details.join(&sep);
                 let term_width = get_terminal_width();
                 let row1_width = display_width(&row1);
                 let details_width = display_width(&details_str);
@@ -1389,7 +1442,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // Underline only the second row
     if let Some(last_line) = header.lines().last() {
         let last_width = display_width(last_line);
-        println!("{}", "─".repeat(last_width));
+        println!("{}{}{}", color(DIM), "─".repeat(last_width), color(RESET));
     }
 
     // Use shared build_display_items for consistent ordering with navigation
