@@ -1178,9 +1178,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             } else {
                 let details_str = details.join(" │ ");
                 let term_width = get_terminal_width();
-                let row1_width = strip_ansi(&row1).len();
+                let row1_width = display_width(&row1);
+                let details_width = display_width(&details_str);
 
-                if term_width > 0 && row1_width + details_str.len() > term_width {
+                if term_width > 0 && row1_width + details_width > term_width {
                     let available = term_width.saturating_sub(row1_width + 3);
                     if available > 20 {
                         let truncated = truncate_details(&details, available);
@@ -1357,9 +1358,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             } else {
                 let details_str = details.join(" │ ");
                 let term_width = get_terminal_width();
-                let row1_width = strip_ansi(&row1).len();
+                let row1_width = display_width(&row1);
+                let details_width = display_width(&details_str);
 
-                if term_width > 0 && row1_width + details_str.len() > term_width {
+                if term_width > 0 && row1_width + details_width > term_width {
                     let available = term_width.saturating_sub(row1_width + 3);
                     if available > 20 {
                         let truncated = truncate_details(&details, available);
@@ -1377,7 +1379,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     println!("{}", header);
     // Underline only the second row
     if let Some(last_line) = header.lines().last() {
-        let last_width = strip_ansi(last_line).len();
+        let last_width = display_width(last_line);
         println!("{}", "─".repeat(last_width));
     }
 
@@ -1458,11 +1460,11 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     let mut max_git = 1; // git status icon (always 1 char)
 
     for (item, contents_raw) in &display_meta {
-        max_owner = max_owner.max(item.owner.len());
-        max_group = max_group.max(item.group.len());
+        max_owner = max_owner.max(display_width(&item.owner));
+        max_group = max_group.max(display_width(&item.group));
         let size_str = format_size_compact(item.size);
-        max_size = max_size.max(size_str.len());
-        max_contents = max_contents.max(contents_raw.len().max(4));
+        max_size = max_size.max(display_width(&size_str));
+        max_contents = max_contents.max(display_width(contents_raw).max(4));
         // Git status is always 1 char, but we need a column for it
         max_git = 1;
     }
@@ -1708,7 +1710,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         // Add inline preview for directories if there's space
         if item.is_dir && config.inline_preview {
             let term_width = get_terminal_width();
-            let current_row_len = strip_ansi(&row_parts.join(" ")).len();
+            let current_row_len = display_width(&row_parts.join(" "));
             let available_for_preview = term_width.saturating_sub(current_row_len + 4); // +4 for spacing
             if term_width > 0 && available_for_preview > 10 {
                 if let Some(preview) = get_dir_inline_preview(item, available_for_preview) {
@@ -1840,10 +1842,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 }
                 // Print tree aligned to the right
                 let tree_str = tree_lines.join("\n");
-                let tree_display_width = strip_ansi(&tree_str)
+                let tree_display_width = tree_str
                     .lines()
-                    .next()
-                    .map(|l| l.len())
+                    .map(display_width)
+                    .max()
                     .unwrap_or(0);
                 let padding = " ".repeat(term_width.saturating_sub(tree_display_width + 5));
                 for (i, line) in tree_str.lines().enumerate() {
@@ -2432,6 +2434,12 @@ fn strip_ansi(s: &str) -> String {
     result
 }
 
+/// Measure visual terminal column width of a string after stripping ANSI escape sequences.
+fn display_width(s: &str) -> usize {
+    let plain = strip_ansi(s);
+    unicode_width::UnicodeWidthStr::width(plain.as_str())
+}
+
 /// Truncate details to fit within available width
 fn truncate_details(details: &[String], available: usize) -> String {
     if details.is_empty() {
@@ -2443,7 +2451,8 @@ fn truncate_details(details: &[String], available: usize) -> String {
 
     for detail in details {
         let plain = strip_ansi(detail);
-        let item_len = plain.len() + if kept.is_empty() { 0 } else { 3 }; // 3 for " │ "
+        let detail_width = unicode_width::UnicodeWidthStr::width(plain.as_str());
+        let item_len = detail_width + if kept.is_empty() { 0 } else { 3 }; // 3 for " │ "
 
         if current_len + item_len <= available {
             kept.push(detail.clone());
@@ -2452,9 +2461,18 @@ fn truncate_details(details: &[String], available: usize) -> String {
             // Try to fit a truncated version
             let remaining = available.saturating_sub(current_len);
             if remaining > 10 {
-                // Truncate this item safely
-                let truncated_len = remaining.saturating_sub(1); // Leave room for "..."
-                let truncated: String = plain.chars().take(truncated_len).collect();
+                // Truncate this item safely by visual column width
+                let mut truncated = String::new();
+                let mut width = 0;
+                let target_width = remaining.saturating_sub(1); // Leave room for "..."
+                for ch in plain.chars() {
+                    let ch_w = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
+                    if width + ch_w > target_width {
+                        break;
+                    }
+                    truncated.push(ch);
+                    width += ch_w;
+                }
                 kept.push(format!("{}...", truncated));
             }
             break;
@@ -2566,6 +2584,14 @@ mod tests {
         // Test with limited space
         let result = truncate_details(&details, 20);
         assert!(result.contains("short"));
+    }
+
+    #[test]
+    fn test_display_width() {
+        assert_eq!(display_width("hello"), 5);
+        assert_eq!(display_width("\x1b[31mred\x1b[0m"), 3);
+        assert_eq!(display_width("🦀"), 2);
+        assert_eq!(display_width("📦 crate"), 8);
     }
 
     #[test]
