@@ -133,6 +133,16 @@ fn highlight_row(row: &str, bg_color: &str) -> String {
     format!("{}{}{}", bg_seq, highlighted, color(RESET))
 }
 
+/// Apply a subtle background tint to an entire row (e.g. for alternating rows).
+/// Re-injects the background sequence after every ANSI reset so the tint covers all columns.
+fn apply_row_tint(row: &str, tint: &str) -> String {
+    if tint.is_empty() || !COLORS_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+        return row.to_string();
+    }
+    let highlighted = row.replace(RESET, &format!("{}{}", RESET, tint));
+    format!("{}{}{}", tint, highlighted, RESET)
+}
+
 /// Build the display items list using the exact same pipeline as output_rich.
 /// This ensures navigate_by_number uses the same ordering as the banner display.
 /// Returns (display_items, hidden_count).
@@ -1471,8 +1481,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // Print each row - PERM OWNER GROUP CONTENTS SIZE DATE NAME
     let num_width = display_items.len().to_string().len(); // for right-aligned numbering
     for (idx, (item, contents_raw)) in display_meta.iter().enumerate() {
-        let row_tint = if idx % 2 == 0 { ROW_TINT } else { "" };
-        let tint_reset = if idx % 2 == 0 { color(RESET) } else { "" };
         let icon_str = if opts.icons {
             icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink)
         } else {
@@ -1752,7 +1760,13 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             })
             .unwrap_or_else(|| row_parts.join(" "));
 
-        println!("{}{}{}", row_tint, row_str, tint_reset);
+        let formatted_row = if idx % 2 == 0 {
+            apply_row_tint(&row_str, ROW_TINT)
+        } else {
+            row_str
+        };
+
+        println!("{}", formatted_row);
     }
     if _profile {
         eprintln!("[FAB_PROFILE] row loop + widths: {:?}", _t1.elapsed());
@@ -2591,6 +2605,19 @@ mod tests {
         assert_eq!(display_width("\x1b[31mred\x1b[0m"), 3);
         assert_eq!(display_width("🦀"), 2);
         assert_eq!(display_width("📦 crate"), 8);
+    }
+
+    #[test]
+    fn test_apply_row_tint() {
+        set_colors_enabled(true);
+        let input = "col1 \x1b[34mcol2\x1b[0m col3";
+        let tinted = apply_row_tint(input, ROW_TINT);
+        // Should start with ROW_TINT
+        assert!(tinted.starts_with(ROW_TINT));
+        // Should re-inject ROW_TINT after reset
+        assert!(tinted.contains(&format!("{}{}", RESET, ROW_TINT)));
+        // Should end with RESET
+        assert!(tinted.ends_with(RESET));
     }
 
     #[test]
