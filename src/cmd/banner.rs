@@ -1561,7 +1561,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 .unwrap_or_else(|| {
                     // Tracked but clean - show dim dot
                     if git_info.is_repo {
-                        format!("{}●{}", color(GREEN), color(RESET))
+                        format!("{}●{}", color(DIM), color(RESET))
                     } else {
                         String::new()
                     }
@@ -1813,7 +1813,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             })
             .unwrap_or_else(|| row_parts.join(" "));
 
-        let formatted_row = if idx % 2 == 0 {
+        let formatted_row = if config.zebra_rows && idx % 2 == 0 {
             apply_row_tint(&row_str, ROW_TINT)
         } else {
             row_str

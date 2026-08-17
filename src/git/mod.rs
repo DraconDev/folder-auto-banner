@@ -83,23 +83,23 @@ pub enum FileStatus {
 impl FileStatus {
     pub fn icon(&self) -> &'static str {
         match self {
-            FileStatus::Modified => "\u{25cf}",  // ●
-            FileStatus::Added => "\u{25cf}",     // ●
-            FileStatus::Deleted => "\u{25cf}",   // ●
-            FileStatus::Renamed => "\u{25cf}",   // ●
-            FileStatus::Untracked => "\u{25cf}", // ●
-            FileStatus::Conflict => "\u{25cf}",  // ●
+            FileStatus::Modified => "~",
+            FileStatus::Added => "+",
+            FileStatus::Deleted => "-",
+            FileStatus::Renamed => "→",
+            FileStatus::Untracked => "?",
+            FileStatus::Conflict => "!",
         }
     }
 
     pub fn color(&self) -> &'static str {
         match self {
-            FileStatus::Modified => "\x1b[33m", // yellow
-            FileStatus::Added => "\x1b[32m",    // green
-            FileStatus::Deleted => "\x1b[31m",  // red
-            FileStatus::Renamed => "\x1b[36m",  // cyan
-            FileStatus::Untracked => "\x1b[2m", // dim
-            FileStatus::Conflict => "\x1b[31m", // red
+            FileStatus::Modified => "\x1b[33m",  // yellow
+            FileStatus::Added => "\x1b[32m",     // green
+            FileStatus::Deleted => "\x1b[31m",   // red
+            FileStatus::Renamed => "\x1b[36m",   // cyan
+            FileStatus::Untracked => "\x1b[36m", // cyan
+            FileStatus::Conflict => "\x1b[31m",  // red
         }
     }
 }

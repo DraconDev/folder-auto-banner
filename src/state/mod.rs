@@ -88,6 +88,7 @@ pub struct Config {
     pub mini_tree: bool,        // show mini tree on right side when there's space
     pub smart_truncation: bool, // smart truncation for big folders
     pub numbered: bool,         // show [N] numbers next to items for quick navigation
+    pub zebra_rows: bool,       // alternating row background tint (disabled by default)
     pub open_command: String,   // command to open files (e.g., "micro", "nano", "vim")
 
     // Directories to ignore
@@ -135,6 +136,7 @@ impl Default for Config {
             mini_tree: false,      // disabled by default - conflicts with inline_preview
             smart_truncation: true, // enabled by default - shows most relevant items first
             numbered: false,       // disabled by default - enable to show [N] navigation numbers
+            zebra_rows: false,     // disabled by default for clean pure-black background
             open_command: "micro".to_string(), // default file opener
             ignore_dirs: vec![
                 "node_modules".to_string(),
