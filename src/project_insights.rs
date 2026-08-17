@@ -136,12 +136,20 @@ pub fn scan_insights(path: &Path, extra_skip_dirs: &[&str]) -> Result<ProjectIns
         };
         total_loc += lines;
 
-        for line in content.lines() {
-            for pattern in TODO_PATTERNS {
-                if line.contains(pattern) {
-                    todo_count += 1;
-                    *todo_by_pattern.entry((*pattern).to_string()).or_insert(0) += 1;
-                    break;
+        // Fast path: skip line-by-line scanning if the file contains no TODO markers at all
+        if content.contains("TODO")
+            || content.contains("FIXME")
+            || content.contains("HACK")
+            || content.contains("XXX")
+            || content.contains("- [ ]")
+        {
+            for line in content.lines() {
+                for pattern in TODO_PATTERNS {
+                    if line.contains(pattern) {
+                        todo_count += 1;
+                        *todo_by_pattern.entry((*pattern).to_string()).or_insert(0) += 1;
+                        break;
+                    }
                 }
             }
         }

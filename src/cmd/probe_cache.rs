@@ -117,14 +117,17 @@ impl ProbeCache {
             return;
         };
         if !guard.entries.contains_key(&key) && guard.entries.len() >= MAX_ENTRIES {
-            // Find the entry with the smallest insert_order and remove it.
-            if let Some(oldest_key) = guard
+            // Batch eviction: collect the oldest 10% entries and remove them.
+            // This amortizes the O(N) sort across hundreds of subsequent insertions.
+            let evict_count = (MAX_ENTRIES / 10).max(1);
+            let mut entries_with_order: Vec<(CacheKey, u64)> = guard
                 .entries
                 .iter()
-                .min_by_key(|(_, v)| v.insert_order)
-                .map(|(k, _)| k.clone())
-            {
-                guard.entries.remove(&oldest_key);
+                .map(|(k, v)| (k.clone(), v.insert_order))
+                .collect();
+            entries_with_order.sort_by_key(|(_, order)| *order);
+            for (k, _) in entries_with_order.into_iter().take(evict_count) {
+                guard.entries.remove(&k);
             }
         }
         let order = guard.next_order;

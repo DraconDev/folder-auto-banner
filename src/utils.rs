@@ -22,6 +22,8 @@ pub fn run_with_timeout(
     cwd: &Path,
     timeout: Duration,
 ) -> Result<CommandOutput> {
+    use std::io::Read;
+
     let mut command = std::process::Command::new(cmd);
     command.args(args);
     command.current_dir(cwd);
@@ -31,13 +33,29 @@ pub fn run_with_timeout(
     let start = std::time::Instant::now();
     let mut child = command.spawn()?;
 
+    let mut stdout_pipe = child.stdout.take().unwrap();
+    let mut stderr_pipe = child.stderr.take().unwrap();
+
+    let stdout_handle = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout_pipe.read_to_end(&mut buf);
+        buf
+    });
+
+    let stderr_handle = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stderr_pipe.read_to_end(&mut buf);
+        buf
+    });
+
     loop {
-        if let Some(_status) = child.try_wait()? {
-            let output = child.wait_with_output()?;
+        if let Some(status) = child.try_wait()? {
+            let stdout_bytes = stdout_handle.join().unwrap_or_default();
+            let stderr_bytes = stderr_handle.join().unwrap_or_default();
             return Ok(CommandOutput {
-                status: output.status,
-                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                status,
+                stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
+                stderr: String::from_utf8_lossy(&stderr_bytes).to_string(),
             });
         }
 
@@ -57,6 +75,8 @@ pub fn run_with_timeout(
 
 /// Run a command with a timeout, returning just stdout as a String
 pub fn run_with_timeout_stdout(cmd: &str, args: &[&str], timeout: Duration) -> Result<String> {
+    use std::io::Read;
+
     let mut command = std::process::Command::new(cmd);
     command.args(args);
     command.stdout(std::process::Stdio::piped());
@@ -65,10 +85,17 @@ pub fn run_with_timeout_stdout(cmd: &str, args: &[&str], timeout: Duration) -> R
     let start = std::time::Instant::now();
     let mut child = command.spawn()?;
 
+    let mut stdout_pipe = child.stdout.take().unwrap();
+    let stdout_handle = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout_pipe.read_to_end(&mut buf);
+        buf
+    });
+
     loop {
-        if let Some(_output) = child.try_wait()? {
-            let result = child.wait_with_output()?;
-            return Ok(String::from_utf8_lossy(&result.stdout).to_string());
+        if let Some(_status) = child.try_wait()? {
+            let stdout_bytes = stdout_handle.join().unwrap_or_default();
+            return Ok(String::from_utf8_lossy(&stdout_bytes).to_string());
         }
 
         if start.elapsed() > timeout {

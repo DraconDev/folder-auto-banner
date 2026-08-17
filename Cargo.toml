@@ -41,46 +41,28 @@ path = "src/daemon.rs"
 [dependencies]
 # CLI parsing
 clap = { version = "4", features = ["derive", "env"] }
-clap_complete = "4"
 
-# Rich terminal output
-comfy-table = "7"
-console = "0.16"
+# Terminal string width
 unicode-width = "0.2"
 
 # Fast directory walking
 ignore = "0.4"
 
-# Git integration
-
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-bincode = "1.3"
 
 # Directories
 directories = "6"
 
-# Progress bars
-indicatif = "0.18"
-
-# Human-readable sizes
-byte-unit = "5"
-
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
 
-# Error handling
+# Error handling and logging
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 toml = "1.1"
-
-# Path handling
-path-absolutize = "3.1"
-
-# Glob patterns
-glob = "0.3"
 
 # Filesystem watching (for daemon)
 inotify = "0.11"

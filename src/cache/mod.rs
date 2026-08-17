@@ -35,13 +35,8 @@ impl Cache {
 
     /// Get cache file path for a given key
     fn path_for(&self, key: &str) -> PathBuf {
-        // Hash the key to avoid filesystem issues with long paths
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut hasher = DefaultHasher::new();
-        key.hash(&mut hasher);
-        let hash = format!("{:016x}", hasher.finish());
-        self.dir.join(format!("{}.json", hash))
+        let hash = fnv1a_64(key.as_bytes());
+        self.dir.join(format!("{:016x}.json", hash))
     }
 
     /// Get a cached value if it exists and is not expired
@@ -125,6 +120,19 @@ impl Cache {
             }
         }
     }
+}
+
+/// 64-bit FNV-1a hash — fast, non-cryptographic, and deterministic across
+/// platforms and compiler releases.
+fn fnv1a_64(bytes: &[u8]) -> u64 {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+    let mut h = FNV_OFFSET;
+    for b in bytes {
+        h ^= *b as u64;
+        h = h.wrapping_mul(FNV_PRIME);
+    }
+    h
 }
 
 /// Build a cache key from a path and a feature name
