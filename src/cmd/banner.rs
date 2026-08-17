@@ -145,7 +145,7 @@ fn apply_row_tint(row: &str, tint: &str) -> String {
 
 /// Collapse repetitive files sharing common prefix/suffix patterns (e.g. RELEASE_NOTES_*.md)
 /// keeping the top N newest files and folding older ones to preserve screen real estate.
-fn fold_repetitive_patterns<'a>(items: &mut Vec<&'a crate::fs::DirEntry>, max_per_pattern: usize) {
+fn fold_repetitive_patterns(items: &mut Vec<&crate::fs::DirEntry>, max_per_pattern: usize) {
     if items.len() <= 20 {
         return;
     }
@@ -157,7 +157,7 @@ fn fold_repetitive_patterns<'a>(items: &mut Vec<&'a crate::fs::DirEntry>, max_pe
             continue;
         }
         let name = &item.name;
-        if let Some(pos) = name.rfind(|c: char| c == '_' || c == '-') {
+        if let Some(pos) = name.rfind(['_', '-']) {
             if pos >= 3 {
                 let ext = name.rfind('.').map(|p| &name[p..]).unwrap_or("");
                 let prefix = format!("{}{}", &name[..=pos], ext);
@@ -407,7 +407,7 @@ fn build_display_items<'a>(
 
             let ordering = match sort_mode {
                 "size" => b.size.cmp(&a.size),
-                "date" => kb.date.cmp(&ka.date),
+                "date" => ka.date.cmp(&kb.date),
                 "type" => {
                     if ka.ext != kb.ext {
                         ka.ext.cmp(&kb.ext)
