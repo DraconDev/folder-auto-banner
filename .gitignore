@@ -112,3 +112,6 @@ test_banner/
 # Scratch/junk files (audit pass 2026-08-16)
 /micro
 /1.txt
+
+# pi runtime state (2026-08-25 consolidation: never track)
+.pi-glla/
