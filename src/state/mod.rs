@@ -2,7 +2,7 @@
 //!
 //! Stores state in `~/.local/share/fab/` via the directories crate.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -13,6 +13,18 @@ pub fn get_data_dir() -> Result<PathBuf> {
     let proj_dirs =
         ProjectDirs::from("com", "fab", "fab").context("Failed to determine data directory")?;
     let data_dir = proj_dirs.data_dir().to_path_buf();
+
+    // Never follow a symlink supplied at the cache root. The directory holds
+    // local state and cache files, so redirecting it elsewhere would weaken
+    // both the permission guarantee and the expected data boundary.
+    if let Ok(metadata) = fs::symlink_metadata(&data_dir) {
+        if metadata.file_type().is_symlink() {
+            bail!("data directory is a symlink: {:?}", data_dir);
+        }
+        if !metadata.is_dir() {
+            bail!("data directory is not a directory: {:?}", data_dir);
+        }
+    }
 
     // Ensure directory exists
     if !data_dir.exists() {
