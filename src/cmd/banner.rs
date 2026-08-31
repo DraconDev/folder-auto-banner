@@ -642,14 +642,13 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         opts.verbose = true;
     }
     if opts.sort.is_none() && config.sort != "name" {
-        opts.sort = Some(Box::leak(config.sort.clone().into_boxed_str()));
+        opts.sort = Some(config.sort.clone());
     }
     if !opts.reverse && config.reverse {
         opts.reverse = true;
     }
     if opts.group_dirs.is_none() && config.group_dirs != "none" {
-        // Leak the string for lifetime - acceptable for CLI tool
-        opts.group_dirs = Some(Box::leak(config.group_dirs.clone().into_boxed_str()));
+        opts.group_dirs = Some(config.group_dirs.clone());
     }
     if !opts.hidden && config.hidden {
         opts.hidden = true;
@@ -747,7 +746,7 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         scan_metrics,
         &extra_skip_dirs,
     )?;
-    let needs_git_for_sort = opts.gitsort || opts.sort == Some("git");
+    let needs_git_for_sort = opts.gitsort || opts.sort.as_deref() == Some("git");
     let git_info = if !config.git_status || ((opts.oneline || opts.raw) && !needs_git_for_sort) {
         crate::git::GitInfo::default()
     } else {
