@@ -31,6 +31,7 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 const ACTIVE_WATCH_DEPTH: usize = 3;
 const MAX_ACTIVE_WATCH_DIRS: usize = 2048;
+const MAX_WATCH_CHILDREN_PER_DIR: usize = 500;
 
 #[cfg(test)]
 #[derive(Clone, Debug, PartialEq)]
@@ -670,7 +671,10 @@ fn collect_watch_targets(
         return;
     };
 
-    for entry in entries.flatten() {
+    // A directory may contain millions of entries that are skipped or cannot
+    // be watched. Bound the raw iterator as well as the global target count so
+    // watcher refresh never performs an unbounded scan.
+    for entry in entries.take(MAX_WATCH_CHILDREN_PER_DIR).flatten() {
         if targets.len() >= max_targets {
             return;
         }

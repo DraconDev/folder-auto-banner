@@ -126,6 +126,11 @@ fn check_go_build(path: &Path) -> Result<BuildStatus> {
 fn check_python_build(path: &Path) -> Result<BuildStatus> {
     // Find Python files to compile-check
     let py_files: Vec<String> = std::fs::read_dir(path)?
+        // Bound the raw iterator before filtering. Without this, a Python
+        // project with hundreds of thousands of non-Python entries would be
+        // fully enumerated just to discover that it has no more than 50 files
+        // worth of compile checks.
+        .take(crate::fs::MAX_DIRECTORY_SCAN_ITEMS)
         .flatten()
         .filter(|e| e.file_name().to_string_lossy().ends_with(".py"))
         .map(|e| e.path().to_string_lossy().to_string())

@@ -2262,6 +2262,7 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
     let output = json!({
         "path": path.to_string_lossy(),
         "total_items": summary.total_items,
+        "truncated": summary.truncated,
         "total_size": summary.total_size,
         "project_type": summary.project_type.label(),
         "items": items,
@@ -2342,6 +2343,10 @@ fn get_dir_inline_preview(entry: &crate::fs::DirEntry, max_width: usize) -> Opti
     let dir_path = &entry.path;
     let items = match std::fs::read_dir(dir_path) {
         Ok(rd) => rd
+            // A preview needs only three visible children. Bound the raw
+            // iterator as well so a child containing a huge run of hidden or
+            // unreadable entries cannot block the banner render.
+            .take(crate::fs::MAX_DIRECTORY_SCAN_ITEMS)
             .filter_map(|e| e.ok())
             .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
             .take(3)
