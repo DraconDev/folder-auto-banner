@@ -359,13 +359,9 @@ fn git_cmd(path: &Path, args: &[&str]) -> Option<String> {
     let mut full_args = Vec::with_capacity(args.len() + 2);
     full_args.extend(["-C", path_arg.as_ref()]);
     full_args.extend_from_slice(args);
-    let output = crate::utils::run_with_timeout_bytes(
-        "git",
-        &full_args,
-        Path::new("."),
-        GIT_COMMAND_TIMEOUT,
-    )
-    .ok()?;
+    let output =
+        crate::utils::run_with_timeout("git", &full_args, Path::new("."), GIT_COMMAND_TIMEOUT)
+            .ok()?;
     if output.status.success() {
         Some(output.stdout)
     } else {
@@ -379,7 +375,7 @@ fn git_cmd_raw(path: &Path, args: &[&str]) -> Option<Vec<u8>> {
     let mut full_args = Vec::with_capacity(args.len() + 2);
     full_args.extend(["-C", path_arg.as_ref()]);
     full_args.extend_from_slice(args);
-    let output = crate::utils::run_with_timeout(
+    let output = crate::utils::run_with_timeout_bytes(
         "git",
         &full_args,
         Path::new("."),

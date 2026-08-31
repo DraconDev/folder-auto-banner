@@ -243,6 +243,22 @@ impl DirSummary {
                 .map(|ft| ft.is_symlink())
                 .unwrap_or(false);
 
+            // Classify a symlink by its target for filtering and aggregate
+            // counts, while retaining `is_symlink` so it remains a separate
+            // display type. This makes `--only-files` include symlinks to
+            // files and keeps directory/file totals consistent with what is
+            // rendered.
+            let (is_dir, is_file) = if is_symlink {
+                std::fs::metadata(entry.path())
+                    .map(|metadata| (metadata.is_dir(), metadata.is_file()))
+                    .unwrap_or((false, false))
+            } else {
+                (
+                    file_type.as_ref().map(|ft| ft.is_dir()).unwrap_or(false),
+                    file_type.as_ref().map(|ft| ft.is_file()).unwrap_or(false),
+                )
+            };
+
             if is_dir {
                 dirs += 1;
             } else if is_file {
@@ -259,16 +275,6 @@ impl DirSummary {
                 })
             } else {
                 entry.metadata().ok()
-            };
-
-            // For symlinks, update is_dir based on the target
-            let is_dir = if is_symlink {
-                // Try to resolve the target to determine if it points to a dir
-                std::fs::metadata(entry.path())
-                    .map(|m| m.is_dir())
-                    .unwrap_or(is_dir)
-            } else {
-                is_dir
             };
 
             let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
