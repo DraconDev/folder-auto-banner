@@ -13,6 +13,7 @@ The script installs:
 - `f` and `fabd` into `~/.local/bin`
 - shell wrappers for `f N` navigation into `~/.local/bin`
 - source lines in `~/.zshrc` and/or `~/.bashrc`
+- responsive auto-banner hooks with bounded large-directory scans
 - the user systemd service for the background daemon, if available
 
 Start a new shell, or activate the shell wrappers immediately:

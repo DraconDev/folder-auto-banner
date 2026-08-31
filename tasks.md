@@ -130,7 +130,7 @@
 - [ ] Sort by file creation time
 
 ### Performance
-- [ ] Optimize banner for large directories (1000+ files)
+- [x] Optimize banner for large directories (bounded scans; truncated views show `500+`)
 - [ ] Cache directory scan results more aggressively
 - [ ] Parallel file system operations
 

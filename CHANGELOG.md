@@ -1,3 +1,15 @@
+## [Unreleased]
+
+### Bound large-directory scans
+
+- Normal banner scans now cap the raw directory iterator at 500 entries plus
+  one sentinel, instead of continuing through every entry after metadata
+  collection stops.
+- Project-type detection, Python build-file discovery, directory child counts,
+  previews, and daemon watcher refreshes now apply equivalent bounds.
+- Truncated summaries are marked explicitly and render sampled statistics as
+  `500+` rather than presenting a partial count as exact.
+
 ## [0.7.11] - 2026-08-17
 
 ### Recency-first ordering, smart pattern folding, Git badges, and safety hardening
