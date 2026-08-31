@@ -405,6 +405,37 @@ mod tests {
     }
 
     #[test]
+    fn test_count_items_in_dir_is_bounded_and_marked() {
+        let tmp = tempfile::tempdir().unwrap();
+        for index in 0..=crate::fs::MAX_DIRECTORY_SCAN_ITEMS {
+            std::fs::write(tmp.path().join(format!("item-{index}")), "content").unwrap();
+        }
+
+        let entry = crate::fs::DirEntry {
+            name: "large".to_string(),
+            path: tmp.path().to_path_buf(),
+            is_dir: true,
+            is_file: false,
+            is_symlink: false,
+            is_exec: false,
+            size: 0,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+            symlink_valid: true,
+            content_probe: None,
+        };
+
+        assert_eq!(count_items_in_dir(&entry), crate::fs::MAX_DIRECTORY_SCAN_ITEMS);
+        assert_eq!(
+            count_items_in_dir_display(&entry),
+            format!("{}+", crate::fs::MAX_DIRECTORY_SCAN_ITEMS)
+        );
+    }
+
+    #[test]
     fn test_count_items_in_nonexistent_dir() {
         let entry = crate::fs::DirEntry {
             name: "nonexistent".to_string(),

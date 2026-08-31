@@ -724,6 +724,31 @@ mod tests {
     }
 
     #[test]
+    fn test_scan_stops_at_directory_entry_limit() {
+        let tmp = tempfile::tempdir().unwrap();
+        for index in 0..=MAX_DIRECTORY_SCAN_ITEMS {
+            std::fs::write(tmp.path().join(format!("item-{index}")), "content").unwrap();
+        }
+
+        let summary = DirSummary::scan_with_options(
+            tmp.path(),
+            false,
+            false,
+            false,
+            false,
+            false,
+            &[],
+        )
+        .unwrap();
+
+        assert!(summary.truncated, "the sentinel entry must mark the scan truncated");
+        assert_eq!(summary.top_items.len(), MAX_DIRECTORY_SCAN_ITEMS);
+        assert_eq!(summary.total_items, MAX_DIRECTORY_SCAN_ITEMS);
+        assert_eq!(summary.files, MAX_DIRECTORY_SCAN_ITEMS);
+        assert_eq!(summary.dirs, 0);
+    }
+
+    #[test]
     fn test_project_type_icons() {
         assert_eq!(ProjectType::Rust.icon(), "🦀");
         assert_eq!(ProjectType::Node.icon(), "📦");
