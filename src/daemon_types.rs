@@ -4,6 +4,18 @@ use std::path::PathBuf;
 use crate::fs::DirSummary;
 use crate::git::GitInfo;
 
+/// Maximum size of a single IPC frame.
+///
+/// Requests are normally tiny (they contain only a path), while a banner
+/// response is bounded by the scanner's entry limits. Keeping an explicit
+/// protocol limit prevents a malformed or hostile local client from making
+/// either side allocate an arbitrary amount of memory.
+pub const MAX_IPC_FRAME_SIZE: usize = 16 * 1024 * 1024;
+
+pub fn checked_frame_len(len: usize) -> Option<u32> {
+    (len <= MAX_IPC_FRAME_SIZE && len <= u32::MAX as usize).then_some(len as u32)
+}
+
 // IPC Protocol
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Request {
@@ -128,5 +140,12 @@ mod tests {
         let json = serde_json::to_string(&data).unwrap();
         let deserialized: crate::daemon_types::BannerData = serde_json::from_str(&json).unwrap();
         assert!(deserialized.git_info.is_none());
+    }
+
+    #[test]
+    fn test_ipc_frame_length_limit() {
+        assert_eq!(checked_frame_len(0), Some(0));
+        assert_eq!(checked_frame_len(MAX_IPC_FRAME_SIZE), Some(MAX_IPC_FRAME_SIZE as u32));
+        assert_eq!(checked_frame_len(MAX_IPC_FRAME_SIZE + 1), None);
     }
 }

@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use folder_auto_banner::daemon_types::{BannerData, Request, Response};
+use folder_auto_banner::daemon_types::{checked_frame_len, BannerData, Request, Response, MAX_IPC_FRAME_SIZE};
 #[cfg(test)]
 use folder_auto_banner::fs::ProjectType;
 use folder_auto_banner::fs::{DirEntry, DirSummary};
@@ -18,6 +18,7 @@ struct CacheEntry {
     data: BannerData,
     computed_at: Instant,
     root_mtime: Option<SystemTime>,
+    config_mtime: Option<SystemTime>,
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
@@ -110,12 +111,7 @@ struct Daemon {
 
 impl Daemon {
     fn new() -> Result<Self> {
-        let socket_dir = directories::ProjectDirs::from("com", "fab", "fab")
-            .ok_or_else(|| anyhow::anyhow!("Cannot determine data directory"))?
-            .data_dir()
-            .to_path_buf();
-
-        std::fs::create_dir_all(&socket_dir)?;
+        let socket_dir = folder_auto_banner::state::get_data_dir()?;
 
         let socket_path = socket_dir.join(SOCKET_NAME);
 
@@ -187,8 +183,7 @@ impl Daemon {
         // active immediately. Persisted entries are intentionally left in the cache for
         // fast startup, but active-folder watchers and a cheap root-mtime check catch
         // changes without forcing a full shallow scan on every cache hit.
-        let socket_dir =
-            directories::ProjectDirs::from("com", "fab", "fab").map(|p| p.data_dir().to_path_buf());
+        let socket_dir = folder_auto_banner::state::get_data_dir().ok();
         if let Some(ref dir) = socket_dir {
             let persisted = load_banner_cache(dir);
             let mut cache = self.cache.lock().unwrap_or_else(|e| {
@@ -216,6 +211,7 @@ impl Daemon {
                         data,
                         computed_at: Instant::now() - CACHE_TTL,
                         root_mtime: current_dir_mtime(&path),
+                        config_mtime: current_config_mtime(),
                     },
                 );
             }
@@ -643,15 +639,14 @@ fn collect_watch_targets(
         Err(_) => return,
     };
 
-    let is_dir = if meta.is_symlink() {
-        std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
-    } else {
-        meta.is_dir()
-    };
-
-    if meta.is_symlink() && !is_dir {
+    // Do not follow symlinks while building the watcher tree. A link may point
+    // outside the requested project or back into an ancestor, which can cause
+    // unrelated invalidations, duplicate watches, or recursive traversal.
+    if meta.is_symlink() {
         return;
     }
+
+    let is_dir = meta.is_dir();
 
     // Skip directories whose internal churn should not invalidate the cache.
     // This must be checked before pushing to targets, otherwise the skipped
@@ -706,11 +701,7 @@ fn can_watch_path(path: &Path) -> bool {
         Err(_) => return false,
     };
 
-    if meta.is_symlink() {
-        return std::fs::metadata(path).is_ok();
-    }
-
-    meta.is_file() || meta.is_dir()
+    !meta.is_symlink() && (meta.is_file() || meta.is_dir())
 }
 
 fn find_owner_for_watch(path: &Path, active_roots: &HashSet<PathBuf>) -> PathBuf {
@@ -816,6 +807,15 @@ fn handle_client(
     stream.read_exact(&mut len_bytes)?;
     let t_read = std::time::Instant::now();
     let req_len = u32::from_le_bytes(len_bytes) as usize;
+    if req_len > MAX_IPC_FRAME_SIZE {
+        send_response(
+            &mut stream,
+            &Response::Error {
+                message: "IPC request exceeds the maximum frame size".to_string(),
+            },
+        )?;
+        return Ok(());
+    }
     let mut req_buf = vec![0u8; req_len];
     stream.read_exact(&mut req_buf)?;
     let request: Request = serde_json::from_slice(&req_buf)?;
@@ -843,7 +843,7 @@ fn handle_client(
                 tracing::debug!("Cache lookup: path={:?}, entries={}", path, cache.len());
                 cache
                     .get(&path)
-                    .filter(|entry| entry.computed_at.elapsed() < CACHE_TTL)
+                    .filter(|entry| cache_entry_is_fresh(entry, &path))
                     .cloned()
             };
 
@@ -890,6 +890,7 @@ fn handle_client(
                             data: data.clone(),
                             computed_at: Instant::now(),
                             root_mtime: current_dir_mtime(&path),
+                            config_mtime: current_config_mtime(),
                         },
                     );
                     touch_active_root(&active_roots, &active_order, path.clone());
@@ -969,6 +970,7 @@ fn handle_client(
                         data: data.clone(),
                         computed_at: Instant::now(),
                         root_mtime: current_dir_mtime(&path),
+                        config_mtime: current_config_mtime(),
                     },
                 );
                 touch_active_root(&active_roots, &active_order, path.clone());
@@ -997,7 +999,7 @@ fn handle_client(
                         e.into_inner()
                     });
                     c.get(&path)
-                        .map(|e| e.computed_at.elapsed() < CACHE_TTL)
+                        .map(|e| cache_entry_is_fresh(e, &path))
                         .unwrap_or(false)
                 };
                 if !cache_hit {
@@ -1018,6 +1020,7 @@ fn handle_client(
                                     data: data.clone(),
                                     computed_at: Instant::now(),
                                     root_mtime: current_dir_mtime(&path),
+                                    config_mtime: current_config_mtime(),
                                 },
                             );
                             touch_active_root(&active_roots, &active_order, path.clone());
@@ -1072,7 +1075,8 @@ fn send_response(stream: &mut UnixStream, response: &Response) -> Result<()> {
     // to_vec on a Vec<u8> buffers the entire output, then a single
     // write_all sends it in one syscall — avoiding 1-byte-at-a-time I/O.
     let resp_bytes = serde_json::to_vec(response)?;
-    let resp_len = resp_bytes.len() as u32;
+    let resp_len = checked_frame_len(resp_bytes.len())
+        .ok_or_else(|| anyhow::anyhow!("IPC response exceeds the maximum frame size"))?;
     let mut combined = Vec::with_capacity(4 + resp_bytes.len());
     let len_bytes = resp_len.to_le_bytes();
     combined.extend_from_slice(&len_bytes);
@@ -1353,7 +1357,7 @@ fn active_size_refresh_loop(ctx: Arc<SizeRefreshContext>) {
                 });
                 cache
                     .get(&path)
-                    .filter(|entry| entry.computed_at.elapsed() < CACHE_TTL)
+                    .filter(|entry| cache_entry_is_fresh(entry, &path))
                     .map(|entry| entry.data.clone())
             };
 
@@ -1433,6 +1437,7 @@ fn schedule_size_refresh(
                     data: refreshed,
                     computed_at,
                     root_mtime: current_dir_mtime(&path),
+                    config_mtime: current_config_mtime(),
                 },
             );
             // Persist the refreshed sizes to the per-path disk cache: the
@@ -1552,6 +1557,19 @@ fn current_dir_mtime(path: &Path) -> Option<SystemTime> {
     std::fs::metadata(path)
         .ok()
         .and_then(|metadata| metadata.modified().ok())
+}
+
+fn current_config_mtime() -> Option<SystemTime> {
+    folder_auto_banner::state::Config::config_path()
+        .ok()
+        .and_then(|path| std::fs::metadata(path).ok())
+        .and_then(|metadata| metadata.modified().ok())
+}
+
+fn cache_entry_is_fresh(entry: &CacheEntry, path: &Path) -> bool {
+    entry.computed_at.elapsed() < CACHE_TTL
+        && entry.root_mtime == current_dir_mtime(path)
+        && entry.config_mtime == current_config_mtime()
 }
 
 fn compute_dir_size_with_status(path: &Path, timeout: Duration) -> SizeComputation {
@@ -1825,6 +1843,7 @@ mod tests {
             data,
             computed_at: Instant::now(),
             root_mtime: None,
+            config_mtime: None,
         };
         assert!(entry.computed_at.elapsed() < Duration::from_secs(1));
     }
@@ -1839,6 +1858,7 @@ mod tests {
             },
             computed_at: Instant::now() - Duration::from_secs(600), // 10 minutes ago
             root_mtime: None,
+            config_mtime: None,
         };
         assert!(entry.computed_at.elapsed() > CACHE_TTL);
     }

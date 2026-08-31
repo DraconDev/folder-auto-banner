@@ -3,7 +3,7 @@ use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::daemon_types::{BannerData, Request, Response};
+use crate::daemon_types::{checked_frame_len, BannerData, Request, Response};
 
 const SOCKET_NAME: &str = "fabd.sock";
 
@@ -19,7 +19,8 @@ fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response>
     use std::io::{Read, Write};
     // Length-prefixed JSON: 4-byte LE length, then payload.
     let req_bytes = serde_json::to_vec(request)?;
-    let req_len = req_bytes.len() as u32;
+    let req_len = checked_frame_len(req_bytes.len())
+        .ok_or_else(|| anyhow::anyhow!("IPC request exceeds the maximum frame size"))?;
     let mut combined = Vec::with_capacity(4 + req_bytes.len());
     let len_bytes = req_len.to_le_bytes();
     combined.extend_from_slice(&len_bytes);
@@ -38,6 +39,9 @@ fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response>
     stream.read_exact(&mut len_bytes)?;
     let t_read4 = std::time::Instant::now();
     let resp_len = u32::from_le_bytes(len_bytes) as usize;
+    if checked_frame_len(resp_len).is_none() {
+        return Err(anyhow::anyhow!("IPC response exceeds the maximum frame size"));
+    }
     let mut resp_bytes = vec![0u8; resp_len];
     stream.read_exact(&mut resp_bytes)?;
     let t_read_payload = std::time::Instant::now();
@@ -203,7 +207,10 @@ fn warm_path(path: &Path) {
             return;
         }
     };
-    let req_len = req_bytes.len() as u32;
+    let Some(req_len) = checked_frame_len(req_bytes.len()) else {
+        tracing::warn!("Warm request exceeds the maximum IPC frame size");
+        return;
+    };
     let mut combined = Vec::with_capacity(4 + req_bytes.len());
     combined.extend_from_slice(&req_len.to_le_bytes());
     combined.extend_from_slice(&req_bytes);
@@ -236,7 +243,10 @@ pub fn send_shutdown() {
             return;
         }
     };
-    let req_len = req_bytes.len() as u32;
+    let Some(req_len) = checked_frame_len(req_bytes.len()) else {
+        tracing::warn!("Shutdown request exceeds the maximum IPC frame size");
+        return;
+    };
     let mut combined = Vec::with_capacity(4 + req_bytes.len());
     combined.extend_from_slice(&req_len.to_le_bytes());
     combined.extend_from_slice(&req_bytes);
@@ -265,9 +275,15 @@ pub fn ensure_daemon_running() {
         return;
     }
 
-    // Clean up stale socket before spawning
+    // Clean up a stale socket before spawning. `is_daemon_running` deliberately
+    // treats an unresponsive daemon as potentially live; re-check the listener
+    // here so a slow daemon cannot be orphaned and replaced by a split-brain
+    // second instance.
     if let Ok(socket) = socket_path() {
         if socket.exists() {
+            if UnixStream::connect(&socket).is_ok() {
+                return;
+            }
             let _ = std::fs::remove_file(&socket);
         }
     }
