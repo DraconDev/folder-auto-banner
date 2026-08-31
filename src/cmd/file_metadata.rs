@@ -520,8 +520,9 @@ mod tests {
         // mvhd atom header (size 24, type "mvhd", version 0)
         truncated_buf.extend_from_slice(&24u32.to_be_bytes());
         truncated_buf.extend_from_slice(b"mvhd");
+        // truncated right here — only 17 bytes total, well short of the
+        // required 28 bytes for version 0
         truncated_buf.push(0); // version 0
-                               // truncated right here — only 17 bytes total, well short of the required 28 bytes for version 0
 
         assert_eq!(parse_mp4_duration(&truncated_buf), None);
     }
