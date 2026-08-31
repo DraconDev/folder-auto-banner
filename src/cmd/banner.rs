@@ -101,7 +101,10 @@ fn is_recent(dt: &DateTime<Utc>) -> bool {
 /// Apply a background highlight or bold to an entire row.
 /// Uses named colors or "bold" for theme-independent highlighting.
 fn highlight_row(row: &str, bg_color: &str) -> String {
-    if bg_color.is_empty() || bg_color == "none" {
+    if bg_color.is_empty()
+        || bg_color == "none"
+        || !COLORS_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
+    {
         return row.to_string();
     }
 
@@ -245,6 +248,17 @@ fn build_display_items<'a>(
         });
     }
 
+    // Apply the same ignore-glob filter in rich, navigation, and machine
+    // output modes. Previously only oneline/recursive output used this flag.
+    if !opts.ignore_glob.is_empty() {
+        display_items.retain(|item| {
+            !opts
+                .ignore_glob
+                .iter()
+                .any(|pattern| glob_match(pattern, &item.name))
+        });
+    }
+
     // Apply only-dirs / only-files filter
     if opts.only_dirs {
         display_items.retain(|item| item.is_dir);
@@ -338,7 +352,7 @@ fn build_display_items<'a>(
             "name"
         };
 
-        let group_dirs_mode = opts.group_dirs.unwrap_or("last");
+        let group_dirs_mode = opts.group_dirs.unwrap_or(config.group_dirs.as_str());
 
         // Pre-compute lowercase names, extensions, and date keys once so the
         // per-comparison sort callback does no allocation. This converts the

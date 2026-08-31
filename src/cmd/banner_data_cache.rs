@@ -51,24 +51,20 @@ const CACHE_SUBDIR: &str = "banner_data";
 /// but Unix paths are case-sensitive so we hash as-is).
 pub fn cache_file_path(path: &Path) -> Option<PathBuf> {
     let data_dir = data_dir()?;
+    let cache_dir = data_dir.join(CACHE_SUBDIR);
+    if let Ok(metadata) = std::fs::symlink_metadata(&cache_dir) {
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return None;
+        }
+    }
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let hash = fnv1a_64(canonical.to_string_lossy().as_bytes());
-    Some(
-        data_dir
-            .join(CACHE_SUBDIR)
-            .join(format!("{:016x}.json", hash)),
-    )
+    Some(cache_dir.join(format!("{:016x}.json", hash)))
 }
 
 /// Returns the cache directory, creating it if necessary.
 fn data_dir() -> Option<PathBuf> {
-    let dir = directories::ProjectDirs::from("com", "fab", "fab")?
-        .data_dir()
-        .to_path_buf();
-    if !dir.exists() {
-        let _ = std::fs::create_dir_all(&dir);
-    }
-    Some(dir)
+    crate::state::get_data_dir().ok()
 }
 
 /// FNV-1a 64-bit hash. Stable across Rust versions and platforms
@@ -172,7 +168,13 @@ pub fn max_descendant_mtime(path: &Path) -> Option<SystemTime> {
             }
             *visited += 1;
             let name_str = entry.file_name().to_string_lossy().to_string();
-            if let Ok(meta) = entry.metadata() {
+            if let Ok(meta) = std::fs::symlink_metadata(entry.path()) {
+                // The freshness walk must stay within the requested tree.
+                // Following a symlink can traverse unrelated directories or
+                // loop back into an ancestor.
+                if meta.file_type().is_symlink() {
+                    continue;
+                }
                 if meta.is_dir() {
                     // Skip heavyweight subtrees: probe-relevant content under
                     // them is not shown by the banner anyway.
@@ -217,6 +219,17 @@ pub fn is_cache_fresh(path: &Path) -> bool {
     };
     if age >= CACHE_TTL {
         return false;
+    }
+    // A changed config can alter both the scan features and the rendered
+    // columns. Do not serve a disk cache written before that change.
+    if let Some(config_mtime) = crate::state::Config::config_path()
+        .ok()
+        .and_then(|config| std::fs::metadata(config).ok())
+        .and_then(|metadata| metadata.modified().ok())
+    {
+        if config_mtime > file_mtime {
+            return false;
+        }
     }
     // Guard against stale data: if the directory's mtime is newer than
     // the cache file's mtime, the file is stale (e.g., a file was

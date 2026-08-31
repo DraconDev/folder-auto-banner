@@ -108,6 +108,35 @@ pub fn run_with_timeout_stdout(cmd: &str, args: &[&str], timeout: Duration) -> R
     }
 }
 
+/// Return whether an environment flag is explicitly enabled with `1`.
+pub fn env_flag(name: &str) -> bool {
+    std::env::var(name).is_ok_and(|value| value == "1")
+}
+
+/// Resolve a feature flag for daemon scans. The config is the default, the
+/// positive environment variable enables the feature, and the `FAB_NO_*`
+/// variable always wins as an explicit disable.
+pub fn feature_enabled(config_enabled: bool, enable_var: &str, disable_var: &str) -> bool {
+    if env_flag(disable_var) {
+        false
+    } else if env_flag(enable_var) {
+        true
+    } else {
+        config_enabled
+    }
+}
+
+/// Resolve an optional direct-scan feature. Direct scans keep expensive probes
+/// opt-in for interactive latency, while still honoring config disables and
+/// the documented positive/negative environment overrides.
+pub fn direct_feature_enabled(config_enabled: bool, enable_var: &str, disable_var: &str) -> bool {
+    if env_flag(disable_var) {
+        false
+    } else {
+        config_enabled && env_flag(enable_var)
+    }
+}
+
 // === Constants ===
 
 /// Directories to skip when scanning (shared between todo_scanner and code_metrics)
@@ -210,5 +239,12 @@ mod tests {
         assert!(BINARY_EXTS.contains(&"jpg"));
         assert!(BINARY_EXTS.contains(&"mp4"));
         assert!(BINARY_EXTS.contains(&"lock"));
+    }
+
+    #[test]
+    fn test_feature_flag_defaults_to_config() {
+        assert!(feature_enabled(true, "FAB_TEST_MISSING_ENABLE", "FAB_TEST_MISSING_DISABLE"));
+        assert!(!feature_enabled(false, "FAB_TEST_MISSING_ENABLE", "FAB_TEST_MISSING_DISABLE"));
+        assert!(!direct_feature_enabled(true, "FAB_TEST_MISSING_ENABLE", "FAB_TEST_MISSING_DISABLE"));
     }
 }
