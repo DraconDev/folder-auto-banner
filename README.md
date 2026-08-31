@@ -198,8 +198,8 @@ f -b top ./src        # → -S -r -m 20 for ./src  (top 20 in src)
 | `hidden` | `-a` | Show hidden files (dotfiles) |
 | `dirs` | `-D` | Only directories |
 | **Sort** | | |
-| `new` | `-t` | Sort by time, newest first |
-| `old` | `-t -r` | Sort by time, oldest first |
+| `new` | `-t` | Sort by time, newest last (near the prompt) |
+| `old` | `-t -r` | Reverse time order |
 | `big` | `-S` | Sort by size, largest first |
 | `small` | `-S -r` | Sort by size, smallest first |
 | `ext` | `-X` | Sort by extension |
@@ -308,7 +308,7 @@ size = "default"          # default, short, bytes
 date = "date"             # date, relative
 classify = true           # append */=>@|
 no_symlink = false
-total_size = false
+total_size = true
 columns = ["permission", "owner", "group", "size", "contents", "date", "name"]
 hide_columns = []
 sort = "name"

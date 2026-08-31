@@ -52,9 +52,7 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
                 std::thread::sleep(std::time::Duration::from_millis(200));
             }
 
-            let project_dir = directories::ProjectDirs::from("com", "fab", "fab")
-                .ok_or_else(|| anyhow::anyhow!("Cannot determine data directory"))?;
-            let data_dir = project_dir.data_dir();
+            let data_dir = crate::state::get_data_dir()?;
             let mut cleared = Vec::new();
 
             // Per-path banner data cache (written by banner_data_cache.rs) is
@@ -73,10 +71,13 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
                 }
             }
 
-            let cache_dir = project_dir.cache_dir().to_path_buf();
-            if cache_dir.exists() {
-                std::fs::remove_dir_all(&cache_dir)?;
-                cleared.push(cache_dir);
+            let cache_dir = directories::ProjectDirs::from("com", "fab", "fab")
+                .map(|project_dir| project_dir.cache_dir().to_path_buf());
+            if let Some(cache_dir) = cache_dir {
+                if cache_dir.exists() {
+                    std::fs::remove_dir_all(&cache_dir)?;
+                    cleared.push(cache_dir);
+                }
             }
 
             if cleared.is_empty() {

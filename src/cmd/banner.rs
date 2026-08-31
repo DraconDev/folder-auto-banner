@@ -26,6 +26,36 @@ fn set_colors_enabled(enabled: bool) {
     COLORS_ENABLED.store(enabled, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// Make filesystem text safe to print in a terminal. Raw mode intentionally
+/// preserves paths for scripting, but human-facing names must not allow a
+/// filename containing a newline or escape sequence to rewrite the display.
+fn escape_terminal_text(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_control() {
+            use std::fmt::Write as _;
+            let _ = write!(escaped, "\\u{{{:x}}}", ch as u32);
+        } else {
+            escaped.push(ch);
+        }
+    }
+    escaped
+}
+
+/// Percent-encode a path for a terminal `file://` hyperlink URI.
+fn file_url(path: &Path) -> String {
+    let mut url = String::from("file://");
+    for byte in path.to_string_lossy().as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(*byte, b'-' | b'.' | b'_' | b'~' | b'/') {
+            url.push(*byte as char);
+        } else {
+            use std::fmt::Write as _;
+            let _ = write!(url, "%{byte:02X}");
+        }
+    }
+    url
+}
+
 const RESET: &str = "\x1b[0m";
 const DIM: &str = "\x1b[2m";
 const BOLD: &str = "\x1b[1m";
@@ -748,7 +778,7 @@ fn output_tree(
     icons: bool,
     _colors: bool,
 ) {
-    println!("{}", path.display());
+    println!("{}", escape_terminal_text(&path.to_string_lossy()));
     print_tree_recursive(path, "", max_depth, 0, show_hidden, filter, icons);
 }
 
@@ -842,7 +872,13 @@ fn print_tree_recursive(
             .unwrap_or_default();
 
         if is_dir {
-            println!("{}{}{}{}/", prefix, connector, icon_str, name);
+            println!(
+                "{}{}{}{}/",
+                prefix,
+                connector,
+                icon_str,
+                escape_terminal_text(&name)
+            );
             let new_prefix = format!("{}{}", prefix, child_prefix);
             print_tree_recursive(
                 &entry.path(),
@@ -860,7 +896,14 @@ fn print_tree_recursive(
             } else {
                 String::new()
             };
-            println!("{}{}{}{}{}", prefix, connector, icon_str, name, meta_str);
+            println!(
+                "{}{}{}{}{}",
+                prefix,
+                connector,
+                icon_str,
+                escape_terminal_text(&name),
+                meta_str
+            );
         }
     }
 }
@@ -1040,15 +1083,20 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     };
 
     let path_display = if path_prefix.is_empty() {
-        format!("{}{}{}", color(BOLD), path_leaf, color(RESET))
+        format!(
+            "{}{}{}",
+            color(BOLD),
+            escape_terminal_text(&path_leaf),
+            color(RESET)
+        )
     } else {
         format!(
             "{}{}{}{}{}",
             color(DIM),
-            path_prefix,
+            escape_terminal_text(&path_prefix),
             color(RESET),
             color(BOLD),
-            path_leaf
+            escape_terminal_text(&path_leaf)
         )
     };
 
@@ -1062,7 +1110,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // Deferred header: compute only when about to display
     let sep = format!(" {}·{} ", color(DIM), color(RESET));
     let header = {
-        let size_str = format_size_compact(summary.total_size);
+        let size_str = format_size_for_mode(summary.total_size, &config.size);
         let size_label = if summary.truncated { "sample" } else { "total" };
         let branch_display = build_branch_display(git_info);
         let git_status_str = build_git_status_indicators(git_info);
@@ -1142,15 +1190,17 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             let mut details = Vec::new();
 
             // File stats
-            details.push(format!(
-                "{}{}{} {}{}{}",
-                color(CYAN),
-                size_str,
-                color(RESET),
-                color(DIM),
-                size_label,
-                color(RESET)
-            ));
+            if opts.total_size || config.total_size {
+                details.push(format!(
+                    "{}{}{} {}{}{}",
+                    color(CYAN),
+                    size_str,
+                    color(RESET),
+                    color(DIM),
+                    size_label,
+                    color(RESET)
+                ));
+            }
             if summary.truncated {
                 details.push(format!(
                     "{}{}+{} {}items{}",
@@ -1387,15 +1437,17 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             let mut details = Vec::new();
 
             // File stats
-            details.push(format!(
-                "{}{}{} {}{}{}",
-                color(CYAN),
-                size_str,
-                color(RESET),
-                color(DIM),
-                size_label,
-                color(RESET)
-            ));
+            if opts.total_size || config.total_size {
+                details.push(format!(
+                    "{}{}{} {}{}{}",
+                    color(CYAN),
+                    size_str,
+                    color(RESET),
+                    color(DIM),
+                    size_label,
+                    color(RESET)
+                ));
+            }
             if summary.truncated {
                 details.push(format!(
                     "{}{}+{} {}items{}",
@@ -1679,7 +1731,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     for (item, contents_raw) in &display_meta {
         max_owner = max_owner.max(display_width(&item.owner));
         max_group = max_group.max(display_width(&item.group));
-        let size_str = format_size_compact(item.size);
+        let size_str = format_size_for_mode(item.size, &config.size);
         max_size = max_size.max(display_width(&size_str));
         max_contents = max_contents.max(display_width(contents_raw).max(4));
         // Git status is always 1 char, but we need a column for it
@@ -1781,18 +1833,19 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             String::new()
         };
 
+        let item_name = escape_terminal_text(&item.name);
         let item_name_str = if opts.hyperlink {
             let canonical = item
                 .path
                 .canonicalize()
                 .unwrap_or_else(|_| item.path.clone());
             format!(
-                "\x1b]8;;file://{}\x1b\\{}\x1b]8;;\x1b\\",
-                canonical.display(),
-                item.name
+                "\x1b]8;;{}\x1b\\{}\x1b]8;;\x1b\\",
+                file_url(&canonical),
+                item_name
             )
         } else {
-            item.name.clone()
+            item_name
         };
 
         let name_display = if item.is_symlink && !opts.no_symlink {
@@ -1807,7 +1860,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     color(DIM),
                     indicator,
                     color(RESET),
-                    target
+                    escape_terminal_text(target)
                 )
             } else {
                 format!(
@@ -1841,12 +1894,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         let group_padded = format!("{:<width$}", item.group, width = max_group);
         let size_str = if item.is_dir {
             if item.size > 0 {
-                format_size_compact(item.size)
+                format_size_for_mode(item.size, &config.size)
             } else {
                 "-".to_string()
             }
         } else {
-            format_size_compact(item.size)
+            format_size_for_mode(item.size, &config.size)
         };
         let size_padded = format!("{:>width$}", size_str, width = max_size);
         let contents_padded = format!("{:>width$}", contents_raw, width = max_contents);
@@ -2077,6 +2130,28 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     }
 }
 
+fn format_size_for_mode(bytes: u64, mode: &str) -> String {
+    match mode {
+        "bytes" => bytes.to_string(),
+        "short" => {
+            const UNITS: [(u64, &str); 5] = [
+                (1024 * 1024 * 1024 * 1024, "T"),
+                (1024 * 1024 * 1024, "G"),
+                (1024 * 1024, "M"),
+                (1024, "k"),
+                (1, ""),
+            ];
+            let (divisor, suffix) = UNITS
+                .iter()
+                .find(|(divisor, _)| bytes >= *divisor)
+                .copied()
+                .unwrap_or((1, ""));
+            format!("{}{}", bytes / divisor, suffix)
+        }
+        _ => format_size_compact(bytes),
+    }
+}
+
 fn output_raw(
     path: &Path,
     summary: &DirSummary,
@@ -2100,7 +2175,7 @@ fn output_oneline(
 ) {
     let (display_items, _) = build_display_items(path, summary, git_info, opts, config, false);
     for item in display_items {
-        println!("{}", item.name);
+        println!("{}", escape_terminal_text(&item.name));
     }
 }
 
@@ -2181,13 +2256,13 @@ fn output_recursive(root: &Path, opts: &BannerOptions) -> Result<()> {
             let relative = path.strip_prefix(root).unwrap_or(&path);
             let relative_str = relative.to_string_lossy();
             if opts.oneline {
-                println!("{}", relative_str);
+                println!("{}", escape_terminal_text(&relative_str));
             } else if opts.raw {
                 println!("{}", path.display());
             } else {
                 // Rich mode - show type indicator
                 let prefix = if is_dir { "/" } else { "" };
-                println!("{}{}", relative_str, prefix);
+                println!("{}{}", escape_terminal_text(&relative_str), prefix);
             }
 
             count += 1;
@@ -2758,11 +2833,126 @@ mod tests {
     }
 
     #[test]
+    fn test_escape_terminal_text_and_file_url() {
+        assert_eq!(escape_terminal_text("a\n\u{1b}[31m"), "a\\u{a}\\u{1b}[31m");
+        assert_eq!(
+            file_url(Path::new("/tmp/name with#query.txt")),
+            "file:///tmp/name%20with%23query.txt"
+        );
+    }
+
+    #[test]
     fn test_natural_cmp() {
         assert_eq!(natural_cmp("file1", "file2"), std::cmp::Ordering::Less);
         assert_eq!(natural_cmp("file2", "file10"), std::cmp::Ordering::Less);
         assert_eq!(natural_cmp("file10", "file2"), std::cmp::Ordering::Greater);
         assert_eq!(natural_cmp("file1", "file1"), std::cmp::Ordering::Equal);
+        assert_eq!(
+            natural_cmp("file18446744073709551616", "file2"),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn test_format_size_modes() {
+        assert_eq!(format_size_for_mode(1536, "default"), "1.5k");
+        assert_eq!(format_size_for_mode(1536, "short"), "1k");
+        assert_eq!(format_size_for_mode(1536, "bytes"), "1536");
+    }
+
+    #[test]
+    fn test_highlight_row_is_plain_when_colors_are_disabled() {
+        set_colors_enabled(false);
+        assert_eq!(highlight_row("plain", "bold"), "plain");
+        assert_eq!(highlight_row("plain", "22"), "plain");
+        set_colors_enabled(true);
+    }
+
+    #[test]
+    fn test_display_pipeline_filters_and_applies_max_after_sort() {
+        let entries = vec![
+            crate::fs::DirEntry {
+                name: "small.rs".to_string(),
+                path: std::path::PathBuf::from("/tmp/small.rs"),
+                is_dir: false,
+                is_file: true,
+                is_symlink: false,
+                is_exec: false,
+                size: 1,
+                modified: None,
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                symlink_target: None,
+                symlink_valid: true,
+                content_probe: None,
+            },
+            crate::fs::DirEntry {
+                name: "large.rs".to_string(),
+                path: std::path::PathBuf::from("/tmp/large.rs"),
+                is_dir: false,
+                is_file: true,
+                is_symlink: false,
+                is_exec: false,
+                size: 100,
+                modified: None,
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                symlink_target: None,
+                symlink_valid: true,
+                content_probe: None,
+            },
+            crate::fs::DirEntry {
+                name: "skip.txt".to_string(),
+                path: std::path::PathBuf::from("/tmp/skip.txt"),
+                is_dir: false,
+                is_file: true,
+                is_symlink: false,
+                is_exec: false,
+                size: 1000,
+                modified: None,
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                symlink_target: None,
+                symlink_valid: true,
+                content_probe: None,
+            },
+        ];
+        let summary = crate::fs::DirSummary {
+            total_items: entries.len(),
+            total_size: 1101,
+            files: entries.len(),
+            dirs: 0,
+            truncated: false,
+            top_items: entries,
+            project_type: crate::fs::ProjectType::Generic,
+            last_modified: None,
+            build_status: None,
+            todo_info: None,
+            code_metrics: None,
+            port_info: None,
+            docker_info: None,
+        };
+        let opts = BannerOptions {
+            sizesort: true,
+            max: Some(1),
+            ignore_glob: vec!["*.txt".to_string()],
+            ..Default::default()
+        };
+        let config = crate::state::Config::default();
+        let (items, hidden_count) = build_display_items(
+            Path::new("/tmp"),
+            &summary,
+            &GitInfo::default(),
+            &opts,
+            &config,
+            false,
+        );
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "large.rs");
+        assert_eq!(hidden_count, 1);
     }
 
     #[test]

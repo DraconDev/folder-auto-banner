@@ -29,7 +29,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::daemon_types::BannerData;
+use crate::daemon_types::{BannerData, MAX_IPC_FRAME_SIZE};
 
 /// Maximum age of a cache file before the client considers it stale.
 /// Must match the daemon's `CACHE_TTL` (`Duration::from_secs(300)` in
@@ -84,8 +84,8 @@ fn fnv1a_64(bytes: &[u8]) -> u64 {
 /// file does not exist, is a directory, or its mtime cannot be read.
 pub fn cache_file_mtime(path: &Path) -> Option<SystemTime> {
     let file = cache_file_path(path)?;
-    let meta = std::fs::metadata(&file).ok()?;
-    if meta.is_dir() {
+    let meta = std::fs::symlink_metadata(&file).ok()?;
+    if meta.file_type().is_symlink() || meta.is_dir() || meta.len() > MAX_IPC_FRAME_SIZE as u64 {
         return None;
     }
     meta.modified().ok()
@@ -258,10 +258,24 @@ pub fn is_cache_fresh(path: &Path) -> bool {
 /// daemon can write a fresh file on the next IPC call.
 pub fn read_cache(path: &Path) -> Option<BannerData> {
     let file = cache_file_path(path)?;
-    let meta = std::fs::metadata(&file).ok()?;
+    let meta = std::fs::symlink_metadata(&file).ok()?;
+    if meta.file_type().is_symlink() {
+        tracing::warn!(
+            "Cache path is a symlink, refusing to read: {}",
+            file.display()
+        );
+        return None;
+    }
     if meta.is_dir() {
         tracing::warn!("Cache path is a directory, removing: {}", file.display());
         let _ = std::fs::remove_dir(&file);
+        return None;
+    }
+    if meta.len() > MAX_IPC_FRAME_SIZE as u64 {
+        tracing::warn!(
+            "Cache file is too large, refusing to read: {}",
+            file.display()
+        );
         return None;
     }
     let bytes = std::fs::read(&file).ok()?;
@@ -288,7 +302,10 @@ pub fn write_cache(path: &Path, data: &BannerData) -> std::io::Result<()> {
         return Ok(());
     };
     if let Some(parent) = file.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!("Failed to create banner data cache directory: {}", e);
+            return Ok(());
+        }
     }
     let bytes = match serde_json::to_vec(data) {
         Ok(b) => b,
@@ -297,11 +314,25 @@ pub fn write_cache(path: &Path, data: &BannerData) -> std::io::Result<()> {
             return Ok(());
         }
     };
+    if bytes.len() > MAX_IPC_FRAME_SIZE {
+        tracing::warn!(
+            "Serialized banner data cache exceeds the maximum size: {} bytes",
+            bytes.len()
+        );
+        return Ok(());
+    }
     // If the path exists and is a directory (corruption from a previous
     // bug, manual intervention, or filesystem weirdness), remove it so
     // we can write a regular file. We only remove it if it's a directory
     // — never remove a regular file.
-    if let Ok(meta) = std::fs::metadata(&file) {
+    if let Ok(meta) = std::fs::symlink_metadata(&file) {
+        if meta.file_type().is_symlink() {
+            tracing::warn!(
+                "Cache path is a symlink, refusing to write: {}",
+                file.display()
+            );
+            return Ok(());
+        }
         if meta.is_dir() {
             tracing::warn!("Cache path is a directory, removing: {}", file.display());
             let _ = std::fs::remove_dir(&file);
@@ -310,11 +341,34 @@ pub fn write_cache(path: &Path, data: &BannerData) -> std::io::Result<()> {
     // Atomic write: temp file + rename in the same directory, so a
     // concurrent reader (client fast path) never observes a partially
     // written file.
-    let tmp = file.with_extension("json.tmp");
-    if let Err(e) = std::fs::write(&tmp, &bytes) {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let tmp = file.with_extension(format!("json.{}.{}.tmp", std::process::id(), nonce));
+    use std::io::Write;
+    let mut tmp_file = match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp)
+    {
+        Ok(file) => file,
+        Err(e) => {
+            tracing::warn!("Failed to create banner data cache temp file: {}", e);
+            return Ok(());
+        }
+    };
+    if let Err(e) = tmp_file.write_all(&bytes) {
+        let _ = std::fs::remove_file(&tmp);
         tracing::warn!("Failed to write banner data cache: {}", e);
         return Ok(());
     }
+    if let Err(e) = tmp_file.sync_all() {
+        let _ = std::fs::remove_file(&tmp);
+        tracing::warn!("Failed to flush banner data cache: {}", e);
+        return Ok(());
+    }
+    drop(tmp_file);
     if let Err(e) = std::fs::rename(&tmp, &file) {
         let _ = std::fs::remove_file(&tmp);
         tracing::warn!("Failed to rename banner data cache: {}", e);

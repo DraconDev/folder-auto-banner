@@ -328,9 +328,13 @@ impl Cli {
         if self.debug {
             tracing_subscriber::fmt()
                 .with_env_filter("f=debug,f=trace")
-                .init();
+                .try_init()
+                .ok();
         } else {
-            tracing_subscriber::fmt().with_env_filter("f=warn").init();
+            tracing_subscriber::fmt()
+                .with_env_filter("f=warn")
+                .try_init()
+                .ok();
         }
 
         match &self.command {

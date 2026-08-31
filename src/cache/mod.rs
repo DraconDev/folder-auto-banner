@@ -7,6 +7,8 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+const MAX_CACHE_ENTRY_BYTES: u64 = 16 * 1024 * 1024;
+
 /// File-based TTL cache
 pub struct Cache {
     dir: PathBuf,
@@ -46,6 +48,13 @@ impl Cache {
         ttl: Duration,
     ) -> Option<T> {
         let path = self.path_for(key);
+        let metadata = std::fs::symlink_metadata(&path).ok()?;
+        if metadata.file_type().is_symlink()
+            || metadata.is_dir()
+            || metadata.len() > MAX_CACHE_ENTRY_BYTES
+        {
+            return None;
+        }
         let content = std::fs::read_to_string(&path).ok()?;
 
         // Parse as generic JSON to extract timestamp
@@ -79,18 +88,32 @@ impl Cache {
 
         let path = self.path_for(key);
         let content = serde_json::to_string(&entry)?;
+        if content.len() as u64 > MAX_CACHE_ENTRY_BYTES {
+            anyhow::bail!("cache entry exceeds the maximum size");
+        }
         // Atomic write: temp file in the same dir + rename, so a crash or a
         // concurrent reader never observes a torn JSON file.
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
         let tmp = self.dir.join(format!(
-            "{}.{}.tmp",
+            "{}.{}.{}.tmp",
             path.file_name().unwrap_or_default().to_string_lossy(),
-            std::process::id()
+            std::process::id(),
+            nonce
         ));
-        let write_result = std::fs::write(&tmp, content);
-        if let Err(e) = write_result {
+        use std::io::Write;
+        let mut tmp_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
+        if let Err(e) = tmp_file.write_all(content.as_bytes()) {
             let _ = std::fs::remove_file(&tmp);
             return Err(e.into());
         }
+        tmp_file.sync_all()?;
+        drop(tmp_file);
         if let Err(e) = std::fs::rename(&tmp, &path) {
             let _ = std::fs::remove_file(&tmp);
             return Err(e.into());

@@ -752,6 +752,29 @@ mod tests {
         assert_eq!(summary.dirs, 0);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn test_symlink_to_file_is_classified_as_file() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("target.txt"), "content").unwrap();
+        symlink(tmp.path().join("target.txt"), tmp.path().join("link.txt")).unwrap();
+
+        let summary =
+            DirSummary::scan_with_options(tmp.path(), false, false, false, false, false, &[])
+                .unwrap();
+        let link = summary
+            .top_items
+            .iter()
+            .find(|item| item.name == "link.txt")
+            .expect("symlink should be listed");
+        assert!(link.is_symlink);
+        assert!(link.is_file);
+        assert!(!link.is_dir);
+        assert_eq!(summary.files, 2);
+    }
+
     #[test]
     fn test_project_type_icons() {
         assert_eq!(ProjectType::Rust.icon(), "🦀");

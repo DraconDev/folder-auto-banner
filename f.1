@@ -8,9 +8,13 @@ f \- folder-auto-banner: contextual directory dashboard
 .SH SYNOPSIS
 .B f
 .RI [ OPTIONS ]
-.RI [ PATH ]
 .br
 .B f banner
+.RI [ OPTIONS ]
+.RI [ PATH ]
+.RI [ ACTION ]
+.br
+.B f -b
 .RI [ OPTIONS ]
 .RI [ PATH ]
 .RI [ ACTION ]
@@ -96,7 +100,7 @@ Background highlight for old files.
 .\"
 .SS Banner Options
 .TP
-.BR \-\-raw ", " \-r
+.B \-\-raw
 Output raw paths.
 .TP
 .BR \-\-json
@@ -182,8 +186,11 @@ Force run the selected file directly.
 .B f
 Show the dashboard for the current directory.
 .TP
-.B f /path/to/dir
+.B f \-b /path/to/dir
 Show the dashboard for a specific directory.
+.TP
+.B f banner /path/to/dir
+Show the dashboard for a specific directory via the banner subcommand.
 .TP
 .B f \-\-json
 Output JSON for scripting.

@@ -66,7 +66,7 @@
 - [x] Removed clipboard commands (yank, paste, clipboard)
 - [x] Removed navigation commands (pin, unpin, pins, jump, root)
 - [x] Removed session commands (save, load, list, delete)
-- [x] Removed other commands (diff, do, peek, stats, config)
+- [x] Removed other commands (diff, do, peek, stats)
 - [x] Renamed binary from fm to f
 
 ### Git Enhancements
@@ -103,26 +103,21 @@
 
 ## 🔴 Current Issues
 
-### Performance (Critical)
-- [ ] **file_statuses bloat** — `get_git_info()` stores every untracked file in `file_statuses` HashMap. In this repo: 36,501 entries (from `target/` build dir) = 3.4MB serialized over IPC on every request. Fix: count only, don't store paths.
-
-### Daemon
-- [ ] Fix daemon log spam for non-existent directories
-- [ ] Fix daemon to handle dead symlinks gracefully
-- [ ] Fix daemon connection issues (sometimes "daemon not available")
+### Performance and robustness
+- [ ] Improve the recursive listing path so a huge directory does not collect
+      every entry before sorting when a small `--max` is requested.
+- [ ] Add a bounded, path-aware Git status strategy for very large worktrees.
 
 ### Display
-- [ ] Fix permission display for octal mode calculation
-- [ ] Ensure config settings are applied correctly
+- [ ] Add integration coverage for config-file changes and daemon/client
+      cache invalidation.
 
 ---
 
 ## 🟡 Future Improvements
 
 ### Display Enhancements
-- [ ] Add `--hyperlink` flag to attach hyperlinks
 - [ ] Add `--header` flag to show block headers
-- [ ] Add `--total-size` flag to show total directory size
 - [ ] Add `--truncate-owner` flag to truncate long names
 
 ### Sorting Enhancements
@@ -131,7 +126,7 @@
 
 ### Performance
 - [x] Optimize banner for large directories (bounded scans; truncated views show `500+`)
-- [ ] Cache directory scan results more aggressively
+- [x] Cache directory scan results more aggressively
 - [ ] Parallel file system operations
 
 ### Context Enhancements
@@ -151,7 +146,7 @@
 - [x] Update CHANGELOG with v0.4.0 changes
 - [x] Create VISION.md with project direction
 - [x] Create AUDIT.md with comparison to lsd/exa
-- [ ] Add man page
+- [x] Add man page
 - [x] Document config file options
 
 ### CI/CD
@@ -162,7 +157,7 @@
 
 ### Code Quality
 - [ ] Remove unused code (dead_code warnings)
-- [ ] Add unit tests for new features
+- [x] Add unit tests for new features
 - [ ] Add integration tests for config command
 
 ---

@@ -60,7 +60,8 @@ When you `cd` into a directory, you see:
 | Command | Description |
 |---------|-------------|
 | `f` | Directory listing + context |
-| `f <dir>` | Listing for specific dir |
+| `f -b <dir>` | Listing for a specific directory |
+| `f banner <dir>` | Listing for a specific directory |
 | `f --sort name\|size\|date\|type` | Sort order |
 | `f --reverse` | Reverse sort |
 | `f --hidden` | Show dotfiles |
@@ -80,7 +81,6 @@ Commands that were removed because they duplicate existing tools:
 - `diff` — people use `diff` or `meld`
 - `do`, `peek` — niche
 - `stats` — covered by banner
-- `config` — keep simple, use env vars
 
 ## Design Principles
 

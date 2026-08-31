@@ -200,17 +200,18 @@ fn count_sqlite_tables(path: &Path) -> Option<usize> {
         return None;
     }
 
-    use std::process::Command;
-    let output = Command::new("sqlite3")
-        .arg(path)
-        .arg("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
-        .output()
-        .ok()?;
+    let path_arg = path.to_string_lossy();
+    let output = crate::utils::run_with_timeout_stdout(
+        "sqlite3",
+        &[
+            path_arg.as_ref(),
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table';",
+        ],
+        std::time::Duration::from_secs(2),
+    )
+    .ok()?;
 
-    let count = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .parse()
-        .ok()?;
+    let count = output.trim().parse().ok()?;
     Some(count)
 }
 

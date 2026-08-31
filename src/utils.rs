@@ -22,6 +22,37 @@ pub struct CommandOutputBytes {
     pub stderr: Vec<u8>,
 }
 
+#[cfg(unix)]
+fn configure_process_group(command: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+
+    // Put each probe and its descendants in a private process group so a
+    // timeout cannot leave cargo/npm/docker helpers running after the parent
+    // process has been killed.
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setpgid(0, 0) == -1 {
+                Err(std::io::Error::last_os_error())
+            } else {
+                Ok(())
+            }
+        });
+    }
+}
+
+#[cfg(not(unix))]
+fn configure_process_group(_command: &mut std::process::Command) {}
+
+fn terminate_child(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        // Negative pid targets the process group created above.
+        let _ = unsafe { libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL) };
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 /// Run a command with a timeout while preserving raw output bytes.
 pub fn run_with_timeout_bytes(
     cmd: &str,
@@ -36,6 +67,7 @@ pub fn run_with_timeout_bytes(
     command.current_dir(cwd);
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
+    configure_process_group(&mut command);
 
     let start = std::time::Instant::now();
     let mut child = command.spawn()?;
@@ -56,7 +88,16 @@ pub fn run_with_timeout_bytes(
     });
 
     loop {
-        if let Some(status) = child.try_wait()? {
+        let status = match child.try_wait() {
+            Ok(status) => status,
+            Err(error) => {
+                terminate_child(&mut child);
+                let _ = stdout_handle.join();
+                let _ = stderr_handle.join();
+                return Err(error.into());
+            }
+        };
+        if let Some(status) = status {
             let stdout_bytes = stdout_handle.join().unwrap_or_default();
             let stderr_bytes = stderr_handle.join().unwrap_or_default();
             return Ok(CommandOutputBytes {
@@ -67,8 +108,9 @@ pub fn run_with_timeout_bytes(
         }
 
         if start.elapsed() > timeout {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_child(&mut child);
+            let _ = stdout_handle.join();
+            let _ = stderr_handle.join();
             return Ok(CommandOutputBytes {
                 status: std::process::ExitStatus::default(),
                 stdout: Vec::new(),
@@ -103,6 +145,7 @@ pub fn run_with_timeout_stdout(cmd: &str, args: &[&str], timeout: Duration) -> R
     command.args(args);
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::null());
+    configure_process_group(&mut command);
 
     let start = std::time::Instant::now();
     let mut child = command.spawn()?;
@@ -115,14 +158,22 @@ pub fn run_with_timeout_stdout(cmd: &str, args: &[&str], timeout: Duration) -> R
     });
 
     loop {
-        if let Some(_status) = child.try_wait()? {
+        let status = match child.try_wait() {
+            Ok(status) => status,
+            Err(error) => {
+                terminate_child(&mut child);
+                let _ = stdout_handle.join();
+                return Err(error.into());
+            }
+        };
+        if status.is_some() {
             let stdout_bytes = stdout_handle.join().unwrap_or_default();
             return Ok(String::from_utf8_lossy(&stdout_bytes).to_string());
         }
 
         if start.elapsed() > timeout {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_child(&mut child);
+            let _ = stdout_handle.join();
             return Ok(String::new());
         }
 

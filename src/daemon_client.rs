@@ -8,11 +8,7 @@ use crate::daemon_types::{checked_frame_len, BannerData, Request, Response};
 const SOCKET_NAME: &str = "fabd.sock";
 
 fn socket_path() -> Result<std::path::PathBuf> {
-    let path = directories::ProjectDirs::from("com", "fab", "fab")
-        .ok_or_else(|| anyhow::anyhow!("Cannot determine data directory"))?
-        .data_dir()
-        .join(SOCKET_NAME);
-    Ok(path)
+    Ok(crate::state::get_data_dir()?.join(SOCKET_NAME))
 }
 
 fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response> {

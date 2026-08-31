@@ -24,8 +24,8 @@ const BUILTIN_ALIASES: &[(&str, &[&str])] = &[
     ("hidden", &["-a"]),     // Show hidden files
     ("dirs", &["-D"]),       // Only directories
     // Sort modes
-    ("new", &["-t"]),         // Sort by time, newest first
-    ("old", &["-t", "-r"]),   // Sort by time, oldest first
+    ("new", &["-t"]),         // Sort by time, newest last near the prompt
+    ("old", &["-t", "-r"]),   // Reverse chronological order
     ("big", &["-S"]),         // Sort by size, largest first
     ("small", &["-S", "-r"]), // Sort by size, smallest first
     ("ext", &["-X"]),         // Sort by extension
@@ -33,7 +33,7 @@ const BUILTIN_ALIASES: &[(&str, &[&str])] = &[
     ("nosort", &["-U"]),      // No sort
     // Limits
     ("top", &["-S", "-m", "20"]),    // Top 20 largest files
-    ("newest", &["-t", "-m", "20"]), // 20 newest files
+    ("newest", &["-t", "-r", "-m", "20"]), // 20 newest files
     // Recursion
     ("recurse", &["-R"]), // Recurse into subdirectories
     // Actions
@@ -340,7 +340,10 @@ mod tests {
 
     #[test]
     fn test_lookup_newest() {
-        assert_eq!(lookup_alias("newest"), Some(&["-t", "-m", "20"][..]));
+        assert_eq!(
+            lookup_alias("newest"),
+            Some(&["-t", "-r", "-m", "20"][..])
+        );
     }
 
     #[test]

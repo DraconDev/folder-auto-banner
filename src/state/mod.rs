@@ -120,7 +120,7 @@ impl Default for Config {
             date: "date".to_string(),
             classify: false,
             no_symlink: false,
-            total_size: false,
+            total_size: true,
             columns: vec![
                 "permission".to_string(),
                 "owner".to_string(),
@@ -220,7 +220,7 @@ mod tests {
         assert_eq!(config.date, "date");
         assert!(!config.classify);
         assert!(!config.no_symlink);
-        assert!(!config.total_size);
+        assert!(config.total_size);
         assert!(config.git_status);
         assert!(!config.build_status); // opt-in feature, see Default
         assert!(config.todo_count);
