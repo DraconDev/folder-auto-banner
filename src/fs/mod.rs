@@ -166,6 +166,8 @@ fn default_true() -> bool {
 /// Directory summary
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirSummary {
+    /// Number of entries observed. When `truncated` is true, this and the
+    /// file/directory counts are lower bounds for the full directory.
     pub total_items: usize,
     pub total_size: u64,
     pub files: usize,
