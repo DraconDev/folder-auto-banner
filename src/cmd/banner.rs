@@ -870,7 +870,7 @@ fn warm_nearby_dirs(path: &Path) {
     // jump into a child is served from the daemon cache. Bounded to a modest
     // number of children to avoid excessive background scans in very large dirs.
     if let Ok(entries) = std::fs::read_dir(path) {
-        for entry in entries.flatten().take(30) {
+        for entry in entries.take(30).flatten() {
             let child = entry.path();
             if child.is_dir() {
                 paths_to_warm.push(child);

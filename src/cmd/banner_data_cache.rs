@@ -37,6 +37,9 @@ use crate::daemon_types::BannerData;
 /// need to read it from the daemon at startup.
 pub const CACHE_TTL: Duration = Duration::from_secs(300);
 
+/// Maximum number of raw descendant entries inspected for cache freshness.
+const MAX_DESCENDANT_ENTRIES: usize = 8192;
+
 /// Subdirectory under the data dir where per-path cache files live.
 const CACHE_SUBDIR: &str = "banner_data";
 
@@ -157,13 +160,14 @@ pub fn is_content_probe_ext(lower_name: &str) -> bool {
 /// could keep banners stale for the full 300s cache TTL.
 pub fn max_descendant_mtime(path: &Path) -> Option<SystemTime> {
     fn walk(path: &Path, depth: usize, visited: &mut usize) -> Option<SystemTime> {
-        if depth > 8 || *visited >= 8192 {
+        if depth > 8 || *visited >= MAX_DESCENDANT_ENTRIES {
             return None;
         }
         let entries = std::fs::read_dir(path).ok()?;
         let mut max: Option<SystemTime> = None;
-        for entry in entries.flatten() {
-            if *visited >= 8192 {
+        let remaining = MAX_DESCENDANT_ENTRIES.saturating_sub(*visited);
+        for entry in entries.take(remaining).flatten() {
+            if *visited >= MAX_DESCENDANT_ENTRIES {
                 break;
             }
             *visited += 1;
@@ -431,6 +435,20 @@ mod tests {
 
         // Cleanup
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn old_cache_without_truncated_field_still_deserializes() {
+        let data = make_test_banner_data();
+        let mut value = serde_json::to_value(&data).unwrap();
+        value
+            .get_mut("summary")
+            .and_then(serde_json::Value::as_object_mut)
+            .expect("serialized banner data must contain a summary object")
+            .remove("truncated");
+
+        let restored: BannerData = serde_json::from_value(value).unwrap();
+        assert!(!restored.summary.truncated);
     }
 
     #[test]
