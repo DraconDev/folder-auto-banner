@@ -987,12 +987,18 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         if relative.is_empty() || relative == "/" {
             ("".to_string(), "~".to_string())
         } else if let Some(pos) = relative.rfind('/') {
-            (format!("~{}/", &relative[..pos]), relative[pos + 1..].to_string())
+            (
+                format!("~{}/", &relative[..pos]),
+                relative[pos + 1..].to_string(),
+            )
         } else {
             ("~".to_string(), relative.to_string())
         }
     } else if let Some(pos) = path_str.rfind('/') {
-        (format!("{}/", &path_str[..pos]), path_str[pos + 1..].to_string())
+        (
+            format!("{}/", &path_str[..pos]),
+            path_str[pos + 1..].to_string(),
+        )
     } else {
         ("".to_string(), path_str.to_string())
     };
@@ -1332,7 +1338,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 parts.push(format!("{}{}{}", color(DIM), project_label, color(RESET)));
             }
             if hidden_count > 0 {
-                parts.push(format!("{}{} hidden{}", color(DIM), hidden_count, color(RESET)));
+                parts.push(format!(
+                    "{}{} hidden{}",
+                    color(DIM),
+                    hidden_count,
+                    color(RESET)
+                ));
             }
             let row1 = parts.join(&sep);
 
@@ -2011,11 +2022,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 }
                 // Print tree aligned to the right
                 let tree_str = tree_lines.join("\n");
-                let tree_display_width = tree_str
-                    .lines()
-                    .map(display_width)
-                    .max()
-                    .unwrap_or(0);
+                let tree_display_width = tree_str.lines().map(display_width).max().unwrap_or(0);
                 let padding = " ".repeat(term_width.saturating_sub(tree_display_width + 5));
                 for (i, line) in tree_str.lines().enumerate() {
                     if i == 0 {

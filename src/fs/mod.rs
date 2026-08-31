@@ -430,48 +430,50 @@ impl DirSummary {
             30,
             crate::build_status::check_build(path, &project_type)
         );
-        let (todo_info, code_metrics) =
-            if (scan_todos || check_metrics) && project_type != ProjectType::Generic && !truncated {
-                // Cache the combined scan_insights result (TODO counts and
-                // code metrics are computed in a single bounded tree walk;
-                // there is no benefit to splitting the cache). TTL is 60s:
-                // both insights are content-derived and don't change often
-                // enough to justify recomputing on every cold scan. The
-                // pre-fix code re-ran scan_insights on every call, which
-                // was 60-65% of the cold-path time on /home/dracon/Dev
-                // (127 ms of 198 ms total). See PROFILE_COLD_PATH.md.
-                //
-                // Skip for Generic (non-code) directories — scanning
-                // Downloads or temp folders for TODOs/LOC is pure waste.
-                let scan_closure =
-                    || crate::project_insights::scan_insights(path, extra_skip_dirs).ok();
-                let insights_opt: Option<crate::project_insights::ProjectInsights> =
-                    if let Some(ref cache) = cache {
-                        let ck = crate::cache::cache_key(path, "insights");
-                        if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
-                            Some(cached)
-                        } else {
-                            let result = scan_closure();
-                            if let Some(ref r) = result {
-                                if let Err(e) = cache.set(&ck, r.clone()) {
-                                    tracing::warn!("Failed to cache insights: {}", e);
-                                }
-                            }
-                            result
-                        }
+        let (todo_info, code_metrics) = if (scan_todos || check_metrics)
+            && project_type != ProjectType::Generic
+            && !truncated
+        {
+            // Cache the combined scan_insights result (TODO counts and
+            // code metrics are computed in a single bounded tree walk;
+            // there is no benefit to splitting the cache). TTL is 60s:
+            // both insights are content-derived and don't change often
+            // enough to justify recomputing on every cold scan. The
+            // pre-fix code re-ran scan_insights on every call, which
+            // was 60-65% of the cold-path time on /home/dracon/Dev
+            // (127 ms of 198 ms total). See PROFILE_COLD_PATH.md.
+            //
+            // Skip for Generic (non-code) directories — scanning
+            // Downloads or temp folders for TODOs/LOC is pure waste.
+            let scan_closure =
+                || crate::project_insights::scan_insights(path, extra_skip_dirs).ok();
+            let insights_opt: Option<crate::project_insights::ProjectInsights> =
+                if let Some(ref cache) = cache {
+                    let ck = crate::cache::cache_key(path, "insights");
+                    if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
+                        Some(cached)
                     } else {
-                        scan_closure()
-                    };
-                match insights_opt {
-                    Some(insights) => (
-                        scan_todos.then_some(insights.todos),
-                        check_metrics.then_some(insights.metrics),
-                    ),
-                    None => (None, None),
-                }
-            } else {
-                (None, None)
-            };
+                        let result = scan_closure();
+                        if let Some(ref r) = result {
+                            if let Err(e) = cache.set(&ck, r.clone()) {
+                                tracing::warn!("Failed to cache insights: {}", e);
+                            }
+                        }
+                        result
+                    }
+                } else {
+                    scan_closure()
+                };
+            match insights_opt {
+                Some(insights) => (
+                    scan_todos.then_some(insights.todos),
+                    check_metrics.then_some(insights.metrics),
+                ),
+                None => (None, None),
+            }
+        } else {
+            (None, None)
+        };
 
         let port_info = cached_check!(
             check_ports,
@@ -730,18 +732,14 @@ mod tests {
             std::fs::write(tmp.path().join(format!("item-{index}")), "content").unwrap();
         }
 
-        let summary = DirSummary::scan_with_options(
-            tmp.path(),
-            false,
-            false,
-            false,
-            false,
-            false,
-            &[],
-        )
-        .unwrap();
+        let summary =
+            DirSummary::scan_with_options(tmp.path(), false, false, false, false, false, &[])
+                .unwrap();
 
-        assert!(summary.truncated, "the sentinel entry must mark the scan truncated");
+        assert!(
+            summary.truncated,
+            "the sentinel entry must mark the scan truncated"
+        );
         assert_eq!(summary.top_items.len(), MAX_DIRECTORY_SCAN_ITEMS);
         assert_eq!(summary.total_items, MAX_DIRECTORY_SCAN_ITEMS);
         assert_eq!(summary.files, MAX_DIRECTORY_SCAN_ITEMS);

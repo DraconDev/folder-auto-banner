@@ -254,8 +254,7 @@ fn parse_mp4_duration(buf: &[u8]) -> Option<String> {
                 {
                     let version = buf[j + 8];
 
-                    if (version == 0 && j + 28 > buf.len())
-                        || (version != 0 && j + 40 > buf.len())
+                    if (version == 0 && j + 28 > buf.len()) || (version != 0 && j + 40 > buf.len())
                     {
                         return None;
                     }
@@ -428,7 +427,10 @@ mod tests {
             content_probe: None,
         };
 
-        assert_eq!(count_items_in_dir(&entry), crate::fs::MAX_DIRECTORY_SCAN_ITEMS);
+        assert_eq!(
+            count_items_in_dir(&entry),
+            crate::fs::MAX_DIRECTORY_SCAN_ITEMS
+        );
         assert_eq!(
             count_items_in_dir_display(&entry),
             format!("{}+", crate::fs::MAX_DIRECTORY_SCAN_ITEMS)
@@ -519,7 +521,7 @@ mod tests {
         truncated_buf.extend_from_slice(&24u32.to_be_bytes());
         truncated_buf.extend_from_slice(b"mvhd");
         truncated_buf.push(0); // version 0
-        // truncated right here — only 17 bytes total, well short of the required 28 bytes for version 0
+                               // truncated right here — only 17 bytes total, well short of the required 28 bytes for version 0
 
         assert_eq!(parse_mp4_duration(&truncated_buf), None);
     }

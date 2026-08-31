@@ -102,7 +102,11 @@ pub fn run_uninstall() -> Result<()> {
     }
 
     // Remove fish function if present.
-    let fish_func_file = home.join(".config").join("fish").join("functions").join("f.fish");
+    let fish_func_file = home
+        .join(".config")
+        .join("fish")
+        .join("functions")
+        .join("f.fish");
     if fish_func_file.exists() {
         let _ = fs::remove_file(&fish_func_file);
         println!("🗑  Removed {}", fish_func_file.display());
