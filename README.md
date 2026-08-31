@@ -292,68 +292,56 @@ Location: `~/.config/fab/config.toml`
 
 Open with: `f config`
 
-### Display Settings
+### Display and feature settings
+
+Configuration keys are top-level TOML keys; the generated file does not use
+`[display]`, `[columns]`, `[features]`, or `[sort]` tables.
+
 ```toml
-[display]
+icons = true
+colors = true
+compact = false
+verbose = false
+max_display_items = 0
 permission = "rwx"        # rwx, octal, disable
 size = "default"          # default, short, bytes
 date = "date"             # date, relative
 classify = true           # append */=>@|
 no_symlink = false
-total_size = true
-```
-
-### Column Selection
-```toml
-[columns]
-show = ["permission", "owner", "group", "size", "date", "name"]
-hide = ["inode", "links"]
-```
-
-### Feature Toggles
-```toml
-[features]
+total_size = false
+columns = ["permission", "owner", "group", "size", "contents", "date", "name"]
+hide_columns = []
+sort = "name"
+reverse = false
+group_dirs = "last"      # last, first, none
+hyperlink = false
+hidden = false
+highlight_recent = "bold"
+highlight_old = ""
 git_status = true
 build_status = true
 todo_count = true
 languages = true
 ports = true
 docker = true
+numbered = true           # Show item numbers for f N navigation
+open_command = "micro"    # Default editor for f N (overridden by $EDITOR)
+smart_truncation = true
+zebra_rows = false
+ignore_dirs = ["node_modules", "target", ".git"]
 ```
 
-### Navigation
-```toml
-[features]
-numbered = true          # Show item numbers for f N navigation
-open_command = "micro"   # Default editor for f N (overridden by $EDITOR)
-```
-
-### Sorting & Layout
-```toml
-[sort]
-default = "name"
-reverse = false
-group_dirs = "last"      # "last" (default, folders at bottom near prompt), "first", or "none"
-smart_truncation = true  # Fold repetitive archival/log files and cap huge folders
-zebra_rows = false       # Alternating row background tint
-```
-
-### Recency Gradient
-```toml
-[display]
-# Color rows based on recency: same hues, dimmer for older files
-# Bright new, dim old — at-a-glance scan of what changed recently
-color_scale = "all"          # "all", "age", "size", or "" to disable
-color_scale_mode = "gradient" # "gradient" (default) or "fixed"
-```
-
-Tiers: <1h = bold, <1d = normal, <1w = faded gray, <1m = dim, >1m = very dim.
-Recent files pop out; old files recede into the background.
+The complete default file is produced by `f config`; unknown nested tables or
+keys are not applied.
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
+| `FAB_TODOS=1` | Enable TODO scanning on a direct fallback scan |
+| `FAB_PORTS=1` | Enable port detection on a direct fallback scan |
+| `FAB_DOCKER=1` | Enable Docker detection on a direct fallback scan |
+| `FAB_METRICS=1` | Enable code metrics on a direct fallback scan |
 | `FAB_NO_TODOS` | Set to `1` to disable TODO scanning |
 | `FAB_NO_PORTS` | Set to `1` to disable port detection |
 | `FAB_NO_DOCKER` | Set to `1` to disable Docker detection |
