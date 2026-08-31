@@ -2102,8 +2102,17 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                 for (i, dir) in dirs.iter().enumerate() {
                     let is_last = i == dirs.len() - 1;
                     let connector = if is_last { "└── " } else { "├── " };
-                    let name = if dir.name.len() > tree_width - 4 {
-                        format!("{}...{}", &dir.name[..tree_width - 7], color(RESET))
+                    let name = if tree_width >= 7 && dir.name.len() > tree_width - 4 {
+                        // Truncate on a UTF-8 char boundary so the slice can
+                        // never split a multibyte codepoint and panic.
+                        let keep = (tree_width - 7).min(dir.name.len());
+                        let end = dir.name
+                            .char_indices()
+                            .take_while(|(i, _)| *i < keep)
+                            .last()
+                            .map(|(i, c)| i + c.len_utf8())
+                            .unwrap_or(keep);
+                        format!("{}...{}", &dir.name[..end], color(RESET))
                     } else {
                         dir.name.clone()
                     };
