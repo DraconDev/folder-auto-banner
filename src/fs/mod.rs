@@ -8,6 +8,13 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+/// Maximum number of directory entries inspected by a normal banner scan.
+///
+/// A banner only displays a small sample of a directory. Keeping this bound
+/// applies the same safety limit to the CLI, daemon, and shell hooks instead
+/// of merely skipping metadata work after an unbounded `read_dir` walk.
+pub const MAX_DIRECTORY_SCAN_ITEMS: usize = 500;
+
 /// Project type detection
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ProjectType {
@@ -38,7 +45,11 @@ impl ProjectType {
             }
 
             if let Ok(d) = std::fs::read_dir(dir) {
-                for entry in d.flatten() {
+                // The direct-marker check above handles normal project files.
+                // Keep this case-insensitive fallback bounded so detecting a
+                // project type cannot enumerate a huge directory such as
+                // /tmp before the main scan starts.
+                for entry in d.take(MAX_DIRECTORY_SCAN_ITEMS).flatten() {
                     let name = entry.file_name();
                     let name_str = name.to_string_lossy().to_lowercase();
 
@@ -159,6 +170,10 @@ pub struct DirSummary {
     pub total_size: u64,
     pub files: usize,
     pub dirs: usize,
+    /// Whether the directory contained more than the sampled entry limit.
+    /// Older daemon/cache payloads omit this field, so default it to false.
+    #[serde(default)]
+    pub truncated: bool,
     pub top_items: Vec<DirEntry>,
     pub project_type: ProjectType,
     pub last_modified: Option<DateTime<Utc>>,
@@ -199,31 +214,24 @@ impl DirSummary {
 
         let entries = std::fs::read_dir(path)?;
 
-        // Cap the number of entries we collect metadata for. The banner only
-        // displays a limited number of items, so stat-ing 100K+ entries in
-        // /tmp or other huge directories is pure waste. Aggregate counts
-        // (files/dirs) stay exact after the cap — the loop keeps counting them
-        // via the cheap file_type read — but stat-based fields (total_size,
-        // last_modified, owner/group, symlinks) cover only the first
-        // MAX_ITEMS entries.
-        const MAX_ITEMS: usize = 500;
+        // Cap the raw directory iterator, not just metadata collection. A
+        // banner only displays a limited number of items, so consuming the
+        // remaining 100K+ entries in /tmp is pure waste and can block a
+        // synchronous shell hook. The first extra entry is used to tell
+        // callers that the displayed sample is incomplete.
         let mut item_count = 0;
-        let mut hit_cap = false;
+        let mut truncated = false;
 
-        for entry in entries.flatten() {
+        for entry_result in entries.take(MAX_DIRECTORY_SCAN_ITEMS + 1) {
             item_count += 1;
-            if item_count > MAX_ITEMS {
-                // Past the display cap: keep the aggregate totals exact using
-                // only the readdir d_type (no stat syscall per entry), and
-                // skip the expensive metadata work below.
-                hit_cap = true;
-                match entry.file_type() {
-                    Ok(ft) if ft.is_dir() => dirs += 1,
-                    Ok(ft) if ft.is_file() => files += 1,
-                    _ => {}
-                }
-                continue;
+            if item_count > MAX_DIRECTORY_SCAN_ITEMS {
+                truncated = true;
+                break;
             }
+
+            let Ok(entry) = entry_result else {
+                continue;
+            };
 
             let file_type = entry.file_type();
             let is_dir = file_type.as_ref().map(|ft| ft.is_dir()).unwrap_or(false);
@@ -423,7 +431,7 @@ impl DirSummary {
             crate::build_status::check_build(path, &project_type)
         );
         let (todo_info, code_metrics) =
-            if (scan_todos || check_metrics) && project_type != ProjectType::Generic && !hit_cap {
+            if (scan_todos || check_metrics) && project_type != ProjectType::Generic && !truncated {
                 // Cache the combined scan_insights result (TODO counts and
                 // code metrics are computed in a single bounded tree walk;
                 // there is no benefit to splitting the cache). TTL is 60s:
@@ -485,6 +493,7 @@ impl DirSummary {
             total_size,
             files,
             dirs,
+            truncated,
             top_items,
             project_type,
             last_modified,
