@@ -280,9 +280,8 @@ fn build_display_items<'a>(
 
     // Apply max limit if specified (smart truncation for big folders)
     let total_before_truncation = display_items.len();
-    if let Some(max_items) = opts.max {
-        display_items.truncate(max_items);
-    } else if config.smart_truncation
+    if opts.max.is_none()
+        && config.smart_truncation
         && config.max_display_items > 0
         && total_before_truncation > config.max_display_items
     {
@@ -311,7 +310,7 @@ fn build_display_items<'a>(
         };
         display_items.truncate(max_fit.max(config.max_display_items));
     }
-    let hidden_count = total_before_truncation - display_items.len();
+    let mut hidden_count = total_before_truncation - display_items.len();
 
     // Group by type if requested
     if opts.group {
@@ -471,6 +470,14 @@ fn build_display_items<'a>(
         // Project the permutation back into display_items.
         let permuted: Vec<&crate::fs::DirEntry> = order.iter().map(|&i| display_items[i]).collect();
         display_items = permuted;
+    }
+
+    // Apply an explicit maximum after sorting so `--sizesort --max 20` really
+    // selects the twenty largest entries (and the analogous time/git/type
+    // modes select their requested top entries).
+    if let Some(max_items) = opts.max {
+        hidden_count += display_items.len().saturating_sub(max_items);
+        display_items.truncate(max_items);
     }
 
     (display_items, hidden_count)
@@ -2454,10 +2461,23 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
                             b_num.push(c);
                         }
                     }
-                    let a_val: u64 = a_num.parse().unwrap_or(0);
-                    let b_val: u64 = b_num.parse().unwrap_or(0);
-                    if a_val != b_val {
-                        return a_val.cmp(&b_val);
+                    // Compare arbitrarily long digit runs without parsing to
+                    // a bounded integer. Parsing overflow as zero made names
+                    // such as `file18446744073709551616` sort before `file2`.
+                    let a_trimmed = a_num.trim_start_matches('0');
+                    let b_trimmed = b_num.trim_start_matches('0');
+                    let a_normalized = if a_trimmed.is_empty() { "0" } else { a_trimmed };
+                    let b_normalized = if b_trimmed.is_empty() { "0" } else { b_trimmed };
+                    if a_normalized.len() != b_normalized.len() {
+                        return a_normalized.len().cmp(&b_normalized.len());
+                    }
+                    if a_normalized != b_normalized {
+                        return a_normalized.cmp(b_normalized);
+                    }
+                    // Equal numeric values: prefer the shorter spelling, so
+                    // `file1` precedes `file01` deterministically.
+                    if a_num.len() != b_num.len() {
+                        return a_num.len().cmp(&b_num.len());
                     }
                 } else {
                     // Compare characters (case-insensitive)
