@@ -2119,12 +2119,12 @@ fn output_recursive(root: &Path, opts: &BannerOptions) -> Result<()> {
     use std::collections::VecDeque;
     use std::path::PathBuf;
 
-    let mut queue: VecDeque<PathBuf> = VecDeque::new();
-    queue.push_back(root.to_path_buf());
+    let mut queue: VecDeque<(PathBuf, usize)> = VecDeque::new();
+    queue.push_back((root.to_path_buf(), 0));
     let mut count = 0usize;
     let max = opts.max.unwrap_or(usize::MAX);
 
-    while let Some(dir) = queue.pop_front() {
+    while let Some((dir, depth)) = queue.pop_front() {
         let entries = match std::fs::read_dir(&dir) {
             Ok(e) => e,
             Err(_) => continue,
@@ -2190,7 +2190,13 @@ fn output_recursive(root: &Path, opts: &BannerOptions) -> Result<()> {
 
             // Queue subdirectories for recursion
             if is_dir {
-                queue.push_back(entry.path());
+                let can_descend = match opts.level {
+                    None | Some(0) => true,
+                    Some(limit) => depth + 1 < limit,
+                };
+                if can_descend {
+                    queue.push_back((entry.path(), depth + 1));
+                }
             }
         }
     }
