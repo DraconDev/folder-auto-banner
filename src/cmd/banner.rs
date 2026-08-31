@@ -366,7 +366,7 @@ fn build_display_items<'a>(
 
     // Sort based on --sort flag or short flags
     if !opts.no_sort {
-        let sort_mode = if let Some(s) = opts.sort {
+        let sort_mode = if let Some(s) = opts.sort.as_deref() {
             s
         } else if opts.timesort {
             "date"
@@ -382,7 +382,10 @@ fn build_display_items<'a>(
             "name"
         };
 
-        let group_dirs_mode = opts.group_dirs.unwrap_or(config.group_dirs.as_str());
+        let group_dirs_mode = opts
+            .group_dirs
+            .as_deref()
+            .unwrap_or(config.group_dirs.as_str());
 
         // Pre-compute lowercase names, extensions, and date keys once so the
         // per-comparison sort callback does no allocation. This converts the
