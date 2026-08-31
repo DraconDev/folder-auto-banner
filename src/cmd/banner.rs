@@ -1568,7 +1568,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
             let t_p = std::time::Instant::now();
             let contents_raw = if item.is_dir {
-                count_items_in_dir(item).to_string()
+                crate::cmd::file_metadata::count_items_in_dir_display(item)
             } else {
                 get_file_contents_raw(item)
             };
@@ -2255,10 +2255,6 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
         serde_json::to_string_pretty(&output)
             .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
     );
-}
-
-fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
-    crate::cmd::file_metadata::count_items_in_dir(entry)
 }
 
 /// Aggregate git status for a directory - returns the most severe status

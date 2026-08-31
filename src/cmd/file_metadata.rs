@@ -90,27 +90,47 @@ pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     result
 }
 
-/// Count items in a directory
+/// Count items in a directory, capped at the normal banner scan limit.
 pub fn count_items_in_dir(entry: &crate::fs::DirEntry) -> usize {
+    let display = count_items_in_dir_display(entry);
+    display
+        .strip_suffix('+')
+        .unwrap_or(&display)
+        .parse::<usize>()
+        .unwrap_or(0)
+        .min(crate::fs::MAX_DIRECTORY_SCAN_ITEMS)
+}
+
+/// Return a bounded directory item count suitable for rendering.
+///
+/// Directories larger than the cap are represented as `500+`. This keeps the
+/// contents column useful without allowing a banner render to enumerate every
+/// child of a huge directory.
+pub fn count_items_in_dir_display(entry: &crate::fs::DirEntry) -> String {
     // Same per-process cache pattern as `get_file_contents`. Directory
-    // contents are cheap (just `readdir`) but the call still costs a
-    // syscall and path resolution; on a warm `f` invocation we can serve
-    // repeated counts from the cache as long as the directory's mtime
-    // and size don't change. (For directories we treat `size` as a
-    // rough hint; the mtime is the real signal that children changed.)
+    // contents are cheap for normal directories but a full count is unsafe
+    // for a huge child. The cache still serves repeated bounded counts as
+    // long as the directory's mtime and size don't change. (For directories
+    // we treat `size` as a rough hint; the mtime is the real signal that
+    // children changed.)
     let cache_key =
         crate::cmd::probe_cache::CacheKey::for_dir(&entry.path, entry.size, entry.modified);
     if let Some(cached) = crate::cmd::probe_cache::ProbeCache::get(&cache_key) {
-        if let Ok(n) = cached.parse::<usize>() {
-            return n;
+        if cached.parse::<usize>().is_ok() || cached.ends_with('+') {
+            return cached;
         }
     }
 
     let count = std::fs::read_dir(&entry.path)
-        .map(|d| d.count())
+        .map(|d| d.take(crate::fs::MAX_DIRECTORY_SCAN_ITEMS + 1).count())
         .unwrap_or(0);
-    crate::cmd::probe_cache::ProbeCache::put(cache_key, count.to_string());
-    count
+    let display = if count > crate::fs::MAX_DIRECTORY_SCAN_ITEMS {
+        format!("{}+", crate::fs::MAX_DIRECTORY_SCAN_ITEMS)
+    } else {
+        count.to_string()
+    };
+    crate::cmd::probe_cache::ProbeCache::put(cache_key, display.clone());
+    display
 }
 
 /// Extract image resolution from PNG or JPEG header bytes.
