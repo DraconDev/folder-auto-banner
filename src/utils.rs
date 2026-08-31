@@ -15,13 +15,20 @@ pub struct CommandOutput {
     pub stderr: String,
 }
 
-/// Run a command with a timeout
-pub fn run_with_timeout(
+/// Byte-preserving output from a command run with a timeout.
+pub struct CommandOutputBytes {
+    pub status: std::process::ExitStatus,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+/// Run a command with a timeout while preserving raw output bytes.
+pub fn run_with_timeout_bytes(
     cmd: &str,
     args: &[&str],
     cwd: &Path,
     timeout: Duration,
-) -> Result<CommandOutput> {
+) -> Result<CommandOutputBytes> {
     use std::io::Read;
 
     let mut command = std::process::Command::new(cmd);
@@ -52,25 +59,40 @@ pub fn run_with_timeout(
         if let Some(status) = child.try_wait()? {
             let stdout_bytes = stdout_handle.join().unwrap_or_default();
             let stderr_bytes = stderr_handle.join().unwrap_or_default();
-            return Ok(CommandOutput {
+            return Ok(CommandOutputBytes {
                 status,
-                stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
-                stderr: String::from_utf8_lossy(&stderr_bytes).to_string(),
+                stdout: stdout_bytes,
+                stderr: stderr_bytes,
             });
         }
 
         if start.elapsed() > timeout {
             let _ = child.kill();
             let _ = child.wait();
-            return Ok(CommandOutput {
+            return Ok(CommandOutputBytes {
                 status: std::process::ExitStatus::default(),
-                stdout: String::new(),
-                stderr: "timeout".to_string(),
+                stdout: Vec::new(),
+                stderr: b"timeout".to_vec(),
             });
         }
 
         std::thread::sleep(Duration::from_millis(10));
     }
+}
+
+/// Run a command with a timeout.
+pub fn run_with_timeout(
+    cmd: &str,
+    args: &[&str],
+    cwd: &Path,
+    timeout: Duration,
+) -> Result<CommandOutput> {
+    let output = run_with_timeout_bytes(cmd, args, cwd, timeout)?;
+    Ok(CommandOutput {
+        status: output.status,
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    })
 }
 
 /// Run a command with a timeout, returning just stdout as a String

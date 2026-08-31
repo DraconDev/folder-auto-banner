@@ -208,6 +208,7 @@ fn build_display_items<'a>(
     git_info: &crate::git::GitInfo,
     opts: &BannerOptions,
     config: &crate::state::Config,
+    include_implicit_hidden: bool,
 ) -> (Vec<&'a crate::fs::DirEntry>, usize) {
     let mut visible_items: Vec<&crate::fs::DirEntry> = Vec::new();
     let mut hidden_items: Vec<&crate::fs::DirEntry> = Vec::new();
@@ -221,7 +222,7 @@ fn build_display_items<'a>(
     }
 
     let total_visible = visible_items.len();
-    let show_hidden_flag = opts.hidden || total_visible < 30;
+    let show_hidden_flag = opts.hidden || (include_implicit_hidden && total_visible < 30);
 
     let mut display_items: Vec<&crate::fs::DirEntry> = if show_hidden_flag {
         visible_items
@@ -506,7 +507,7 @@ fn navigate_by_number(
 
     // Use the EXACT same pipeline as banner display
     let (display_items, _hidden_count) =
-        build_display_items(path, &summary, &git_info, opts, &config);
+        build_display_items(path, &summary, &git_info, opts, &config, true);
 
     if num == 0 || num > display_items.len() {
         anyhow::bail!(
@@ -1588,7 +1589,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     }
 
     // Use shared build_display_items for consistent ordering with navigation
-    let (display_items, hidden_count) = build_display_items(path, summary, git_info, opts, &config);
+    let (display_items, hidden_count) =
+        build_display_items(path, summary, git_info, opts, &config, true);
 
     // Determine the effective column set so we can skip the expensive
     // per-file contents probe (PNG/JPG/ZIP header reads, text line counts)
@@ -2075,7 +2077,7 @@ fn output_raw(
     opts: &BannerOptions,
     config: &crate::state::Config,
 ) {
-    let (display_items, _) = build_display_items(path, summary, git_info, opts, config);
+    let (display_items, _) = build_display_items(path, summary, git_info, opts, config, false);
     for item in display_items {
         println!("{}", item.path.display());
     }
@@ -2089,7 +2091,7 @@ fn output_oneline(
     opts: &BannerOptions,
     config: &crate::state::Config,
 ) {
-    let (display_items, _) = build_display_items(path, summary, git_info, opts, config);
+    let (display_items, _) = build_display_items(path, summary, git_info, opts, config, false);
     for item in display_items {
         println!("{}", item.name);
     }
@@ -2263,7 +2265,8 @@ fn output_json(
 ) {
     use serde_json::json;
 
-    let (display_items, hidden_count) = build_display_items(path, summary, git_info, opts, config);
+    let (display_items, hidden_count) =
+        build_display_items(path, summary, git_info, opts, config, false);
     let items: Vec<_> = display_items
         .iter()
         .map(|item| {

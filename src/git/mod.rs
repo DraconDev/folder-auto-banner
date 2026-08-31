@@ -9,7 +9,9 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
-use std::process::Command;
+use std::time::Duration;
+
+const GIT_COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Git status for a directory
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -353,14 +355,19 @@ fn git_file_churn(path: &Path) -> std::collections::HashMap<String, usize> {
 /// Run a git command in the given directory and return stdout.
 /// Returns None on any error (non-git dir, git not installed, etc.).
 fn git_cmd(path: &Path, args: &[&str]) -> Option<String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(path)
-        .args(args)
-        .output()
-        .ok()?;
+    let path_arg = path.to_string_lossy();
+    let mut full_args = Vec::with_capacity(args.len() + 2);
+    full_args.extend(["-C", path_arg.as_ref()]);
+    full_args.extend_from_slice(args);
+    let output = crate::utils::run_with_timeout_bytes(
+        "git",
+        &full_args,
+        Path::new("."),
+        GIT_COMMAND_TIMEOUT,
+    )
+    .ok()?;
     if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).to_string())
+        Some(output.stdout)
     } else {
         None
     }
@@ -368,12 +375,17 @@ fn git_cmd(path: &Path, args: &[&str]) -> Option<String> {
 
 /// Like `git_cmd` but returns the raw bytes (for when we need exact content).
 fn git_cmd_raw(path: &Path, args: &[&str]) -> Option<Vec<u8>> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(path)
-        .args(args)
-        .output()
-        .ok()?;
+    let path_arg = path.to_string_lossy();
+    let mut full_args = Vec::with_capacity(args.len() + 2);
+    full_args.extend(["-C", path_arg.as_ref()]);
+    full_args.extend_from_slice(args);
+    let output = crate::utils::run_with_timeout(
+        "git",
+        &full_args,
+        Path::new("."),
+        GIT_COMMAND_TIMEOUT,
+    )
+    .ok()?;
     if output.status.success() {
         Some(output.stdout)
     } else {
@@ -403,13 +415,8 @@ fn is_git_repo(path: &Path) -> bool {
         return false;
     }
 
-    Command::new("git")
-        .arg("-C")
-        .arg(path)
-        .args(["rev-parse", "--is-inside-work-tree"])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    git_cmd(path, &["rev-parse", "--is-inside-work-tree"])
+        .is_some_and(|output| output.trim() == "true")
 }
 
 /// Discover the .git directory for a given path.
