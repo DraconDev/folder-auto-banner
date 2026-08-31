@@ -764,6 +764,7 @@ mod tests {
             total_size: 100,
             files: 3,
             dirs: 0,
+            truncated: false,
             top_items: vec![
                 DirEntry {
                     name: "test.rs".into(),

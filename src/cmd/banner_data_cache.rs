@@ -323,6 +323,7 @@ mod tests {
                 total_size: 42,
                 files: 1,
                 dirs: 0,
+                truncated: false,
                 top_items: vec![DirEntry {
                     name: "test.txt".to_string(),
                     path: PathBuf::from("/tmp/test.txt"),

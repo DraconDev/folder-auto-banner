@@ -1021,6 +1021,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     let sep = format!(" {}·{} ", color(DIM), color(RESET));
     let header = {
         let size_str = format_size_compact(summary.total_size);
+        let size_label = if summary.truncated { "sample" } else { "total" };
         let branch_display = build_branch_display(git_info);
         let git_status_str = build_git_status_indicators(git_info);
         let mut git_status = if git_status_str.is_empty() {
@@ -1100,30 +1101,42 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 
             // File stats
             details.push(format!(
-                "{}{}{} {}total{}",
+                "{}{}{} {}{}{}",
                 color(CYAN),
                 size_str,
                 color(RESET),
                 color(DIM),
+                size_label,
                 color(RESET)
             ));
-            details.push(format!(
-                "{}{}{} {}files{}",
-                color(BRIGHT_WHITE),
-                summary.files,
-                color(RESET),
-                color(DIM),
-                color(RESET)
-            ));
-            details.push(format!(
-                "{}{}{} {}{}{}",
-                color(BRIGHT_WHITE),
-                summary.dirs,
-                color(RESET),
-                color(DIM),
-                if summary.dirs == 1 { "dir" } else { "dirs" },
-                color(RESET)
-            ));
+            if summary.truncated {
+                details.push(format!(
+                    "{}{}+{} {}items{}",
+                    color(BRIGHT_WHITE),
+                    crate::fs::MAX_DIRECTORY_SCAN_ITEMS,
+                    color(RESET),
+                    color(DIM),
+                    color(RESET)
+                ));
+            } else {
+                details.push(format!(
+                    "{}{}{} {}files{}",
+                    color(BRIGHT_WHITE),
+                    summary.files,
+                    color(RESET),
+                    color(DIM),
+                    color(RESET)
+                ));
+                details.push(format!(
+                    "{}{}{} {}{}{}",
+                    color(BRIGHT_WHITE),
+                    summary.dirs,
+                    color(RESET),
+                    color(DIM),
+                    if summary.dirs == 1 { "dir" } else { "dirs" },
+                    color(RESET)
+                ));
+            }
 
             // Code metrics
             if let Some(ref todos) = summary.todo_info {
@@ -1328,30 +1341,42 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 
             // File stats
             details.push(format!(
-                "{}{}{} {}total{}",
+                "{}{}{} {}{}{}",
                 color(CYAN),
                 size_str,
                 color(RESET),
                 color(DIM),
+                size_label,
                 color(RESET)
             ));
-            details.push(format!(
-                "{}{}{} {}files{}",
-                color(BRIGHT_WHITE),
-                summary.files,
-                color(RESET),
-                color(DIM),
-                color(RESET)
-            ));
-            details.push(format!(
-                "{}{}{} {}{}{}",
-                color(BRIGHT_WHITE),
-                summary.dirs,
-                color(RESET),
-                color(DIM),
-                if summary.dirs == 1 { "dir" } else { "dirs" },
-                color(RESET)
-            ));
+            if summary.truncated {
+                details.push(format!(
+                    "{}{}+{} {}items{}",
+                    color(BRIGHT_WHITE),
+                    crate::fs::MAX_DIRECTORY_SCAN_ITEMS,
+                    color(RESET),
+                    color(DIM),
+                    color(RESET)
+                ));
+            } else {
+                details.push(format!(
+                    "{}{}{} {}files{}",
+                    color(BRIGHT_WHITE),
+                    summary.files,
+                    color(RESET),
+                    color(DIM),
+                    color(RESET)
+                ));
+                details.push(format!(
+                    "{}{}{} {}{}{}",
+                    color(BRIGHT_WHITE),
+                    summary.dirs,
+                    color(RESET),
+                    color(DIM),
+                    if summary.dirs == 1 { "dir" } else { "dirs" },
+                    color(RESET)
+                ));
+            }
 
             // Build status
             if let Some(ref build) = summary.build_status {
