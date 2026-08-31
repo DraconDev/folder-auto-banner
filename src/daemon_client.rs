@@ -40,7 +40,9 @@ fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response>
     let t_read4 = std::time::Instant::now();
     let resp_len = u32::from_le_bytes(len_bytes) as usize;
     if checked_frame_len(resp_len).is_none() {
-        return Err(anyhow::anyhow!("IPC response exceeds the maximum frame size"));
+        return Err(anyhow::anyhow!(
+            "IPC response exceeds the maximum frame size"
+        ));
     }
     let mut resp_bytes = vec![0u8; resp_len];
     stream.read_exact(&mut resp_bytes)?;

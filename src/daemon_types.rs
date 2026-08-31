@@ -145,7 +145,10 @@ mod tests {
     #[test]
     fn test_ipc_frame_length_limit() {
         assert_eq!(checked_frame_len(0), Some(0));
-        assert_eq!(checked_frame_len(MAX_IPC_FRAME_SIZE), Some(MAX_IPC_FRAME_SIZE as u32));
+        assert_eq!(
+            checked_frame_len(MAX_IPC_FRAME_SIZE),
+            Some(MAX_IPC_FRAME_SIZE as u32)
+        );
         assert_eq!(checked_frame_len(MAX_IPC_FRAME_SIZE + 1), None);
     }
 }

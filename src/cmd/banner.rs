@@ -601,14 +601,14 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         opts.verbose = true;
     }
     if opts.sort.is_none() && config.sort != "name" {
-        opts.sort = Some(Box::leak(config.sort.into_boxed_str()));
+        opts.sort = Some(Box::leak(config.sort.clone().into_boxed_str()));
     }
     if !opts.reverse && config.reverse {
         opts.reverse = true;
     }
     if opts.group_dirs.is_none() && config.group_dirs != "none" {
         // Leak the string for lifetime - acceptable for CLI tool
-        opts.group_dirs = Some(Box::leak(config.group_dirs.into_boxed_str()));
+        opts.group_dirs = Some(Box::leak(config.group_dirs.clone().into_boxed_str()));
     }
     if !opts.hidden && config.hidden {
         opts.hidden = true;
@@ -629,10 +629,10 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         opts.hyperlink = true;
     }
     if opts.highlight_recent.is_none() && !config.highlight_recent.is_empty() {
-        opts.highlight_recent = Some(config.highlight_recent);
+        opts.highlight_recent = Some(config.highlight_recent.clone());
     }
     if opts.highlight_old.is_none() && !config.highlight_old.is_empty() {
-        opts.highlight_old = Some(config.highlight_old);
+        opts.highlight_old = Some(config.highlight_old.clone());
     }
 
     // Check if path argument is a number for navigation (after config is loaded)
@@ -666,19 +666,11 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         let git_info = cached.git_info.unwrap_or_default();
 
         if opts.oneline {
-            output_oneline(
-                &summary,
-                opts.hidden,
-                opts.filter,
-                opts.max,
-                &opts.ignore_glob,
-                opts.only_dirs,
-                opts.only_files,
-            );
+            output_oneline(&path, &summary, &git_info, &opts, &config);
         } else if opts.json {
-            output_json(&path, &summary, &git_info);
+            output_json(&path, &summary, &git_info, &opts, &config);
         } else if opts.raw {
-            output_raw(&summary);
+            output_raw(&path, &summary, &git_info, &opts, &config);
         } else {
             output_rich(&path, &summary, &git_info, &opts);
         }
@@ -691,10 +683,14 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
     // Daemon not available or cache miss - try direct scan.
     // Todos/ports/docker/metrics are disabled by default for speed; set FAB_*=1 to enable.
     tracing::debug!("f daemon not available, falling back to direct scan");
-    let no_todos = std::env::var("FAB_TODOS").unwrap_or_default() != "1";
-    let no_ports = std::env::var("FAB_PORTS").unwrap_or_default() != "1";
-    let no_docker = std::env::var("FAB_DOCKER").unwrap_or_default() != "1";
-    let no_metrics = std::env::var("FAB_METRICS").unwrap_or_default() != "1";
+    let scan_todos =
+        crate::utils::direct_feature_enabled(config.todo_count, "FAB_TODOS", "FAB_NO_TODOS");
+    let scan_ports =
+        crate::utils::direct_feature_enabled(config.ports, "FAB_PORTS", "FAB_NO_PORTS");
+    let scan_docker =
+        crate::utils::direct_feature_enabled(config.docker, "FAB_DOCKER", "FAB_NO_DOCKER");
+    let scan_metrics =
+        crate::utils::direct_feature_enabled(config.languages, "FAB_METRICS", "FAB_NO_METRICS");
 
     // Build extra skip dirs from config
     let extra_skip_dirs: Vec<&str> = config.ignore_dirs.iter().map(|s| s.as_str()).collect();
@@ -704,13 +700,14 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
         // Build checks spawn subprocesses (cargo check ≈ 6.7s) — opt-in via
         // `f config` (build_status), off by default.
         config.build_status,
-        !no_todos,
-        !no_ports,
-        !no_docker,
-        !no_metrics,
+        scan_todos,
+        scan_ports,
+        scan_docker,
+        scan_metrics,
         &extra_skip_dirs,
     )?;
-    let git_info = if opts.oneline || opts.raw {
+    let needs_git_for_sort = opts.gitsort || opts.sort == Some("git");
+    let git_info = if !config.git_status || ((opts.oneline || opts.raw) && !needs_git_for_sort) {
         crate::git::GitInfo::default()
     } else {
         let git_filter_paths = crate::git::status_filter_paths_for_items(&summary.top_items);
@@ -719,19 +716,11 @@ pub fn run_banner(mut opts: BannerOptions) -> Result<()> {
 
     // Display the banner
     if opts.oneline {
-        output_oneline(
-            &summary,
-            opts.hidden,
-            opts.filter,
-            opts.max,
-            &opts.ignore_glob,
-            opts.only_dirs,
-            opts.only_files,
-        );
+        output_oneline(&path, &summary, &git_info, &opts, &config);
     } else if opts.json {
-        output_json(&path, &summary, &git_info);
+        output_json(&path, &summary, &git_info, &opts, &config);
     } else if opts.raw {
-        output_raw(&summary);
+        output_raw(&path, &summary, &git_info, &opts, &config);
     } else {
         output_rich(&path, &summary, &git_info, &opts);
     }
@@ -990,6 +979,31 @@ fn build_git_status_indicators(git_info: &GitInfo) -> String {
 fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &BannerOptions) {
     // Load config for display settings
     let config = crate::state::Config::load().unwrap_or_default();
+    let todo_info = if config.todo_count {
+        summary.todo_info.as_ref()
+    } else {
+        None
+    };
+    let code_metrics = if config.languages {
+        summary.code_metrics.as_ref()
+    } else {
+        None
+    };
+    let build_status = if config.build_status {
+        summary.build_status.as_ref()
+    } else {
+        None
+    };
+    let port_info = if config.ports {
+        summary.port_info.as_ref()
+    } else {
+        None
+    };
+    let docker_info = if config.docker {
+        summary.docker_info.as_ref()
+    } else {
+        None
+    };
 
     let path_str = path.to_string_lossy();
     let project_icon = summary.project_type.icon();
@@ -1159,7 +1173,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // Code metrics
-            if let Some(ref todos) = summary.todo_info {
+            if let Some(todos) = todo_info {
                 if todos.count > 0 {
                     details.push(format!(
                         "{}{}{} {}TODOs{}",
@@ -1171,7 +1185,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                     ));
                 }
             }
-            if let Some(ref metrics) = summary.code_metrics {
+            if let Some(metrics) = code_metrics {
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
                     details.push(format!(
@@ -1236,7 +1250,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // Build status
-            if let Some(ref build) = summary.build_status {
+            if let Some(build) = build_status {
                 if build.ok {
                     let duration_str = if build.duration_ms > 0 {
                         if build.duration_ms < 1000 {
@@ -1269,7 +1283,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // Port usage
-            if let Some(ref ports) = summary.port_info {
+            if let Some(ports) = port_info {
                 if !ports.ports.is_empty() {
                     let port_str: Vec<String> =
                         ports.ports.iter().map(|p| format!(":{}", p)).collect();
@@ -1283,7 +1297,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // Docker info
-            if let Some(ref docker) = summary.docker_info {
+            if let Some(docker) = docker_info {
                 let running = docker
                     .containers
                     .iter()
@@ -1404,7 +1418,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // Build status
-            if let Some(ref build) = summary.build_status {
+            if let Some(build) = build_status {
                 if build.ok {
                     let duration_str = if build.duration_ms > 0 {
                         if build.duration_ms < 1000 {
@@ -1427,7 +1441,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // TODO count
-            if let Some(ref todos) = summary.todo_info {
+            if let Some(todos) = todo_info {
                 if todos.count > 0 {
                     details.push(format!(
                         "{}{}{} {}TODOs{}",
@@ -1441,7 +1455,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // Code metrics - show languages breakdown
-            if let Some(ref metrics) = summary.code_metrics {
+            if let Some(metrics) = code_metrics {
                 if metrics.total_loc > 0 {
                     let loc_str = format_loc(metrics.total_loc);
                     details.push(format!(
@@ -1505,7 +1519,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // Port usage
-            if let Some(ref ports) = summary.port_info {
+            if let Some(ports) = port_info {
                 if !ports.ports.is_empty() {
                     let port_str: Vec<String> =
                         ports.ports.iter().map(|p| format!(":{}", p)).collect();
@@ -1519,7 +1533,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
 
             // Docker info
-            if let Some(ref docker) = summary.docker_info {
+            if let Some(docker) = docker_info {
                 let running = docker
                     .containers
                     .iter()
@@ -1581,7 +1595,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // when the user has hidden the contents column. This is the single biggest
     // performance win in directories with many images, archives, or large text
     // files.
-    let effective_columns: Vec<String> = if let Some(blocks_str) = opts.blocks {
+    let mut effective_columns: Vec<String> = if let Some(blocks_str) = opts.blocks {
         blocks_str
             .split(',')
             .map(|s| s.trim().to_string())
@@ -1601,6 +1615,10 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     } else {
         config.columns.clone()
     };
+    if opts.blocks.is_none() {
+        effective_columns
+            .retain(|column| !config.hide_columns.iter().any(|hidden| hidden == column));
+    }
     let show_contents_column = effective_columns.iter().any(|c| c == "contents");
     let _profile = std::env::var("FAB_PROFILE").is_ok();
     let _t0 = std::time::Instant::now();
@@ -1768,7 +1786,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             item.name.clone()
         };
 
-        let name_display = if item.is_symlink {
+        let name_display = if item.is_symlink && !opts.no_symlink {
             if let Some(target) = &item.symlink_target {
                 let indicator = if item.symlink_valid { "→" } else { "✗→" };
                 format!(
@@ -2050,52 +2068,30 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     }
 }
 
-fn output_raw(summary: &DirSummary) {
-    for item in &summary.top_items {
+fn output_raw(
+    path: &Path,
+    summary: &DirSummary,
+    git_info: &GitInfo,
+    opts: &BannerOptions,
+    config: &crate::state::Config,
+) {
+    let (display_items, _) = build_display_items(path, summary, git_info, opts, config);
+    for item in display_items {
         println!("{}", item.path.display());
     }
 }
 
 /// One file per line output (like ls -1)
 fn output_oneline(
+    path: &Path,
     summary: &DirSummary,
-    hidden: bool,
-    filter: Option<&str>,
-    max: Option<usize>,
-    ignore_glob: &[String],
-    only_dirs: bool,
-    only_files: bool,
+    git_info: &GitInfo,
+    opts: &BannerOptions,
+    config: &crate::state::Config,
 ) {
-    let mut count = 0;
-    for item in &summary.top_items {
-        if !hidden && item.name.starts_with('.') {
-            continue;
-        }
-        // Only-dirs / only-files filter
-        if only_dirs && !item.is_dir {
-            continue;
-        }
-        if only_files && item.is_dir {
-            continue;
-        }
-        // Filter by pattern
-        if let Some(pat) = filter {
-            if !item.name.contains(pat) && !item.path.to_string_lossy().contains(pat) {
-                continue;
-            }
-        }
-        // Filter by ignore glob
-        let dominated = ignore_glob.iter().any(|g| glob_match(g, &item.name));
-        if dominated {
-            continue;
-        }
+    let (display_items, _) = build_display_items(path, summary, git_info, opts, config);
+    for item in display_items {
         println!("{}", item.name);
-        count += 1;
-        if let Some(m) = max {
-            if count >= m {
-                break;
-            }
-        }
     }
 }
 
@@ -2258,11 +2254,17 @@ fn is_git_ignored(path: &Path) -> bool {
     false
 }
 
-fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
+fn output_json(
+    path: &Path,
+    summary: &DirSummary,
+    git_info: &GitInfo,
+    opts: &BannerOptions,
+    config: &crate::state::Config,
+) {
     use serde_json::json;
 
-    let items: Vec<_> = summary
-        .top_items
+    let (display_items, hidden_count) = build_display_items(path, summary, git_info, opts, config);
+    let items: Vec<_> = display_items
         .iter()
         .map(|item| {
             json!({
@@ -2284,6 +2286,7 @@ fn output_json(path: &Path, summary: &DirSummary, git_info: &GitInfo) {
         "path": path.to_string_lossy(),
         "total_items": summary.total_items,
         "truncated": summary.truncated,
+        "hidden_items": hidden_count,
         "total_size": summary.total_size,
         "project_type": summary.project_type.label(),
         "items": items,

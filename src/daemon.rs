@@ -7,7 +7,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use folder_auto_banner::daemon_types::{checked_frame_len, BannerData, Request, Response, MAX_IPC_FRAME_SIZE};
+use folder_auto_banner::daemon_types::{
+    checked_frame_len, BannerData, Request, Response, MAX_IPC_FRAME_SIZE,
+};
 #[cfg(test)]
 use folder_auto_banner::fs::ProjectType;
 use folder_auto_banner::fs::{DirEntry, DirSummary};
@@ -1097,8 +1099,20 @@ fn persist_banner_data_cache(path: &Path, data: &BannerData) {
 
 fn compute_banner_data(path: &Path) -> Result<BannerData> {
     let config = folder_auto_banner::state::Config::load().unwrap_or_default();
-    let mut summary =
-        DirSummary::scan_with_options(path, config.build_status, true, true, true, true, &[])?;
+    let extra_skip_dirs: Vec<&str> = config.ignore_dirs.iter().map(String::as_str).collect();
+    let mut summary = DirSummary::scan_with_options(
+        path,
+        config.build_status,
+        folder_auto_banner::utils::feature_enabled(config.todo_count, "FAB_TODOS", "FAB_NO_TODOS"),
+        folder_auto_banner::utils::feature_enabled(config.ports, "FAB_PORTS", "FAB_NO_PORTS"),
+        folder_auto_banner::utils::feature_enabled(config.docker, "FAB_DOCKER", "FAB_NO_DOCKER"),
+        folder_auto_banner::utils::feature_enabled(
+            config.languages,
+            "FAB_METRICS",
+            "FAB_NO_METRICS",
+        ),
+        &extra_skip_dirs,
+    )?;
 
     // Build pathspecs for git status collection. Files use their exact
     // top-level name; directories use `dir/*` so native git status only
@@ -1111,13 +1125,15 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
     // the full cost. The file cache survives daemon restarts.
     let cache = folder_auto_banner::cache::Cache::new().ok();
     let mut git_info: Option<folder_auto_banner::git::GitInfo> = None;
-    if let Some(ref cache) = cache {
-        let ck = folder_auto_banner::cache::cache_key(path, "git");
-        if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
-            git_info = Some(cached);
+    if config.git_status {
+        if let Some(ref cache) = cache {
+            let ck = folder_auto_banner::cache::cache_key(path, "git");
+            if let Some(cached) = cache.get(&ck, std::time::Duration::from_secs(60)) {
+                git_info = Some(cached);
+            }
         }
     }
-    if git_info.is_none() {
+    if config.git_status && git_info.is_none() {
         git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
         if let (Some(ref mut gi), Some(ref cache)) = (&mut git_info, &cache) {
             // Trim to displayable paths BEFORE caching: the unfiltered map can

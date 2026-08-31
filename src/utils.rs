@@ -243,8 +243,20 @@ mod tests {
 
     #[test]
     fn test_feature_flag_defaults_to_config() {
-        assert!(feature_enabled(true, "FAB_TEST_MISSING_ENABLE", "FAB_TEST_MISSING_DISABLE"));
-        assert!(!feature_enabled(false, "FAB_TEST_MISSING_ENABLE", "FAB_TEST_MISSING_DISABLE"));
-        assert!(!direct_feature_enabled(true, "FAB_TEST_MISSING_ENABLE", "FAB_TEST_MISSING_DISABLE"));
+        assert!(feature_enabled(
+            true,
+            "FAB_TEST_MISSING_ENABLE",
+            "FAB_TEST_MISSING_DISABLE"
+        ));
+        assert!(!feature_enabled(
+            false,
+            "FAB_TEST_MISSING_ENABLE",
+            "FAB_TEST_MISSING_DISABLE"
+        ));
+        assert!(!direct_feature_enabled(
+            true,
+            "FAB_TEST_MISSING_ENABLE",
+            "FAB_TEST_MISSING_DISABLE"
+        ));
     }
 }
