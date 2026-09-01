@@ -1,5 +1,32 @@
 ## [Unreleased]
 
+## [0.7.13] - 2026-09-01
+
+### Audit hardening, daemon robustness, and Trust model docs
+
+21 commits since 0.7.12 — a full-project audit pass and its follow-ups.
+
+**Audit pass (a8ad227)** — 10 FIX + 4 DECIDE, spawned ≥3 scout briefs (fallback inline when registry empty), every FIX committed on `main` and checked in `.pi-glla/audit-loop/findings.md`:
+- `BannerOptions` `sort`/`group_dirs` `Option<&str>` → `Option<String>` — eliminates `Box::leak` on every `run_banner` (src/cmd/banner.rs, src/cli/mod.rs)
+- Mini-tree slice `&dir.name[..tree_width-7]` guarded (`tree_width>=7` + UTF-8 boundary, avoids panic on narrow terminals)
+- `is_recent` future-mtime false (`max(0)` → `age_secs<=0` → false)
+- Daemon `handle_client` removed post-response 5 s drain loops — length-prefixed read + dropping `stream` is sufficient (src/daemon.rs, added `Read`)
+- `is_daemon_running` ping timeout 10 s → 2 s
+- `daemon_mgmt::run_daemon(Stop/Restart)` now polls `is_daemon_running` 50×100 ms before success
+- `install.sh` idempotent `grep -qF` guards + narrowed seds (`^# fab shell integration` / `^fab_clean|^fab_test|^fab_build`)
+- `get_data_dir` `set_permissions(0o700)` every call with `warn!` (src/state/mod.rs)
+- Removed dead `let _ = SystemTime::now().duration_since(UNIX_EPOCH);` (banner_data_cache.rs)
+
+**DECIDE follow-ups:**
+- **DECIDE 2 (4720d3d)** — daemon `get_banner_cached` hung-daemon fallback: `set_read_timeout` 30 s → 3 s + `Err => None` so `run_banner`/`navigate_by_number` fall through to direct `DirSummary::scan_with_options` within 3 s (connect-failed path already 2 s poll). Large cold scans >3 s correctly fallback and warm the on-disk cache.
+- **DECIDE 3 (5761ec0)** — `output_rich` deduplication: extracted `build_details_row(path, summary, git_info, opts, config)` shared by git-repo and plain branches (3 differing details via `is_repo`: clean indicator in row1, port list, docker fallback `containers>0` vs generic `🐳 docker`; plus build-error-count, ordering, test-results). Net `-137` lines (+260/-397), single `push_code_metrics` closure, both branches `let details = build_details_row(...)`. Verified `cargo check` clean, 105 lib + 19 integration tests, manual banner renders unchanged.
+- **DECIDE 4 (436cb34)** — docs: added `## Security / Trust model` to `README.md` (socket `~/.local/share/fab/fabd.sock` via `ProjectDirs`, data dir `0700` re-chmod, socket `0600` at `src/daemon.rs:161`, unauthenticated length-prefixed JSON `16 MiB`, no multi-tenant isolation — run `f daemon stop` / direct scan fallback).
+
+**Other commits since 0.7.12:**
+- Daemon/cache bounds and watcher hardenings (`719cd11`, `66324f9`, `619cf57`, `20359f9`, `92dd0ba`, `27304cb`, `2206278`, `bade042`, `6f57c52`, `68e4df8`, `0f568b7`, `3f462a9`, `45a64f1`, `a2bbaf4`, `1f43e78`, `013ec17`) — git/status/docs/bounded scans, `.gitignore` + `.pi-glla/` ignore.
+
+**Validation:** `cargo check --all-targets` 0 errors, `cargo test --lib` 105 passed, `cargo test --test integration_test` 19 passed, `cargo fmt` / `cargo clippy -D warnings` / `bash -n install.sh` clean; `dracon-warden` hardened.
+
 ## [0.7.12] - 2026-08-31
 
 ### Bound large-directory scans
