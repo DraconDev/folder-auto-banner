@@ -119,9 +119,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     // the daemon still computes in the background and populates the
     // on-disk cache for the next invocation, so the result is correct
     // either way.
-    stream
-        .set_read_timeout(Some(Duration::from_secs(3)))
-        .ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
     stream
         .set_write_timeout(Some(Duration::from_secs(1)))
         .ok()?;
@@ -140,7 +138,10 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
             // where the socket connected but the daemon never answered
             // (the `connect`-failed path already falls back via the
             // `connected?` early return above).
-            tracing::debug!("daemon Banner request failed, falling back to direct scan: {}", e);
+            tracing::debug!(
+                "daemon Banner request failed, falling back to direct scan: {}",
+                e
+            );
             return None;
         }
     };

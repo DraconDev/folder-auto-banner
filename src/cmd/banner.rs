@@ -1219,37 +1219,65 @@ fn build_details_row(
                 } else {
                     String::new()
                 };
-                details.push(format!("{}✓ builds{}{}", color(GREEN), duration_str, color(RESET)));
+                details.push(format!(
+                    "{}✓ builds{}{}",
+                    color(GREEN),
+                    duration_str,
+                    color(RESET)
+                ));
             } else {
                 let err_str = if build.errors > 0 {
                     format!(" ({} err)", build.errors)
                 } else {
                     String::new()
                 };
-                details.push(format!("{}✗ build errors{}{}", color(RED), err_str, color(RESET)));
+                details.push(format!(
+                    "{}✗ build errors{}{}",
+                    color(RED),
+                    err_str,
+                    color(RESET)
+                ));
             }
         }
         if let Some(ports) = port_info {
             if !ports.ports.is_empty() {
                 let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                details.push(format!("{}🔌 {}{}", color(CYAN), port_str.join(", "), color(RESET)));
+                details.push(format!(
+                    "{}🔌 {}{}",
+                    color(CYAN),
+                    port_str.join(", "),
+                    color(RESET)
+                ));
             }
         }
         if let Some(docker) = docker_info {
-            let running = docker.containers.iter().filter(|c| c.status.contains("Up")).count();
+            let running = docker
+                .containers
+                .iter()
+                .filter(|c| c.status.contains("Up"))
+                .count();
             let total = docker.containers.len();
             if total > 0 {
                 details.push(format!(
                     "{}🐳 {} container(s){}",
                     color(CYAN),
-                    if running > 0 { format!("{} up", running) } else { total.to_string() },
+                    if running > 0 {
+                        format!("{} up", running)
+                    } else {
+                        total.to_string()
+                    },
                     color(RESET)
                 ));
             }
         }
         if let Some(test_results) = crate::test_cache::TestResults::load() {
             if test_results.failed > 0 {
-                details.push(format!("{}✗ {} failed{}", color(RED), test_results.failed, color(RESET)));
+                details.push(format!(
+                    "{}✗ {} failed{}",
+                    color(RED),
+                    test_results.failed,
+                    color(RESET)
+                ));
             } else if test_results.passed > 0 {
                 details.push(format!(
                     "{}✓ {} tests{} ({})",
@@ -1273,7 +1301,12 @@ fn build_details_row(
                 } else {
                     String::new()
                 };
-                details.push(format!("{}✓ builds{}{}", color(GREEN), duration_str, color(RESET)));
+                details.push(format!(
+                    "{}✓ builds{}{}",
+                    color(GREEN),
+                    duration_str,
+                    color(RESET)
+                ));
             } else {
                 details.push(format!("{}✗ build errors{}", color(RED), color(RESET)));
             }
@@ -1294,17 +1327,30 @@ fn build_details_row(
         if let Some(ports) = port_info {
             if !ports.ports.is_empty() {
                 let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                details.push(format!("{}🔌 {}{}", color(CYAN), port_str.join(", "), color(RESET)));
+                details.push(format!(
+                    "{}🔌 {}{}",
+                    color(CYAN),
+                    port_str.join(", "),
+                    color(RESET)
+                ));
             }
         }
         if let Some(docker) = docker_info {
-            let running = docker.containers.iter().filter(|c| c.status.contains("Up")).count();
+            let running = docker
+                .containers
+                .iter()
+                .filter(|c| c.status.contains("Up"))
+                .count();
             let total = docker.containers.len();
             if total > 0 {
                 details.push(format!(
                     "{}🐳 {} container(s){}",
                     color(CYAN),
-                    if running > 0 { format!("{} up", running) } else { total.to_string() },
+                    if running > 0 {
+                        format!("{} up", running)
+                    } else {
+                        total.to_string()
+                    },
                     color(RESET)
                 ));
             } else if docker.has_compose || docker.has_dockerfile {
@@ -1975,7 +2021,8 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
                         // Truncate on a UTF-8 char boundary so the slice can
                         // never split a multibyte codepoint and panic.
                         let keep = (tree_width - 7).min(dir.name.len());
-                        let end = dir.name
+                        let end = dir
+                            .name
                             .char_indices()
                             .take_while(|(i, _)| *i < keep)
                             .last()

@@ -39,8 +39,7 @@ pub fn get_data_dir() -> Result<PathBuf> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Err(e) =
-            std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o700))
+        if let Err(e) = std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o700))
         {
             // Only warn — a permission failure is not fatal for the rest of
             // the call (the data dir is still usable, just less hardened).

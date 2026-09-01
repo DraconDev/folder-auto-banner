@@ -32,7 +32,7 @@ const BUILTIN_ALIASES: &[(&str, &[&str])] = &[
     ("git", &["-G"]),         // Sort by git status
     ("nosort", &["-U"]),      // No sort
     // Limits
-    ("top", &["-S", "-m", "20"]),    // Top 20 largest files
+    ("top", &["-S", "-m", "20"]),          // Top 20 largest files
     ("newest", &["-t", "-r", "-m", "20"]), // 20 newest files
     // Recursion
     ("recurse", &["-R"]), // Recurse into subdirectories
@@ -340,10 +340,7 @@ mod tests {
 
     #[test]
     fn test_lookup_newest() {
-        assert_eq!(
-            lookup_alias("newest"),
-            Some(&["-t", "-r", "-m", "20"][..])
-        );
+        assert_eq!(lookup_alias("newest"), Some(&["-t", "-r", "-m", "20"][..]));
     }
 
     #[test]
