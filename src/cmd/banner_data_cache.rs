@@ -374,9 +374,10 @@ pub fn write_cache(path: &Path, data: &BannerData) -> std::io::Result<()> {
         tracing::warn!("Failed to rename banner data cache: {}", e);
         return Ok(());
     }
-    // The mtime is implicitly set to "now" by the write. No need to
-    // call `utimes`/`filetime` — `std::fs::write` does the right thing.
-    let _ = SystemTime::now().duration_since(UNIX_EPOCH);
+    // The mtime is implicitly set to "now" by the rename above; the
+    // client's freshness check (banner_data_cache::is_cache_fresh) uses
+    // std::fs::metadata().modified() to read it. No utimes/filetime call
+    // is needed — std::fs::write + rename does the right thing.
     Ok(())
 }
 

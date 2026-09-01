@@ -101,8 +101,12 @@ for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
         # Remove orphaned function fragments from partial teardowns
         sed -i '/^    command f banner/d' "$rc" 2>/dev/null || true
         sed -i '/command \/home\/.*\/bin\/f banner/d' "$rc" 2>/dev/null || true
-        sed -i '/^}export PATH=/d' "$rc" 2>/dev/null || true
-        sed -i '/^}autoload/d' "$rc" 2>/dev/null || true
+        # The next two patterns used to be `/^}export PATH=/d` and
+        # `/^}autoload/d` which would also delete user content that
+        # happened to end a block with `}export PATH=…` or `}autoload …`.
+        # Anchor the removal to the fab-anchored lines we actually install.
+        sed -i '/^# fab shell integration/d' "$rc" 2>/dev/null || true
+        sed -i '/^fab_clean\|^fab_test\|^fab_build/d' "$rc" 2>/dev/null || true
         # Remove old ~/bin PATH exports (we use ~/.local/bin now)
         sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' "$rc" 2>/dev/null || true
     fi
@@ -112,28 +116,36 @@ done
 # The shell function (`f N` → `cd`) is installed separately below via
 # `f install`, which reads the single source of truth in src/shell_wrapper.rs.
 if [ -f "$HOME/.zshrc" ]; then
-    {
-        echo ''
-        echo '# fab auto-banner hook'
-        if ! grep -qF 'autoload -U add-zsh-hook' "$HOME/.zshrc"; then
-            echo 'autoload -U add-zsh-hook'
-        fi
-        echo 'add-zsh-hook chpwd _fab_hook'
-        echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
-        echo '_fab_hook  # fire on new shell/tab startup'
-    } >> "$HOME/.zshrc"
-    echo "✅ Added chpwd hook to ~/.zshrc"
+    if ! grep -qF 'add-zsh-hook chpwd _fab_hook' "$HOME/.zshrc"; then
+        {
+            echo ''
+            echo '# fab auto-banner hook'
+            if ! grep -qF 'autoload -U add-zsh-hook' "$HOME/.zshrc"; then
+                echo 'autoload -U add-zsh-hook'
+            fi
+            echo 'add-zsh-hook chpwd _fab_hook'
+            echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
+            echo '_fab_hook  # fire on new shell/tab startup'
+        } >> "$HOME/.zshrc"
+        echo "✅ Added chpwd hook to ~/.zshrc"
+    else
+        echo "ℹ️  chpwd hook already present in ~/.zshrc"
+    fi
 fi
 
 # --- Install hook for bash (auto-banner only) ---
 if [ -f "$HOME/.bashrc" ]; then
-    {
-        echo ''
-        echo '# fab auto-banner hook'
-        echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
-        echo 'PROMPT_COMMAND="_fab_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"'
-    } >> "$HOME/.bashrc"
-    echo "✅ Added PROMPT_COMMAND hook to ~/.bashrc"
+    if ! grep -qF '_fab_hook()' "$HOME/.bashrc"; then
+        {
+            echo ''
+            echo '# fab auto-banner hook'
+            echo "_fab_hook() { command $BIN_PATH banner \"\$PWD\"; }"
+            echo 'PROMPT_COMMAND="_fab_hook${PROMPT_COMMAND:+;$PROMPT_COMMAND}"'
+        } >> "$HOME/.bashrc"
+        echo "✅ Added PROMPT_COMMAND hook to ~/.bashrc"
+    else
+        echo "ℹ️  PROMPT_COMMAND hook already present in ~/.bashrc"
+    fi
 fi
 
 # --- Install shell function (delegated to `f install`) ---

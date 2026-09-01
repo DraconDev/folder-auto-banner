@@ -802,6 +802,7 @@ fn handle_client(
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
 
     let mut stream = stream;
+    use std::io::Read;
 
     let t_start = std::time::Instant::now();
     // Length-prefixed JSON: read 4-byte LE length, then payload.
@@ -927,15 +928,6 @@ fn handle_client(
                     t4 - t3,
                     t4 - _t_req_start,
                 );
-                // Keep stream alive while client reads
-                let mut discard = [0u8; 256];
-                loop {
-                    match stream.read(&mut discard) {
-                        Ok(0) => break,
-                        Ok(_) => continue,
-                        Err(_) => break,
-                    }
-                }
                 return Ok(());
             }
 
@@ -1054,18 +1046,11 @@ fn handle_client(
     send_response(&mut stream, &response)?;
     tracing::trace!("Sent response successfully");
 
-    // Keep stream alive while client reads. The client signals it's done by
-    // closing the connection (dropping its UnixStream). Until then, the client
-    // may still be reading the response.
-    use std::io::Read;
-    let mut discard = [0u8; 256];
-    loop {
-        match stream.read(&mut discard) {
-            Ok(0) => break, // EOF — client closed
-            Ok(_) => continue,
-            Err(_) => break, // timeout or error
-        }
-    }
+    // The client has its own length-prefixed read: it knows exactly when the
+    // response ends and will close the socket (drop UnixStream) immediately
+    // after. A drain loop here would just wait for the client's close, which
+    // is bounded by the read timeout (5s) and adds 5s of latency per request
+    // for nothing. Dropping `stream` returns the kernel-side FD to the OS.
     Ok(())
 }
 

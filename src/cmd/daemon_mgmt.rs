@@ -22,7 +22,23 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
         DaemonAction::Stop => {
             if daemon_client::is_daemon_running() {
                 daemon_client::send_shutdown();
-                println!("Daemon stopped");
+                // Wait for the daemon to actually exit. `send_shutdown` only
+                // sets an in-process flag; the daemon still needs to drain
+                // its accept loop and run cache-save + socket-unlink on the
+                // way out. Poll for up to 5s.
+                let mut exited = false;
+                for _ in 0..50 {
+                    if !daemon_client::is_daemon_running() {
+                        exited = true;
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                if exited {
+                    println!("Daemon stopped");
+                } else {
+                    anyhow::bail!("Daemon did not exit within 5s of shutdown request");
+                }
             } else {
                 println!("Daemon is not running");
             }
@@ -37,7 +53,20 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
         DaemonAction::Restart => {
             if daemon_client::is_daemon_running() {
                 daemon_client::send_shutdown();
-                std::thread::sleep(std::time::Duration::from_millis(500));
+                // Wait for the old daemon to actually exit before spawning
+                // a replacement, otherwise the second instance sees the
+                // live socket and bails with "daemon already running".
+                let mut exited = false;
+                for _ in 0..50 {
+                    if !daemon_client::is_daemon_running() {
+                        exited = true;
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                if !exited {
+                    anyhow::bail!("Daemon did not exit within 5s of shutdown request");
+                }
             }
             daemon_client::ensure_daemon_running();
             if daemon_client::is_daemon_running() {

@@ -121,10 +121,16 @@ fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
 }
 
 /// Return whether a file is recent enough to highlight.
-/// Binary: files modified within the last 6 hours are "recent", everything else is "old".
+/// Binary: files modified within the last 6 hours are "recent", everything
+/// else is "old". Future mtimes (clock skew) are treated as "old" rather
+/// than "just modified" — the 6-hour window would otherwise fold any
+/// ahead-of-clock mtime into the "recent" bucket and never catch up.
 fn is_recent(dt: &DateTime<Utc>) -> bool {
     let now = Utc::now();
-    let age_secs = (now - *dt).num_seconds().max(0);
+    let age_secs = (now - *dt).num_seconds();
+    if age_secs <= 0 {
+        return false;
+    }
     age_secs < 21600 // 6 hours
 }
 

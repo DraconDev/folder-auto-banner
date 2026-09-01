@@ -159,7 +159,7 @@ pub fn is_daemon_running() -> bool {
             return false;
         }
     };
-    stream.set_read_timeout(Some(Duration::from_secs(10))).ok();
+    stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
 
     let request = Request::Ping;
@@ -167,9 +167,10 @@ pub fn is_daemon_running() -> bool {
         Ok(Response::Pong) => true,
         _ => {
             // Unresponsive daemon. NOTE: do NOT unlink the socket here — a
-            // live-but-busy daemon may simply be slow to answer (10s timeout
-            // while it computes a banner for a huge directory). Unlinking a
-            // live daemon's socket orphans it and lets a second daemon start
+            // live-but-busy daemon may simply be slow to answer (we use a
+            // 2s ping timeout instead of 10s so a dead daemon doesn't
+            // stall every `f` invocation). Unlinking a live daemon's
+            // socket orphans it and lets a second daemon start
             // (two daemons writing caches concurrently).
             false
         }

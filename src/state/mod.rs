@@ -31,12 +31,21 @@ pub fn get_data_dir() -> Result<PathBuf> {
         fs::create_dir_all(&data_dir)
             .context(format!("Failed to create data directory: {:?}", data_dir))?;
     }
-    // The data dir holds per-path banner caches (listings, git status) —
-    // restrict it to this user.
+    // The data dir holds per-path banner caches (listings, git status) and
+    // the IPC socket — restrict it to this user. Apply on every call so an
+    // existing install with looser permissions is also tightened (the
+    // `directories` crate can return a path that pre-existed with mode
+    // 0755 from an earlier version of fab or from a manual mkdir).
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o700));
+        if let Err(e) =
+            std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o700))
+        {
+            // Only warn — a permission failure is not fatal for the rest of
+            // the call (the data dir is still usable, just less hardened).
+            tracing::warn!("Failed to set 0700 permissions on data dir: {}", e);
+        }
     }
 
     Ok(data_dir)
