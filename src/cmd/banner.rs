@@ -1035,9 +1035,23 @@ fn build_git_status_indicators(git_info: &GitInfo) -> String {
     indicators.join(" ")
 }
 
-fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &BannerOptions) {
-    // Load config for display settings
-    let config = crate::state::Config::load().unwrap_or_default();
+/// Build the second header row (stats/details) for both git-repo and plain outputs.
+///
+/// The git and plain branches historically duplicated ~120 lines differing only
+/// in 3 details: clean indicator (handled in row1's git_status), port list
+/// rendering note, and docker fallback (plain shows generic docker when
+/// has_compose/has_dockerfile). The helper also captures the remaining
+/// variant differences: build error string (git includes count), ordering
+/// (git: todos→metrics→build, plain: build→todos→metrics), and test-results
+/// (git only). Callers in both `if git_info.is_repo` branches share this
+/// helper so the diff stays small — variant is chosen via `git_info.is_repo`.
+fn build_details_row(
+    _path: &Path,
+    summary: &DirSummary,
+    git_info: &GitInfo,
+    opts: &BannerOptions,
+    config: &crate::state::Config,
+) -> Vec<String> {
     let todo_info = if config.todo_count {
         summary.todo_info.as_ref()
     } else {
@@ -1064,8 +1078,248 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         None
     };
 
-    let path_str = path.to_string_lossy();
     let project_icon = summary.project_type.icon();
+    let size_str = format_size_for_mode(summary.total_size, &config.size);
+    let size_label = if summary.truncated { "sample" } else { "total" };
+
+    let mut details = Vec::new();
+
+    // File stats (common)
+    if opts.total_size || config.total_size {
+        details.push(format!(
+            "{}{}{} {}{}{}",
+            color(CYAN),
+            size_str,
+            color(RESET),
+            color(DIM),
+            size_label,
+            color(RESET)
+        ));
+    }
+    if summary.truncated {
+        details.push(format!(
+            "{}{}+{} {}items{}",
+            color(BRIGHT_WHITE),
+            crate::fs::MAX_DIRECTORY_SCAN_ITEMS,
+            color(RESET),
+            color(DIM),
+            color(RESET)
+        ));
+    } else {
+        details.push(format!(
+            "{}{}{} {}files{}",
+            color(BRIGHT_WHITE),
+            summary.files,
+            color(RESET),
+            color(DIM),
+            color(RESET)
+        ));
+        details.push(format!(
+            "{}{}{} {}{}{}",
+            color(BRIGHT_WHITE),
+            summary.dirs,
+            color(RESET),
+            color(DIM),
+            if summary.dirs == 1 { "dir" } else { "dirs" },
+            color(RESET)
+        ));
+    }
+
+    // Shared language-breakdown push — used in both variants
+    let push_code_metrics = |details: &mut Vec<String>| {
+        if let Some(metrics) = code_metrics {
+            if metrics.total_loc > 0 {
+                let loc_str = format_loc(metrics.total_loc);
+                details.push(format!(
+                    "{}{}{} {}lines{}",
+                    color(GREEN),
+                    loc_str,
+                    color(RESET),
+                    color(DIM),
+                    color(RESET)
+                ));
+                if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
+                    let lang_parts: Vec<String> = metrics
+                        .by_extension
+                        .iter()
+                        .filter(|(ext, _)| {
+                            !ext.chars().all(|c| c.is_numeric())
+                                && ext != "no-ext"
+                                && !ext.is_empty()
+                        })
+                        .take(3)
+                        .map(|(ext, loc)| {
+                            let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
+                            let name = match ext.as_str() {
+                                "rs" => "Rust",
+                                "md" | "mdx" => "Markdown",
+                                "sh" | "bash" => "Shell",
+                                "py" => "Python",
+                                "js" | "mjs" => "JavaScript",
+                                "ts" | "tsx" => "TypeScript",
+                                "svelte" => "Svelte",
+                                "go" => "Go",
+                                "c" | "h" => "C",
+                                "cpp" | "cc" | "cxx" | "hpp" => "C++",
+                                "java" => "Java",
+                                "rb" => "Ruby",
+                                "toml" => "TOML",
+                                "yaml" | "yml" => "YAML",
+                                "json" => "JSON",
+                                "html" | "htm" => "HTML",
+                                "css" => "CSS",
+                                "sql" => "SQL",
+                                "vim" => "VimL",
+                                "el" => "Emacs Lisp",
+                                _ => ext,
+                            };
+                            format!("{}% {}{}{}", pct, color(DIM), name, color(RESET))
+                        })
+                        .collect();
+                    if !lang_parts.is_empty() {
+                        details.push(format!(
+                            "{} {}{}{}",
+                            project_icon,
+                            color(DIM),
+                            lang_parts.join(", "),
+                            color(RESET)
+                        ));
+                    }
+                }
+            }
+        }
+    };
+
+    if git_info.is_repo {
+        // Git-repo variant — 3 differing details handled here:
+        // clean indicator lives in row1's git_status, port list is identical,
+        // docker fallback is omitted (only containers>0). Also: build error
+        // includes count, and test results are shown.
+        if let Some(todos) = todo_info {
+            if todos.count > 0 {
+                details.push(format!(
+                    "{}{}{} {}TODOs{}",
+                    color(YELLOW),
+                    todos.count,
+                    color(RESET),
+                    color(DIM),
+                    color(RESET)
+                ));
+            }
+        }
+        push_code_metrics(&mut details);
+        if let Some(build) = build_status {
+            if build.ok {
+                let duration_str = if build.duration_ms > 0 {
+                    if build.duration_ms < 1000 {
+                        format!(" ({}ms)", build.duration_ms)
+                    } else {
+                        format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
+                    }
+                } else {
+                    String::new()
+                };
+                details.push(format!("{}✓ builds{}{}", color(GREEN), duration_str, color(RESET)));
+            } else {
+                let err_str = if build.errors > 0 {
+                    format!(" ({} err)", build.errors)
+                } else {
+                    String::new()
+                };
+                details.push(format!("{}✗ build errors{}{}", color(RED), err_str, color(RESET)));
+            }
+        }
+        if let Some(ports) = port_info {
+            if !ports.ports.is_empty() {
+                let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
+                details.push(format!("{}🔌 {}{}", color(CYAN), port_str.join(", "), color(RESET)));
+            }
+        }
+        if let Some(docker) = docker_info {
+            let running = docker.containers.iter().filter(|c| c.status.contains("Up")).count();
+            let total = docker.containers.len();
+            if total > 0 {
+                details.push(format!(
+                    "{}🐳 {} container(s){}",
+                    color(CYAN),
+                    if running > 0 { format!("{} up", running) } else { total.to_string() },
+                    color(RESET)
+                ));
+            }
+        }
+        if let Some(test_results) = crate::test_cache::TestResults::load() {
+            if test_results.failed > 0 {
+                details.push(format!("{}✗ {} failed{}", color(RED), test_results.failed, color(RESET)));
+            } else if test_results.passed > 0 {
+                details.push(format!(
+                    "{}✓ {} tests{} ({})",
+                    color(GREEN),
+                    test_results.passed,
+                    color(RESET),
+                    test_results.format_time_ago()
+                ));
+            }
+        }
+    } else {
+        // Plain variant — todos after build, generic docker fallback, build error without count
+        if let Some(build) = build_status {
+            if build.ok {
+                let duration_str = if build.duration_ms > 0 {
+                    if build.duration_ms < 1000 {
+                        format!(" ({}ms)", build.duration_ms)
+                    } else {
+                        format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
+                    }
+                } else {
+                    String::new()
+                };
+                details.push(format!("{}✓ builds{}{}", color(GREEN), duration_str, color(RESET)));
+            } else {
+                details.push(format!("{}✗ build errors{}", color(RED), color(RESET)));
+            }
+        }
+        if let Some(todos) = todo_info {
+            if todos.count > 0 {
+                details.push(format!(
+                    "{}{}{} {}TODOs{}",
+                    color(YELLOW),
+                    todos.count,
+                    color(RESET),
+                    color(DIM),
+                    color(RESET)
+                ));
+            }
+        }
+        push_code_metrics(&mut details);
+        if let Some(ports) = port_info {
+            if !ports.ports.is_empty() {
+                let port_str: Vec<String> = ports.ports.iter().map(|p| format!(":{}", p)).collect();
+                details.push(format!("{}🔌 {}{}", color(CYAN), port_str.join(", "), color(RESET)));
+            }
+        }
+        if let Some(docker) = docker_info {
+            let running = docker.containers.iter().filter(|c| c.status.contains("Up")).count();
+            let total = docker.containers.len();
+            if total > 0 {
+                details.push(format!(
+                    "{}🐳 {} container(s){}",
+                    color(CYAN),
+                    if running > 0 { format!("{} up", running) } else { total.to_string() },
+                    color(RESET)
+                ));
+            } else if docker.has_compose || docker.has_dockerfile {
+                details.push(format!("{}🐳 docker{}", color(DIM), color(RESET)));
+            }
+        }
+    }
+
+    details
+}
+
+fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &BannerOptions) {
+    // Load config for display settings
+    let config = crate::state::Config::load().unwrap_or_default();
+    let path_str = path.to_string_lossy();
     let project_label = summary.project_type.label();
 
     let home = std::env::var("HOME").unwrap_or_default();
@@ -1118,8 +1372,6 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     // Deferred header: compute only when about to display
     let sep = format!(" {}·{} ", color(DIM), color(RESET));
     let header = {
-        let size_str = format_size_for_mode(summary.total_size, &config.size);
-        let size_label = if summary.truncated { "sample" } else { "total" };
         let branch_display = build_branch_display(git_info);
         let git_status_str = build_git_status_indicators(git_info);
         let mut git_status = if git_status_str.is_empty() {
@@ -1194,215 +1446,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
             let row1 = parts.join(&sep);
 
-            // Row 2: Stats with labels
-            let mut details = Vec::new();
-
-            // File stats
-            if opts.total_size || config.total_size {
-                details.push(format!(
-                    "{}{}{} {}{}{}",
-                    color(CYAN),
-                    size_str,
-                    color(RESET),
-                    color(DIM),
-                    size_label,
-                    color(RESET)
-                ));
-            }
-            if summary.truncated {
-                details.push(format!(
-                    "{}{}+{} {}items{}",
-                    color(BRIGHT_WHITE),
-                    crate::fs::MAX_DIRECTORY_SCAN_ITEMS,
-                    color(RESET),
-                    color(DIM),
-                    color(RESET)
-                ));
-            } else {
-                details.push(format!(
-                    "{}{}{} {}files{}",
-                    color(BRIGHT_WHITE),
-                    summary.files,
-                    color(RESET),
-                    color(DIM),
-                    color(RESET)
-                ));
-                details.push(format!(
-                    "{}{}{} {}{}{}",
-                    color(BRIGHT_WHITE),
-                    summary.dirs,
-                    color(RESET),
-                    color(DIM),
-                    if summary.dirs == 1 { "dir" } else { "dirs" },
-                    color(RESET)
-                ));
-            }
-
-            // Code metrics
-            if let Some(todos) = todo_info {
-                if todos.count > 0 {
-                    details.push(format!(
-                        "{}{}{} {}TODOs{}",
-                        color(YELLOW),
-                        todos.count,
-                        color(RESET),
-                        color(DIM),
-                        color(RESET)
-                    ));
-                }
-            }
-            if let Some(metrics) = code_metrics {
-                if metrics.total_loc > 0 {
-                    let loc_str = format_loc(metrics.total_loc);
-                    details.push(format!(
-                        "{}{}{} {}lines{}",
-                        color(GREEN),
-                        loc_str,
-                        color(RESET),
-                        color(DIM),
-                        color(RESET)
-                    ));
-                    // Show top 3 languages (skip non-language extensions like man pages and no-ext)
-                    if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                        let lang_parts: Vec<String> = metrics
-                            .by_extension
-                            .iter()
-                            .filter(|(ext, _)| {
-                                // Skip man page extensions (1, 2, 3, etc.), no-ext, and empty
-                                !ext.chars().all(|c| c.is_numeric())
-                                    && ext != "no-ext"
-                                    && !ext.is_empty()
-                            })
-                            .take(3)
-                            .map(|(ext, loc)| {
-                                let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                                let name = match ext.as_str() {
-                                    "rs" => "Rust",
-                                    "md" | "mdx" => "Markdown",
-                                    "sh" | "bash" => "Shell",
-                                    "py" => "Python",
-                                    "js" | "mjs" => "JavaScript",
-                                    "ts" | "tsx" => "TypeScript",
-                                    "svelte" => "Svelte",
-                                    "go" => "Go",
-                                    "c" | "h" => "C",
-                                    "cpp" | "cc" | "cxx" | "hpp" => "C++",
-                                    "java" => "Java",
-                                    "rb" => "Ruby",
-                                    "toml" => "TOML",
-                                    "yaml" | "yml" => "YAML",
-                                    "json" => "JSON",
-                                    "html" | "htm" => "HTML",
-                                    "css" => "CSS",
-                                    "sql" => "SQL",
-                                    "vim" => "VimL",
-                                    "el" => "Emacs Lisp",
-                                    _ => ext,
-                                };
-                                format!("{}% {}{}{}", pct, color(DIM), name, color(RESET))
-                            })
-                            .collect();
-                        if !lang_parts.is_empty() {
-                            details.push(format!(
-                                "{} {}{}{}",
-                                project_icon,
-                                color(DIM),
-                                lang_parts.join(", "),
-                                color(RESET)
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // Build status
-            if let Some(build) = build_status {
-                if build.ok {
-                    let duration_str = if build.duration_ms > 0 {
-                        if build.duration_ms < 1000 {
-                            format!(" ({}ms)", build.duration_ms)
-                        } else {
-                            format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
-                        }
-                    } else {
-                        String::new()
-                    };
-                    details.push(format!(
-                        "{}✓ builds{}{}",
-                        color(GREEN),
-                        duration_str,
-                        color(RESET)
-                    ));
-                } else {
-                    let err_str = if build.errors > 0 {
-                        format!(" ({} err)", build.errors)
-                    } else {
-                        String::new()
-                    };
-                    details.push(format!(
-                        "{}✗ build errors{}{}",
-                        color(RED),
-                        err_str,
-                        color(RESET)
-                    ));
-                }
-            }
-
-            // Port usage
-            if let Some(ports) = port_info {
-                if !ports.ports.is_empty() {
-                    let port_str: Vec<String> =
-                        ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                    details.push(format!(
-                        "{}🔌 {}{}",
-                        color(CYAN),
-                        port_str.join(", "),
-                        color(RESET)
-                    ));
-                }
-            }
-
-            // Docker info
-            if let Some(docker) = docker_info {
-                let running = docker
-                    .containers
-                    .iter()
-                    .filter(|c| c.status.contains("Up"))
-                    .count();
-                let total = docker.containers.len();
-                if total > 0 {
-                    details.push(format!(
-                        "{}🐳 {} container(s){}",
-                        color(CYAN),
-                        if running > 0 {
-                            format!("{} up", running)
-                        } else {
-                            total.to_string()
-                        },
-                        color(RESET)
-                    ));
-                }
-            }
-
-            // Cached test results
-            if let Some(test_results) = crate::test_cache::TestResults::load() {
-                if test_results.failed > 0 {
-                    details.push(format!(
-                        "{}✗ {} failed{}",
-                        color(RED),
-                        test_results.failed,
-                        color(RESET)
-                    ));
-                } else if test_results.passed > 0 {
-                    details.push(format!(
-                        "{}✓ {} tests{} ({})",
-                        color(GREEN),
-                        test_results.passed,
-                        color(RESET),
-                        test_results.format_time_ago()
-                    ));
-                }
-            }
+            let details = build_details_row(path, summary, git_info, opts, &config);
 
             // Combine rows with dynamic truncation
             if details.is_empty() {
@@ -1441,188 +1485,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
             }
             let row1 = parts.join(&sep);
 
-            // Row 2: Details
-            let mut details = Vec::new();
-
-            // File stats
-            if opts.total_size || config.total_size {
-                details.push(format!(
-                    "{}{}{} {}{}{}",
-                    color(CYAN),
-                    size_str,
-                    color(RESET),
-                    color(DIM),
-                    size_label,
-                    color(RESET)
-                ));
-            }
-            if summary.truncated {
-                details.push(format!(
-                    "{}{}+{} {}items{}",
-                    color(BRIGHT_WHITE),
-                    crate::fs::MAX_DIRECTORY_SCAN_ITEMS,
-                    color(RESET),
-                    color(DIM),
-                    color(RESET)
-                ));
-            } else {
-                details.push(format!(
-                    "{}{}{} {}files{}",
-                    color(BRIGHT_WHITE),
-                    summary.files,
-                    color(RESET),
-                    color(DIM),
-                    color(RESET)
-                ));
-                details.push(format!(
-                    "{}{}{} {}{}{}",
-                    color(BRIGHT_WHITE),
-                    summary.dirs,
-                    color(RESET),
-                    color(DIM),
-                    if summary.dirs == 1 { "dir" } else { "dirs" },
-                    color(RESET)
-                ));
-            }
-
-            // Build status
-            if let Some(build) = build_status {
-                if build.ok {
-                    let duration_str = if build.duration_ms > 0 {
-                        if build.duration_ms < 1000 {
-                            format!(" ({}ms)", build.duration_ms)
-                        } else {
-                            format!(" ({:.1}s)", build.duration_ms as f64 / 1000.0)
-                        }
-                    } else {
-                        String::new()
-                    };
-                    details.push(format!(
-                        "{}✓ builds{}{}",
-                        color(GREEN),
-                        duration_str,
-                        color(RESET)
-                    ));
-                } else {
-                    details.push(format!("{}✗ build errors{}", color(RED), color(RESET)));
-                }
-            }
-
-            // TODO count
-            if let Some(todos) = todo_info {
-                if todos.count > 0 {
-                    details.push(format!(
-                        "{}{}{} {}TODOs{}",
-                        color(YELLOW),
-                        todos.count,
-                        color(RESET),
-                        color(DIM),
-                        color(RESET)
-                    ));
-                }
-            }
-
-            // Code metrics - show languages breakdown
-            if let Some(metrics) = code_metrics {
-                if metrics.total_loc > 0 {
-                    let loc_str = format_loc(metrics.total_loc);
-                    details.push(format!(
-                        "{}{}{} {}lines{}",
-                        color(GREEN),
-                        loc_str,
-                        color(RESET),
-                        color(DIM),
-                        color(RESET)
-                    ));
-                    // Show top 3 languages with percentages
-                    if !metrics.by_extension.is_empty() && metrics.total_loc > 0 {
-                        let lang_parts: Vec<String> = metrics
-                            .by_extension
-                            .iter()
-                            .filter(|(ext, _)| {
-                                !ext.chars().all(|c| c.is_numeric())
-                                    && ext != "no-ext"
-                                    && !ext.is_empty()
-                            })
-                            .take(3)
-                            .map(|(ext, loc)| {
-                                let pct = (*loc as f64 / metrics.total_loc as f64 * 100.0) as usize;
-                                let name = match ext.as_str() {
-                                    "rs" => "Rust",
-                                    "md" | "mdx" => "Markdown",
-                                    "sh" | "bash" => "Shell",
-                                    "py" => "Python",
-                                    "js" | "mjs" => "JavaScript",
-                                    "ts" | "tsx" => "TypeScript",
-                                    "svelte" => "Svelte",
-                                    "go" => "Go",
-                                    "c" | "h" => "C",
-                                    "cpp" | "cc" | "cxx" | "hpp" => "C++",
-                                    "java" => "Java",
-                                    "rb" => "Ruby",
-                                    "toml" => "TOML",
-                                    "yaml" | "yml" => "YAML",
-                                    "json" => "JSON",
-                                    "html" | "htm" => "HTML",
-                                    "css" => "CSS",
-                                    "sql" => "SQL",
-                                    "vim" => "VimL",
-                                    "el" => "Emacs Lisp",
-                                    _ => ext,
-                                };
-                                format!("{}% {}{}{}", pct, color(DIM), name, color(RESET))
-                            })
-                            .collect();
-                        if !lang_parts.is_empty() {
-                            details.push(format!(
-                                "{} {}{}{}",
-                                project_icon,
-                                color(DIM),
-                                lang_parts.join(", "),
-                                color(RESET)
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // Port usage
-            if let Some(ports) = port_info {
-                if !ports.ports.is_empty() {
-                    let port_str: Vec<String> =
-                        ports.ports.iter().map(|p| format!(":{}", p)).collect();
-                    details.push(format!(
-                        "{}🔌 {}{}",
-                        color(CYAN),
-                        port_str.join(", "),
-                        color(RESET)
-                    ));
-                }
-            }
-
-            // Docker info
-            if let Some(docker) = docker_info {
-                let running = docker
-                    .containers
-                    .iter()
-                    .filter(|c| c.status.contains("Up"))
-                    .count();
-                let total = docker.containers.len();
-                if total > 0 {
-                    details.push(format!(
-                        "{}🐳 {} container(s){}",
-                        color(CYAN),
-                        if running > 0 {
-                            format!("{} up", running)
-                        } else {
-                            total.to_string()
-                        },
-                        color(RESET)
-                    ));
-                } else if docker.has_compose || docker.has_dockerfile {
-                    details.push(format!("{}🐳 docker{}", color(DIM), color(RESET)));
-                }
-            }
+            let details = build_details_row(path, summary, git_info, opts, &config);
 
             // Combine rows with dynamic truncation
             if details.is_empty() {
