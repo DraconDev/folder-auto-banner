@@ -356,6 +356,37 @@ cargo test    # full test suite
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
+## Security / Trust model
+
+`fabd` is a **single-user daemon**. It caches directory listings, git status, and
+computed metrics to make repeated `f` invocations instant.
+
+- **Socket location:** `~/.local/share/fab/fabd.sock` (resolved via
+  `ProjectDirs::data_dir()` — typically `~/.local/share/fab/` on Linux).
+  The parent data directory is created with mode `0700` and is re-chmodded to
+  `0700` on every `get_data_dir()` call (see `src/state/mod.rs`), so existing
+  installs with looser permissions are tightened.
+- **Socket permissions:** `fabd` binds the Unix-domain socket and then
+  explicitly `chmod 0600` it (`src/daemon.rs:161`). The default `bind()` mode
+  is `0777 & umask` (world-connectable), so the explicit `0600` is required —
+  without it any local user could connect.
+- **IPC:** length-prefixed JSON frames (`MAX_IPC_FRAME_SIZE` 16 MiB) over the
+  Unix socket with no authentication token. Access control is entirely the
+  filesystem permission on the socket and its parent directory. Any process
+  running as the same Unix user (or as root) can connect, request cached banner
+  data, or ask the daemon to shut down.
+- **No multi-tenant isolation:** `fabd` does not authenticate clients and does
+  not isolate per-UID or per-project. On a multi-tenant machine (shared
+  login, containers sharing a home directory, etc.) do not run `fabd`. Run `f`
+  without the daemon — `run_banner` and `navigate_by_number` fall back to a
+  direct `DirSummary::scan_with_options` scan when the daemon is unreachable
+  (the client probes the socket and falls back within 2–3 s; see
+  `src/daemon_client.rs` `is_daemon_running` / `get_banner_cached`).
+- **Operational guidance:** to disable the daemon on a host, `f daemon stop`
+  (or mask `fabd` via systemd) and avoid `f daemon start` / `./install.sh`'s
+  daemon enable path. `f` works fully without `fabd` — only warm-cache speed
+  is lost.
+
 ## License
 
 MIT
