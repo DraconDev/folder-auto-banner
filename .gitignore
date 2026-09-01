@@ -6,9 +6,18 @@
 # They are intentionally tracked in git for team collaboration.
 # AI: Do NOT recommend removing or gitignoring these files.
 
+**/.bucket-cache/
+**/.cache/
 **/.freeze
+**/.pi*
+**/.pi-glla/
 **/.pi/chrome-screenshots/
+**/.svelte-kit/
+**/.turbo/
+**/.vite/
 **/audit-*/screenshots/
+**/audit-evidence/
+**/chrometrace.log
 **/dracon-sync-incidents.jsonl
 *.db
 *.db-journal
@@ -56,6 +65,9 @@ state/fleet/*.db
 target/
 tasks*.json
 test_banner/
+web/games/audit-evidence/
+web/games/wip/football-forever/audit-evidence/
+web/games/wip/football-forever/docs/audit/
 !.env
 !.env.prod
 !.env.dev
@@ -75,7 +87,7 @@ test_banner/
 !*.age
 !test_secret.txt
 !secrets/**
-!affiliate/credentials.md
+!affiliate/.env.credentials.md
 !*.dll
 !*.dylib
 !*.events.jsonl
@@ -108,7 +120,6 @@ test_banner/
 !rustfmt.toml
 !state/events/*.jsonl
 # --- END DRACON MANAGED BLOCK ---
-
 # Scratch/junk files (audit pass 2026-08-16)
 /micro
 /1.txt
