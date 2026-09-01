@@ -110,8 +110,17 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     };
     let t1 = std::time::Instant::now();
 
+    // Banner read timeout: keep it short so an unresponsive daemon falls
+    // back to a direct local scan quickly (DECIDE 2: short ping 2s +
+    // direct-scan fallback). Cache hits return in ~1-10ms; a hung daemon
+    // that doesn't respond within 2s would otherwise stall the prompt for
+    // up to 30s before `run_banner` could fall through. Large cold scans
+    // that legitimately take >3s will also fallback to a direct scan —
+    // the daemon still computes in the background and populates the
+    // on-disk cache for the next invocation, so the result is correct
+    // either way.
     stream
-        .set_read_timeout(Some(Duration::from_secs(30)))
+        .set_read_timeout(Some(Duration::from_secs(3)))
         .ok()?;
     stream
         .set_write_timeout(Some(Duration::from_secs(1)))
@@ -124,7 +133,14 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let response = match result {
         Ok(r) => r,
         Err(e) => {
-            tracing::debug!("send_and_recv error: {}", e);
+            // Timeout / disconnect / malformed response — fall back to
+            // a direct scan in the caller (`run_banner` and
+            // `navigate_by_number` both treat `None` as "daemon
+            // unavailable, scan directly"). This is the rare path
+            // where the socket connected but the daemon never answered
+            // (the `connect`-failed path already falls back via the
+            // `connected?` early return above).
+            tracing::debug!("daemon Banner request failed, falling back to direct scan: {}", e);
             return None;
         }
     };
