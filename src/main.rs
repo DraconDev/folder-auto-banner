@@ -10,11 +10,13 @@ use std::env;
 /// Aliases compose with paths in banner mode: `f -b top ./src` → `-S -r -m 20` for `./src`.
 ///
 /// User intent: bare words (not numbers, not paths) are alias lookups.
-/// The routing accepts only numbers, aliases, and flags. Unknown bare
-/// words and paths are dropped (the "nothing happens" rule, exit 0
-/// with no output). For path-specific banners, use `f -b <path>` or
-/// `f banner <path>`. `f -b` switches to banner mode where paths
-/// are allowed.
+/// The routing accepts numbers, aliases, flags, and **existing**
+/// filesystem paths (e.g. `f src`, `f docs`, `f ./src`). Unknown
+/// bare words and non-existing paths are dropped (the "nothing
+/// happens" rule, exit 0 with no output). For an explicit path
+/// that may not exist yet, use `f -b <path>` or `f banner <path>`.
+/// `f -b` switches to banner mode where syntactic paths (`./`, `/`,
+/// `~/`) are kept even before existence is checked.
 const BUILTIN_ALIASES: &[(&str, &[&str])] = &[
     // Display modes
     ("tree", &["-R", "-D"]), // Recursive, only dirs (like `tree`)
@@ -49,10 +51,55 @@ fn lookup_alias(name: &str) -> Option<&'static [&'static str]> {
         .map(|(_, flags)| *flags)
 }
 
+/// Returns true if the arg points to an existing filesystem entry.
+/// Handles `~` expansion and checks both files and directories.
+fn is_existing_path(arg: &str) -> bool {
+    if arg.is_empty() {
+        return false;
+    }
+    // Expand leading `~` / `~/` via $HOME.
+    let expanded = if arg == "~" || arg.starts_with("~/") {
+        if let Ok(home) = env::var("HOME") {
+            // "~" -> HOME, "~/foo" -> "HOME/foo"
+            if arg == "~" {
+                home
+            } else {
+                format!("{}{}", home, &arg[1..])
+            }
+        } else {
+            arg.to_string()
+        }
+    } else {
+        arg.to_string()
+    };
+    std::path::Path::new(&expanded).exists()
+}
+
+/// Returns true if the arg looks like an explicit path (starts with
+/// `.`, `/`, or `~`) OR already exists on disk as a file/dir.
+/// Bare names like `src` / `docs` are considered paths when they
+/// exist relative to cwd — so `f src` shows that folder's banner.
+fn is_path_like(arg: &str) -> bool {
+    if arg.is_empty() {
+        return false;
+    }
+    let first = arg.chars().next().unwrap();
+    if first == '.' || first == '/' || first == '~' {
+        return true;
+    }
+    is_existing_path(arg)
+}
+
+/// Unified path predicate used by both strict and banner expansion:
+/// syntactic path (`./`, `/`, `~/`) OR existing filesystem entry.
+fn is_path_arg(arg: &str) -> bool {
+    is_path_like(arg)
+}
+
 /// Expand a list of args for the banner subcommand: pass through
-/// flags and numbers; expand aliases to their flag lists; drop
-/// paths and unknown words. Used for non-banner routing where
-/// paths are not allowed.
+/// flags, numbers, and **existing** paths; expand aliases; drop
+/// unknown words. `f src` now shows the banner for `./src` when
+/// `src` exists — previously paths were unconditionally dropped.
 fn expand_args_strict(args: &[String]) -> Vec<String> {
     let mut new_args: Vec<String> = vec!["f".to_string(), "banner".to_string()];
     for a in args {
@@ -64,8 +111,11 @@ fn expand_args_strict(args: &[String]) -> Vec<String> {
             for flag in flags {
                 new_args.push(flag.to_string());
             }
+        } else if is_path_arg(a) {
+            // Existing file/dir or explicit path — treat as banner path.
+            new_args.push(a.clone());
         }
-        // Paths and unknown words are dropped.
+        // Unknown bare words (no alias, no path) are dropped.
     }
     new_args
 }
@@ -80,8 +130,8 @@ fn expand_args_for_banner(args: &[String]) -> Vec<String> {
             // The banner switch itself is consumed.
             continue;
         }
-        if a.starts_with('-') || is_path_like(a) || a.parse::<usize>().is_ok() {
-            // Explicit flag, path, or number — pass through unchanged.
+        if a.starts_with('-') || is_path_arg(a) || a.parse::<usize>().is_ok() {
+            // Explicit flag, path (including bare existing names), or number.
             new_args.push(a.clone());
         } else if let Some(flags) = lookup_alias(a) {
             // Known alias — expand to its flags.
@@ -92,17 +142,6 @@ fn expand_args_for_banner(args: &[String]) -> Vec<String> {
         // Unknown bare word — DROP.
     }
     new_args
-}
-
-/// Returns true if the arg looks like an explicit path (starts with
-/// `.`, `/`, or `~`). Used only in banner mode (`-b`) where paths
-/// are allowed.
-fn is_path_like(arg: &str) -> bool {
-    if arg.is_empty() {
-        return false;
-    }
-    let first = arg.chars().next().unwrap();
-    first == '.' || first == '/' || first == '~'
 }
 
 /// Known subcommands that clap should parse. When the first non-flag
@@ -119,12 +158,17 @@ const KNOWN_SUBCOMMANDS: &[&str] = &[
 ];
 
 /// Returns true if the user-provided args contain an alias, number,
-/// or flag (i.e., anything the banner subcommand should act on).
-/// Paths and unknown bare words are not considered useful — they
-/// are dropped per the "nothing happens" rule.
+/// flag, or existing path (i.e., anything the banner subcommand
+/// should act on). Bare names that resolve to a real file/dir
+/// (e.g. `f src`) are now considered useful so the "nothing
+/// happens" rule doesn't swallow them.
 fn args_contain_something_useful(args: &[String]) -> bool {
-    args.iter()
-        .any(|a| a.starts_with('-') || lookup_alias(a).is_some() || a.parse::<usize>().is_ok())
+    args.iter().any(|a| {
+        a.starts_with('-')
+            || lookup_alias(a).is_some()
+            || a.parse::<usize>().is_ok()
+            || is_path_arg(a)
+    })
 }
 
 /// Returns true if the invocation should exit 0 with no output —
@@ -162,24 +206,25 @@ fn main() -> Result<()> {
     }
 
     // "Nothing happens" rule: if the user typed only args that match
-    // no alias, number, or flag (e.g. `f t`, `f foo`, `f ./src`,
-    // `f /tmp`, `f Downloads`), the command exits 0 with no output.
-    // The user said: "we only take numbers, aliases, and flags, not
-    // folders and files by name." `f` (no args) still shows the
-    // default banner for cwd. Use `f -b <path>` for path-specific
-    // banners.
+    // no alias, number, flag, or existing path (e.g. `f t`, `f foo`,
+    // `f Downloads`), the command exits 0 with no output. Existing
+    // paths like `f src`, `f ./src`, `f /tmp` now show that folder's
+    // banner; use `f -b <path>` for a syntactic path that may not
+    // exist yet. `f` (no args) still shows the default banner for cwd.
     if should_exit_silently(&args) {
         return Ok(());
     }
 
-    // If the args contain only flags (no aliases, no numbers), let
-    // clap handle directly. This covers `f -V`, `f --help`, `f -e`,
-    // `f -f txt`, etc. — invocations where the top-level Cli flags
-    // are sufficient and no alias expansion is needed.
-    let has_alias_or_number = args
+    // If the args contain only flags (no aliases, no numbers, no
+    // paths), let clap handle directly. This covers `f -V`,
+    // `f --help`, `f -e`, `f -f txt`, etc. — invocations where the
+    // top-level Cli flags are sufficient and no alias expansion is
+    // needed. When a path is present (`f src -t`, `f ./src -a`)
+    // we must expand so the path routes to `f banner <path>`.
+    let has_alias_or_number_or_path = args
         .iter()
-        .any(|a| lookup_alias(a).is_some() || a.parse::<usize>().is_ok());
-    if !has_alias_or_number && args.iter().any(|a| a.starts_with('-')) {
+        .any(|a| lookup_alias(a).is_some() || a.parse::<usize>().is_ok() || is_path_arg(a));
+    if !has_alias_or_number_or_path && args.iter().any(|a| a.starts_with('-')) {
         let cli = cli::Cli::parse();
         return cli.run();
     }
@@ -402,10 +447,22 @@ mod tests {
 
     #[test]
     fn test_should_exit_silently_with_path() {
-        // `f ./src`, `f /tmp` — paths are dropped, exit silently.
-        assert!(should_exit_silently(&["./src".to_string()]));
-        assert!(should_exit_silently(&["/tmp".to_string()]));
-        assert!(should_exit_silently(&["~/Downloads".to_string()]));
+        // Existing paths are now considered useful — `f ./src`, `f /tmp`
+        // show that dir's banner instead of exiting silently.
+        assert!(!should_exit_silently(&["./src".to_string()]));
+        assert!(!should_exit_silently(&["/tmp".to_string()]));
+        // Syntactic paths (even non-existing) are considered paths —
+        // `f -b` / `f <path>` routes to banner (banner will error).
+        assert!(!should_exit_silently(&[
+            "/nonexistent_f_test_path_xyz".to_string()
+        ]));
+        assert!(!should_exit_silently(
+            &["./no_such_dir_xyz_123".to_string()]
+        ));
+        // Bare non-existing word is silent.
+        assert!(should_exit_silently(&[
+            "definitely_not_a_real_file_xyz_123".to_string()
+        ]));
     }
 
     #[test]
@@ -429,11 +486,20 @@ mod tests {
     fn test_should_exit_silently_mixed() {
         // `f t 4` — has number 4, not silent.
         assert!(!should_exit_silently(&["t".to_string(), "4".to_string()]));
-        // `f t ./src` — paths are dropped, so the only useful arg is
-        // the (unknown) `t`, which means silent.
-        assert!(should_exit_silently(&[
+        // `f t ./src` — ./src is an existing path, so not silent.
+        assert!(!should_exit_silently(&[
             "t".to_string(),
             "./src".to_string()
+        ]));
+        // `f t ./no_such_dir` — ./no_such_dir is still a syntactic path → not silent.
+        assert!(!should_exit_silently(&[
+            "t".to_string(),
+            "./no_such_dir_xyz_123".to_string()
+        ]));
+        // `f t <bare-nonexisting>` — both useless → silent.
+        assert!(should_exit_silently(&[
+            "t".to_string(),
+            "definitely_not_a_real_file_xyz_123".to_string()
         ]));
     }
 
@@ -470,10 +536,26 @@ mod tests {
 
     #[test]
     fn test_expand_aliases_strict_drops_paths() {
-        // In strict (non-banner) mode, paths are dropped. Use `f -b
-        // <path>` for path-specific banners.
-        let result = expand_args_strict(&["tree".to_string(), "./src".to_string()]);
+        // Bare non-existing words are dropped in strict mode.
+        let result = expand_args_strict(&[
+            "tree".to_string(),
+            "definitely_not_a_real_file_xyz_123".to_string(),
+        ]);
         assert_eq!(result, vec!["f", "banner", "-R", "-D"]);
+    }
+
+    #[test]
+    fn test_expand_aliases_strict_keeps_existing_paths() {
+        // Existing paths are now kept — `f tree ./src` → banner for ./src.
+        let result = expand_args_strict(&["tree".to_string(), "./src".to_string()]);
+        assert_eq!(result, vec!["f", "banner", "-R", "-D", "./src"]);
+    }
+
+    #[test]
+    fn test_expand_aliases_strict_bare_name_existing() {
+        // Bare dir name that exists on disk (`src`, `docs`) is a path.
+        let result = expand_args_strict(&["src".to_string()]);
+        assert_eq!(result, vec!["f", "banner", "src"]);
     }
 
     #[test]
@@ -506,13 +588,24 @@ mod tests {
 
     #[test]
     fn test_expand_aliases_mix_of_alias_and_path_drops_path_in_strict() {
-        // In strict mode, paths are dropped even when mixed with aliases.
+        // Bare non-existing words are dropped even when mixed with aliases.
+        let result = expand_args_strict(&[
+            "hidden".to_string(),
+            "definitely_not_a_real_file_xyz_123".to_string(),
+            "verbose".to_string(),
+        ]);
+        assert_eq!(result, vec!["f", "banner", "-a", "-v"]);
+    }
+
+    #[test]
+    fn test_expand_aliases_strict_mix_keeps_existing_path() {
+        // Existing path is kept alongside aliases.
         let result = expand_args_strict(&[
             "hidden".to_string(),
             "/tmp".to_string(),
             "verbose".to_string(),
         ]);
-        assert_eq!(result, vec!["f", "banner", "-a", "-v"]);
+        assert_eq!(result, vec!["f", "banner", "-a", "/tmp", "-v"]);
     }
 
     #[test]
@@ -603,8 +696,22 @@ mod tests {
         assert!(is_path_like("/tmp"));
         assert!(is_path_like("~"));
         assert!(is_path_like("~/Downloads"));
+        // Bare names that exist are also paths.
+        assert!(is_path_like("src"));
+        assert!(is_path_like("Cargo.toml"));
         assert!(!is_path_like("tree"));
         assert!(!is_path_like("foo"));
+        assert!(!is_path_like("nonexistentword123"));
         assert!(!is_path_like(""));
+    }
+
+    #[test]
+    fn test_is_existing_path() {
+        assert!(is_existing_path("src"));
+        assert!(is_existing_path("Cargo.toml"));
+        assert!(is_existing_path("./src"));
+        assert!(is_existing_path("/tmp"));
+        assert!(!is_existing_path("definitely_not_a_real_file_xyz_123"));
+        assert!(!is_existing_path(""));
     }
 }
