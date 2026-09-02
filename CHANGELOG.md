@@ -1,5 +1,34 @@
 ## [Unreleased]
 
+### Routing fix — `f src` / `f docs` / `f ./src` now show that folder's banner
+
+Bare directory names that exist on disk are now recognized as paths
+instead of being dropped by the "nothing happens" rule. `f -b src`
+also now works for bare names. Implementation in `src/main.rs`:
+
+- `is_existing_path()` (tilde-expanded `Path::exists`) + unified
+  `is_path_arg()` = syntactic path (`./`, `/`, `~/`) **or** existing
+  filesystem entry.
+- `expand_args_strict` and `expand_args_for_banner` keep `is_path_arg`
+  entries so `f src` → `f banner src`.
+- `args_contain_something_useful` and `has_alias_or_number_or_path`
+  include paths so `f src` no longer hits `should_exit_silently` and
+  `f src -t` routes correctly (was `unrecognized subcommand 'src'`).
+- Syntactic paths (`./src`, `/tmp`, `~/Downloads`) are always considered
+  paths — `f /nonexistent` routes to banner (which errors) instead of
+  silently showing cwd.
+- 5 existing tests updated, 3 new tests added (bare existing paths,
+  strict mix with existing path, `is_existing_path`).
+
+**Action for users** (relates to zsh auto-banner hook): if the zsh
+auto-banner hook in `~/.zshrc` is currently **commented out** (older
+`install.sh` would have written a "intentionally disabled" block
+because `f banner` was synchronous), re-run `./install.sh` after
+upgrading to enable `chpwd`-triggered banners, or uncomment the
+`_fab_hook` block at the end of `~/.zshrc` manually. (The
+`./install.sh` hook line is now wrapped with a `grep -qF` idempotency
+guard so re-running it is safe.)
+
 ## [0.7.13] - 2026-09-01
 
 ### Audit hardening, daemon robustness, and Trust model docs

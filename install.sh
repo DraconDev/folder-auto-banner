@@ -97,13 +97,16 @@ for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
         # Remove old fab function names and hook registrations
         sed -i '/_fab_hook\|_fab_on_directory_change\|_fab_on_startup/d' "$rc" 2>/dev/null || true
         sed -i '/add-zsh-hook \(chpwd\|precmd\) _fab/d' "$rc" 2>/dev/null || true
-        sed -i '/^# fab shell integration\|^# fab auto-banner hook/d' "$rc" 2>/dev/null || true
+        # IMPORTANT: only delete the "intentionally disabled" comment
+        # block when we're about to install the live hook — otherwise
+        # the cleanup step below would silently strip the user's
+        # commented-out hook. Match a more specific anchor that only
+        # appears in a "disabled" trailer (the "intentionally disabled"
+        # phrase that older installers wrote).
+        sed -i '/intentionally disabled/d' "$rc" 2>/dev/null || true
         # Remove orphaned function fragments from partial teardowns
         sed -i '/^    command f banner/d' "$rc" 2>/dev/null || true
         sed -i '/command \/home\/.*\/bin\/f banner/d' "$rc" 2>/dev/null || true
-        # The next two patterns used to be `/^}export PATH=/d` and
-        # `/^}autoload/d` which would also delete user content that
-        # happened to end a block with `}export PATH=…` or `}autoload …`.
         # Anchor the removal to the fab-anchored lines we actually install.
         sed -i '/^# fab shell integration/d' "$rc" 2>/dev/null || true
         sed -i '/^fab_clean\|^fab_test\|^fab_build/d' "$rc" 2>/dev/null || true
