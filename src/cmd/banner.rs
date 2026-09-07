@@ -87,6 +87,7 @@ pub struct BannerOptions<'a> {
     pub versionsort: bool,
     pub no_sort: bool,
     pub group_dirs: Option<String>,
+    pub number_order: Option<String>, // "top" | "bottom" — overrides config number_from_bottom
     pub reverse: bool,
     pub hidden: bool,
     pub relative_date: bool,
@@ -118,6 +119,36 @@ pub struct BannerOptions<'a> {
 
 fn colorize_date(_dt: &DateTime<Utc>, formatted: &str) -> String {
     format!("{}{}{}", color(GREEN), formatted, color(RESET))
+}
+
+/// Resolve whether navigation numbers count up from the bottom row.
+/// An explicit `--number-order` wins; otherwise fall back to config.
+fn resolve_number_from_bottom(opts: &BannerOptions, config: &crate::state::Config) -> bool {
+    match opts.number_order.as_deref() {
+        Some("top") => false,
+        Some("bottom") => true,
+        _ => config.number_from_bottom,
+    }
+}
+
+/// Number shown next to the row at position `idx` (0-based, top-down)
+/// out of `len` rows. Bottom-up keeps the visual order but puts [1]
+/// on the row nearest the prompt, so the most recent items (with
+/// `sort = "date"`) get single-digit numbers.
+fn display_number(idx: usize, len: usize, from_bottom: bool) -> usize {
+    if from_bottom {
+        len - idx
+    } else {
+        idx + 1
+    }
+}
+
+/// Row index for a typed navigation number (exact inverse of display_number).
+fn index_for_number(num: usize, len: usize, from_bottom: bool) -> Option<usize> {
+    if num == 0 || num > len {
+        return None;
+    }
+    Some(if from_bottom { len - num } else { num - 1 })
 }
 
 /// Return whether a file is recent enough to highlight.
@@ -555,15 +586,16 @@ fn navigate_by_number(
     let (display_items, _hidden_count) =
         build_display_items(path, &summary, &git_info, opts, &config, true);
 
-    if num == 0 || num > display_items.len() {
+    let from_bottom = resolve_number_from_bottom(opts, &config);
+    let Some(row) = index_for_number(num, display_items.len(), from_bottom) else {
         anyhow::bail!(
             "Error: number {} out of range (1-{}). Use 'f' to see available items.",
             num,
             display_items.len()
         );
-    }
+    };
 
-    let entry = &display_items[num - 1];
+    let entry = &display_items[row];
     let target = &entry.path;
 
     if let Some(app) = action {
@@ -1657,6 +1689,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
 
     // Print each row - PERM OWNER GROUP CONTENTS SIZE DATE NAME
     let num_width = display_items.len().to_string().len(); // for right-aligned numbering
+    let from_bottom = resolve_number_from_bottom(opts, &config);
     for (idx, (item, contents_raw)) in display_meta.iter().enumerate() {
         let icon_str = if opts.icons {
             icon::icon_for(&item.name, item.is_dir, item.is_exec, item.is_symlink)
@@ -1878,7 +1911,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         }
         // Add navigation number if enabled
         if config.numbered {
-            let num = idx + 1; // 1-based numbering
+            let num = display_number(idx, display_items.len(), from_bottom);
             let num_padded = format!("{:>width$}", num, width = num_width);
             let num_str = format!(
                 "{bold}{white}[{num}{reset}{white}]",
@@ -2906,6 +2939,64 @@ mod tests {
         assert!(result.contains("w"));
         assert!(result.contains("x"));
         assert!(result.contains("-"));
+    }
+
+    #[test]
+    fn test_display_number_top_down() {
+        // Classic 1-based top-down: row 0 -> [1], last row -> [N].
+        assert_eq!(display_number(0, 156, false), 1);
+        assert_eq!(display_number(1, 156, false), 2);
+        assert_eq!(display_number(155, 156, false), 156);
+    }
+
+    #[test]
+    fn test_display_number_bottom_up() {
+        // Bottom-up: row 0 -> [N], bottom row -> [1].
+        assert_eq!(display_number(0, 156, true), 156);
+        assert_eq!(display_number(155, 156, true), 1);
+        assert_eq!(display_number(154, 156, true), 2);
+    }
+
+    #[test]
+    fn test_index_for_number_roundtrip() {
+        // index_for_number is the exact inverse of display_number.
+        for len in [1, 2, 10, 156] {
+            for from_bottom in [false, true] {
+                for idx in 0..len {
+                    let num = display_number(idx, len, from_bottom);
+                    assert_eq!(index_for_number(num, len, from_bottom), Some(idx));
+                }
+            }
+        }
+        // Out of range in both modes.
+        assert_eq!(index_for_number(0, 10, false), None);
+        assert_eq!(index_for_number(0, 10, true), None);
+        assert_eq!(index_for_number(11, 10, false), None);
+        assert_eq!(index_for_number(11, 10, true), None);
+    }
+
+    #[test]
+    fn test_resolve_number_from_bottom() {
+        let mut config = crate::state::Config::default();
+        // Default config is bottom-up.
+        assert!(config.number_from_bottom);
+        let opts = BannerOptions {
+            ..Default::default()
+        };
+        assert!(resolve_number_from_bottom(&opts, &config));
+        // Explicit CLI flag wins either way.
+        let opts_top = BannerOptions {
+            number_order: Some("top".to_string()),
+            ..Default::default()
+        };
+        assert!(!resolve_number_from_bottom(&opts_top, &config));
+        config.number_from_bottom = false;
+        assert!(!resolve_number_from_bottom(&opts, &config));
+        let opts_bottom = BannerOptions {
+            number_order: Some("bottom".to_string()),
+            ..Default::default()
+        };
+        assert!(resolve_number_from_bottom(&opts_bottom, &config));
     }
 
     #[test]

@@ -131,13 +131,20 @@ The shell wrapper is the source of truth for `f N` navigation. It calls the inst
 
 ## Numbered Navigation
 
-When `numbered = true` in config (or enabled by default), each item gets a number:
+When `numbered = true` in config (or enabled by default), each item gets a number.
+Numbers count **up from the bottom row** by default (`number_from_bottom = true`),
+so the items nearest your prompt — the most recent ones with `sort = "date"` —
+get the smallest numbers:
 
 ```
-[ 1] 📁 .github
+[ 3] 📁 .github
 [ 2] 📁 src
-[ 3] 📄 README.md
+[ 1] 📄 README.md
 ```
+
+Prefer classic top-down `[1]`-first numbering? Either set
+`number_from_bottom = false` in config or pass `--number-order top` for one invocation
+(`--number-order bottom` forces bottom-up).
 
 Navigate with `f N` (a number is the **only** non-alias bare word
 that produces a result):
@@ -325,6 +332,7 @@ languages = true
 ports = true
 docker = true
 numbered = true           # Show item numbers for f N navigation
+number_from_bottom = true # [1] on the bottom row (false = classic top-down)
 open_command = "micro"    # Default editor for f N (overridden by $EDITOR)
 smart_truncation = true
 zebra_rows = false

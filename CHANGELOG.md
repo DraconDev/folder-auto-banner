@@ -1,5 +1,21 @@
 ## [Unreleased]
 
+### Bottom-up navigation numbers (`[1]` on the bottom row)
+
+With `sort = "date"` the most recent files sit at the bottom but used to
+carry the biggest numbers (`f 156` for the file you just touched).
+Numbers now count up from the bottom row by default, so the likeliest
+targets get single-digit numbers (`f 1` opens the bottom row):
+
+- New config `number_from_bottom = true` (default). `false` restores
+  classic top-down `[1]`-first numbering.
+- New CLI override `--number-order top|bottom` (both `f --number-order top`
+  and `f banner --number-order top`); explicit flag wins over config.
+- `f N` navigation uses the exact inverse mapping, so the typed number
+  always matches the number shown in the banner in both modes.
+- Visual row order, sorting, and zebra/highlight behavior are unchanged —
+  only the number labels and their index mapping flip.
+
 ### Routing fix — `f src` / `f docs` / `f ./src` now show that folder's banner
 
 Bare directory names that exist on disk are now recognized as paths

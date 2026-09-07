@@ -45,6 +45,10 @@ pub struct Cli {
     #[arg(short = 'r', long = "reverse")]
     pub reverse: bool,
 
+    /// Number rows from the top ([1] first row) or bottom ([1] last row)
+    #[arg(long = "number-order", value_parser = ["top", "bottom"])]
+    pub number_order: Option<String>,
+
     /// Show hidden files (dotfiles)
     #[arg(short = 'a', long = "hidden")]
     pub hidden: bool,
@@ -185,6 +189,10 @@ pub enum Commands {
         /// Reverse sort order
         #[arg(short = 'r', long = "reverse")]
         reverse: bool,
+
+        /// Number rows from the top ([1] first row) or bottom ([1] last row)
+        #[arg(long = "number-order", value_parser = ["top", "bottom"])]
+        number_order: Option<String>,
 
         /// Show hidden files (dotfiles)
         #[arg(short = 'a', long = "hidden")]
@@ -353,6 +361,7 @@ impl Cli {
                 versionsort,
                 no_sort,
                 group_dirs,
+                number_order,
                 reverse,
                 hidden,
                 relative_date,
@@ -393,6 +402,7 @@ impl Cli {
                     versionsort: *versionsort,
                     no_sort: *no_sort,
                     group_dirs: group_dirs.clone(),
+                    number_order: number_order.clone(),
                     reverse: *reverse,
                     hidden: *hidden,
                     relative_date: *relative_date,
@@ -436,6 +446,7 @@ impl Cli {
                     versionsort: false,
                     no_sort: self.no_sort,
                     group_dirs: None,
+                    number_order: self.number_order.clone(),
                     reverse: self.reverse,
                     hidden: self.hidden,
                     relative_date: false,

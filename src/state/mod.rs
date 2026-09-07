@@ -104,12 +104,14 @@ pub struct Config {
     pub languages: bool,
     pub ports: bool,
     pub docker: bool,
-    pub inline_preview: bool,   // show inline previews for directories
-    pub mini_tree: bool,        // show mini tree on right side when there's space
-    pub smart_truncation: bool, // smart truncation for big folders
-    pub numbered: bool,         // show [N] numbers next to items for quick navigation
-    pub zebra_rows: bool,       // alternating row background tint (disabled by default)
-    pub open_command: String,   // command to open files (e.g., "micro", "nano", "vim")
+    pub inline_preview: bool,     // show inline previews for directories
+    pub mini_tree: bool,          // show mini tree on right side when there's space
+    pub smart_truncation: bool,   // smart truncation for big folders
+    pub numbered: bool,           // show [N] numbers next to items for quick navigation
+    pub number_from_bottom: bool, // [1] on the bottom row (nearest the prompt) so recent
+    // items get small numbers; false = classic top-down [1]..[N]
+    pub zebra_rows: bool, // alternating row background tint (disabled by default)
+    pub open_command: String, // command to open files (e.g., "micro", "nano", "vim")
 
     // Directories to ignore
     pub ignore_dirs: Vec<String>,
@@ -156,6 +158,7 @@ impl Default for Config {
             mini_tree: false,      // disabled by default - conflicts with inline_preview
             smart_truncation: true, // enabled by default - shows most relevant items first
             numbered: false,       // disabled by default - enable to show [N] navigation numbers
+            number_from_bottom: true, // bottom-up numbering so `f 1` hits the most recent row
             zebra_rows: false,     // disabled by default for clean pure-black background
             open_command: "micro".to_string(), // default file opener
             ignore_dirs: vec![
