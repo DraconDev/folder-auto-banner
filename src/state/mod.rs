@@ -143,7 +143,11 @@ impl Default for Config {
             hide_columns: vec![],
             sort: "name".to_string(),
             reverse: false,
-            group_dirs: "last".to_string(),
+            // Dirs on top, files at the bottom: with bottom-up numbering the
+            // files own [1], [2], ... because `f N` opens files while
+            // directories are reached via cd/z. Override with
+            // group_dirs = "last"/"none" or --group-dirs.
+            group_dirs: "first".to_string(),
             hyperlink: false,
             hidden: false,
             highlight_recent: "bold".to_string(), // bold text for recent files

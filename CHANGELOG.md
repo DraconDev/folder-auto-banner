@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+### Dirs-first default (files own the small numbers)
+
+`group_dirs` default flips `"last"` → `"first"`: directories render on
+top, files sit on the bottom rows. Combined with bottom-up numbering,
+`f 1`, `f 2`, … now open files — the actual `f N` use case — while
+directories keep their big numbers and are reached via `cd`/`z` as
+before. Override per-machine with `group_dirs = "last"`/`"none"` or
+per-invocation with `--group-dirs`. (Existing config files that set
+`group_dirs` explicitly are unaffected; only the built-in default
+changes.)
+
 ### Bottom-up navigation numbers (`[1]` on the bottom row)
 
 With `sort = "date"` the most recent files sit at the bottom but used to

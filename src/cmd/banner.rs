@@ -2838,6 +2838,71 @@ mod tests {
     }
 
     #[test]
+    fn test_default_groups_dirs_first_so_files_own_low_numbers() {
+        // Project default: dirs on top, files at the bottom. Combined with
+        // bottom-up numbering, the files own [1], [2], ... because `f N`
+        // opens files while directories are reached via cd/z.
+        fn entry(name: &str, is_dir: bool) -> crate::fs::DirEntry {
+            crate::fs::DirEntry {
+                name: name.to_string(),
+                path: std::path::PathBuf::from(format!("/tmp/{}", name)),
+                is_dir,
+                is_file: !is_dir,
+                is_symlink: false,
+                is_exec: false,
+                size: 1,
+                modified: None,
+                perms: String::new(),
+                owner: String::new(),
+                group: String::new(),
+                symlink_target: None,
+                symlink_valid: true,
+                content_probe: None,
+            }
+        }
+        let entries = vec![
+            entry("notes.md", false),
+            entry("server", true),
+            entry("main.rs", false),
+            entry("assets", true),
+        ];
+        let summary = crate::fs::DirSummary {
+            total_items: entries.len(),
+            total_size: 4,
+            files: 2,
+            dirs: 2,
+            truncated: false,
+            top_items: entries,
+            project_type: crate::fs::ProjectType::Generic,
+            last_modified: None,
+            build_status: None,
+            todo_info: None,
+            code_metrics: None,
+            port_info: None,
+            docker_info: None,
+        };
+        let opts = BannerOptions {
+            ..Default::default()
+        };
+        let config = crate::state::Config::default();
+        assert_eq!(config.group_dirs, "first");
+        let (items, _) = build_display_items(
+            Path::new("/tmp"),
+            &summary,
+            &GitInfo::default(),
+            &opts,
+            &config,
+            false,
+        );
+        let names: Vec<&str> = items.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["assets", "server", "main.rs", "notes.md"]);
+        // Bottom-up: the bottom file owns [1].
+        assert_eq!(display_number(3, items.len(), true), 1);
+        assert_eq!(index_for_number(1, items.len(), true), Some(3));
+        assert_eq!(items[3].name, "notes.md");
+    }
+
+    #[test]
     fn test_display_pipeline_filters_and_applies_max_after_sort() {
         let entries = vec![
             crate::fs::DirEntry {
