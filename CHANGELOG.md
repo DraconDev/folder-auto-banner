@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [0.7.14] - 2026-09-07
+
+### Small numbers for the files you actually open
+
+6 commits since 0.7.13 (`v0.7.13..v0.7.14`): navigation numbers count up
+from the bottom row and directories render on top, so `f 1`, `f 2`, …
+open files while `cd`/`z` keep handling directories — plus the `f src`
+bare-path routing fix. Every new default has a config/flag override, so
+existing setups can restore the old behavior.
+
 ### Dirs-first default (files own the small numbers)
 
 `group_dirs` default flips `"last"` → `"first"`: directories render on
