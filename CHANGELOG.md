@@ -16,6 +16,18 @@ targets get single-digit numbers (`f 1` opens the bottom row):
 - Visual row order, sorting, and zebra/highlight behavior are unchanged —
   only the number labels and their index mapping flip.
 
+### Test isolation fixes (no behavior change)
+
+- `src/cmd/banner.rs`: color-gated tests now share a `COLOR_TEST_LOCK` —
+  `test_highlight_row_is_plain_when_colors_are_disabled` toggles the global
+  `COLORS_ENABLED` flag and previously raced with tests asserting colored
+  output (`test_build_branch_display_*`, `test_apply_row_tint`,
+  `test_colorize_perms`), flaking the suite under parallel threads.
+- `src/cache/mod.rs`: cache tests now share a `CACHE_TEST_LOCK` —
+  `test_cache_cleanup` runs `cleanup(0)` against the real per-user cache
+  dir and previously deleted entries sibling tests had written
+  milliseconds earlier.
+
 ### Routing fix — `f src` / `f docs` / `f ./src` now show that folder's banner
 
 Bare directory names that exist on disk are now recognized as paths

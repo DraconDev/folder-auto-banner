@@ -195,8 +195,15 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    // All cache tests share the real per-user cache dir, and cleanup(0)
+    // deletes every entry in it — including entries another test wrote
+    // milliseconds earlier. Serialize the dir-touching tests so parallel
+    // threads cannot delete each other's entries mid-assertion.
+    static CACHE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_cache_set_and_get() {
+        let _guard = CACHE_TEST_LOCK.lock().unwrap();
         let cache = Cache::new().unwrap();
         let key = format!("test-key-{}", std::process::id());
         let value: String = "hello".to_string();
@@ -211,6 +218,7 @@ mod tests {
 
     #[test]
     fn test_cache_expired() {
+        let _guard = CACHE_TEST_LOCK.lock().unwrap();
         let cache = Cache::new().unwrap();
         let key = format!("test-expired-{}", std::process::id());
 
@@ -232,6 +240,7 @@ mod tests {
 
     #[test]
     fn test_cache_cleanup() {
+        let _guard = CACHE_TEST_LOCK.lock().unwrap();
         let cache = Cache::new().unwrap();
         let key = format!("test-cleanup-{}", std::process::id());
 
