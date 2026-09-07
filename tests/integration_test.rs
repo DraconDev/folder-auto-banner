@@ -180,22 +180,27 @@ fn test_navigate_by_number_matches_banner() {
     let items = json["items"].as_array().unwrap();
     assert!(!items.is_empty(), "banner should list the temp dir items");
 
-    // For each item, verify that `f N` returns the same path.
+    // For each item, verify that `f N` returns the same path in both
+    // numbering modes. Explicit `--number-order` keeps the test independent
+    // of ambient config: top-down maps N -> items[N-1], bottom-up maps
+    // N -> items[len-N] (the number shown next to that row in the banner).
     // Run from inside the temp dir so the banner and navigation agree.
+    let len = items.len();
     for (idx, item) in items.iter().enumerate() {
-        let num = idx + 1;
         let expected_path = item["path"].as_str().unwrap();
-        let actual = StdCommand::cargo_bin("f")
-            .unwrap()
-            .args(["banner", &num.to_string()])
-            .current_dir(&tmp)
-            .output()
-            .unwrap();
-        let actual_path = String::from_utf8(actual.stdout).unwrap().trim().to_string();
-        assert_eq!(
-            actual_path, expected_path,
-            "f {num} returned {actual_path} but banner shows {expected_path} at [{num}]"
-        );
+        for (order, num) in [("top", idx + 1), ("bottom", len - idx)] {
+            let actual = StdCommand::cargo_bin("f")
+                .unwrap()
+                .args(["banner", "--number-order", order, &num.to_string()])
+                .current_dir(&tmp)
+                .output()
+                .unwrap();
+            let actual_path = String::from_utf8(actual.stdout).unwrap().trim().to_string();
+            assert_eq!(
+                actual_path, expected_path,
+                "f banner --number-order {order} {num} returned {actual_path} but banner shows {expected_path} at [{num}]"
+            );
+        }
     }
 
     let _ = std::fs::remove_dir_all(&tmp);

@@ -2744,8 +2744,15 @@ fn truncate_details(details: &[String], available: usize) -> String {
 mod tests {
     use super::*;
 
+    // Color output is gated by the global COLORS_ENABLED flag, but Rust runs
+    // tests on multiple threads — a test that disables colors can interleave
+    // with one asserting colored output and flake. Every test that toggles
+    // the flag or asserts on produced colors must hold this lock.
+    static COLOR_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_build_branch_display_keeps_closing_bracket_in_same_style() {
+        let _color_guard = COLOR_TEST_LOCK.lock().unwrap();
         set_colors_enabled(true);
 
         let dirty = GitInfo {
@@ -2765,6 +2772,7 @@ mod tests {
 
     #[test]
     fn test_build_branch_display_empty_branch() {
+        let _color_guard = COLOR_TEST_LOCK.lock().unwrap();
         set_colors_enabled(true);
 
         let no_branch = GitInfo::default();
@@ -2822,6 +2830,7 @@ mod tests {
 
     #[test]
     fn test_highlight_row_is_plain_when_colors_are_disabled() {
+        let _color_guard = COLOR_TEST_LOCK.lock().unwrap();
         set_colors_enabled(false);
         assert_eq!(highlight_row("plain", "bold"), "plain");
         assert_eq!(highlight_row("plain", "22"), "plain");
@@ -2930,6 +2939,8 @@ mod tests {
 
     #[test]
     fn test_colorize_perms() {
+        let _color_guard = COLOR_TEST_LOCK.lock().unwrap();
+        set_colors_enabled(true);
         let result = colorize_perms("drwxr-xr-x");
         // Should contain ANSI codes
         assert!(result.contains("\x1b["));
@@ -3027,6 +3038,7 @@ mod tests {
 
     #[test]
     fn test_apply_row_tint() {
+        let _color_guard = COLOR_TEST_LOCK.lock().unwrap();
         set_colors_enabled(true);
         let input = "col1 \x1b[34mcol2\x1b[0m col3";
         let tinted = apply_row_tint(input, ROW_TINT);
