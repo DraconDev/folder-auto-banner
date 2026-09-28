@@ -2207,7 +2207,10 @@ mod tests {
         // 40,000 files is well past the 20,000 file budget, so this is a
         // sample and must be reported as one.
         assert!(computed.sampled, "40k files must be reported as a sample");
-        assert!(!computed.measured, "truncated walk must not claim exactness");
+        assert!(
+            !computed.measured,
+            "truncated walk must not claim exactness"
+        );
         assert!(computed.size > 0, "sample should still observe bytes");
     }
 

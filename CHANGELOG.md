@@ -1,5 +1,65 @@
 ## [Unreleased]
 
+### Fix: `cd` into a large directory no longer takes seconds
+
+Prompt-hook latency had two independent causes, both measured on this
+machine. `cd ~/Dev` went from **~1.5s–7s to 8–28ms**.
+
+**1. `du` could never satisfy a prompt-time budget.** Measuring a directory
+size shelled out to `du -s -b`, but `du -s -b ~/Dev` takes **106s** and
+`~/Dev/dracon-platform` (222 GB) takes **56s** across 1.19M files. Every call
+hit the timeout, returned the 4 KiB directory-inode placeholder, and — since
+a placeholder is not authoritative — was never cached. The daemon therefore
+re-ran it forever: 5 concurrent `du` processes at all times (`ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK`),
+~37% of a core, ~17% sustained I/O pressure, and **every** directory in the
+`~/Dev` banner rendering as `4.0k` with a `44k` total for a 330 GB tree.
+
+No cache TTL can fix a 106-second primitive, so the primitive changed.
+`compute_dir_size_with_status` now runs a bounded breadth-first walk capped
+by file count, directory count, *and* wall clock (`SIZE_SAMPLE_*`). Small
+directories still complete and stay exact; large ones return a true lower
+bound in milliseconds, rendered with a `≥` prefix (`DirEntry::size_is_estimate`)
+so the UI no longer implies precision the measurement does not have.
+Breadth-first keeps the sample spread across siblings instead of being
+consumed by one subtree, and symlinks are never followed.
+
+Sampled values are now **cached with their mtime**. This is the part that
+actually ends the storm: the old code cleared the mtime for any
+non-`du`-exact value, making it permanently uncacheable, so the same huge
+tree was re-walked on every refresh tick. Background CPU dropped **11×**
+(5620 ms → 500 ms per 15s).
+
+**2. The client "fast path" was slower than the path it avoided.**
+`is_cache_fresh` validated the disk cache with a depth-8, 8192-entry
+descendant walk — **11,430 syscalls and 22–76 ms** on a home directory, to
+prove freshness before a Unix-socket round trip costing 1–10 ms. On a
+container like `~/Dev` some project is always being written, so the cache was
+permanently stale and the fast path never engaged. The walk is now depth-1
+(`MAX_DESCENDANT_DEPTH`), matching what its own doc comment already claimed.
+Deeper changes remain covered by the daemon's inotify watcher
+(`ACTIVE_WATCH_DEPTH = 3`), which removes the on-disk cache file when a change
+lands. Syscalls for `f banner ~`: **11,430 → 1,941**.
+
+### Add: `f daemon warm`
+
+`Request::Warm` and `warm_paths()` existed in the daemon and client but no CLI
+subcommand reached them, so "the daemon already knows this" was unreachable
+dead code. `f daemon warm [PATH...]` now pre-computes banners in the
+background, making the first `cd` into a usual directory fast.
+
+### Tests
+
++7 tests. Notably, the freshness-walk boundary is pinned by
+`test_max_descendant_mtime_stops_at_one_level` — it asserts the walk does
+*not* visit depth 2, so re-deepening it (and reintroducing the 11k-syscall
+tree walk) fails loudly. Sampler coverage: exact on small trees, bounded by
+budget, spread across siblings, symlink-loop safe, and regression-guarded
+against the uncacheable-mtime bug.
+
+Test results are unchanged from baseline: the same 5 pre-existing failures
+(4 alias-routing cases in `alias_test`, `test_daemon_new` which conflicts
+with a live `fabd` holding the socket).
+
 ## [0.7.14] - 2026-09-07
 
 ### Small numbers for the files you actually open
