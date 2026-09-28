@@ -56,9 +56,13 @@ const SIZE_SAMPLE_FILE_BUDGET: usize = 20_000;
 const SIZE_SAMPLE_DIR_BUDGET: usize = 4_000;
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
+#[cfg(target_os = "linux")]
 const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
+#[cfg(target_os = "linux")]
 const ACTIVE_WATCH_DEPTH: usize = 3;
+#[cfg(target_os = "linux")]
 const MAX_ACTIVE_WATCH_DIRS: usize = 2048;
+#[cfg(target_os = "linux")]
 const MAX_WATCH_CHILDREN_PER_DIR: usize = 500;
 /// Maximum speculative `Warm` computations running concurrently. Warm work is
 /// optional, so saturating this budget drops new warm requests rather than
@@ -99,6 +103,7 @@ struct ShallowItem {
     symlink_valid: bool,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, Debug)]
 struct WatchRegistration {
     owner: PathBuf,
@@ -785,6 +790,7 @@ fn should_skip_dir(path: &Path) -> bool {
     folder_auto_banner::utils::SKIP_DIRS.contains(&name)
 }
 
+#[cfg(target_os = "linux")]
 fn can_watch_path(path: &Path) -> bool {
     let meta = match std::fs::symlink_metadata(path) {
         Ok(meta) => meta,
@@ -794,6 +800,7 @@ fn can_watch_path(path: &Path) -> bool {
     !meta.is_symlink() && (meta.is_file() || meta.is_dir())
 }
 
+#[cfg(target_os = "linux")]
 fn find_owner_for_watch(path: &Path, active_roots: &HashSet<PathBuf>) -> PathBuf {
     let roots = active_roots;
 
@@ -849,6 +856,7 @@ fn remove_inactive_watchers(
     failed_watches.retain(|path| is_path_under_any_root(path, roots));
 }
 
+#[cfg(target_os = "linux")]
 fn is_path_under_any_root(path: &Path, roots: &HashSet<PathBuf>) -> bool {
     roots
         .iter()
@@ -1529,6 +1537,7 @@ fn shallow_snapshot(path: &Path) -> Result<ShallowSnapshot> {
     })
 }
 
+#[cfg(target_os = "linux")]
 fn prune_size_cache_for_root(
     dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
