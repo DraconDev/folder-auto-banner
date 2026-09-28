@@ -99,9 +99,11 @@ fan-out were both invisible until the banner stopped feeling instant.
 
 ## Tests
 
-207 passing, 4 failing — the same 4 pre-existing alias-routing failures as
-0.7.14, unchanged by this work (verified against a clean checkout of the
-previous tag). +8 new tests, including `test_max_descendant_mtime_stops_at_one_level`,
+253 passing, 4 failing (baseline at v0.7.14: 244 passing, 5 failing). The 4
+failures are the same pre-existing alias-routing cases, unchanged by this
+work and verified against a clean checkout of the previous tag; the fifth
+baseline failure, `test_daemon_new`, only fails when a live `fabd` holds the
+socket. +9 new tests, including `test_max_descendant_mtime_stops_at_one_level`,
 which pins the depth-1 freshness boundary so re-deepening the walk fails
 loudly, and `test_sampled_sizes_are_cached_and_marked`, which guards the
 uncacheable-mtime regression that caused the `du` storm.

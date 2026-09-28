@@ -106,7 +106,7 @@ banner stopped feeling instant.
 
 ### Tests
 
-+8 tests. Notable: `test_max_descendant_mtime_stops_at_one_level` asserts the
++9 tests (253 passing vs 244 at 0.7.14). Notable: `test_max_descendant_mtime_stops_at_one_level` asserts the
 freshness walk does *not* visit depth 2, so re-deepening it (and
 reintroducing the 11k-syscall tree walk) fails loudly.
 `test_fast_pass_skips_enrichment_and_full_pass_includes_it` pins that the fast
@@ -115,9 +115,10 @@ pass still lists the directory and the full pass still finds TODOs.
 regression that caused the `du` storm. Sampler coverage: exact on small trees,
 bounded by budget, spread across siblings, symlink-loop safe.
 
-Test results unchanged from baseline: the same 5 pre-existing failures
-(4 alias-routing cases in `alias_test`, `test_daemon_new` which conflicts
-with a live `fabd` holding the socket).
+Test results: 253 passing / 4 failing, against a baseline of 244 / 5 at
+v0.7.14. The 4 failures are the same pre-existing alias-routing cases
+(verified against a clean checkout of the previous tag); the fifth baseline
+failure, `test_daemon_new`, only fails when a live `fabd` holds the socket.
 
 ## [0.7.14] - 2026-09-07
 
