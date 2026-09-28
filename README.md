@@ -6,7 +6,9 @@
 
 A contextual directory dashboard that combines a file listing with project signals such as git status, TODOs, code metrics, build status, ports, Docker state, and cached directory sizes.
 
-Repeated views are served from the background daemon. Normal banner scans inspect at most 500 entries, so the shell hook remains responsive even in very large directories. A truncated view is marked `500+` and may show temporary `4.0k` placeholders while directory sizes refresh in the background; subsequent warm views use populated cached sizes.
+Repeated views are served from the background daemon. Normal banner scans inspect at most 500 entries, so the shell hook remains responsive even in very large directories. A truncated view is marked `500+`. The file listing answers immediately; git badges, sizes, TODO counts, language mix and ports fill in behind it, so the next view shows the full banner. Directory sizes are measured with a bounded walk, so a very large tree shows a sampled lower bound marked `≥` rather than a placeholder — a small tree is still exact.
+
+`f daemon warm [PATH...]` pre-computes banners in the background, making the first `cd` into a usual directory fast.
 
 ## What It Does
 
