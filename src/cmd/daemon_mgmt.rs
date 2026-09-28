@@ -75,6 +75,38 @@ pub fn run_daemon(action: &DaemonAction) -> Result<()> {
                 anyhow::bail!("Failed to restart daemon");
             }
         }
+        DaemonAction::Warm { paths } => {
+            // Default to the current directory so `f daemon warm` on its own
+            // is useful.
+            let targets: Vec<std::path::PathBuf> = if paths.is_empty() {
+                vec![std::env::current_dir().unwrap_or_else(|_| ".".into())]
+            } else {
+                paths.clone()
+            };
+            // Make sure something is listening before warming, otherwise every
+            // warm request is a silent no-op against a missing socket.
+            if !daemon_client::is_daemon_running() {
+                daemon_client::ensure_daemon_running();
+            }
+            if !daemon_client::is_daemon_running() {
+                anyhow::bail!("Failed to start daemon — cannot warm");
+            }
+            daemon_client::warm_paths(&targets);
+            // `warm_paths` is fire-and-forget (the daemon computes on its own
+            // thread and writes the on-disk cache when done), so give it a
+            // moment to land before reporting, otherwise the first `cd` right
+            // after this command races the warm.
+            std::thread::sleep(std::time::Duration::from_millis(
+                300 * targets.len().min(10) as u64,
+            ));
+            for path in &targets {
+                println!("Warming {}", path.display());
+            }
+            println!(
+                "Queued {} path(s). The daemon computes them in the background; sizes fill in as they land.",
+                targets.len()
+            );
+        }
         DaemonAction::ClearCache => {
             if daemon_client::is_daemon_running() {
                 daemon_client::send_shutdown();

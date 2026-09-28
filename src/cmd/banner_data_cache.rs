@@ -38,7 +38,24 @@ use crate::daemon_types::{BannerData, MAX_IPC_FRAME_SIZE};
 pub const CACHE_TTL: Duration = Duration::from_secs(300);
 
 /// Maximum number of raw descendant entries inspected for cache freshness.
+///
+/// Depth is deliberately shallow. The original walk recursed to depth 8 and up
+/// to 8192 entries, which cost 11,430 syscalls (8,279 `statx`, 2,008
+/// `getdents64`) and 22–76 ms on the client's supposedly sub-millisecond
+/// "fast path" — more work than the Unix-socket round trip it existed to
+/// avoid. On a container directory like `~/Dev` (11 projects, 1.19M files,
+/// 330 GB) some project is always being written, so a deep walk marked the
+/// cache permanently stale and the fast path never engaged at all.
+///
+/// Nested changes are not left uncovered: the daemon runs an inotify watcher
+/// (`ACTIVE_WATCH_DEPTH = 3`) over active folders and removes the on-disk
+/// cache file when a change lands. So this walk only needs to catch what
+/// inotify has not yet delivered — top-level adds/removes and direct-child
+/// edits — which is exactly depth 1.
 const MAX_DESCENDANT_ENTRIES: usize = 8192;
+/// Maximum recursion depth for the client-side freshness walk. See
+/// `MAX_DESCENDANT_ENTRIES`: the daemon's inotify watcher covers depth 3.
+const MAX_DESCENDANT_DEPTH: usize = 1;
 
 /// Subdirectory under the data dir where per-path cache files live.
 const CACHE_SUBDIR: &str = "banner_data";
@@ -156,7 +173,7 @@ pub fn is_content_probe_ext(lower_name: &str) -> bool {
 /// could keep banners stale for the full 300s cache TTL.
 pub fn max_descendant_mtime(path: &Path) -> Option<SystemTime> {
     fn walk(path: &Path, depth: usize, visited: &mut usize) -> Option<SystemTime> {
-        if depth > 8 || *visited >= MAX_DESCENDANT_ENTRIES {
+        if depth > MAX_DESCENDANT_DEPTH || *visited >= MAX_DESCENDANT_ENTRIES {
             return None;
         }
         let entries = std::fs::read_dir(path).ok()?;
@@ -241,8 +258,9 @@ pub fn is_cache_fresh(path: &Path) -> bool {
     }
     // Guard against in-place file edits that don't advance the dir
     // mtime: if any direct child's mtime is newer than the cache
-    // file's mtime, the file is stale. O(N) stat calls, but page-cached
-    // and fast (~0.6 ms for ~200 files).
+    // file's mtime, the file is stale. Scoped to direct children (depth 1)
+    // so this stays a handful of stats rather than a tree walk; deeper
+    // changes are the daemon's inotify watcher's job.
     if let Some(max_child_mtime) = max_descendant_mtime(path) {
         if max_child_mtime > file_mtime {
             return false;
@@ -404,6 +422,7 @@ mod tests {
                     is_symlink: false,
                     is_exec: false,
                     size: 42,
+                    size_is_estimate: false,
                     modified: None,
                     perms: "rw-r--r--".to_string(),
                     owner: "dracon".to_string(),
@@ -666,15 +685,39 @@ mod tests {
     }
 
     #[test]
-    fn test_max_descendant_mtime_finds_nested_files() {
+    fn test_max_descendant_mtime_finds_direct_child_files() {
+        // Depth 1 is the contract: direct children are what the client-side
+        // walk is responsible for catching.
+        let tmp = std::env::temp_dir().join(format!("fab-test-child-{}", std::process::id()));
+        let _ = fs::create_dir_all(&tmp);
+        fs::write(tmp.join("direct.rs"), "fn main() {}").unwrap();
+
+        let mtime = max_descendant_mtime(&tmp);
+        assert!(mtime.is_some(), "should find a direct-child .rs file");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_max_descendant_mtime_stops_at_one_level() {
+        // Deliberate: the walk is depth-1 so it costs a handful of stats
+        // instead of 8,279 on a home directory. Deeper changes are the
+        // daemon's inotify watcher's job (`ACTIVE_WATCH_DEPTH = 3`), which
+        // removes the on-disk cache file when a change lands.
+        //
+        // This test pins that boundary on purpose. If someone re-deepens the
+        // walk to "catch" nested edits, the prompt pays the full tree-walk
+        // cost again — 11,430 syscalls and 22-76ms for a container directory
+        // like ~/Dev — and this test is the thing that tells them.
         let tmp = std::env::temp_dir().join(format!("fab-test-nested-{}", std::process::id()));
         let nested_dir = tmp.join("src").join("nested");
         let _ = fs::create_dir_all(&nested_dir);
-        let nested_file = nested_dir.join("test.rs");
-        fs::write(&nested_file, "fn main() {}").unwrap();
+        fs::write(nested_dir.join("test.rs"), "fn main() {}").unwrap();
 
-        let mtime = max_descendant_mtime(&tmp);
-        assert!(mtime.is_some(), "should find nested .rs file");
+        assert!(
+            max_descendant_mtime(&tmp).is_none(),
+            "a depth-2 file must not be visited by the depth-1 freshness walk"
+        );
 
         let _ = fs::remove_dir_all(&tmp);
     }

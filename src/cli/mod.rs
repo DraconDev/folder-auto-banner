@@ -326,6 +326,16 @@ pub enum DaemonAction {
     Stop,
     /// Show daemon status
     Status,
+    /// Pre-compute banners for one or more directories in the background
+    ///
+    /// The daemon can already accept a `Request::Warm`, but nothing could
+    /// reach it, so the "the daemon already knows this" path was dead code.
+    /// Warming your usual directories makes the first `cd` into them fast.
+    Warm {
+        /// Directories to pre-compute. Defaults to the current directory.
+        #[arg(value_name = "PATH", num_args = 0..)]
+        paths: Vec<PathBuf>,
+    },
 }
 
 impl Cli {

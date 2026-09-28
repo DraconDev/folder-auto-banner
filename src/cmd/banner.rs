@@ -1111,7 +1111,10 @@ fn build_details_row(
     };
 
     let project_icon = summary.project_type.icon();
-    let size_str = format_size_for_mode(summary.total_size, &config.size);
+    // The header total sums the same per-row sizes shown below, so if any row
+    // carries a sampled lower bound the total is a lower bound too.
+    let total_is_estimate = summary.top_items.iter().any(|item| item.size_is_estimate);
+    let size_str = format_size_for_mode(summary.total_size, &config.size, total_is_estimate);
     let size_label = if summary.truncated { "sample" } else { "total" };
 
     let mut details = Vec::new();
@@ -1680,7 +1683,7 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     for (item, contents_raw) in &display_meta {
         max_owner = max_owner.max(display_width(&item.owner));
         max_group = max_group.max(display_width(&item.group));
-        let size_str = format_size_for_mode(item.size, &config.size);
+        let size_str = format_size_for_mode(item.size, &config.size, item.size_is_estimate);
         max_size = max_size.max(display_width(&size_str));
         max_contents = max_contents.max(display_width(contents_raw).max(4));
         // Git status is always 1 char, but we need a column for it
@@ -1844,12 +1847,12 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
         let group_padded = format!("{:<width$}", item.group, width = max_group);
         let size_str = if item.is_dir {
             if item.size > 0 {
-                format_size_for_mode(item.size, &config.size)
+                format_size_for_mode(item.size, &config.size, item.size_is_estimate)
             } else {
                 "-".to_string()
             }
         } else {
-            format_size_for_mode(item.size, &config.size)
+            format_size_for_mode(item.size, &config.size, item.size_is_estimate)
         };
         let size_padded = format!("{:>width$}", size_str, width = max_size);
         let contents_padded = format!("{:>width$}", contents_raw, width = max_contents);
@@ -2090,8 +2093,14 @@ fn output_rich(path: &Path, summary: &DirSummary, git_info: &GitInfo, opts: &Ban
     }
 }
 
-fn format_size_for_mode(bytes: u64, mode: &str) -> String {
-    match mode {
+/// Format a size for display. `is_estimate` marks a value produced by the
+/// daemon's bounded size sampler rather than a complete walk, in which case
+/// the number is a true lower bound on the real total. Prefixing `≥` says
+/// "at least this much" instead of implying a precision the measurement does
+/// not have — the same thing `4.0k` used to communicate by accident, except
+/// this one is an honest under-estimate rather than a placeholder inode size.
+fn format_size_for_mode(bytes: u64, mode: &str, is_estimate: bool) -> String {
+    let rendered = match mode {
         "bytes" => bytes.to_string(),
         "short" => {
             const UNITS: [(u64, &str); 5] = [
@@ -2109,6 +2118,11 @@ fn format_size_for_mode(bytes: u64, mode: &str) -> String {
             format!("{}{}", bytes / divisor, suffix)
         }
         _ => format_size_compact(bytes),
+    };
+    if is_estimate {
+        format!("\u{2265}{}", rendered)
+    } else {
+        rendered
     }
 }
 
@@ -2823,9 +2837,20 @@ mod tests {
 
     #[test]
     fn test_format_size_modes() {
-        assert_eq!(format_size_for_mode(1536, "default"), "1.5k");
-        assert_eq!(format_size_for_mode(1536, "short"), "1k");
-        assert_eq!(format_size_for_mode(1536, "bytes"), "1536");
+        assert_eq!(format_size_for_mode(1536, "default", false), "1.5k");
+        assert_eq!(format_size_for_mode(1536, "short", false), "1k");
+        assert_eq!(format_size_for_mode(1536, "bytes", false), "1536");
+    }
+
+    #[test]
+    fn test_format_size_marks_sampled_estimate_with_ge_prefix() {
+        // A sampled value is a true lower bound, so it must be marked rather
+        // than presented as an exact total.
+        assert_eq!(format_size_for_mode(1536, "default", true), "≥1.5k");
+        assert_eq!(format_size_for_mode(1536, "short", true), "≥1k");
+        assert_eq!(format_size_for_mode(1536, "bytes", true), "≥1536");
+        // Exact values are unmarked.
+        assert_eq!(format_size_for_mode(1536, "default", false), "1.5k");
     }
 
     #[test]
@@ -2851,6 +2876,7 @@ mod tests {
                 is_symlink: false,
                 is_exec: false,
                 size: 1,
+                size_is_estimate: false,
                 modified: None,
                 perms: String::new(),
                 owner: String::new(),
@@ -2913,6 +2939,7 @@ mod tests {
                 is_symlink: false,
                 is_exec: false,
                 size: 1,
+                size_is_estimate: false,
                 modified: None,
                 perms: String::new(),
                 owner: String::new(),
@@ -2929,6 +2956,7 @@ mod tests {
                 is_symlink: false,
                 is_exec: false,
                 size: 100,
+                size_is_estimate: false,
                 modified: None,
                 perms: String::new(),
                 owner: String::new(),
@@ -2945,6 +2973,7 @@ mod tests {
                 is_symlink: false,
                 is_exec: false,
                 size: 1000,
+                size_is_estimate: false,
                 modified: None,
                 perms: String::new(),
                 owner: String::new(),
@@ -3135,6 +3164,7 @@ mod tests {
                 is_symlink: false,
                 is_exec: false,
                 size: 100,
+                size_is_estimate: false,
                 modified: Some(chrono::DateTime::from_timestamp(i as i64 * 100, 0).unwrap()),
                 perms: String::new(),
                 owner: String::new(),
@@ -3153,6 +3183,7 @@ mod tests {
                 is_symlink: false,
                 is_exec: false,
                 size: 200,
+                size_is_estimate: false,
                 modified: Some(chrono::DateTime::from_timestamp(i as i64 * 50, 0).unwrap()),
                 perms: String::new(),
                 owner: String::new(),

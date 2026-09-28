@@ -29,6 +29,13 @@ const ACTIVE_SIZE_REFRESH_TIMEOUT: Duration = Duration::from_secs(10);
 const ACTIVE_SIZE_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
 const ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK: usize = 5;
 const MAX_SIZE_COMPUTE_THREADS: usize = 16;
+/// Hard ceiling on wall clock for one directory size measurement. A size is a
+/// display detail; it must never be able to hold up a shell prompt.
+const SIZE_SAMPLE_TIME_BUDGET: Duration = Duration::from_millis(120);
+/// Hard ceiling on file entries summed during one size measurement.
+const SIZE_SAMPLE_FILE_BUDGET: usize = 20_000;
+/// Hard ceiling on directories `read_dir`'d during one size measurement.
+const SIZE_SAMPLE_DIR_BUDGET: usize = 4_000;
 const SOCKET_NAME: &str = "fabd.sock";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
@@ -66,13 +73,19 @@ struct WatchRegistration {
     watched_path: PathBuf,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct SizeComputation {
+    /// Size in bytes. Exact only when `measured`; otherwise a true lower
+    /// bound over the portion of the tree that was sampled.
     size: u64,
+    /// The whole subtree was walked within budget, so `size` is exact.
     measured: bool,
+    /// The budget ran out first, so `size` is a lower bound. The UI renders
+    /// these with a `≥` prefix instead of implying a precise total.
+    sampled: bool,
 }
 
-type SizeComputeResult = (usize, u64, Option<SystemTime>, bool);
+type SizeComputeResult = (usize, u64, Option<SystemTime>, bool, bool);
 
 struct SizeRefreshGuard {
     in_flight: Arc<Mutex<HashSet<PathBuf>>>,
@@ -94,6 +107,7 @@ struct SizeRefreshContext {
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    dir_size_sampled: Arc<Mutex<HashSet<PathBuf>>>,
     pending_size_refreshes: Arc<Mutex<Vec<PathBuf>>>,
     size_refresh_in_flight: Arc<Mutex<HashSet<PathBuf>>>,
     active_roots: Arc<Mutex<HashSet<PathBuf>>>,
@@ -106,6 +120,12 @@ struct Daemon {
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     /// Last observed mtime for each cached directory size
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    /// Paths whose cached size is a sampled lower bound, not an exact total.
+    /// Drives the `≥` marker in the UI. Deliberately not persisted: after a
+    /// daemon restart the set is empty, so a previously sampled value is shown
+    /// without its marker until the next refresh re-labels it. Showing a
+    /// correct lower bound unlabelled is a cosmetic miss, never a wrong number.
+    dir_size_sampled: Arc<Mutex<HashSet<PathBuf>>>,
     pending_size_refreshes: Arc<Mutex<Vec<PathBuf>>>,
     size_refresh_in_flight: Arc<Mutex<HashSet<PathBuf>>>,
     socket_path: PathBuf,
@@ -140,6 +160,10 @@ impl Daemon {
             cache: Arc::new(Mutex::new(HashMap::new())),
             dir_sizes: Arc::new(Mutex::new(dir_sizes)),
             dir_size_mtimes: Arc::new(Mutex::new(dir_size_mtimes)),
+            // Not persisted: an empty set only means previously sampled sizes
+            // render without their `≥` marker until the next refresh relabels
+            // them. The underlying number is still a correct lower bound.
+            dir_size_sampled: Arc::new(Mutex::new(HashSet::new())),
             pending_size_refreshes: Arc::new(Mutex::new(Vec::new())),
             size_refresh_in_flight: Arc::new(Mutex::new(HashSet::new())),
             socket_path,
@@ -167,6 +191,7 @@ impl Daemon {
         let cache_clone = self.cache.clone();
         let dir_sizes_clone = self.dir_sizes.clone();
         let dir_size_mtimes_clone = self.dir_size_mtimes.clone();
+        let dir_size_sampled_clone = self.dir_size_sampled.clone();
         let active_roots = Arc::new(Mutex::new(HashSet::new()));
         let active_order = Arc::new(Mutex::new(Vec::new()));
         let active_roots_clone = active_roots.clone();
@@ -176,6 +201,7 @@ impl Daemon {
                 cache_clone,
                 dir_sizes_clone,
                 dir_size_mtimes_clone,
+                dir_size_sampled_clone,
                 active_roots_clone,
                 active_order_clone,
             );
@@ -224,6 +250,7 @@ impl Daemon {
             cache: self.cache.clone(),
             dir_sizes: self.dir_sizes.clone(),
             dir_size_mtimes: self.dir_size_mtimes.clone(),
+            dir_size_sampled: self.dir_size_sampled.clone(),
             pending_size_refreshes: self.pending_size_refreshes.clone(),
             size_refresh_in_flight: self.size_refresh_in_flight.clone(),
             active_roots: active_roots.clone(),
@@ -342,6 +369,7 @@ fn watch_loop(
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    dir_size_sampled: Arc<Mutex<HashSet<PathBuf>>>,
     active_roots: Arc<Mutex<HashSet<PathBuf>>>,
     active_order: Arc<Mutex<Vec<PathBuf>>>,
 ) {
@@ -526,7 +554,12 @@ fn watch_loop(
                                     }
                                 }
                                 if cache_guard.remove(path).is_some() {
-                                    prune_size_cache_for_root(&dir_sizes, &dir_size_mtimes, path);
+                                    prune_size_cache_for_root(
+                                        &dir_sizes,
+                                        &dir_size_mtimes,
+                                        &dir_size_sampled,
+                                        path,
+                                    );
                                     // The client's fast path trusts the on-disk
                                     // banner cache file's mtime; a stale file
                                     // would keep serving the pre-event banner,
@@ -537,7 +570,12 @@ fn watch_loop(
                             }
                         } else {
                             for path in &invalidated {
-                                prune_size_cache_for_root(&dir_sizes, &dir_size_mtimes, path);
+                                prune_size_cache_for_root(
+                                    &dir_sizes,
+                                    &dir_size_mtimes,
+                                    &dir_size_sampled,
+                                    path,
+                                );
                                 tracing::debug!(
                                     "Size cache pruned for descendant event under: {}",
                                     path.display()
@@ -1264,6 +1302,7 @@ fn shallow_snapshot(path: &Path) -> Result<ShallowSnapshot> {
 fn prune_size_cache_for_root(
     dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    dir_size_sampled: &Arc<Mutex<HashSet<PathBuf>>>,
     root: &Path,
 ) {
     dir_sizes
@@ -1281,6 +1320,14 @@ fn prune_size_cache_for_root(
             e.into_inner()
         })
         .retain(|path, _| path != root && !path.starts_with(root));
+
+    dir_size_sampled
+        .lock()
+        .unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        })
+        .retain(|path| path != root && !path.starts_with(root));
 }
 
 fn apply_cached_displayed_dir_sizes(
@@ -1414,6 +1461,7 @@ fn schedule_size_refresh(
             &mut refreshed.summary.top_items,
             &ctx.dir_sizes,
             &ctx.dir_size_mtimes,
+            &ctx.dir_size_sampled,
             timeout,
         );
         refreshed.summary.total_size = refreshed
@@ -1456,6 +1504,7 @@ fn refresh_displayed_dir_sizes(
     items: &mut [DirEntry],
     dir_sizes: &Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: &Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
+    dir_size_sampled: &Arc<Mutex<HashSet<PathBuf>>>,
     timeout: Duration,
 ) {
     // First, set sizes from cache where valid, and collect jobs for stale/missing ones.
@@ -1466,6 +1515,10 @@ fn refresh_displayed_dir_sizes(
             e.into_inner()
         });
         let mtimes = dir_size_mtimes.lock().unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        });
+        let sampled_paths = dir_size_sampled.lock().unwrap_or_else(|e| {
             tracing::warn!("Mutex poisoned, recovering");
             e.into_inner()
         });
@@ -1485,6 +1538,7 @@ fn refresh_displayed_dir_sizes(
             if let Some(size) = cached_size {
                 if cached_dir_size_is_fresh(&item.path, size, cached_mtime) {
                     item.size = size;
+                    item.size_is_estimate = sampled_paths.contains(&item.path);
                     continue;
                 }
             }
@@ -1508,20 +1562,37 @@ fn refresh_displayed_dir_sizes(
         tracing::warn!("Mutex poisoned, recovering");
         e.into_inner()
     });
-    for (idx, size, mtime_opt, measured) in results {
+    let mut sampled_paths = dir_size_sampled.lock().unwrap_or_else(|e| {
+        tracing::warn!("Mutex poisoned, recovering");
+        e.into_inner()
+    });
+    for (idx, size, mtime_opt, measured, sampled) in results {
         let path = items[idx].path.clone();
         sizes.insert(path.clone(), size);
-        if measured {
+        if measured || sampled {
+            // A sampled lower bound is still worth caching. The old code
+            // cleared the mtime whenever a value was not an exact `du` total,
+            // which made the value permanently uncacheable, so the daemon
+            // re-walked the same huge tree on every refresh tick forever.
+            // Recording the mtime lets the value be reused until the directory
+            // actually changes, and re-sampled only then.
             if let Some(mt) = mtime_opt {
-                mtimes.insert(path, Some(mt));
+                mtimes.insert(path.clone(), Some(mt));
             }
         } else {
-            mtimes.insert(path, None);
+            mtimes.insert(path.clone(), None);
+        }
+        if sampled {
+            sampled_paths.insert(path);
+        } else {
+            sampled_paths.remove(&path);
         }
         items[idx].size = size;
+        items[idx].size_is_estimate = sampled;
     }
     drop(sizes);
     drop(mtimes);
+    drop(sampled_paths);
 }
 
 fn compute_sizes_parallel(
@@ -1546,7 +1617,13 @@ fn compute_sizes_parallel(
                 let (orig_idx, path, mtime) = &jobs[idx];
                 let computed = compute_dir_size_with_status(path, timeout);
                 if let Ok(mut r) = results.lock() {
-                    r.push((*orig_idx, computed.size, *mtime, computed.measured));
+                    r.push((
+                        *orig_idx,
+                        computed.size,
+                        *mtime,
+                        computed.measured,
+                        computed.sampled,
+                    ));
                 }
             });
         }
@@ -1573,36 +1650,114 @@ fn cache_entry_is_fresh(entry: &CacheEntry, path: &Path) -> bool {
         && entry.config_mtime == current_config_mtime()
 }
 
+/// Measure a directory's size with a bounded breadth-first walk.
+///
+/// This used to shell out to `du -s -b`, which cannot meet a prompt-time
+/// budget on a real workspace tree: `du -s -b ~/Dev` takes 106s and
+/// `~/Dev/dracon-platform` (222 GB) takes 56s, because the tree holds
+/// 1.19M files. Every call therefore hit the timeout, returned the 4 KiB
+/// directory-inode placeholder, and — since a placeholder is not
+/// authoritative — was never cached. The daemon re-ran it forever
+/// (5 concurrent `du` at all times, 5–10s per `cd`) and every directory in
+/// the `~/Dev` banner rendered as `4.0k`.
+///
+/// No cache TTL can fix a 106-second primitive, so the primitive changed.
+/// The walk is breadth-first, so the sample is spread across the top of the
+/// tree rather than being consumed by one deep subtree, and it is bounded by
+/// file count, directory count, *and* wall clock. Directories small enough to
+/// finish stay exact; large ones return a lower bound in milliseconds,
+/// flagged `sampled` so the UI can show `≥` instead of implying precision the
+/// measurement does not have.
+///
+/// The returned `size` is always a true lower bound on the real total: it sums
+/// only bytes actually observed, and is only exact when the whole subtree was
+/// walked. Extrapolating a sample up to an estimated total was rejected: on a
+/// build-artifact tree the sample is dominated by whichever subtree fills the
+/// budget first, so a scaled-up number would be a fabrication presented as a
+/// measurement.
 fn compute_dir_size_with_status(path: &Path, timeout: Duration) -> SizeComputation {
-    // Use `du -s -b` for logical byte sizes. It is much faster than
-    // `du --bytes -x` on large workspace trees while producing the same logical
-    // sizes for normal files, so displayed sizes can be populated from cache
-    // instead of falling back to the 4 KiB directory inode size.
-    let path_arg = path.to_string_lossy();
-    // `--` so a directory whose name starts with `-` is not parsed as a flag.
-    if let Ok(stdout) = folder_auto_banner::utils::run_with_timeout_stdout(
-        "du",
-        &["-s", "-b", "--", path_arg.as_ref()],
-        timeout,
-    ) {
-        let stdout = stdout.trim();
-        if !stdout.is_empty() {
-            let size_str = stdout.split_whitespace().next().unwrap_or("0");
-            if let Ok(size) = size_str.parse::<u64>() {
-                return SizeComputation {
-                    size,
-                    measured: true,
-                };
+    // Honour the caller's budget, but never spend more than the hard cap:
+    // a size estimate is a display detail and must not hold up a prompt.
+    let budget = timeout.min(SIZE_SAMPLE_TIME_BUDGET);
+    let deadline = Instant::now() + budget;
+
+    // A path we cannot even read is not a measurement, and is not a sample
+    // either — there is no partial result to report. Fall back to the inode
+    // size, matching the old `du`-timeout path, and stay uncacheable so a
+    // later retry can pick the directory up once it exists.
+    if let Err(e) = std::fs::read_dir(path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            tracing::debug!("Size sample could not read {}: {e}", path.display());
+        }
+        return SizeComputation {
+            size: std::fs::metadata(path).map(|m| m.len()).unwrap_or(0),
+            measured: false,
+            sampled: false,
+        };
+    }
+
+    let mut queue: std::collections::VecDeque<PathBuf> = std::collections::VecDeque::new();
+    queue.push_back(path.to_path_buf());
+
+    let mut size: u64 = 0;
+    let mut files = 0usize;
+    let mut dirs = 0usize;
+    let mut truncated = false;
+
+    while let Some(dir) = queue.pop_front() {
+        if files >= SIZE_SAMPLE_FILE_BUDGET || dirs >= SIZE_SAMPLE_DIR_BUDGET {
+            truncated = true;
+            break;
+        }
+        dirs += 1;
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            // `file_type()` uses the dirent `d_type` on Linux, so classifying
+            // an entry usually costs no syscall. Stat only what we must size.
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            // Never follow symlinks: they can escape the requested tree or
+            // loop back into an ancestor, and would double-count.
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_dir() {
+                queue.push_back(entry.path());
+            } else if file_type.is_file() {
+                if let Ok(meta) = entry.metadata() {
+                    size = size.saturating_add(meta.len());
+                }
+                files += 1;
+            }
+            // Check the clock inside the inner loop too: a single directory
+            // holding tens of thousands of entries would otherwise blow the
+            // whole budget before returning to the outer check.
+            if files >= SIZE_SAMPLE_FILE_BUDGET || Instant::now() >= deadline {
+                truncated = true;
+                break;
             }
         }
+        if truncated {
+            break;
+        }
     }
-    // Fallback: just the directory inode size. Do not mark the mtime as
-    // authoritative, because a timeout should not prevent a later background
-    // refresh from retrying once the daemon is idle.
-    let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+
+    // An empty directory really is 0 bytes. Reporting the inode size there
+    // would be a fabricated non-zero total, so only fall back when nothing at
+    // all was observed on a readable directory.
+    let size = if size == 0 {
+        std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+    } else {
+        size
+    };
+    let fully_walked = !truncated;
     SizeComputation {
         size,
-        measured: false,
+        measured: fully_walked,
+        sampled: !fully_walked,
     }
 }
 
@@ -1961,6 +2116,7 @@ mod tests {
             is_symlink: false,
             is_exec: true,
             size: 4096,
+            size_is_estimate: false,
             modified: None,
             perms: String::new(),
             owner: String::new(),
@@ -1971,6 +2127,7 @@ mod tests {
         }];
         let dir_sizes = Arc::new(Mutex::new(HashMap::new()));
         let dir_size_mtimes = Arc::new(Mutex::new(HashMap::new()));
+        let dir_size_sampled = Arc::new(Mutex::new(HashSet::new()));
         let placeholder_size = std::fs::metadata(&child).unwrap().len();
         dir_sizes
             .lock()
@@ -1985,6 +2142,7 @@ mod tests {
             &mut items,
             &dir_sizes,
             &dir_size_mtimes,
+            &dir_size_sampled,
             Duration::from_secs(5),
         );
 
@@ -1999,6 +2157,179 @@ mod tests {
         );
         assert_eq!(computed.size, 0);
         assert!(!computed.measured);
+        assert!(!computed.sampled);
+    }
+
+    #[test]
+    fn test_compute_dir_size_small_tree_is_exact() {
+        // A tree the budget can finish must stay exact and must NOT be marked
+        // as an estimate, otherwise every small directory would render with a
+        // misleading `≥` prefix.
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir(tmp.path().join("sub")).unwrap();
+        std::fs::write(tmp.path().join("a.txt"), "0123456789").unwrap();
+        std::fs::write(tmp.path().join("sub/b.txt"), "0123456789").unwrap();
+
+        let computed = compute_dir_size_with_status(tmp.path(), Duration::from_secs(5));
+        assert!(computed.measured, "small tree should be measured exactly");
+        assert!(!computed.sampled, "small tree should not be a sample");
+        assert!(
+            computed.size >= 20,
+            "should observe both 10-byte files, got {}",
+            computed.size
+        );
+    }
+
+    #[test]
+    fn test_compute_dir_size_is_bounded_by_its_budget() {
+        // The whole point of the sampler: a wide tree must return fast rather
+        // than shelling out to `du`, which took 106s for ~/Dev. Assert the
+        // wall-clock bound, not the exact number.
+        let tmp = tempfile::tempdir().unwrap();
+        // Enough entries to blow the entry budget many times over.
+        for d in 0..40 {
+            let sub = tmp.path().join(format!("d{d}"));
+            std::fs::create_dir(&sub).unwrap();
+            for f in 0..1_000 {
+                std::fs::write(sub.join(format!("f{f}.txt")), "x").unwrap();
+            }
+        }
+
+        let started = Instant::now();
+        let computed = compute_dir_size_with_status(tmp.path(), Duration::from_secs(30));
+        let elapsed = started.elapsed();
+
+        // The caller may ask for 30s; the hard cap must still win.
+        assert!(
+            elapsed < SIZE_SAMPLE_TIME_BUDGET * 3,
+            "size sampling must stay bounded, took {elapsed:?}"
+        );
+        // 40,000 files is well past the 20,000 file budget, so this is a
+        // sample and must be reported as one.
+        assert!(computed.sampled, "40k files must be reported as a sample");
+        assert!(!computed.measured, "truncated walk must not claim exactness");
+        assert!(computed.size > 0, "sample should still observe bytes");
+    }
+
+    #[test]
+    fn test_compute_dir_size_samples_across_the_tree_not_one_subtree() {
+        // Breadth-first matters: a depth-first walk would spend its whole
+        // budget inside the first subdirectory and report a number dominated
+        // by whichever subtree happens to be widest.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut expected: u64 = 0;
+        for d in 0..8 {
+            let sub = tmp.path().join(format!("d{d}"));
+            std::fs::create_dir(&sub).unwrap();
+            // Give each sibling a distinguishable, equal share.
+            for f in 0..4_000 {
+                std::fs::write(sub.join(format!("f{f}.txt")), "0123456789").unwrap();
+                expected += 10;
+            }
+        }
+        // 32,000 files > the 20,000 file budget, so only a prefix is visited.
+        let computed = compute_dir_size_with_status(tmp.path(), Duration::from_secs(30));
+        assert!(computed.sampled, "should be a sample");
+        assert!(
+            computed.size < expected,
+            "a truncated sample must not claim the full total"
+        );
+        // A BFS spread across 8 siblings observes roughly half the tree; a DFS
+        // wedged in one sibling would observe ~1/8. Require > 20% of total to
+        // prove the sample is spread rather than concentrated.
+        assert!(
+            computed.size * 5 > expected,
+            "sample should span siblings, got {} of {expected}",
+            computed.size
+        );
+    }
+
+    #[test]
+    fn test_compute_dir_size_does_not_follow_symlinks() {
+        // A symlink back into the tree would double-count and, pointing at an
+        // ancestor, could loop forever.
+        let tmp = tempfile::tempdir().unwrap();
+        let sub = tmp.path().join("sub");
+        std::fs::create_dir(&sub).unwrap();
+        std::fs::write(sub.join("a.txt"), "0123456789").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(tmp.path(), sub.join("loop")).unwrap();
+
+        let computed = compute_dir_size_with_status(tmp.path(), Duration::from_secs(5));
+        assert!(computed.measured, "should complete without looping");
+        assert!(
+            computed.size < 1_000_000,
+            "symlink loop must not inflate the total, got {}",
+            computed.size
+        );
+    }
+
+    #[test]
+    fn test_sampled_sizes_are_cached_and_marked() {
+        // Regression guard for the 7s `cd ~/Dev`: a sampled value used to be
+        // written with a cleared mtime, which made it permanently uncacheable,
+        // so the daemon re-walked the same tree on every refresh forever.
+        let tmp = tempfile::tempdir().unwrap();
+        let child = tmp.path().join("child");
+        std::fs::create_dir(&child).unwrap();
+        std::fs::write(child.join("one.txt"), "one").unwrap();
+
+        let mk_item = |path: std::path::PathBuf| DirEntry {
+            name: "child".to_string(),
+            path,
+            is_dir: true,
+            is_file: false,
+            is_symlink: false,
+            is_exec: true,
+            size: 0,
+            size_is_estimate: false,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+            symlink_valid: true,
+            content_probe: None,
+        };
+        let mut items = vec![mk_item(child.clone())];
+        let dir_sizes = Arc::new(Mutex::new(HashMap::new()));
+        let dir_size_mtimes = Arc::new(Mutex::new(HashMap::new()));
+        let dir_size_sampled = Arc::new(Mutex::new(HashSet::new()));
+
+        refresh_displayed_dir_sizes(
+            &mut items,
+            &dir_sizes,
+            &dir_size_mtimes,
+            &dir_size_sampled,
+            Duration::from_secs(5),
+        );
+
+        // The critical assertion: a mtime was recorded, so the next refresh
+        // reuses this value instead of recomputing.
+        assert!(
+            dir_size_mtimes
+                .lock()
+                .unwrap()
+                .get(&child)
+                .copied()
+                .flatten()
+                .is_some(),
+            "computed size must record an mtime so it is cacheable"
+        );
+        // This small dir completes exactly, so it must not be marked.
+        assert!(!items[0].size_is_estimate, "small dir should be exact");
+
+        // Second pass reuses the cache rather than re-walking.
+        let cached_size = items[0].size;
+        let mut items_again = vec![mk_item(child.clone())];
+        refresh_displayed_dir_sizes(
+            &mut items_again,
+            &dir_sizes,
+            &dir_size_mtimes,
+            &dir_size_sampled,
+            Duration::from_secs(5),
+        );
+        assert_eq!(items_again[0].size, cached_size);
     }
 
     #[test]
@@ -2016,6 +2347,7 @@ mod tests {
             is_symlink: false,
             is_exec: true,
             size: 0,
+            size_is_estimate: false,
             modified: None,
             perms: String::new(),
             owner: String::new(),
@@ -2026,11 +2358,13 @@ mod tests {
         }];
         let dir_sizes = Arc::new(Mutex::new(HashMap::new()));
         let dir_size_mtimes = Arc::new(Mutex::new(HashMap::new()));
+        let dir_size_sampled = Arc::new(Mutex::new(HashSet::new()));
 
         refresh_displayed_dir_sizes(
             &mut items,
             &dir_sizes,
             &dir_size_mtimes,
+            &dir_size_sampled,
             Duration::from_secs(5),
         );
         let first_size = items[0].size;
@@ -2042,6 +2376,7 @@ mod tests {
             &mut items,
             &dir_sizes,
             &dir_size_mtimes,
+            &dir_size_sampled,
             Duration::from_secs(5),
         );
 

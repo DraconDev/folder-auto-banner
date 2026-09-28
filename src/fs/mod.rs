@@ -139,6 +139,12 @@ pub struct DirEntry {
     #[serde(default)]
     pub is_exec: bool,
     pub size: u64,
+    /// `size` came from a bounded sample rather than a full walk, so it is a
+    /// true lower bound on the real total rather than an exact figure. The UI
+    /// renders these with a `≥` prefix. Set by the daemon's size refresher;
+    /// absent in older persisted banner caches, hence the default.
+    #[serde(default)]
+    pub size_is_estimate: bool,
     pub modified: Option<DateTime<Utc>>,
     pub perms: String,
     pub owner: String,
@@ -386,6 +392,10 @@ impl DirSummary {
                 is_symlink,
                 is_exec,
                 size,
+                // A freshly scanned entry's own size is exact; the `≥` estimate
+                // marker only applies to a whole directory total, which the
+                // daemon's size refresher fills in later.
+                size_is_estimate: false,
                 modified,
                 perms,
                 owner,
@@ -826,6 +836,7 @@ mod tests {
                     is_symlink: false,
                     is_exec: false,
                     size: 50,
+                    size_is_estimate: false,
                     modified: None,
                     perms: String::new(),
                     owner: String::new(),
@@ -842,6 +853,7 @@ mod tests {
                     is_symlink: false,
                     is_exec: false,
                     size: 30,
+                    size_is_estimate: false,
                     modified: None,
                     perms: String::new(),
                     owner: String::new(),
@@ -858,6 +870,7 @@ mod tests {
                     is_symlink: false,
                     is_exec: false,
                     size: 20,
+                    size_is_estimate: false,
                     modified: None,
                     perms: String::new(),
                     owner: String::new(),
