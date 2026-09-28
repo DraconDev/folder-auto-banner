@@ -137,8 +137,18 @@ exactly as before.
 via `inotify`); the call sites that use it (`ioctl(TIOCGWINSZ)` for terminal
 size) are already `#[cfg(unix)]`.
 
-The release matrix builds all three targets now: `x86_64-unknown-linux-gnu`,
-`aarch64-unknown-linux-gnu`, and `aarch64-apple-darwin`.
+The release matrix builds the two Linux targets:
+`x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu`.
+
+The daemon also compiles cleanly for `x86_64-apple-darwin` and
+`aarch64-apple-darwin` (verified locally via `cargo build --target …`); it is
+not in the release matrix because this repo's CI is currently routing the
+apple matrix entry to `ubuntu` rather than `macos-latest`, so the link step
+fails with gcc unable to parse Apple's `-framework` / `-arch` flags. The
+matrix entry is removed for this release; restoring it requires a working
+macOS runner (or an osxcross setup step) and is a CI-inffrastructure fix,
+not a code one. On Linux the inotify watcher still fires exactly as before,
+and on macOS it is the same code path minus the watcher thread.
 
 ## [0.7.14] - 2026-09-07
 

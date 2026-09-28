@@ -239,8 +239,7 @@ impl Daemon {
         // calls `touch_active_root(&active_roots, ...)` keeps a clean view of
         // which threads share these arcs.
         #[cfg(target_os = "linux")]
-        let (active_roots_clone, active_order_clone) =
-            (active_roots.clone(), active_order.clone());
+        let (active_roots_clone, active_order_clone) = (active_roots.clone(), active_order.clone());
         #[cfg(target_os = "linux")]
         let _watcher_handle = thread::spawn(move || {
             watch_loop(
@@ -259,7 +258,12 @@ impl Daemon {
         // desktop use this is a no-op gate; for a future macOS port this is
         // the line that becomes "FSEvents or equivalent".
         #[cfg(not(target_os = "linux"))]
-        let _ = (cache_clone, dir_sizes_clone, dir_size_mtimes_clone, dir_size_sampled_clone);
+        let _ = (
+            cache_clone,
+            dir_sizes_clone,
+            dir_size_mtimes_clone,
+            dir_size_sampled_clone,
+        );
 
         // Load persisted banner cache after the watcher is ready so watched paths become
         // active immediately. Persisted entries are intentionally left in the cache for
