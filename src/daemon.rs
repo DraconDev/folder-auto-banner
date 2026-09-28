@@ -233,8 +233,14 @@ impl Daemon {
         let dir_size_sampled_clone = self.dir_size_sampled.clone();
         let active_roots = Arc::new(Mutex::new(HashSet::new()));
         let active_order = Arc::new(Mutex::new(Vec::new()));
-        let active_roots_clone = active_roots.clone();
-        let active_order_clone = active_order.clone();
+        // The watcher thread is Linux-only (gated below). On other targets
+        // the clones below are unused; gate the clones to the same target
+        // rather than `let _ = ...` them, so the request-handler path that
+        // calls `touch_active_root(&active_roots, ...)` keeps a clean view of
+        // which threads share these arcs.
+        #[cfg(target_os = "linux")]
+        let (active_roots_clone, active_order_clone) =
+            (active_roots.clone(), active_order.clone());
         #[cfg(target_os = "linux")]
         let _watcher_handle = thread::spawn(move || {
             watch_loop(
