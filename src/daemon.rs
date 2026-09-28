@@ -412,6 +412,7 @@ impl Daemon {
 /// active folders more aggressively: once a folder is requested, the daemon watches
 /// the folder and a bounded set of descendant files/directories so nested changes
 /// invalidate the cached banner without a full scan on every request.
+#[cfg(target_os = "linux")]
 fn watch_loop(
     cache: Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
@@ -644,6 +645,7 @@ fn watch_loop(
     }
 }
 
+#[cfg(target_os = "linux")]
 fn refresh_active_watchers(
     inotify: &mut Inotify,
     roots: &HashSet<PathBuf>,
@@ -711,6 +713,7 @@ fn refresh_active_watchers(
     }
 }
 
+#[cfg(target_os = "linux")]
 fn collect_watch_targets(
     path: &Path,
     depth: usize,
@@ -802,6 +805,7 @@ fn find_owner_for_watch(path: &Path, active_roots: &HashSet<PathBuf>) -> PathBuf
         .unwrap_or_else(|| path.to_path_buf())
 }
 
+#[cfg(target_os = "linux")]
 fn remove_inactive_watchers(
     roots: &HashSet<PathBuf>,
     active_order: &Arc<Mutex<Vec<PathBuf>>>,
