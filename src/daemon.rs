@@ -1,4 +1,5 @@
 use anyhow::Result;
+#[cfg(target_os = "linux")]
 use inotify::{Inotify, WatchMask};
 use std::collections::{HashMap, HashSet};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -229,6 +230,7 @@ impl Daemon {
         let active_order = Arc::new(Mutex::new(Vec::new()));
         let active_roots_clone = active_roots.clone();
         let active_order_clone = active_order.clone();
+        #[cfg(target_os = "linux")]
         let _watcher_handle = thread::spawn(move || {
             watch_loop(
                 cache_clone,
@@ -239,6 +241,14 @@ impl Daemon {
                 active_order_clone,
             );
         });
+        // On non-Linux the daemon has no inotify watcher. The cache still
+        // invalidates on the mtime checks in `cache_entry_is_fresh` and
+        // `cached_dir_size_is_fresh`, so staleness is bounded by the 5-minute
+        // banner TTL rather than by filesystem events. For Linux-only
+        // desktop use this is a no-op gate; for a future macOS port this is
+        // the line that becomes "FSEvents or equivalent".
+        #[cfg(not(target_os = "linux"))]
+        let _ = (cache_clone, dir_sizes_clone, dir_size_mtimes_clone, dir_size_sampled_clone);
 
         // Load persisted banner cache after the watcher is ready so watched paths become
         // active immediately. Persisted entries are intentionally left in the cache for

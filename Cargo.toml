@@ -65,6 +65,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 toml = "1.1"
 
 # Filesystem watching (for daemon)
+# inotify is Linux-only — the crate itself unconditionally uses `SYS_kcmp`,
+# which `libc` does not expose on macOS. The daemon gates its use to Linux so
+# the macOS build can still compile; the watcher thread (and the freshness
+# invalidation it provides) simply does not start on macOS. Cache staleness
+# then falls back to the mtime checks that already exist.
+[target.'cfg(target_os = "linux")'.dependencies]
 inotify = "0.11"
 libc = "0.2"
 
