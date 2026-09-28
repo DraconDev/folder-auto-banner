@@ -21,6 +21,23 @@ struct CacheEntry {
     computed_at: Instant,
     root_mtime: Option<SystemTime>,
     config_mtime: Option<SystemTime>,
+    /// `false` when this entry came from a fast pass that skipped the expensive
+    /// enrichment (TODO/code-metrics aggregation, port detection). The listing
+    /// is complete either way; this only records that the extra context has not
+    /// been filled in yet.
+    enriched: bool,
+}
+
+/// Which features a compute pass should include.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ComputeMode {
+    /// Listing, git, and cheap per-entry metadata only. Bounded to
+    /// milliseconds no matter how large the tree below is.
+    Fast,
+    /// Everything, including the recursive TODO/code-metrics walk and port
+    /// detection. On a container directory such as `~/Dev` these cost ~1.5s and
+    /// ~0.5s, which is exactly why they are kept off the request path.
+    Full,
 }
 
 const CACHE_TTL: Duration = Duration::from_secs(300); // 5 minutes
@@ -42,6 +59,20 @@ const WATCH_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 const ACTIVE_WATCH_DEPTH: usize = 3;
 const MAX_ACTIVE_WATCH_DIRS: usize = 2048;
 const MAX_WATCH_CHILDREN_PER_DIR: usize = 500;
+/// Maximum speculative `Warm` computations running concurrently. Warm work is
+/// optional, so saturating this budget drops new warm requests rather than
+/// queueing them: a dropped warm only defers a computation to the next visit.
+const MAX_CONCURRENT_WARM: usize = 2;
+
+/// RAII guard that releases a `Warm` concurrency slot on drop, including on
+/// panic, so a failed warm cannot permanently leak capacity.
+struct WarmSlotGuard(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl Drop for WarmSlotGuard {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
 
 #[cfg(test)]
 #[derive(Clone, Debug, PartialEq)]
@@ -108,6 +139,8 @@ struct SizeRefreshContext {
     dir_sizes: Arc<Mutex<HashMap<PathBuf, u64>>>,
     dir_size_mtimes: Arc<Mutex<HashMap<PathBuf, Option<SystemTime>>>>,
     dir_size_sampled: Arc<Mutex<HashSet<PathBuf>>>,
+    /// Bounds concurrent speculative `Warm` computations process-wide.
+    warm_in_flight: Arc<std::sync::atomic::AtomicUsize>,
     pending_size_refreshes: Arc<Mutex<Vec<PathBuf>>>,
     size_refresh_in_flight: Arc<Mutex<HashSet<PathBuf>>>,
     active_roots: Arc<Mutex<HashSet<PathBuf>>>,
@@ -240,6 +273,9 @@ impl Daemon {
                         computed_at: Instant::now() - CACHE_TTL,
                         root_mtime: current_dir_mtime(&path),
                         config_mtime: current_config_mtime(),
+                        // Persisted entries were always written from a full
+                        // compute, so their enrichment is already present.
+                        enriched: true,
                     },
                 );
             }
@@ -251,6 +287,7 @@ impl Daemon {
             dir_sizes: self.dir_sizes.clone(),
             dir_size_mtimes: self.dir_size_mtimes.clone(),
             dir_size_sampled: self.dir_size_sampled.clone(),
+            warm_in_flight: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             pending_size_refreshes: self.pending_size_refreshes.clone(),
             size_refresh_in_flight: self.size_refresh_in_flight.clone(),
             active_roots: active_roots.clone(),
@@ -861,6 +898,12 @@ fn handle_client(
     stream.read_exact(&mut req_buf)?;
     let request: Request = serde_json::from_slice(&req_buf)?;
     let t_parse = std::time::Instant::now();
+    if std::env::var("FAB_PROFILE").is_ok() {
+        // Which requests arrive, and for what. A single `f` invocation in a
+        // container directory was fanning out into ~13 warm requests, which is
+        // invisible without this trace.
+        eprintln!("[FAB_PROFILE_REQ] {:?}", request);
+    }
     tracing::debug!(
         "Received request: {:?} (read={:?}, parse={:?})",
         request,
@@ -909,7 +952,7 @@ fn handle_client(
                     // the freshly-computed banner, not the stale entry.
                     // (Pre-0.6.27 the inner `let data =` shadowed the
                     // outer `data` and the response used the old data.)
-                    data = match compute_banner_data(&path) {
+                    data = match compute_banner_data(&path, ComputeMode::Fast) {
                         Ok(data) => data,
                         Err(e) => {
                             send_response(
@@ -932,6 +975,7 @@ fn handle_client(
                             computed_at: Instant::now(),
                             root_mtime: current_dir_mtime(&path),
                             config_mtime: current_config_mtime(),
+                            enriched: false,
                         },
                     );
                     touch_active_root(&active_roots, &active_order, path.clone());
@@ -950,6 +994,17 @@ fn handle_client(
                     );
                 }
                 data.summary.total_size = data.summary.top_items.iter().map(|item| item.size).sum();
+                // A root-mtime change invalidates the entry, so the fast pass
+                // above replaced an enriched banner with a bare one. Queue the
+                // enrichment again, or this path would show a listing with no
+                // TODO/line/port context until its next cold miss.
+                schedule_enrichment_refresh(
+                    &cache,
+                    &active_roots,
+                    &active_order,
+                    &size_refresh_ctx,
+                    path.clone(),
+                );
                 let t2 = std::time::Instant::now();
                 let t3 = std::time::Instant::now();
                 // Persist to the on-disk cache so the next client
@@ -969,8 +1024,16 @@ fn handle_client(
                 return Ok(());
             }
 
-            // Cache miss or stale shallow snapshot — do full scan
-            let mut data = match compute_banner_data(&path) {
+            // Cache miss — serve the listing immediately.
+            //
+            // The expensive enrichment (recursive TODO/code-metrics walk,
+            // port detection) is deliberately *not* on this path. On a
+            // container directory like `~/Dev` those two phases cost ~1.5s
+            // and ~0.5s, so putting them here meant the first `cd` after a
+            // cache expiry blocked for seconds. A fast pass returns the
+            // complete listing plus git in milliseconds; enrichment lands in
+            // the cache a moment later and the next visit shows it.
+            let mut data = match compute_banner_data(&path, ComputeMode::Fast) {
                 Ok(data) => data,
                 Err(e) => {
                     send_response(
@@ -1003,6 +1066,7 @@ fn handle_client(
                         computed_at: Instant::now(),
                         root_mtime: current_dir_mtime(&path),
                         config_mtime: current_config_mtime(),
+                        enriched: false,
                     },
                 );
                 touch_active_root(&active_roots, &active_order, path.clone());
@@ -1012,10 +1076,17 @@ fn handle_client(
             // (the IPC `read4` has a 1–10 ms kernel-scheduling floor).
             persist_banner_data_cache(&path, &data);
             schedule_size_refresh(
-                size_refresh_ctx,
+                size_refresh_ctx.clone(),
                 path.clone(),
                 data.clone(),
                 BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
+            );
+            schedule_enrichment_refresh(
+                &cache,
+                &active_roots,
+                &active_order,
+                &size_refresh_ctx,
+                path.clone(),
             );
             Response::Banner(Box::new(data))
         }
@@ -1023,8 +1094,36 @@ fn handle_client(
             let path = path.canonicalize().unwrap_or_else(|_| path.clone());
             let cache = cache.clone();
             let active_order = active_order.clone();
-            // Pre-compute in background — don't block the client
+            // Pre-compute in background — don't block the client.
+            //
+            // Warm work is strictly speculative: a warm miss only means the
+            // directory gets computed on demand when it is next visited. So
+            // bound how much of it can run at once. Without this bound, one
+            // `f` invocation in a container directory fires ~13 warm requests
+            // (parent, grandparent, every child), each running its own ~1s
+            // `scan_insights` tree walk concurrently with the single banner
+            // the user actually asked for. That saturated I/O and made the
+            // requested directory take 1.4s instead of ~50ms — the warm path
+            // was actively making the real request slower.
+            if size_refresh_ctx
+                .warm_in_flight
+                .fetch_update(
+                    std::sync::atomic::Ordering::SeqCst,
+                    std::sync::atomic::Ordering::SeqCst,
+                    |n| (n < MAX_CONCURRENT_WARM).then_some(n + 1),
+                )
+                .is_err()
+            {
+                tracing::debug!(
+                    "Dropping warm request for {}: {} warm tasks already in flight",
+                    path.display(),
+                    MAX_CONCURRENT_WARM
+                );
+                return Ok(());
+            }
+            let warm_slot = WarmSlotGuard(size_refresh_ctx.warm_in_flight.clone());
             thread::spawn(move || {
+                let _warm_slot = warm_slot;
                 let cache_hit = {
                     let c = cache.lock().unwrap_or_else(|e| {
                         tracing::warn!("Mutex poisoned, recovering");
@@ -1035,7 +1134,9 @@ fn handle_client(
                         .unwrap_or(false)
                 };
                 if !cache_hit {
-                    match compute_banner_data(&path) {
+                    // Warm work is off the critical path, so it can afford the
+                    // full pass and lands the result already enriched.
+                    match compute_banner_data(&path, ComputeMode::Full) {
                         Ok(mut data) => {
                             apply_cached_displayed_dir_sizes(
                                 &mut data.summary.top_items,
@@ -1053,6 +1154,7 @@ fn handle_client(
                                     computed_at: Instant::now(),
                                     root_mtime: current_dir_mtime(&path),
                                     config_mtime: current_config_mtime(),
+                                    enriched: true,
                                 },
                             );
                             touch_active_root(&active_roots, &active_order, path.clone());
@@ -1120,20 +1222,117 @@ fn persist_banner_data_cache(path: &Path, data: &BannerData) {
     let _ = banner_data_cache::write_cache(path, data);
 }
 
-fn compute_banner_data(path: &Path) -> Result<BannerData> {
+/// Fill in the expensive enrichment for a path in the background, off the
+/// request path.
+///
+/// After a fast pass has answered the user, this recomputes the TODO /
+/// code-metrics aggregation and port detection, then replaces the cache entry
+/// and rewrites the on-disk cache file — so the next `cd` shows the full
+/// banner. Mirrors the existing directory-size refresh: the prompt never
+/// waits, and the enriched value is picked up on the following visit.
+///
+/// Skipped entirely when the entry is already enriched, so a warm path only
+/// ever does this work once.
+fn schedule_enrichment_refresh(
+    cache: &Arc<Mutex<HashMap<PathBuf, CacheEntry>>>,
+    active_roots: &Arc<Mutex<HashSet<PathBuf>>>,
+    active_order: &Arc<Mutex<Vec<PathBuf>>>,
+    size_refresh_ctx: &Arc<SizeRefreshContext>,
+    path: PathBuf,
+) {
+    // Already enriched: nothing to do.
+    {
+        let c = cache.lock().unwrap_or_else(|e| {
+            tracing::warn!("Mutex poisoned, recovering");
+            e.into_inner()
+        });
+        match c.get(&path) {
+            Some(entry) if entry.enriched => return,
+            // The directory changed while we were deciding; its own recompute
+            // path will handle enrichment.
+            Some(entry) if entry.root_mtime != current_dir_mtime(&path) => return,
+            None => return,
+            _ => {}
+        }
+    }
+
+    let cache = cache.clone();
+    let active_roots = active_roots.clone();
+    let active_order = active_order.clone();
+    let size_refresh_ctx = size_refresh_ctx.clone();
+    thread::spawn(move || {
+        let Ok(mut enriched) = compute_banner_data(&path, ComputeMode::Full) else {
+            return;
+        };
+        apply_cached_displayed_dir_sizes(
+            &mut enriched.summary.top_items,
+            &size_refresh_ctx.dir_sizes,
+            &size_refresh_ctx.dir_size_mtimes,
+        );
+        {
+            let mut c = cache.lock().unwrap_or_else(|e| {
+                tracing::warn!("Mutex poisoned, recovering");
+                e.into_inner()
+            });
+            c.insert(
+                path.clone(),
+                CacheEntry {
+                    data: enriched.clone(),
+                    computed_at: Instant::now(),
+                    root_mtime: current_dir_mtime(&path),
+                    config_mtime: current_config_mtime(),
+                    enriched: true,
+                },
+            );
+        }
+        // Rewrite the disk cache so the client's fast path picks up the
+        // enriched banner without another IPC round trip.
+        let _ = folder_auto_banner::cmd::banner_data_cache::write_cache(&path, &enriched);
+        touch_active_root(&active_roots, &active_order, path.clone());
+        // Sizes may also have filled in during the full pass.
+        schedule_size_refresh(
+            size_refresh_ctx,
+            path,
+            enriched,
+            BACKGROUND_SIZE_CACHE_REFRESH_TIMEOUT,
+        );
+    });
+}
+
+fn compute_banner_data(path: &Path, mode: ComputeMode) -> Result<BannerData> {
+    let __t_all = std::time::Instant::now();
     let config = folder_auto_banner::state::Config::load().unwrap_or_default();
     let extra_skip_dirs: Vec<&str> = config.ignore_dirs.iter().map(String::as_str).collect();
+    let enrich = mode == ComputeMode::Full;
     let mut summary = DirSummary::scan_with_options(
         path,
-        config.build_status,
-        folder_auto_banner::utils::feature_enabled(config.todo_count, "FAB_TODOS", "FAB_NO_TODOS"),
-        folder_auto_banner::utils::feature_enabled(config.ports, "FAB_PORTS", "FAB_NO_PORTS"),
-        folder_auto_banner::utils::feature_enabled(config.docker, "FAB_DOCKER", "FAB_NO_DOCKER"),
-        folder_auto_banner::utils::feature_enabled(
-            config.languages,
-            "FAB_METRICS",
-            "FAB_NO_METRICS",
-        ),
+        // Build checks spawn subprocesses (cargo check ≈ 6.7s) — opt-in via
+        // `f config` (build_status), off by default. Never on the fast path.
+        config.build_status && enrich,
+        enrich
+            && folder_auto_banner::utils::feature_enabled(
+                config.todo_count,
+                "FAB_TODOS",
+                "FAB_NO_TODOS",
+            ),
+        enrich
+            && folder_auto_banner::utils::feature_enabled(
+                config.ports,
+                "FAB_PORTS",
+                "FAB_NO_PORTS",
+            ),
+        enrich
+            && folder_auto_banner::utils::feature_enabled(
+                config.docker,
+                "FAB_DOCKER",
+                "FAB_NO_DOCKER",
+            ),
+        enrich
+            && folder_auto_banner::utils::feature_enabled(
+                config.languages,
+                "FAB_METRICS",
+                "FAB_NO_METRICS",
+            ),
         &extra_skip_dirs,
     )?;
 
@@ -1157,7 +1356,17 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
         }
     }
     if config.git_status && git_info.is_none() {
-        git_info = folder_auto_banner::git::get_git_info_filtered(path, &filter_paths).ok();
+        let __t_git = std::time::Instant::now();
+        git_info =
+            folder_auto_banner::git::get_git_info_filtered_with(path, &filter_paths, enrich).ok();
+        if std::env::var("FAB_PROFILE").is_ok() {
+            eprintln!(
+                "[FAB_PROFILE_GIT] {} rich={} took={:?}",
+                path.display(),
+                enrich,
+                __t_git.elapsed()
+            );
+        }
         if let (Some(ref mut gi), Some(ref cache)) = (&mut git_info, &cache) {
             // Trim to displayable paths BEFORE caching: the unfiltered map can
             // hold tens of thousands of deep untracked entries under large
@@ -1188,6 +1397,13 @@ fn compute_banner_data(path: &Path) -> Result<BannerData> {
         }
     }
 
+    if std::env::var("FAB_PROFILE").is_ok() {
+        eprintln!(
+            "[FAB_PROFILE_TOTAL] {:?} {mode:?} total={:?}",
+            path,
+            __t_all.elapsed()
+        );
+    }
     populate_content_probes(&mut summary.top_items);
 
     // Return immediately — sizes come from global cache
@@ -1480,6 +1696,9 @@ fn schedule_size_refresh(
             .map(|entry| entry.computed_at <= computed_at)
             .unwrap_or(true);
         if should_replace {
+            // A size refresh only re-lists the directory; it must not clear
+            // an enrichment that a background full pass already produced.
+            let was_enriched = c.get(&path).map(|entry| entry.enriched).unwrap_or(false);
             c.insert(
                 path.clone(),
                 CacheEntry {
@@ -1487,6 +1706,7 @@ fn schedule_size_refresh(
                     computed_at,
                     root_mtime: current_dir_mtime(&path),
                     config_mtime: current_config_mtime(),
+                    enriched: was_enriched,
                 },
             );
             // Persist the refreshed sizes to the per-path disk cache: the
@@ -2000,6 +2220,7 @@ mod tests {
             computed_at: Instant::now(),
             root_mtime: None,
             config_mtime: None,
+            enriched: true,
         };
         assert!(entry.computed_at.elapsed() < Duration::from_secs(1));
     }
@@ -2015,6 +2236,7 @@ mod tests {
             computed_at: Instant::now() - Duration::from_secs(600), // 10 minutes ago
             root_mtime: None,
             config_mtime: None,
+            enriched: true,
         };
         assert!(entry.computed_at.elapsed() > CACHE_TTL);
     }
@@ -2158,6 +2380,50 @@ mod tests {
         assert_eq!(computed.size, 0);
         assert!(!computed.measured);
         assert!(!computed.sampled);
+    }
+
+    #[test]
+    fn test_fast_pass_skips_enrichment_and_full_pass_includes_it() {
+        // The whole point of ComputeMode: a cache miss must return the listing
+        // in milliseconds. `scan_insights` is a recursive tree walk costing
+        // ~1.5s on a container directory like ~/Dev, so gating it off the
+        // request path is what keeps the first `cd` fast.
+        let tmp = tempfile::tempdir().unwrap();
+        // A manifest so the directory is detected as a project: insights are
+        // deliberately skipped for Generic directories.
+        std::fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"x\"\n").unwrap();
+        std::fs::create_dir(tmp.path().join("src")).unwrap();
+        std::fs::write(
+            tmp.path().join("src/main.rs"),
+            "// TODO: something\nfn main() {}\n",
+        )
+        .unwrap();
+
+        let fast = compute_banner_data(tmp.path(), ComputeMode::Fast).unwrap();
+        // The listing is complete either way — that must not regress.
+        assert!(
+            !fast.summary.top_items.is_empty(),
+            "fast pass must still list the directory"
+        );
+        assert!(
+            fast.summary.todo_info.is_none(),
+            "fast pass must not run the TODO/metrics walk"
+        );
+        assert!(
+            fast.summary.code_metrics.is_none(),
+            "fast pass must not compute code metrics"
+        );
+
+        let full = compute_banner_data(tmp.path(), ComputeMode::Full).unwrap();
+        assert_eq!(
+            full.summary.todo_info.as_ref().map(|t| t.count),
+            Some(1),
+            "full pass must still find the TODO"
+        );
+        assert!(
+            full.summary.code_metrics.is_some(),
+            "full pass must still compute code metrics"
+        );
     }
 
     #[test]

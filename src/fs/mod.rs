@@ -439,6 +439,7 @@ impl DirSummary {
             };
         }
 
+        let __t_build = std::time::Instant::now();
         let build_status = cached_check!(
             check_build,
             cache,
@@ -446,6 +447,7 @@ impl DirSummary {
             30,
             crate::build_status::check_build(path, &project_type)
         );
+        let __t_insights = std::time::Instant::now();
         let (todo_info, code_metrics) = if (scan_todos || check_metrics)
             && project_type != ProjectType::Generic
             && !truncated
@@ -491,6 +493,7 @@ impl DirSummary {
             (None, None)
         };
 
+        let __t_ports = std::time::Instant::now();
         let port_info = cached_check!(
             check_ports,
             cache,
@@ -498,6 +501,19 @@ impl DirSummary {
             10,
             crate::port_usage::detect_ports(path).ok()
         );
+        if std::env::var("FAB_PROFILE").is_ok() {
+            // Per-phase scan timing. `FAB_PROFILE` is the same opt-in switch
+            // the client already uses for IPC and render timings; the daemon
+            // had no equivalent, which is why a 1.5s insight walk was
+            // invisible until a banner stopped feeling instant.
+            eprintln!(
+                "[FAB_PROFILE_SCAN] {} build={:?} insights+ports={:?} ports={:?}",
+                path.display(),
+                __t_build.elapsed(),
+                __t_insights.elapsed(),
+                __t_ports.elapsed()
+            );
+        }
         let docker_info = cached_check!(
             check_docker,
             cache,

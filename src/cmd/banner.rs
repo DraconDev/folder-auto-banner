@@ -948,11 +948,25 @@ fn print_tree_recursive(
     }
 }
 
-/// Pre-compute banners for the parent directory and the immediate children of
-/// the current directory, so moving up to the parent or into a sibling
+/// Maximum directories one `f` invocation speculatively warms. The parent
+/// plus the first few children. See `warm_nearby_dirs` for why this is small.
+const MAX_WARM_TARGETS: usize = 4;
+
+/// Pre-compute banners for the parent directory and a few immediate children
+/// of the current directory, so moving up to the parent or into a sibling
 /// directory is served from the daemon cache.
+///
+/// Kept deliberately small. The previous version warmed the parent, the
+/// grandparent and up to 30 children — 32 warm requests for a single
+/// invocation. Visiting a container directory like `~/Dev` therefore fired 13
+/// concurrent `scan_insights` tree walks (each ~1s over 1.19M files) racing
+/// the one banner the user actually asked for, and the real request slowed
+/// from ~50ms to ~1.4s. Warming is speculative: a skipped path is simply
+/// computed on demand next visit, so breadth is worth much less than not
+/// stealing I/O from the request in flight.
 fn warm_nearby_dirs(path: &Path) {
-    // Warm the parent so `cd ..` is fast.
+    // Warm the parent so `cd ..` is fast. This is the single most likely next
+    // move, so it goes first.
     let mut paths_to_warm = Vec::new();
     if let Some(parent) = path.parent() {
         if parent.is_dir() {
@@ -960,23 +974,16 @@ fn warm_nearby_dirs(path: &Path) {
         }
     }
 
-    // Warm immediate children of the current directory so `cd <child>` or fuzzy
-    // jump into a child is served from the daemon cache. Bounded to a modest
-    // number of children to avoid excessive background scans in very large dirs.
+    // Warm a handful of immediate children so `cd <child>` or a fuzzy jump into
+    // a child is served from cache. Bounded hard: each one is a full tree walk.
     if let Ok(entries) = std::fs::read_dir(path) {
-        for entry in entries.take(30).flatten() {
+        for entry in entries.flatten() {
+            if paths_to_warm.len() >= MAX_WARM_TARGETS {
+                break;
+            }
             let child = entry.path();
             if child.is_dir() {
                 paths_to_warm.push(child);
-            }
-        }
-    }
-
-    // Warm the grandparent so `cd ../..` is also fast.
-    if let Some(parent) = path.parent() {
-        if let Some(grandparent) = parent.parent() {
-            if grandparent.is_dir() {
-                paths_to_warm.push(grandparent.to_path_buf());
             }
         }
     }
@@ -985,12 +992,14 @@ fn warm_nearby_dirs(path: &Path) {
         return;
     }
 
-    // Deduplicate (paths_to_warm may contain parent and grandparent).
+    // Deduplicate: a child can also be the parent in a symlinked layout.
     paths_to_warm.sort();
     paths_to_warm.dedup();
+    paths_to_warm.truncate(MAX_WARM_TARGETS);
 
     // Send bounded warm requests before exiting. The daemon handles Warm
-    // requests asynchronously, so this should not block on full scans.
+    // requests asynchronously and caps how many run at once, so this should
+    // not block on full scans.
     crate::daemon_client::warm_paths(&paths_to_warm);
 }
 

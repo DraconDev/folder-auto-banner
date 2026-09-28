@@ -12,6 +12,16 @@ use std::path::Path;
 use std::time::Duration;
 
 const GIT_COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
+/// Budget for the `git status` that the fast, on-request pass runs.
+///
+/// The rich collectors can afford the full `GIT_COMMAND_TIMEOUT` because they
+/// run in the background. The fast pass cannot: `git status` costs 1.5–2.0s on
+/// a large monorepo (`~/Dev/dracon-platform`, 26,633 commits, 50 GB `.git`),
+/// and it is the only git work the listing itself needs. Bounding it means a
+/// big repository shows its listing immediately without git badges, and the
+/// background enrichment pass fills the real statuses in for the next visit.
+/// A missing status column beats a prompt that hangs for eight seconds.
+const GIT_FAST_STATUS_TIMEOUT: Duration = Duration::from_millis(400);
 
 /// Git status for a directory
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -114,12 +124,25 @@ impl FileStatus {
 /// (which can be 39K+ entries for large repos). Use false when you only need
 /// aggregate counts (staged/modified/untracked) for the banner header.
 pub fn get_git_info(path: &Path) -> Result<GitInfo> {
-    get_git_info_inner(path, true, &[])
+    get_git_info_inner(path, true, &[], true)
 }
 
 /// Get Git info with optional path filtering for performance.
 pub fn get_git_info_filtered(path: &Path, filter_paths: &[String]) -> Result<GitInfo> {
-    get_git_info_inner(path, true, filter_paths)
+    get_git_info_filtered_with(path, filter_paths, true)
+}
+
+/// Get Git info, optionally skipping the header-decoration collectors.
+///
+/// `rich = false` runs only `git status` and `git rev-parse`, which is what
+/// the per-file listing needs. See `get_git_info_inner` for why the other
+/// nine commands are worth deferring.
+pub fn get_git_info_filtered_with(
+    path: &Path,
+    filter_paths: &[String],
+    rich: bool,
+) -> Result<GitInfo> {
+    get_git_info_inner(path, true, filter_paths, rich)
 }
 
 /// Result of parsing `git status --porcelain`.
@@ -136,7 +159,12 @@ struct StatusResult {
 /// Format: `XY filename` where X is index status, Y is worktree status.
 /// X/Y codes: ' ' unmodified, M modified, A added, D deleted, R renamed,
 ///            C copied, U unmerged, ? untracked, ! ignored
-fn git_status(path: &Path, collect_file_statuses: bool, filter_paths: &[String]) -> StatusResult {
+fn git_status(
+    path: &Path,
+    collect_file_statuses: bool,
+    filter_paths: &[String],
+    timeout: Duration,
+) -> StatusResult {
     let mut args = vec!["status", "--porcelain", "-z"];
     let filter_args: Vec<String>;
     if !filter_paths.is_empty() {
@@ -148,7 +176,7 @@ fn git_status(path: &Path, collect_file_statuses: bool, filter_paths: &[String])
         }
     }
 
-    let Some(raw) = git_cmd_raw(path, &args) else {
+    let Some(raw) = git_cmd_raw_with_timeout(path, &args, timeout) else {
         return StatusResult::default();
     };
 
@@ -370,18 +398,15 @@ fn git_cmd(path: &Path, args: &[&str]) -> Option<String> {
 }
 
 /// Like `git_cmd` but returns the raw bytes (for when we need exact content).
-fn git_cmd_raw(path: &Path, args: &[&str]) -> Option<Vec<u8>> {
+/// Run a `git` command returning raw bytes, with an explicit timeout so the
+/// fast pass can bound how long it will wait for `git status`.
+fn git_cmd_raw_with_timeout(path: &Path, args: &[&str], timeout: Duration) -> Option<Vec<u8>> {
     let path_arg = path.to_string_lossy();
     let mut full_args = Vec::with_capacity(args.len() + 2);
     full_args.extend(["-C", path_arg.as_ref()]);
     full_args.extend_from_slice(args);
-    let output = crate::utils::run_with_timeout_bytes(
-        "git",
-        &full_args,
-        Path::new("."),
-        GIT_COMMAND_TIMEOUT,
-    )
-    .ok()?;
+    let output =
+        crate::utils::run_with_timeout_bytes("git", &full_args, Path::new("."), timeout).ok()?;
     if output.status.success() {
         Some(output.stdout)
     } else {
@@ -433,6 +458,7 @@ fn get_git_info_inner(
     path: &Path,
     collect_file_statuses: bool,
     filter_paths: &[String],
+    rich: bool,
 ) -> Result<GitInfo> {
     // Fast bail: not a git repo
     if !is_git_repo(path) {
@@ -445,47 +471,104 @@ fn get_git_info_inner(
     let status_handle = std::thread::spawn({
         let p = path_owned.clone();
         let fp = filter_owned.clone();
-        move || git_status(&p, collect_file_statuses, &fp)
+        let status_timeout = if rich {
+            GIT_COMMAND_TIMEOUT
+        } else {
+            GIT_FAST_STATUS_TIMEOUT
+        };
+        move || git_status(&p, collect_file_statuses, &fp, status_timeout)
     });
 
     let path_clone = path_owned.clone();
     let branch_handle =
         std::thread::spawn(move || git_cmd(&path_clone, &["rev-parse", "--abbrev-ref", "HEAD"]));
 
+    // Everything past this point is header decoration, not part of the
+    // per-file listing. Each one is a separate `git` fork+exec, and eleven of
+    // them in parallel cost ~900ms on a project directory even though a single
+    // `git status` is ~40ms — the banner was paying for subprocess spawn
+    // latency, not for git work.
+    //
+    // `rich == false` (the fast, on-request path) runs only `status` and
+    // `rev-parse`: the per-file status letters and the branch name, which is
+    // what the listing actually renders. The remaining fields are filled in
+    // by the daemon's background enrichment pass and show up on the next
+    // visit, exactly like directory sizes and the TODO/metrics walk.
+    let _rich = rich;
     let path_clone = path_owned.clone();
-    let ahead_behind_handle = std::thread::spawn(move || git_ahead_behind(&path_clone));
+    let ahead_behind_handle = std::thread::spawn(move || {
+        if !rich {
+            return (0, 0);
+        }
+        git_ahead_behind(&path_clone)
+    });
 
     let path_clone = path_owned.clone();
-    let last_commit_handle = std::thread::spawn(move || git_last_commit(&path_clone));
+    let last_commit_handle = std::thread::spawn(move || {
+        if !rich {
+            return (None, None, None);
+        }
+        git_last_commit(&path_clone)
+    });
 
     let path_clone = path_owned.clone();
     let stash_handle = std::thread::spawn(move || {
+        if !rich {
+            return 0;
+        }
         let out = git_cmd(&path_clone, &["stash", "list"]);
         out.map(|s| s.lines().count()).unwrap_or(0)
     });
 
     let path_clone = path_owned.clone();
-    let commits_today_handle = std::thread::spawn(move || git_commits_today(&path_clone));
+    let commits_today_handle = std::thread::spawn(move || {
+        if !rich {
+            return 0;
+        }
+        git_commits_today(&path_clone)
+    });
 
     let path_clone = path_owned.clone();
     let branch_count_handle = std::thread::spawn(move || {
+        if !rich {
+            return 0;
+        }
         let out = git_cmd(&path_clone, &["branch"]);
         out.map(|s| s.lines().count()).unwrap_or(0)
     });
 
     let path_clone = path_owned.clone();
     let tag_handle = std::thread::spawn(move || {
+        if !rich {
+            return None;
+        }
         let out = git_cmd(&path_clone, &["tag", "--points-at", "HEAD"]);
         out.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
     });
 
     let path_clone = path_owned.clone();
-    let diff_stats_handle = std::thread::spawn(move || git_diff_stats(&path_clone));
+    let diff_stats_handle = std::thread::spawn(move || {
+        if !rich {
+            return (0, 0);
+        }
+        git_diff_stats(&path_clone)
+    });
 
     let path_clone = path_owned.clone();
-    let file_churn_handle = std::thread::spawn(move || git_file_churn(&path_clone));
+    let file_churn_handle = std::thread::spawn(move || {
+        if !rich {
+            return Default::default();
+        }
+        git_file_churn(&path_clone)
+    });
 
-    let merge_state_handle = std::thread::spawn(move || git_merge_state(&path_owned));
+    let path_owned2 = path_owned.clone();
+    let merge_state_handle = std::thread::spawn(move || {
+        if !rich {
+            return Default::default();
+        }
+        git_merge_state(&path_owned2)
+    });
 
     // --- Collect results ---
     let StatusResult {

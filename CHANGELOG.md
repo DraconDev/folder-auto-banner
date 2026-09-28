@@ -2,43 +2,89 @@
 
 ### Fix: `cd` into a large directory no longer takes seconds
 
-Prompt-hook latency had two independent causes, both measured on this
-machine. `cd ~/Dev` went from **~1.5s–7s to 8–28ms**.
+Two independent causes, both measured on this machine. The headline case —
+`cd ~/Dev/dracon-platform` (26,633 commits, 50 GB `.git`) — went from
+**~8s to ~0.6s cold and ~20ms warm**.
+
+The organizing idea: the banner's *listing* is cheap, and everything else is
+enrichment that used to be computed on the request path. Now the listing
+answers immediately and the enrichment lands in the cache behind it, so the
+next visit shows the full banner. Same pattern the project already used for
+directory sizes.
 
 **1. `du` could never satisfy a prompt-time budget.** Measuring a directory
 size shelled out to `du -s -b`, but `du -s -b ~/Dev` takes **106s** and
 `~/Dev/dracon-platform` (222 GB) takes **56s** across 1.19M files. Every call
 hit the timeout, returned the 4 KiB directory-inode placeholder, and — since
 a placeholder is not authoritative — was never cached. The daemon therefore
-re-ran it forever: 5 concurrent `du` processes at all times (`ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK`),
-~37% of a core, ~17% sustained I/O pressure, and **every** directory in the
-`~/Dev` banner rendering as `4.0k` with a `44k` total for a 330 GB tree.
+re-ran it forever: 5 concurrent `du` at all times
+(`ACTIVE_SIZE_REFRESH_ROOTS_PER_TICK`), ~37% of a core, ~17% sustained I/O
+pressure, and **every** directory in the `~/Dev` banner rendering as `4.0k`
+with a `44k` total for a 330 GB tree.
 
-No cache TTL can fix a 106-second primitive, so the primitive changed.
+No cache TTL fixes a 106-second primitive, so the primitive changed.
 `compute_dir_size_with_status` now runs a bounded breadth-first walk capped
 by file count, directory count, *and* wall clock (`SIZE_SAMPLE_*`). Small
 directories still complete and stay exact; large ones return a true lower
-bound in milliseconds, rendered with a `≥` prefix (`DirEntry::size_is_estimate`)
-so the UI no longer implies precision the measurement does not have.
-Breadth-first keeps the sample spread across siblings instead of being
-consumed by one subtree, and symlinks are never followed.
+bound in milliseconds, rendered `≥` (`DirEntry::size_is_estimate`) so the UI
+no longer implies precision the measurement lacks. Breadth-first keeps the
+sample spread across siblings instead of being consumed by one subtree, and
+symlinks are never followed.
 
-Sampled values are now **cached with their mtime**. This is the part that
-actually ends the storm: the old code cleared the mtime for any
-non-`du`-exact value, making it permanently uncacheable, so the same huge
-tree was re-walked on every refresh tick. Background CPU dropped **11×**
-(5620 ms → 500 ms per 15s).
+Sampled values are now **cached with their mtime**. This is the part that ends
+the storm: the old code cleared the mtime for any non-`du`-exact value, making
+it permanently uncacheable, so the same huge tree was re-walked every refresh
+tick. Background CPU dropped **11×** (5620 ms → 500 ms per 15s).
 
-**2. The client "fast path" was slower than the path it avoided.**
+**2. Eleven `git` subprocesses per banner.** `get_git_info_inner` spawned 11
+parallel `git` commands to assemble the header. A single `git status` on
+`~/Dev/dracon-platform` costs 1.5–2.0s, so the banner was paying subprocess
+spawn latency, not git work. Only `status` and `rev-parse` serve the listing;
+the other nine are header decoration and now run only in the enrichment pass
+(`get_git_info_filtered_with(.., rich)`).
+
+**3. `GIT_COMMAND_TIMEOUT` let a slow `git status` block the prompt for 10s.**
+The fast pass now bounds that call to `GIT_FAST_STATUS_TIMEOUT` (400ms). A
+huge repository shows its listing without git badges; the background pass
+fills the real statuses in for the next visit. A missing status column beats
+an eight-second prompt.
+
+**4. `scan_insights` (~1.5s) and `detect_ports` (~0.5s) were on the request
+path.** These walk the whole subtree for TODO counts, LOC, language mix, and
+listening ports — none of which the listing needs. `ComputeMode::Fast` skips
+them; `ComputeMode::Full` (background, via `schedule_enrichment_refresh`) runs
+them and replaces the cache entry plus the on-disk cache file. The first visit
+shows the listing; the next shows everything.
+
+**5. Warming made the real request slower.** `warm_nearby_dirs` fired the
+parent, the grandparent and up to 30 children — 32 warm requests per
+invocation. Visiting `~/Dev` therefore launched 13 concurrent ~1s tree walks
+*racing the one banner the user asked for*, pushing a 50ms request to 1.4s.
+Now capped at `MAX_WARM_TARGETS = 4` (parent first), and the daemon bounds
+concurrent warm work with `MAX_CONCURRENT_WARM` — a warm miss only defers a
+computation, so dropping one is always safe.
+
+**6. The client "fast path" was slower than the path it avoided.**
 `is_cache_fresh` validated the disk cache with a depth-8, 8192-entry
 descendant walk — **11,430 syscalls and 22–76 ms** on a home directory, to
 prove freshness before a Unix-socket round trip costing 1–10 ms. On a
 container like `~/Dev` some project is always being written, so the cache was
 permanently stale and the fast path never engaged. The walk is now depth-1
 (`MAX_DESCENDANT_DEPTH`), matching what its own doc comment already claimed.
-Deeper changes remain covered by the daemon's inotify watcher
-(`ACTIVE_WATCH_DEPTH = 3`), which removes the on-disk cache file when a change
-lands. Syscalls for `f banner ~`: **11,430 → 1,941**.
+Deeper changes stay covered by the daemon's inotify watcher
+(`ACTIVE_WATCH_DEPTH = 3`). Syscalls for `f banner ~`: **11,430 → 1,941**.
+
+### Measured
+
+Fully cold (all caches wiped, fresh daemon), then warm:
+
+| Path | cold before | cold after | warm |
+|---|---:|---:|---:|
+| `~/Dev` | 1655–2966 ms | **61–292 ms** | 14–28 ms |
+| `~/Dev/dracon-platform` | **8067 ms** | **643 ms** | 16–31 ms |
+| `~/Dev/folder-auto-banner` | 1677 ms | **227 ms** | 10–26 ms |
+| `~` | 1655–2966 ms | **227 ms** | 15–46 ms |
+| `~/Downloads` | 556 ms | **61 ms** | 12–26 ms |
 
 ### Add: `f daemon warm`
 
@@ -47,16 +93,27 @@ subcommand reached them, so "the daemon already knows this" was unreachable
 dead code. `f daemon warm [PATH...]` now pre-computes banners in the
 background, making the first `cd` into a usual directory fast.
 
+### Diagnostics
+
+`FAB_PROFILE=1` now also reports from the daemon: per-phase scan timing
+(`FAB_PROFILE_SCAN`), git timing per compute (`FAB_PROFILE_GIT`), the whole
+compute (`FAB_PROFILE_TOTAL`), and the request trace
+(`FAB_PROFILE_REQ`). The daemon had no equivalent, which is why a 1.5s
+insight walk and an 11-subprocess git fan-out were both invisible until the
+banner stopped feeling instant.
+
 ### Tests
 
-+7 tests. Notably, the freshness-walk boundary is pinned by
-`test_max_descendant_mtime_stops_at_one_level` — it asserts the walk does
-*not* visit depth 2, so re-deepening it (and reintroducing the 11k-syscall
-tree walk) fails loudly. Sampler coverage: exact on small trees, bounded by
-budget, spread across siblings, symlink-loop safe, and regression-guarded
-against the uncacheable-mtime bug.
++8 tests. Notable: `test_max_descendant_mtime_stops_at_one_level` asserts the
+freshness walk does *not* visit depth 2, so re-deepening it (and
+reintroducing the 11k-syscall tree walk) fails loudly.
+`test_fast_pass_skips_enrichment_and_full_pass_includes_it` pins that the fast
+pass still lists the directory and the full pass still finds TODOs.
+`test_sampled_sizes_are_cached_and_marked` guards the uncacheable-mtime
+regression that caused the `du` storm. Sampler coverage: exact on small trees,
+bounded by budget, spread across siblings, symlink-loop safe.
 
-Test results are unchanged from baseline: the same 5 pre-existing failures
+Test results unchanged from baseline: the same 5 pre-existing failures
 (4 alias-routing cases in `alias_test`, `test_daemon_new` which conflicts
 with a live `fabd` holding the socket).
 
