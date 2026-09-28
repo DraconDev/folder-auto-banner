@@ -109,3 +109,25 @@ loudly, and `test_sampled_sizes_are_cached_and_marked`, which guards the
 uncacheable-mtime regression that caused the `du` storm.
 
 `cargo clippy --all-targets`: no issues. No lint suppressions were added.
+
+
+
+### macOS support (newly buildable)
+
+The daemon and `f` now compile cleanly for `aarch64-apple-darwin` as well as
+both Linux targets. There is one behavioral caveat: `inotify` is a Linux-only
+crate, so the filesystem watcher that backs the daemon's cache-invalidation
+fast path does not start on macOS. The cache still invalidates on the mtime
+checks in `cache_entry_is_fresh` and `cached_dir_size_is_fresh`, so staleness
+is bounded by the 5-minute banner TTL rather than by filesystem events.
+This is gated at the dep and call-site level (`#[cfg(target_os = "linux")]`
+on the `inotify` dependency, the watcher constants, the `watch_loop` thread,
+and its helpers). On Linux there is no change — the watcher still fires
+exactly as before.
+
+`libc` is promoted to a direct `unix`-gated dependency (it was transitive
+via `inotify`); the call sites that use it (`ioctl(TIOCGWINSZ)` for terminal
+size) are already `#[cfg(unix)]`.
+
+The release matrix builds all three targets now: `x86_64-unknown-linux-gnu`,
+`aarch64-unknown-linux-gnu`, and `aarch64-apple-darwin`.
