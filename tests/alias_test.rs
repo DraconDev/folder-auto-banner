@@ -250,41 +250,44 @@ fn unknown_bare_word_does_not_match_path() {
 }
 
 #[test]
-fn explicit_path_with_dot_slash_does_nothing() {
-    // `f ./src` is dropped (paths are not in the routing table).
-    // User said: "we only take numbers, aliases, and flags, not
-    // folders and files by name."
-    let (stdout, _stderr, code) = run_f_full(&["./src"]);
-    assert_eq!(code, 0, "./src should not error, got: {}", _stderr);
+fn explicit_path_with_dot_slash_shows_that_path() {
+    // 0.7.14 changed this: a bare path that exists on disk is now routed as a
+    // path (`is_existing_path` + `is_path_arg`) instead of being dropped, so
+    // `f ./src` shows `src`'s banner rather than nothing. See
+    // docs/releases/RELEASE_NOTES_0.7.14.md ("Routing fix").
+    let (stdout, stderr, code) = run_f_full(&["./src"]);
+    assert_eq!(code, 0, "./src should not error, got: {}", stderr);
     assert!(
-        stdout.is_empty(),
-        "./src should produce no output, got: {}",
-        stdout
+        !stdout.is_empty(),
+        "./src should show src's banner (0.7.14 routing fix), got nothing"
+    );
+    assert!(
+        first_line_header(&stdout).contains("src"),
+        "banner should be for src, got: {}",
+        first_line_header(&stdout)
     );
 }
 
 #[test]
-fn explicit_path_with_slash_does_nothing() {
-    let (stdout, _stderr, code) = run_f_full(&["/tmp"]);
-    assert_eq!(code, 0, "/tmp should not error, got: {}", _stderr);
+fn explicit_path_with_slash_shows_that_path() {
+    let (stdout, stderr, code) = run_f_full(&["/tmp"]);
+    assert_eq!(code, 0, "/tmp should not error, got: {}", stderr);
     assert!(
-        stdout.is_empty(),
-        "/tmp should produce no output, got: {}",
-        stdout
+        first_line_header(&stdout).contains("/tmp"),
+        "banner should be for /tmp, got: {}",
+        first_line_header(&stdout)
     );
 }
 
 #[test]
-fn explicit_path_with_tilde_does_nothing() {
-    // Tilde expansion is a shell feature, so we use the expanded
-    // path here. Even when expanded, paths are still dropped.
+fn explicit_path_with_tilde_shows_that_path() {
+    // Tilde expansion is a shell feature, so we use the expanded path here.
     let home = std::env::var("HOME").unwrap_or("/tmp".to_string());
-    let (stdout, _stderr, code) = run_f_full(&[home.as_str()]);
-    assert_eq!(code, 0, "HOME path should not error, got: {}", _stderr);
+    let (stdout, stderr, code) = run_f_full(&[home.as_str()]);
+    assert_eq!(code, 0, "HOME path should not error, got: {}", stderr);
     assert!(
-        stdout.is_empty(),
-        "HOME path should produce no output, got: {}",
-        stdout
+        !stdout.is_empty(),
+        "HOME path should show that directory's banner, got nothing"
     );
 }
 
@@ -488,12 +491,22 @@ fn alias_plus_explicit_flag() {
 }
 
 #[test]
-fn alias_plus_path_drops_path() {
-    // `f tree ./src` — the alias expands to `-R -D`, the path is
-    // dropped. The result is equivalent to `f tree`.
+fn alias_plus_path_applies_alias_to_that_path() {
+    // Since 0.7.14 the path is no longer dropped, so `f tree ./src` is a
+    // recursive banner of `src` — not of the cwd. Previously this asserted
+    // equivalence with `f tree`, which encoded the pre-0.7.14 routing.
     let with_path = run_f(&["tree", "./src"]);
     let just_tree = run_f(&["tree"]);
-    assert_eq!(first_line_header(&with_path), first_line_header(&just_tree));
+    let src_header = first_line_header(&with_path);
+    assert_ne!(
+        src_header,
+        first_line_header(&just_tree),
+        "`f tree ./src` should target src, not the cwd"
+    );
+    assert!(
+        !src_header.is_empty(),
+        "`f tree ./src` should produce a banner"
+    );
 }
 
 #[test]
