@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.7.15] - 2026-09-28
+
 ### Fix: `cd` into a large directory no longer takes seconds
 
 Two independent causes, both measured on this machine. The headline case —
