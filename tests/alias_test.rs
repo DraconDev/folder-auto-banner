@@ -36,6 +36,33 @@ fn first_line_header(s: &str) -> String {
     s.lines().next().unwrap_or("").chars().take(200).collect()
 }
 
+/// Strip ANSI SGR/CSI escape sequences.
+///
+/// The banner colourises its path with style codes, so the rendered text for
+/// `/tmp` is `ESC[2m/ESC[0mESC[1mtmp` — the literal substring `/tmp` is not
+/// contiguous. Assertions about what path a banner is for must compare against
+/// the de-styled text.
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' {
+            // Skip the CSI sequence: ESC '[' params (0x30-0x3f) final byte
+            // (0x40-0x7e).
+            if chars.next() == Some('[') {
+                for c in chars.by_ref() {
+                    if ('\u{40}'..='\u{7e}').contains(&c) {
+                        break;
+                    }
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 // ===== Alias smoke tests (one per alias) =====
 // Each alias must produce the same output as its explicit form.
 
@@ -262,9 +289,9 @@ fn explicit_path_with_dot_slash_shows_that_path() {
         "./src should show src's banner (0.7.14 routing fix), got nothing"
     );
     assert!(
-        first_line_header(&stdout).contains("src"),
+        first_line_header(&strip_ansi(&stdout)).contains("src"),
         "banner should be for src, got: {}",
-        first_line_header(&stdout)
+        first_line_header(&strip_ansi(&stdout))
     );
 }
 
@@ -272,10 +299,11 @@ fn explicit_path_with_dot_slash_shows_that_path() {
 fn explicit_path_with_slash_shows_that_path() {
     let (stdout, stderr, code) = run_f_full(&["/tmp"]);
     assert_eq!(code, 0, "/tmp should not error, got: {}", stderr);
+    let header = first_line_header(&strip_ansi(&stdout));
     assert!(
-        first_line_header(&stdout).contains("/tmp"),
+        header.contains("/tmp"),
         "banner should be for /tmp, got: {}",
-        first_line_header(&stdout)
+        header
     );
 }
 
