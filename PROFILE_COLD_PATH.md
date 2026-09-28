@@ -150,3 +150,111 @@ Cargo.toml, reducing compile time significantly.
   (`test_project_insights_serializes`), the cache hit
   (`test_scan_insights_cache_warm_returns_same_value`), and the
   cache expiry (`test_scan_insights_cache_expired_returns_none`).
+
+---
+
+# Cold path, revisited — 0.7.15 (2026-09-28)
+
+Everything above describes the cold path as it behaved through 0.7.14:
+one `compute_banner_data` call that did *everything* before answering.
+That model is gone. This section supersedes the sections above; they are
+kept for the measurements they record.
+
+## The new model
+
+The listing is cheap; everything else is enrichment. So:
+
+```text
+client  ──f banner $PWD──▶  daemon
+                              │
+                              ├─ cache miss ─▶ ComputeMode::Fast
+                              │                  listing + git status (400ms cap)
+                              │                  respond immediately        ◀── prompt unblocked
+                              │
+                              └─ background    ComputeMode::Full
+                                                 scan_insights, detect_ports,
+                                                 9 extra git collectors
+                                                 └─▶ replace cache entry
+                                                     + rewrite disk cache
+                                                              │
+client  ──next f banner──▶  ◀──────────────────────────────┘  (full banner, ~20ms)
+```
+
+`CacheEntry::enriched` records which pass produced an entry, so a banner is
+never left un-enriched and never enriched twice.
+
+## What was actually slow, and why
+
+The old profile blamed `scan_insights` and fixed it with a 60 s file cache.
+That was real but minor. Measuring the same paths in 0.7.15 found four
+larger costs, none of which a cache TTL could touch:
+
+| Cost | Measured | Why caching could not fix it |
+|---|---:|---|
+| `du -s -b ~/Dev` | **106 s** | A 106 s primitive cannot be cached, only replaced. On timeout it returned the 4 KiB inode placeholder, and a placeholder is not authoritative — so it was recomputed forever (5 concurrent `du` at all times). |
+| `scan_insights` + `detect_ports` on `~/Dev` | 1.5 s + 0.5 s | Computed *before* responding, for values the listing never renders. |
+| 11 parallel `git` subprocesses | ~0.9 s | `git status` alone is 1.5–2.0 s on `~/Dev/dracon-platform` (26,633 commits, 50 GB `.git`); `GIT_COMMAND_TIMEOUT` was 10 s, so a slow status could hold the prompt for 8 s. |
+| `warm_nearby_dirs` fan-out | +0.9 s | Fired 32 warm requests (parent + grandparent + 30 children) that raced the one banner the user asked for, turning a 50 ms request into 1.4 s. |
+
+Plus the client-side freshness walk: depth 8, 8192 entries,
+**11,430 syscalls and 22–76 ms** on a home directory, to validate a disk
+cache before a Unix-socket round trip costing 1–10 ms. On a container like
+`~/Dev` some project is always being written, so the walk marked the cache
+permanently stale and the "fast path" never engaged. Now depth-1
+(`MAX_DESCENDANT_DEPTH`); depth 2–3 remains the daemon inotify watcher's job
+(`ACTIVE_WATCH_DEPTH = 3`). Syscalls for `f banner ~`: **11,430 → 1,941**.
+
+## Results
+
+Fully cold (all caches wiped, fresh daemon), then warm:
+
+| Path | cold before | cold after | warm after |
+|---|---:|---:|---:|
+| `~/Dev` | 1655–2966 ms | 61–292 ms | 12–28 ms |
+| `~/Dev/dracon-platform` | **8067 ms** | **643 ms** | 16–31 ms |
+| `~/Dev/folder-auto-banner` | 1677 ms | 227 ms | 10–26 ms |
+| `~` | 1655–2966 ms | 227 ms | 15–46 ms |
+| `~/Downloads` | 556 ms | 61 ms | 12–26 ms |
+
+Background cost dropped alongside it: 5 concurrent `du` processes at all
+times → 0, and daemon CPU 5620 ms → 500 ms per 15 s wall (11×).
+
+## Directory sizes: why `≥`
+
+`compute_dir_size_with_status` is now a bounded breadth-first walk, capped by
+file count (`SIZE_SAMPLE_FILE_BUDGET`), directory count
+(`SIZE_SAMPLE_DIR_BUDGET`), and wall clock (`SIZE_SAMPLE_TIME_BUDGET`).
+
+The returned value is **always a true lower bound** — it sums only bytes it
+actually observed — and it is marked `≥` in the UI when the budget ran out
+before the walk finished. Small trees finish inside the budget and stay exact.
+
+Extrapolating a partial sample up to an estimated total was deliberately
+rejected. On a build-artifact tree the sample is dominated by whichever
+subtree fills the budget first, so a scaled-up figure would be a fabrication
+presented as a measurement. `~/Dev/dracon-platform` legitimately shows `≥1.4G`
+against a real 222 GB: loose, but honest. Breadth-first keeps the sample
+spread across siblings rather than consumed by one subtree, and symlinks are
+never followed (they can escape the tree or loop).
+
+Sampled values are cached **with their mtime**. That is what ends the storm:
+the old code cleared the mtime for any non-`du`-exact value, so the value was
+permanently uncacheable and the tree was re-walked on every refresh tick.
+
+## Profiling the daemon
+
+`FAB_PROFILE=1` previously only instrumented the client (IPC and render
+times). The daemon had no equivalent, which is why a 1.5 s insight walk and
+an 11-subprocess git fan-out were both invisible until the banner stopped
+feeling instant. It now reports:
+
+- `FAB_PROFILE_SCAN` — per-phase scan timing (build, insights, ports)
+- `FAB_PROFILE_GIT` — git timing for each compute, tagged `rich=true|false`
+- `FAB_PROFILE_TOTAL` — whole `compute_banner_data`, tagged with its `ComputeMode`
+- `FAB_PROFILE_REQ` — the request trace (this is what exposed the 13-request
+  warm fan-out)
+
+The warm fan-out is bounded on both sides, because the two limits solve
+different problems: `MAX_WARM_TARGETS` (client, 4) caps what is sent,
+`MAX_CONCURRENT_WARM` (daemon, 2) caps what runs. A dropped warm request only
+defers a computation to the next visit, so dropping is always safe.
