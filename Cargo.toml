@@ -65,6 +65,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 toml = "1.1"
 
 # Filesystem watching (for daemon)
+# `libc` for `ioctl(TIOCGWINSZ)` in the unix terminal-size helpers
+# (`get_terminal_width` / `get_terminal_height`). Previously transitive via
+# the now-Linux-only `inotify` dep; promoting to a direct, unix-gated dep so
+# the apple-darwin build keeps resolving it.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # inotify is Linux-only — the crate itself unconditionally uses `SYS_kcmp`,
 # which `libc` does not expose on macOS. The daemon gates its use to Linux so
 # the macOS build can still compile; the watcher thread (and the freshness
