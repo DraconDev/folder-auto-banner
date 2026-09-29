@@ -17,21 +17,54 @@ use std::time::Duration;
 /// kernel wait state of every thread that was stuck".
 const F_TIMEOUT: Duration = Duration::from_secs(45);
 
+/// Direct children of `pid`, read from /proc (no `ps` dependency).
+fn child_pids(pid: u32) -> Vec<u32> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if !name.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let Ok(other) = name.parse::<u32>() else {
+            continue;
+        };
+        // Field 4 of /proc/<pid>/stat is the ppid. The comm field can contain
+        // spaces and parens, so split after the last ')'.
+        let Ok(stat) = std::fs::read_to_string(format!("/proc/{other}/stat")) else {
+            continue;
+        };
+        let parent = stat
+            .rsplit_once(") ")
+            .and_then(|(_, rest)| rest.split_whitespace().next())
+            .and_then(|v| v.parse::<u32>().ok());
+        if parent == Some(pid) {
+            out.push(other);
+        }
+    }
+    out
+}
+
 /// Describe a pid tree: for every process and every thread, the kernel wait
 /// channel and the current syscall. That is what actually answers "where is it
-/// blocked?" — `ps` only shows the process exists.
+/// blocked?" — `ps` only shows the process exists. Descendants matter as much
+/// as the root: a client stuck in `wait4` on a wedged `git` reads as "do_wait"
+/// until the child's own wait state is included.
 fn describe_process_tree(root: u32) -> String {
     let mut out = String::new();
     let read = |p: String| std::fs::read_to_string(&p).unwrap_or_default();
 
-    // Collect the tree breadth-first: /proc/*/stat field 4 is the ppid.
-    let mut frontier = vec![root];
+    let mut stack = vec![(root, 0usize)];
     let mut seen: Vec<u32> = Vec::new();
-    while let Some(pid) = frontier.pop() {
+    while let Some((pid, depth)) = stack.pop() {
         if seen.contains(&pid) {
             continue;
         }
         seen.push(pid);
+        let indent = "  ".repeat(depth + 1);
         let stat = read(format!("/proc/{pid}/stat"));
         let ppid = stat
             .rsplit_once(") ")
@@ -43,7 +76,7 @@ fn describe_process_tree(root: u32) -> String {
             .to_string();
         let wchan = read(format!("/proc/{pid}/wchan")).trim().to_string();
         out.push_str(&format!(
-            "\n  pid {pid} ppid {ppid:?} wchan={wchan:?}\n    cmd: {cmdline}\n"
+            "\n{indent}pid {pid} ppid {ppid:?} wchan={wchan:?}\n{indent}  cmd: {cmdline}\n"
         ));
 
         let tasks = std::fs::read_dir(format!("/proc/{pid}/task"));
@@ -53,21 +86,21 @@ fn describe_process_tree(root: u32) -> String {
                     let tid = task.file_name().to_string_lossy().to_string();
                     let comm = read(format!("/proc/{pid}/task/{tid}/comm"));
                     let wchan = read(format!("/proc/{pid}/task/{tid}/wchan"));
+                    // /proc/<pid>/syscall comes back empty for processes we may
+                    // not ptrace, so wchan is the reliable signal here.
                     let syscall = read(format!("/proc/{pid}/task/{tid}/syscall"));
                     let syscall = syscall.split_whitespace().next().unwrap_or("-");
                     out.push_str(&format!(
-                        "    thread {tid} {} wchan={} syscall={syscall}\n",
+                        "{indent}  thread {tid} {} wchan={} syscall={syscall}\n",
                         comm.trim(),
                         wchan.trim()
                     ));
                 }
             }
-            Err(e) => out.push_str(&format!("    (no /proc/{pid}/task: {e})\n")),
+            Err(e) => out.push_str(&format!("{indent}  (no /proc/{pid}/task: {e})\n")),
         }
-        if let Some(ppid) = ppid {
-            if ppid > 1 {
-                frontier.push(ppid);
-            }
+        for child in child_pids(pid) {
+            stack.push((child, depth + 1));
         }
     }
     out
