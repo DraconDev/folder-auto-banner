@@ -53,6 +53,48 @@ fn child_pids(pid: u32) -> Vec<u32> {
     out
 }
 
+/// Resolve the path argument of a blocked syscall from the target's memory.
+///
+/// A stuck `openat` (kernel `wait_for_partner`) says a filesystem is not
+/// answering, but not *which* file was asked for: the pathname lives in the
+/// target's address space. We are the target's parent, so ptrace_scope allows
+/// reading `/proc/<pid>/mem` and the raw pointer printed in
+/// `/proc/<tid>/syscall` resolves to the string.
+///
+/// Syscalls whose second argument is a path pointer (x86_64).
+const PATH_ARG_SYSCALLS: &[(&str, u64)] = &[
+    ("open", 2),
+    ("stat", 4),
+    ("lstat", 6),
+    ("readlink", 89),
+    ("openat", 257),
+    ("newfstatat", 262),
+    ("readlinkat", 267),
+    ("unlinkat", 263),
+    ("statx", 332),
+    ("openat2", 437),
+];
+
+fn blocked_path(pid: u32, tid: &str) -> Option<String> {
+    let raw = std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/syscall")).ok()?;
+    let mut fields = raw.split_whitespace();
+    let number: u64 = fields.next()?.parse().ok()?;
+    let args: Vec<u64> = fields.map(|f| u64::from_str_radix(f, 16).ok()).collect();
+    let (_, path_index) = PATH_ARG_SYSCALLS.iter().find(|(_, n)| *n == number)?;
+    let pointer = *args.get(*path_index)? as usize;
+    if pointer == 0 {
+        return Some(format!("{number} with a null path pointer"));
+    }
+
+    use std::io::{Read, Seek, SeekFrom};
+    let mut mem = std::fs::File::open(format!("/proc/{pid}/mem")).ok()?;
+    mem.seek(SeekFrom::Start(pointer as u64)).ok()?;
+    let mut buf = [0u8; 512];
+    let read = mem.read(&mut buf).ok()?;
+    let end = buf[..read].iter().position(|b| *b == 0).unwrap_or(read);
+    Some(String::from_utf8_lossy(&buf[..end]).into_owned())
+}
+
 /// Describe a pid tree: for every process and every thread, the kernel wait
 /// channel and the current syscall. That is what actually answers "where is it
 /// blocked?" — `ps` only shows the process exists. Descendants matter as much
@@ -90,12 +132,16 @@ fn describe_process_tree(root: u32) -> String {
                     // /proc/<pid>/syscall comes back empty for processes we may
                     // not ptrace, so wchan is the reliable signal here.
                     let syscall = read(format!("/proc/{pid}/task/{tid}/syscall"));
-                    let syscall = syscall.split_whitespace().next().unwrap_or("-");
+                    let number = syscall.split_whitespace().next().unwrap_or("-");
                     out.push_str(&format!(
-                        "{indent}  thread {tid} {} wchan={} syscall={syscall}\n",
+                        "{indent}  thread {tid} {} wchan={} syscall={number}\n",
                         comm.trim(),
                         wchan.trim()
                     ));
+                    // Name the file a blocked path-taking syscall is stuck on.
+                    if let Some(path) = blocked_path(pid, &tid) {
+                        out.push_str(&format!("{indent}    blocked on: {path}\n"));
+                    }
                 }
             }
             Err(e) => out.push_str(&format!("{indent}  (no /proc/{pid}/task: {e})\n")),
@@ -133,6 +179,19 @@ fn daemon_state() -> String {
         out.push_str("\n  fabd.log (last 40 lines):\n");
         for line in tail.into_iter().rev() {
             out.push_str(&format!("    {line}\n"));
+        }
+    }
+    // A blocked open with kernel wchan `wait_for_partner` means some
+    // filesystem is not answering. The mount table says which one.
+    if let Ok(mounts) = std::fs::read_to_string("/proc/self/mountinfo") {
+        out.push_str("\n  interesting mounts:\n");
+        for line in mounts.lines() {
+            if line.contains(" / ") || line.contains(" /tmp ") || line.contains(" /home ") {
+                let fs = line
+                    .split_whitespace()
+                    .nth(line.split_whitespace().count().saturating_sub(2));
+                out.push_str(&format!("    {:?}: {line}\n", fs.unwrap_or("")));
+            }
         }
     }
     out
