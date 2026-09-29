@@ -103,6 +103,23 @@ jobs:
             done
           done
 
+      # Notes files are named after the version without the `v` prefix
+      # (RELEASE_NOTES_0.7.16.md) while the ref is `v0.7.16`, so resolve the
+      # path rather than assuming, and fall back to a minimal body.
+      - name: Resolve release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          notes="docs/releases/RELEASE_NOTES_${GITHUB_REF_NAME#v}.md"
+          if [ ! -f "$notes" ]; then
+            echo "::warning::no release notes at $notes — using a generated body"
+            printf 'Release %s\n\nSee CHANGELOG.md for details.\n' \
+              "$GITHUB_REF_NAME" > /tmp/release-body.md
+            notes=/tmp/release-body.md
+          fi
+          echo "using $notes"
+          echo "path=$notes" >> "$GITHUB_OUTPUT"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -115,7 +132,7 @@ jobs:
           # Fail if an asset is missing rather than replacing an existing one:
           # a silently overwritten architecture is worse than a failed run.
           overwrite_files: false
-          body_path: docs/releases/RELEASE_NOTES_${{ github.ref_name }}.md
+          body_path: ${{ steps.notes.outputs.path }}
           draft: false
           prerelease: false
         env:
