@@ -850,7 +850,12 @@ fn fifo_in_listed_directory_does_not_hang() {
         let path = dir.join(name);
         let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
         let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
-        assert_eq!(rc, 0, "mkfifo {name} failed: {}", std::io::Error::last_os_error());
+        assert_eq!(
+            rc,
+            0,
+            "mkfifo {name} failed: {}",
+            std::io::Error::last_os_error()
+        );
     }
     // A regular file alongside them, so the listing is not entirely special.
     std::fs::write(dir.join("real.txt"), "one\ntwo\n").unwrap();
