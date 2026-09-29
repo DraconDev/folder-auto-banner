@@ -12,6 +12,9 @@ jobs:
   release:
     name: Release ${{ github.ref_name }}
     runs-on: ubuntu-latest
+    # Fail fast instead of burning the 6h default. A hung test step once
+    # blocked a release for hours with the `Create Release` job waiting on it.
+    timeout-minutes: 20
     strategy:
       matrix:
         include:
@@ -60,6 +63,7 @@ jobs:
     name: Create Release
     needs: release
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

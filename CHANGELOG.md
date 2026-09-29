@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+## [0.7.16] - 2026-09-29
+
+### Fix: `f` no longer hangs on a directory containing a FIFO
+
+The contents-column probe opened every non-directory entry, and opening a FIFO
+read-only waits for a writer. `f` blocked in `openat` (kernel wait channel
+`wait_for_partner`) with no output and no error, so the prompt never came back.
+
+`get_file_contents` now refuses non-regular files, the text probe opens with
+`O_NONBLOCK` and re-checks the descriptor, and `read_cache` got the same
+guard. Regular files are unaffected.
+
+This is what stalled CI: a GitHub runner keeps `clr-debug-pipe-*` FIFOs in
+`/tmp`, the suite scans `/tmp`, and the v0.7.15 release never published
+because its `Run tests` step hung the same way.
+
+Added `timeout-minutes` to the CI and release jobs, a bounded `f` runner in the
+alias tests that dumps kernel wait state for a hung process, and daemon log
+capture under `FAB_PROFILE=1`.
+
+260 passing, 0 failing.
+
 ## [0.7.15] - 2026-09-28
 
 ### Fix: `cd` into a large directory no longer takes seconds
