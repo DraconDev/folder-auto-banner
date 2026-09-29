@@ -83,9 +83,6 @@ pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
     // GitHub runner's /tmp is full of .NET `clr-debug-pipe-*` FIFOs) wedges the
     // prompt in `openat` with kernel wchan `wait_for_partner` — no output, no
     // error, no way back.
-    if !entry.is_file {
-        return String::new();
-    }
     // Per-process cache: identical (path, size, mtime) lookups are served
     // from memory, so a warm `f` on the same directory doesn't re-read
     // headers we already know about. The cache is bounded by an LRU-style
