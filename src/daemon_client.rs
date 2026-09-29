@@ -198,7 +198,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
 /// Check if daemon is running. Cleans up stale sockets automatically.
 pub fn is_daemon_running() -> bool {
     let Ok(socket) = socket_path() else {
-        return false;
+        return;
     };
     if !socket.exists() {
         return false;
@@ -306,9 +306,29 @@ pub fn send_shutdown() {
     }
 }
 
+/// Where the spawned daemon's stdout/stderr go. `/dev/null` normally; a log
+/// file under the data dir when `FAB_PROFILE` is set, so a daemon that hangs
+/// still leaves a trace instead of vanishing into the null device.
+fn daemon_stdio() -> std::process::Stdio {
+    if std::env::var("FAB_PROFILE").is_err() {
+        return std::process::Stdio::null();
+    }
+    let log = socket_path()
+        .ok()
+        .and_then(|socket| socket.parent().map(|dir| dir.join("fabd.log")));
+    let Some(log) = log else {
+        return std::process::Stdio::null();
+    };
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+        .map(std::process::Stdio::from)
+        .unwrap_or_else(|_| std::process::Stdio::null())
+}
+
 /// Start daemon in background (auto-start)
-pub fn ensure_daemon_running() {
-    if is_daemon_running() {
+pub fn ensure_daemon_running() {    if is_daemon_running() {
         return;
     }
 
@@ -339,12 +359,18 @@ pub fn ensure_daemon_running() {
         }
     }
 
-    match std::process::Command::new(&daemon_bin)
+    // Diagnostics: with FAB_PROFILE=1 the daemon inherits stderr, which is
+    // otherwise /dev/null. A wedged daemon is then invisible — its trace is
+    // the only evidence of where it stopped — so send it to a log file next
+    // to the socket that CI/hang-hunt tooling can read.
+    let daemon_stdout = daemon_stdio();
+    let daemon_stderr = daemon_stdio();
+    let mut spawn = std::process::Command::new(&daemon_bin);
+    spawn
         .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-    {
+        .stdout(daemon_stdout)
+        .stderr(daemon_stderr);
+    match spawn.spawn() {
         Ok(_) => {
             tracing::info!("Started fabd daemon");
             // Poll for socket to appear (up to 2s, checking every 50ms)
