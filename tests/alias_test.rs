@@ -249,9 +249,15 @@ fn daemon_state() -> String {
 
 /// Run `f` once, bounded, with hang forensics on timeout.
 fn run_f_capture(args: &[&str]) -> (String, String, i32) {
+    run_f_capture_env(args, &[])
+}
+
+/// `run_f_capture` with extra environment variables for the child.
+fn run_f_capture_env(args: &[&str], envs: &[(&str, &std::path::Path)]) -> (String, String, i32) {
     let mut child: std::process::Command = std::process::Command::cargo_bin("f").unwrap();
     let mut child = child
         .args(args)
+        .envs(envs.iter().map(|(k, v)| (*k, v)))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null())
@@ -838,7 +844,6 @@ fn number_passes_through_with_alias() {
 #[test]
 fn fifo_in_listed_directory_does_not_hang() {
     use std::os::unix::ffi::OsStrExt;
-    use std::process::Command as StdCommand;
 
     let dir = std::env::temp_dir().join(format!("fab-test-fifo-dir-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -869,20 +874,18 @@ fn fifo_in_listed_directory_does_not_hang() {
     std::fs::create_dir_all(&config_dir).expect("create config dir");
     std::fs::write(config_dir.join("config.toml"), "columns = [\"contents\"]\n").unwrap();
 
-    let output = StdCommand::new(env!("CARGO_BIN_EXE_f"))
-        .env("HOME", &home)
-        .env("XDG_CONFIG_HOME", home.join(".config"))
-        .env("XDG_DATA_HOME", home.join(".local/share"))
-        .env("XDG_CACHE_HOME", home.join(".cache"))
-        .arg(dir.to_str().unwrap())
-        .output()
-        .expect("run f");
-    assert!(
-        output.status.success(),
-        "f failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+    // Bounded like every other invocation in this file, so a regression fails
+    // the test with kernel-state forensics instead of stalling the suite.
+    let (stdout, stderr, code) = run_f_capture_env(
+        &[dir.to_str().unwrap()],
+        &[
+            ("HOME", home.as_path()),
+            ("XDG_CONFIG_HOME", &home.join(".config")),
+            ("XDG_DATA_HOME", &home.join(".local/share")),
+            ("XDG_CACHE_HOME", &home.join(".cache")),
+        ],
     );
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(code, 0, "f failed: {stderr}");
     assert!(
         stdout.contains("real.txt"),
         "listing should show the regular file, got:\n{stdout}"
