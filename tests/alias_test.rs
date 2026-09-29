@@ -37,7 +37,10 @@ fn describe_process_tree(root: u32) -> String {
             .rsplit_once(") ")
             .and_then(|(_, rest)| rest.split_whitespace().next())
             .and_then(|v| v.parse::<u32>().ok());
-        let cmdline = read(format!("/proc/{pid}/cmdline")).replace('\0', " ").trim().to_string();
+        let cmdline = read(format!("/proc/{pid}/cmdline"))
+            .replace('\0', " ")
+            .trim()
+            .to_string();
         let wchan = read(format!("/proc/{pid}/wchan")).trim().to_string();
         out.push_str(&format!(
             "\n  pid {pid} ppid {ppid:?} wchan={wchan:?}\n    cmd: {cmdline}\n"
