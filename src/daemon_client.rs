@@ -40,10 +40,7 @@ pub fn connect_with_timeout(socket: &Path) -> Result<UnixStream> {
     match rx.recv_timeout(CONNECT_TIMEOUT) {
         Ok(Ok(stream)) => Ok(stream),
         Ok(Err(e)) => Err(e.into()),
-        Err(_) => anyhow::bail!(
-            "timed out connecting to daemon socket {}",
-            socket.display()
-        ),
+        Err(_) => anyhow::bail!("timed out connecting to daemon socket {}", socket.display()),
     }
 }
 
