@@ -198,7 +198,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
 /// Check if daemon is running. Cleans up stale sockets automatically.
 pub fn is_daemon_running() -> bool {
     let Ok(socket) = socket_path() else {
-        return;
+        return false;
     };
     if !socket.exists() {
         return false;
