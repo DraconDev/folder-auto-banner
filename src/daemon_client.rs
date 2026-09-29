@@ -11,6 +11,42 @@ fn socket_path() -> Result<std::path::PathBuf> {
     Ok(crate::state::get_data_dir()?.join(SOCKET_NAME))
 }
 
+/// Timeout for establishing the daemon IPC connection.
+///
+/// A blocking `connect()` waits forever when a live daemon stops draining
+/// its accept backlog (bound socket, wedged before/without its accept loop):
+/// every `f` invocation then wedges with no fallback. Observed on CI as the
+/// whole suite stalling on a single banner test with an orphaned `f`.
+/// A short timeout keeps every call site fail-fast — callers already treat a
+/// refused connection as absence (stale-socket cleanup, daemon (re)start, or
+/// direct-scan fallback).
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Connect to a Unix socket with a timeout.
+///
+/// std has no `UnixStream::connect_timeout`, so the blocking connect runs on
+/// a helper thread and the caller waits at most `CONNECT_TIMEOUT`. On timeout
+/// the helper thread stays parked in `connect()` until the process exits —
+/// that only happens when the daemon is already wedged, in which case the
+/// caller is falling back anyway.
+pub fn connect_with_timeout(socket: &Path) -> Result<UnixStream> {
+    let path = socket.to_path_buf();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::Builder::new()
+        .name("fab-ipc-connect".to_string())
+        .spawn(move || {
+            let _ = tx.send(UnixStream::connect(&path));
+        })?;
+    match rx.recv_timeout(CONNECT_TIMEOUT) {
+        Ok(Ok(stream)) => Ok(stream),
+        Ok(Err(e)) => Err(e.into()),
+        Err(_) => anyhow::bail!(
+            "timed out connecting to daemon socket {}",
+            socket.display()
+        ),
+    }
+}
+
 fn send_and_recv(stream: &mut UnixStream, request: &Request) -> Result<Response> {
     use std::io::{Read, Write};
     // Length-prefixed JSON: 4-byte LE length, then payload.
@@ -86,7 +122,9 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
     let socket = socket_path().ok()?;
 
     // Try connecting — if it fails, start daemon and poll for readiness.
-    let mut stream = match UnixStream::connect(&socket) {
+    // `connect_with_timeout` (not blocking `connect`): a wedged daemon with
+    // a full backlog would otherwise stall this `f` invocation forever.
+    let mut stream = match connect_with_timeout(&socket) {
         Ok(s) => s,
         Err(_) => {
             // Nobody listening behind the file — stale, safe to remove.
@@ -97,7 +135,7 @@ pub fn get_banner_cached(path: &Path) -> Option<BannerData> {
             // old code silently fell back to a local scan.
             let mut connected = None;
             for _ in 0..40 {
-                match UnixStream::connect(&socket) {
+                match connect_with_timeout(&socket) {
                     Ok(s) => {
                         connected = Some(s);
                         break;
@@ -168,7 +206,7 @@ pub fn is_daemon_running() -> bool {
     if !socket.exists() {
         return false;
     }
-    let mut stream = match UnixStream::connect(&socket) {
+    let mut stream = match connect_with_timeout(&socket) {
         Ok(s) => s,
         Err(_) => {
             // Socket file exists but nobody is listening — remove stale socket
@@ -208,7 +246,7 @@ fn warm_path(path: &Path) {
     let Ok(socket) = socket_path() else {
         return;
     };
-    let Ok(mut stream) = UnixStream::connect(&socket) else {
+    let Ok(mut stream) = connect_with_timeout(&socket) else {
         return;
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
@@ -246,7 +284,7 @@ pub fn send_shutdown() {
     let Ok(socket) = socket_path() else {
         return;
     };
-    let Ok(mut stream) = UnixStream::connect(&socket) else {
+    let Ok(mut stream) = connect_with_timeout(&socket) else {
         return;
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
@@ -297,7 +335,7 @@ pub fn ensure_daemon_running() {
     // second instance.
     if let Ok(socket) = socket_path() {
         if socket.exists() {
-            if UnixStream::connect(&socket).is_ok() {
+            if connect_with_timeout(&socket).is_ok() {
                 return;
             }
             let _ = std::fs::remove_file(&socket);
@@ -315,7 +353,7 @@ pub fn ensure_daemon_running() {
             // Poll for socket to appear (up to 2s, checking every 50ms)
             for _ in 0..40 {
                 if let Ok(socket) = socket_path() {
-                    if socket.exists() && UnixStream::connect(&socket).is_ok() {
+                    if socket.exists() && connect_with_timeout(&socket).is_ok() {
                         return;
                     }
                 }
