@@ -825,3 +825,69 @@ fn number_passes_through_with_alias() {
     let _ = _stdout;
     let _ = _stderr;
 }
+
+/// Rendering a directory that contains a FIFO must not hang.
+///
+/// The render path probes every non-directory entry for the contents column,
+/// and opening a FIFO read-only blocks until a writer appears. A GitHub runner
+/// keeps `clr-debug-pipe-*` FIFOs in /tmp, so `f /tmp` stalled in `openat` with
+/// kernel wchan `wait_for_partner` and the whole suite stopped. This pins the
+/// end-to-end behaviour, so the guard cannot be lost through the client-side
+/// fallback in `get_file_contents_raw`.
+#[cfg(unix)]
+#[test]
+fn fifo_in_listed_directory_does_not_hang() {
+    use std::os::unix::ffi::OsStrExt;
+    use std::process::Command as StdCommand;
+
+    let dir = std::env::temp_dir().join(format!("fab-test-fifo-dir-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("create test dir");
+
+    // Both shapes seen on a CI runner: a probe-extension name and the
+    // .NET diagnostic naming that triggered the stall.
+    for name in ["pipe.txt", "clr-debug-pipe-1234-5678-out"] {
+        let path = dir.join(name);
+        let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+        let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+        assert_eq!(rc, 0, "mkfifo {name} failed: {}", std::io::Error::last_os_error());
+    }
+    // A regular file alongside them, so the listing is not entirely special.
+    std::fs::write(dir.join("real.txt"), "one\ntwo\n").unwrap();
+
+    // Give the child its own config so the contents column is shown. Without
+    // it the column can be dropped for width and the probe never runs, which
+    // would make this test pass for the wrong reason. An isolated HOME keeps
+    // the developer's real config untouched.
+    let home = std::env::temp_dir().join(format!("fab-test-fifo-home-{}", std::process::id()));
+    let config_dir = home.join(".config/fab");
+    std::fs::create_dir_all(&config_dir).expect("create config dir");
+    std::fs::write(config_dir.join("config.toml"), "columns = [\"contents\"]\n").unwrap();
+
+    let output = StdCommand::new(env!("CARGO_BIN_EXE_f"))
+        .env("HOME", &home)
+        .env("XDG_CONFIG_HOME", home.join(".config"))
+        .env("XDG_DATA_HOME", home.join(".local/share"))
+        .env("XDG_CACHE_HOME", home.join(".cache"))
+        .arg(dir.to_str().unwrap())
+        .output()
+        .expect("run f");
+    assert!(
+        output.status.success(),
+        "f failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("real.txt"),
+        "listing should show the regular file, got:\n{stdout}"
+    );
+    // The line count of the regular file proves the probe still runs.
+    assert!(
+        stdout.contains("2"),
+        "the contents column should still probe regular files, got:\n{stdout}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&home);
+}
