@@ -275,8 +275,16 @@ pub fn is_cache_fresh(path: &Path) -> bool {
 /// bug, manual intervention, etc.), the directory is removed so the
 /// daemon can write a fresh file on the next IPC call.
 pub fn read_cache(path: &Path) -> Option<BannerData> {
-    let file = cache_file_path(path)?;
-    let meta = std::fs::symlink_metadata(&file).ok()?;
+    read_cache_at(&cache_file_path(path)?)
+}
+
+/// `read_cache` against an explicit cache file.
+///
+/// Split out from `read_cache` so the guards below — in particular the
+/// regular-file check that keeps a FIFO from blocking forever — are
+/// testable without faking the process-wide data directory.
+fn read_cache_at(file: &Path) -> Option<BannerData> {
+    let meta = std::fs::symlink_metadata(file).ok()?;
     if meta.file_type().is_symlink() {
         tracing::warn!(
             "Cache path is a symlink, refusing to read: {}",
@@ -286,7 +294,7 @@ pub fn read_cache(path: &Path) -> Option<BannerData> {
     }
     if meta.is_dir() {
         tracing::warn!("Cache path is a directory, removing: {}", file.display());
-        let _ = std::fs::remove_dir(&file);
+        let _ = std::fs::remove_dir(file);
         return None;
     }
     if meta.len() > MAX_IPC_FRAME_SIZE as u64 {
@@ -307,7 +315,7 @@ pub fn read_cache(path: &Path) -> Option<BannerData> {
         );
         return None;
     }
-    let bytes = std::fs::read(&file).ok()?;
+    let bytes = std::fs::read(file).ok()?;
     serde_json::from_slice(&bytes).ok()
 }
 
@@ -737,5 +745,53 @@ mod tests {
     fn cache_ttl_is_5_minutes() {
         // Sanity check: the TTL must match the daemon's CACHE_TTL.
         assert_eq!(CACHE_TTL, Duration::from_secs(300));
+    }
+
+    /// A cache path that is not a regular file must be refused, not read.
+    ///
+    /// A FIFO has no writer, so `open(O_RDONLY)` — and therefore
+    /// `fs::read` — blocks forever. That is not hypothetical: a `f` process
+    /// stuck in `openat` with kernel wchan `wait_for_partner` is exactly this,
+    /// and it silently swallows every prompt for that path. The read runs on a
+    /// worker thread with a deadline so a regression fails the test instead of
+    /// hanging the suite.
+    #[cfg(unix)]
+    #[test]
+    fn read_cache_refuses_non_regular_files() {
+        use std::os::unix::ffi::OsStrExt;
+
+        let dir = std::env::temp_dir().join(format!("fab-test-fifo-cache-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let fifo = dir.join("cache.json");
+        let _ = fs::remove_file(&fifo);
+
+        // Create a real FIFO. std has no mkfifo, so call libc directly.
+        let c_path = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+        let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+        assert_eq!(rc, 0, "mkfifo failed: {}", std::io::Error::last_os_error());
+        assert!(
+            !fs::symlink_metadata(&fifo).unwrap().file_type().is_file(),
+            "expected a FIFO at {}",
+            fifo.display()
+        );
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let target = fifo.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(read_cache_at(&target).is_some());
+        });
+        let was_read = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("read_cache_at blocked on a FIFO — the regular-file guard is gone");
+
+        assert!(!was_read, "a FIFO cache path must be refused, never read");
+        // Nothing opened the FIFO for reading, so no writer is waiting on us.
+        assert!(
+            fs::symlink_metadata(&fifo).is_ok(),
+            "read_cache_at must leave the FIFO alone"
+        );
+
+        let _ = fs::remove_file(&fifo);
+        let _ = fs::remove_dir_all(&dir);
     }
 }
