@@ -43,7 +43,7 @@ fn read_text_for_line_count(path: &std::path::Path) -> std::io::Result<String> {
     use std::io::Read;
     use std::os::unix::fs::OpenOptionsExt;
 
-    let file = std::fs::OpenOptions::new()
+    let mut file = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NONBLOCK)
         .open(path)?;
@@ -63,7 +63,7 @@ fn read_text_for_line_count(path: &std::path::Path) -> std::io::Result<String> {
 #[cfg(not(unix))]
 fn read_text_for_line_count(path: &std::path::Path) -> std::io::Result<String> {
     use std::io::Read;
-    let file = std::fs::File::open(path)?;
+    let mut file = std::fs::File::open(path)?;
     if !file.metadata()?.is_file() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
