@@ -6,7 +6,6 @@
 // a single shared socket and parallel runs can flake.
 
 use assert_cmd::cargo::CommandCargoExt;
-use assert_cmd::Command;
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -117,8 +116,8 @@ fn run_f_capture(args: &[&str]) -> (String, String, i32) {
         .expect("failed to spawn f");
 
     let pid = child.id();
-    let stdout = child.stdout.take().expect("piped stdout");
-    let stderr = child.stderr.take().expect("piped stderr");
+    let mut stdout = child.stdout.take().expect("piped stdout");
+    let mut stderr = child.stderr.take().expect("piped stderr");
     let out_handle = std::thread::spawn(move || {
         use std::io::Read;
         let mut buf = Vec::new();
