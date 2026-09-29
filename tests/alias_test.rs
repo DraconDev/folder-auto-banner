@@ -177,6 +177,53 @@ fn daemon_state() -> String {
         }
         Err(e) => out.push_str(&format!("    (unreadable: {e})\n")),
     }
+    // A blocked open on a FIFO has no writer, so the path cannot be recovered
+    // from the hung process (ptrace is unavailable). Hunt for the special
+    // files instead — anything that is neither a regular file nor a directory
+    // under the data dir, its cache subdirectory, or /tmp.
+    for root in [
+        data_dir.clone(),
+        data_dir.join("banner_data"),
+        std::path::PathBuf::from("/tmp"),
+    ] {
+        out.push_str(&format!(
+            "\n  non-regular files under {}:\n",
+            root.display()
+        ));
+        let mut found = 0usize;
+        let mut stack = vec![(root.clone(), 0usize)];
+        let mut budget = 20_000usize;
+        while let Some((dir, depth)) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                if budget == 0 {
+                    break;
+                }
+                budget -= 1;
+                let Ok(meta) = entry.metadata() else { continue };
+                if meta.is_dir() && depth < 3 {
+                    stack.push((entry.path(), depth + 1));
+                } else if !meta.is_dir() && !meta.is_file() {
+                    use std::os::unix::fs::FileTypeExt;
+                    found += 1;
+                    out.push_str(&format!(
+                        "    {} ({})\n",
+                        entry.path().display(),
+                        if meta.file_type().is_fifo() {
+                            "FIFO"
+                        } else {
+                            "special"
+                        }
+                    ));
+                }
+            }
+        }
+        if found == 0 {
+            out.push_str("    (none)\n");
+        }
+    }
     if let Ok(log) = std::fs::read_to_string(data_dir.join("fabd.log")) {
         let tail: Vec<&str> = log.lines().rev().take(40).collect();
         out.push_str("\n  fabd.log (last 40 lines):\n");
