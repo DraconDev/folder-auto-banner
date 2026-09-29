@@ -53,6 +53,15 @@ are unchanged.
 - With `FAB_PROFILE=1` the daemon logs to `fabd.log` beside its socket instead
   of `/dev/null`, so a wedged daemon is no longer invisible.
 
+## Release packaging
+
+The publish step uploaded every target's binary under the same asset name
+(`f`, `fabd`), so architectures overwrote each other: v0.7.16 shipped an
+x86_64 `f` next to an aarch64 `fabd`, which cannot work together. Assets are now
+named `f-<arch>-linux` / `fabd-<arch>-linux`, a missing target now fails the run
+instead of clobbering an existing asset, and the release body comes from the
+version's notes file. v0.7.16's assets were repaired in place.
+
 ## Tests
 
 260 passing, 0 failing. Three new tests: the FIFO cache read, the FIFO content
