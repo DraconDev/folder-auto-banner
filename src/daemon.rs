@@ -181,7 +181,9 @@ impl Daemon {
         // two daemons run concurrently (split-brain caches + duplicate
         // inotify watchers).
         if socket_path.exists() {
-            if std::os::unix::net::UnixStream::connect(&socket_path).is_ok() {
+            // Timeout (not blocking) connect: a wedged predecessor holding
+            // the socket must not wedge this startup forever.
+            if folder_auto_banner::daemon_client::connect_with_timeout(&socket_path).is_ok() {
                 anyhow::bail!(
                     "daemon already running (socket {} is live)",
                     socket_path.display()
