@@ -13,6 +13,9 @@ jobs:
   test:
     name: Test Suite
     runs-on: ubuntu-latest
+    # Fail fast with logs on a hung suite instead of burning the 6h default:
+    # a wedged daemon IPC once stalled this job for 5h with zero output.
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,6 +43,7 @@ jobs:
   docs:
     name: Documentation
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,6 +57,7 @@ jobs:
   security:
     name: Security Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
