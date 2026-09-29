@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  # Re-run a release without re-pushing the tag, e.g. when the publish job
+  # fails on a transient error or a missing permission.
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -64,6 +67,10 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Without this the default GITHUB_TOKEN cannot create a release and the
+    # job fails with 403 "Resource not accessible by integration".
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
