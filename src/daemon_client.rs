@@ -328,7 +328,8 @@ fn daemon_stdio() -> std::process::Stdio {
 }
 
 /// Start daemon in background (auto-start)
-pub fn ensure_daemon_running() {    if is_daemon_running() {
+pub fn ensure_daemon_running() {
+    if is_daemon_running() {
         return;
     }
 

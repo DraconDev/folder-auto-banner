@@ -6,28 +6,161 @@
 // a single shared socket and parallel runs can flake.
 
 use assert_cmd::Command;
+use std::process::Stdio;
+use std::time::Duration;
 
-/// Helper: run `f` with the given args and return trimmed stdout.
-fn run_f(args: &[&str]) -> String {
+/// Wall-clock ceiling for one `f` invocation under test.
+///
+/// Every client path is supposed to be bounded (socket connect 2s, banner read
+/// 3s, subprocess probes have their own timeouts). This is the backstop that
+/// turns "the suite hangs forever on a 4-core runner" into "here is the exact
+/// kernel wait state of every thread that was stuck".
+const F_TIMEOUT: Duration = Duration::from_secs(45);
+
+/// Describe a pid tree: for every process and every thread, the kernel wait
+/// channel and the current syscall. That is what actually answers "where is it
+/// blocked?" — `ps` only shows the process exists.
+fn describe_process_tree(root: u32) -> String {
+    let mut out = String::new();
+    let read = |p: String| std::fs::read_to_string(&p).unwrap_or_default();
+
+    // Collect the tree breadth-first: /proc/*/stat field 4 is the ppid.
+    let mut frontier = vec![root];
+    let mut seen: Vec<u32> = Vec::new();
+    while let Some(pid) = frontier.pop() {
+        if seen.contains(&pid) {
+            continue;
+        }
+        seen.push(pid);
+        let stat = read(format!("/proc/{pid}/stat"));
+        let ppid = stat
+            .rsplit_once(") ")
+            .and_then(|(_, rest)| rest.split_whitespace().next())
+            .and_then(|v| v.parse::<u32>().ok());
+        let cmdline = read(format!("/proc/{pid}/cmdline")).replace('\0', " ").trim().to_string();
+        let wchan = read(format!("/proc/{pid}/wchan")).trim().to_string();
+        out.push_str(&format!(
+            "\n  pid {pid} ppid {ppid:?} wchan={wchan:?}\n    cmd: {cmdline}\n"
+        ));
+
+        let tasks = std::fs::read_dir(format!("/proc/{pid}/task"));
+        match tasks {
+            Ok(list) => {
+                for task in list.flatten() {
+                    let tid = task.file_name().to_string_lossy().to_string();
+                    let comm = read(format!("/proc/{pid}/task/{tid}/comm"));
+                    let wchan = read(format!("/proc/{pid}/task/{tid}/wchan"));
+                    let syscall = read(format!("/proc/{pid}/task/{tid}/syscall"));
+                    let syscall = syscall.split_whitespace().next().unwrap_or("-");
+                    out.push_str(&format!(
+                        "    thread {tid} {} wchan={} syscall={syscall}\n",
+                        comm.trim(),
+                        wchan.trim()
+                    ));
+                }
+            }
+            Err(e) => out.push_str(&format!("    (no /proc/{pid}/task: {e})\n")),
+        }
+        if let Some(ppid) = ppid {
+            if ppid > 1 {
+                frontier.push(ppid);
+            }
+        }
+    }
+    out
+}
+
+/// Extra state a hang dump needs: the daemon log (if profiling is on) and the
+/// data dir, where a stale socket or unwritten cache tells its own story.
+fn daemon_state() -> String {
+    let mut out = String::new();
+    let home = std::env::var("HOME").unwrap_or_default();
+    let data_dir = std::path::Path::new(&home).join(".local/share/fab");
+    out.push_str(&format!("\n  data dir {}:\n", data_dir.display()));
+    match std::fs::read_dir(&data_dir) {
+        Ok(entries) => {
+            for e in entries.flatten() {
+                let name = e.file_name();
+                let meta = e.metadata();
+                out.push_str(&format!(
+                    "    {} ({} bytes)\n",
+                    name.to_string_lossy(),
+                    meta.map(|m| m.len()).unwrap_or(0)
+                ));
+            }
+        }
+        Err(e) => out.push_str(&format!("    (unreadable: {e})\n")),
+    }
+    if let Ok(log) = std::fs::read_to_string(data_dir.join("fabd.log")) {
+        let tail: Vec<&str> = log.lines().rev().take(40).collect();
+        out.push_str("\n  fabd.log (last 40 lines):\n");
+        for line in tail.into_iter().rev() {
+            out.push_str(&format!("    {line}\n"));
+        }
+    }
+    out
+}
+
+/// Run `f` once, bounded, with hang forensics on timeout.
+fn run_f_capture(args: &[&str]) -> (String, String, i32) {
     let mut cmd = Command::cargo_bin("f").unwrap();
     for a in args {
         cmd.arg(a);
     }
-    let output = cmd.output().expect("failed to run f");
-    String::from_utf8_lossy(&output.stdout).trim().to_string()
+    let mut child = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null())
+        .spawn()
+        .expect("failed to spawn f");
+
+    let pid = child.id();
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
+    let out_handle = std::thread::spawn(move || {
+        use std::io::Read;
+        let mut buf = Vec::new();
+        let _ = stdout.read_to_end(&mut buf);
+        buf
+    });
+    let err_handle = std::thread::spawn(move || {
+        use std::io::Read;
+        let mut buf = Vec::new();
+        let _ = stderr.read_to_end(&mut buf);
+        buf
+    });
+
+    let deadline = std::time::Instant::now() + F_TIMEOUT;
+    let status = loop {
+        match child.try_wait().expect("try_wait") {
+            Some(status) => break status,
+            None if std::time::Instant::now() >= deadline => {
+                let tree = describe_process_tree(pid);
+                let state = daemon_state();
+                let _ = child.kill();
+                panic!(
+                    "\n`f {}` hung for {:?} (pid {pid}) — kernel state:{tree}{state}\n",
+                    args.join(" "),
+                    F_TIMEOUT
+                );
+            }
+            None => std::thread::sleep(Duration::from_millis(50)),
+        }
+    };
+
+    let out = String::from_utf8_lossy(&out_handle.join().unwrap_or_default()).to_string();
+    let err = String::from_utf8_lossy(&err_handle.join().unwrap_or_default()).to_string();
+    (out, err, status.code().unwrap_or(-1))
+}
+
+/// Helper: run `f` with the given args and return trimmed stdout.
+fn run_f(args: &[&str]) -> String {
+    run_f_capture(args).0.trim().to_string()
 }
 
 /// Helper: run `f` and return (stdout, stderr, exit_code).
 fn run_f_full(args: &[&str]) -> (String, String, i32) {
-    let mut cmd = Command::cargo_bin("f").unwrap();
-    for a in args {
-        cmd.arg(a);
-    }
-    let output = cmd.output().expect("failed to run f");
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let code = output.status.code().unwrap_or(-1);
-    (stdout, stderr, code)
+    run_f_capture(args)
 }
 
 /// Get the first line of output, truncated to 200 chars (for
