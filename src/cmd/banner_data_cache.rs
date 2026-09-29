@@ -296,6 +296,17 @@ pub fn read_cache(path: &Path) -> Option<BannerData> {
         );
         return None;
     }
+    // Anything that is not a regular file can block `fs::read` forever: a FIFO
+    // has no writer, so `open(O_RDONLY)` never returns. A cache path left as a
+    // FIFO by an external tool or a corrupted state would then hang every `f`
+    // invocation for that path — silently, since the prompt never appears.
+    if !meta.is_file() {
+        tracing::warn!(
+            "Cache path is not a regular file, refusing to read: {}",
+            file.display()
+        );
+        return None;
+    }
     let bytes = std::fs::read(&file).ok()?;
     serde_json::from_slice(&bytes).ok()
 }
