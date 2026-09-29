@@ -20,6 +20,14 @@ Added `timeout-minutes` to the CI and release jobs, a bounded `f` runner in the
 alias tests that dumps kernel wait state for a hung process, and daemon log
 capture under `FAB_PROFILE=1`.
 
+### Fix: release assets no longer overwrite each other
+
+The publish step uploaded every target's binary as `f` / `fabd`, so the two
+architectures clobbered each other and v0.7.16 shipped an x86_64 `f` beside an
+aarch64 `fabd`. Assets are now named `f-<arch>-linux` / `fabd-<arch>-linux`, a
+missing target fails the run instead of clobbering, and the release body comes
+from the version's notes file. v0.7.16's assets were repaired in place.
+
 260 passing, 0 failing.
 
 ## [0.7.15] - 2026-09-28
