@@ -17,6 +17,20 @@ use std::time::Duration;
 /// kernel wait state of every thread that was stuck".
 const F_TIMEOUT: Duration = Duration::from_secs(45);
 
+/// Parent pid from /proc/<pid>/stat.
+///
+/// The comm field can contain spaces and parens, so split after the last `") "`.
+/// The tokens after that are: state, ppid, pgrp, ... — ppid is the *second* one.
+fn proc_ppid(pid: u32) -> Option<u32> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    stat.rsplit_once(") ")?
+        .1
+        .split_whitespace()
+        .nth(1)?
+        .parse::<u32>()
+        .ok()
+}
+
 /// Direct children of `pid`, read from /proc (no `ps` dependency).
 fn child_pids(pid: u32) -> Vec<u32> {
     let mut out = Vec::new();
@@ -32,16 +46,7 @@ fn child_pids(pid: u32) -> Vec<u32> {
         let Ok(other) = name.parse::<u32>() else {
             continue;
         };
-        // Field 4 of /proc/<pid>/stat is the ppid. The comm field can contain
-        // spaces and parens, so split after the last ')'.
-        let Ok(stat) = std::fs::read_to_string(format!("/proc/{other}/stat")) else {
-            continue;
-        };
-        let parent = stat
-            .rsplit_once(") ")
-            .and_then(|(_, rest)| rest.split_whitespace().next())
-            .and_then(|v| v.parse::<u32>().ok());
-        if parent == Some(pid) {
+        if other != pid && proc_ppid(other) == Some(pid) {
             out.push(other);
         }
     }
@@ -65,11 +70,7 @@ fn describe_process_tree(root: u32) -> String {
         }
         seen.push(pid);
         let indent = "  ".repeat(depth + 1);
-        let stat = read(format!("/proc/{pid}/stat"));
-        let ppid = stat
-            .rsplit_once(") ")
-            .and_then(|(_, rest)| rest.split_whitespace().next())
-            .and_then(|v| v.parse::<u32>().ok());
+        let ppid = proc_ppid(pid);
         let cmdline = read(format!("/proc/{pid}/cmdline"))
             .replace('\0', " ")
             .trim()

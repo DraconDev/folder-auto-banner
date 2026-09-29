@@ -39,6 +39,12 @@ jobs:
 
       - name: Run tests
         run: cargo test --all-features -- --test-threads=1
+        # FAB_PROFILE makes the daemon log to ~/.local/share/fab/fabd.log
+        # instead of /dev/null, and the test harness prints that log if any `f`
+        # invocation exceeds its watchdog. That is the only evidence of where a
+        # stuck daemon stopped.
+        env:
+          FAB_PROFILE: "1"
 
   docs:
     name: Documentation
