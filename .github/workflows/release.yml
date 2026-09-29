@@ -78,17 +78,44 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
+      # Every artifact contains a binary called `f` (and `fabd`), so
+      # publishing the paths as-is gives all targets the same asset name and
+      # the last one uploaded silently replaces the others. Name them per
+      # architecture, so a download is unambiguous and `f`/`fabd` always come
+      # from the same build.
+      - name: Name binaries per architecture
+        run: |
+          set -euo pipefail
+          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
+            arch="${target%%-*}"
+            for bin in f fabd; do
+              test -f "f-$target/$bin" || {
+                echo "::error::missing f-$target/$bin — the release matrix changed"
+                exit 1
+              }
+              mv "f-$target/$bin" "$bin-$arch-linux"
+            done
+          done
+          ls -l
+          for bin in f fabd; do
+            for arch in x86_64 aarch64; do
+              test -x "$bin-$arch-linux" || { echo "::error::$bin-$arch-linux missing"; exit 1; }
+            done
+          done
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           files: |
-            f-x86_64-unknown-linux-gnu/f
-            f-x86_64-unknown-linux-gnu/fabd
-            f-aarch64-unknown-linux-gnu/f
-            f-aarch64-unknown-linux-gnu/fabd
-          body: |
-            Release ${{ github.ref_name }}
+            f-x86_64-linux
+            fabd-x86_64-linux
+            f-aarch64-linux
+            fabd-aarch64-linux
+          # Fail if an asset is missing rather than replacing an existing one:
+          # a silently overwritten architecture is worse than a failed run.
+          overwrite_files: false
+          body_path: docs/releases/RELEASE_NOTES_${{ github.ref_name }}.md
           draft: false
           prerelease: false
         env:
