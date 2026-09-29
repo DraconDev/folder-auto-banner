@@ -31,7 +31,61 @@ fn read_file_header(path: &Path) -> Option<Vec<u8>> {
 /// Get contents description for a file — line count for text, resolution for image, etc.
 /// Returns plain text (no ANSI codes) — coloring is applied by the renderer.
 #[allow(dead_code)]
+/// Read a text file for line counting, refusing to block.
+///
+/// `O_NONBLOCK` is a no-op for regular files, so the line count is unchanged.
+/// It is the second line of defence behind the `is_file` check in
+/// [`get_file_contents`]: if a path is replaced by a FIFO between the scan's
+/// `stat` and this `open`, the open returns immediately instead of blocking
+/// forever on a writer that will never arrive.
+#[cfg(unix)]
+fn read_text_for_line_count(path: &std::path::Path) -> std::io::Result<String> {
+    use std::io::Read;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)?;
+    // Belt and braces: never read from a non-regular file, even if we hold an
+    // open descriptor to one.
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "not a regular file",
+        ));
+    }
+    let mut text = String::new();
+    file.read_to_string(&mut text)?;
+    Ok(text)
+}
+
+#[cfg(not(unix))]
+fn read_text_for_line_count(path: &std::path::Path) -> std::io::Result<String> {
+    use std::io::Read;
+    let file = std::fs::File::open(path)?;
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "not a regular file",
+        ));
+    }
+    let mut text = String::new();
+    file.read_to_string(&mut text)?;
+    Ok(text)
+}
+
 pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
+    // Only regular files can be probed. This is a hang guard, not a nicety:
+    // every branch below ends in `File::open(path)`, and a FIFO has no writer,
+    // so `open(O_RDONLY)` blocks forever. The render path calls this for every
+    // non-directory entry, so a single stray FIFO in a scanned directory (a
+    // GitHub runner's /tmp is full of .NET `clr-debug-pipe-*` FIFOs) wedges the
+    // prompt in `openat` with kernel wchan `wait_for_partner` — no output, no
+    // error, no way back.
+    if !entry.is_file {
+        return String::new();
+    }
     // Per-process cache: identical (path, size, mtime) lookups are served
     // from memory, so a warm `f` on the same directory doesn't re-read
     // headers we already know about. The cache is bounded by an LRU-style
@@ -75,7 +129,7 @@ pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
             // `read_to_string` on a small text file is small (a few hundred
             // microseconds at most), so re-reading is the right tradeoff.
             if entry.size < 1024 * 1024 {
-                if let Ok(content) = std::fs::read_to_string(&entry.path) {
+                if let Ok(content) = read_text_for_line_count(&entry.path) {
                     return content.lines().count().to_string();
                 }
             }
@@ -514,6 +568,57 @@ mod tests {
 
         let contents = get_file_contents(&entry);
         assert_eq!(contents, "");
+    }
+
+    /// A FIFO must never be probed: opening one read-only blocks until a
+    /// writer arrives, which for a leftover diagnostic pipe never happens.
+    ///
+    /// This is the CI hang. `f` renders every non-directory entry, and a
+    /// GitHub runner's /tmp holds `clr-debug-pipe-*-out` FIFOs from the
+    /// runner's .NET tooling, so `f /tmp` blocked in `openat` with kernel
+    /// wchan `wait_for_partner` and the suite never finished. The probe runs on
+    /// a worker thread with a deadline so a regression fails the test instead
+    /// of wedging the suite.
+    #[cfg(unix)]
+    #[test]
+    fn test_get_file_contents_refuses_fifo() {
+        use std::os::unix::ffi::OsStrExt;
+        use std::time::Duration;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let fifo = tmp.path().join("pipe.txt");
+        let c_path = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+        let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+        assert_eq!(rc, 0, "mkfifo failed: {}", std::io::Error::last_os_error());
+
+        // `.txt` is a probe extension, so without the guards this takes the
+        // text branch and blocks in the open.
+        let entry = crate::fs::DirEntry {
+            name: "pipe.txt".to_string(),
+            path: fifo,
+            is_dir: false,
+            is_file: false,
+            is_symlink: false,
+            is_exec: false,
+            size: 0,
+            size_is_estimate: false,
+            modified: None,
+            perms: String::new(),
+            owner: String::new(),
+            group: String::new(),
+            symlink_target: None,
+            symlink_valid: true,
+            content_probe: None,
+        };
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(get_file_contents(&entry));
+        });
+        let probed = rx.recv_timeout(Duration::from_secs(5)).unwrap_or_else(|_| {
+            panic!("get_file_contents blocked on a FIFO — the is_file guard is gone")
+        });
+        assert_eq!(probed, "", "a FIFO must yield no probe, not a block");
     }
 
     #[test]
