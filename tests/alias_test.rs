@@ -5,6 +5,7 @@
 // Note: tests must run with --test-threads=1 because the daemon uses
 // a single shared socket and parallel runs can flake.
 
+use assert_cmd::cargo::CommandCargoExt;
 use assert_cmd::Command;
 use std::process::Stdio;
 use std::time::Duration;
@@ -106,11 +107,9 @@ fn daemon_state() -> String {
 
 /// Run `f` once, bounded, with hang forensics on timeout.
 fn run_f_capture(args: &[&str]) -> (String, String, i32) {
-    let mut cmd = Command::cargo_bin("f").unwrap();
-    for a in args {
-        cmd.arg(a);
-    }
-    let mut child = cmd
+    let mut child: std::process::Command = std::process::Command::cargo_bin("f").unwrap();
+    let mut child = child
+        .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null())
