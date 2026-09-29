@@ -40,7 +40,39 @@ fn read_file_header(path: &Path) -> Option<Vec<u8>> {
 /// forever on a writer that will never arrive.
 #[cfg(unix)]
 fn read_text_for_line_count(path: &std::path::Path) -> std::io::Result<String> {
-    std::fs::read_to_string(path)
+    use std::io::Read;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)?;
+    // Belt and braces: never read from a non-regular file, even if we hold an
+    // open descriptor to one.
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "not a regular file",
+        ));
+    }
+    let mut text = String::new();
+    file.read_to_string(&mut text)?;
+    Ok(text)
+}
+
+#[cfg(not(unix))]
+fn read_text_for_line_count(path: &std::path::Path) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "not a regular file",
+        ));
+    }
+    let mut text = String::new();
+    file.read_to_string(&mut text)?;
+    Ok(text)
 }
 
 pub fn get_file_contents(entry: &crate::fs::DirEntry) -> String {
