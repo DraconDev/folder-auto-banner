@@ -79,8 +79,9 @@ fn blocked_path(pid: u32, tid: &str) -> Option<String> {
     let raw = std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/syscall")).ok()?;
     let mut fields = raw.split_whitespace();
     let number: u64 = fields.next()?.parse().ok()?;
+    // Args are printed as `0x`-prefixed hex, which from_str_radix rejects.
     let args: Vec<u64> = fields
-        .map(|f| u64::from_str_radix(f, 16).unwrap_or(0))
+        .map(|f| u64::from_str_radix(f.trim_start_matches("0x"), 16).unwrap_or(0))
         .collect();
     let (_, path_index) = PATH_ARG_SYSCALLS.iter().find(|(_, n)| *n == number)?;
     let pointer = *args.get(*path_index as usize)? as usize;
